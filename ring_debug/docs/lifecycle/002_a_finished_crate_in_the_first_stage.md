@@ -45,7 +45,7 @@ The crate's state is written down in three places.
 |---|---|---|
 | The task's state field and directory | Not yet scoped, not claimable | `task/unverified/126_…` |
 | The same file's Implementation Record | Built, 22 tests, gate 6/6, acceptance criterion satisfied | the same file |
-| The family module ledger | `●` implemented · `🟩` green | [`docs/crate/readme.md`](../../../../docs/crate/readme.md) |
+| The family module ledger | `●` implemented · `🟩` green | an internal module ledger (not part of this repo) |
 
 Two of the three agree with each other and with the directory listing. The one that
 disagrees is the one the task system treats as authoritative, because in this
@@ -136,9 +136,9 @@ Live output:
 
 | File | Relationship |
 |------|--------------|
-| [`task/unverified/126_implement_ring_debug.md`](../../task/unverified/126_implement_ring_debug.md) | The task, its state, and its Implementation Record |
-| [`task/readme.md`](../../task/readme.md) | The local task index row, and its `last_sync` stamp |
-| [`docs/crate/readme.md`](../../../../docs/crate/readme.md) | The family module ledger row |
+| an internal task tracker (not part of this repo) | The task, its state, and its Implementation Record |
+| an internal task tracker (not part of this repo) | The local task index row, and its `last_sync` stamp |
+| an internal module ledger (not part of this repo) | The family module ledger row |
 
 ### Tests
 

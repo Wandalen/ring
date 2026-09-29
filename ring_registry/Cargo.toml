@@ -19,8 +19,8 @@ publish = true
 ring_handle = { path = "../ring_handle", version = "0.1.0" }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config", version = "0.1.0" }
-ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_config = { path = "../ring_config" }
+ring_core = { path = "../ring_core" }
 
 [lints]
 workspace = true

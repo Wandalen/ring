@@ -145,7 +145,7 @@ it.
 
 A third `unsafe fn` means the surface grew. That is not forbidden, but it is a
 change to what
-[decision 123](../../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
+decision 123
 ruled and to what `docs/workaround/readme.md` justifies, and both must move with
 it. The workspace's `undocumented_unsafe_blocks = "deny"` catches a missing
 `SAFETY` comment on a block; nothing but this check catches a *stale* one.

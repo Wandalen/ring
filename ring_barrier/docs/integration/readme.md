@@ -9,7 +9,7 @@ nothing `ring_wait` does not already declare.
 | ID | Name | Covers |
 |----|------|--------|
 | 001 | [Three Dependencies and One Dependent](001_three_dependencies_and_one_dependent.md) | Every edge in and out, the dependent that reimplements a method it holds, and the crate that names a barrier without one |
-| 002 | [The Dependency That Is Not `ring_seqno`](002_the_dependency_that_is_not_ring_seq.md) | Why the third slot is `ring_wait` where the sibling has `ring_seqno` — one clamp, one crate |
+| 002 | [The Dependency That Is Not `ring_seqno`](002_the_dependency_that_is_not_ring_seqno.md) | Why the third slot is `ring_wait` where the sibling has `ring_seqno` — one clamp, one crate |
 
 ### The Forest, Locally
 

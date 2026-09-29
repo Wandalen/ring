@@ -17,7 +17,7 @@ ring_wait = { path = "../ring_wait", version = "0.1.0" }
 # and `ring_gating`'s over one set of cursors — see the test file's own header on
 # why a stand-in would assert nothing. The library itself never names it.
 [dev-dependencies]
-ring_gating = { path = "../ring_gating", version = "0.1.0" }
+ring_gating = { path = "../ring_gating" }
 
 [lints]
 workspace = true

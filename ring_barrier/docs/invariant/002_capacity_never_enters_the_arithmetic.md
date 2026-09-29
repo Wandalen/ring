@@ -199,7 +199,7 @@ ring_cursor/tests/cursor_test.rs:1
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | The crate the clamp would have cost |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | The crate the clamp would have cost |
 
 ### Types
 

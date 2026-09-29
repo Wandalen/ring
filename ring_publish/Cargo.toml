@@ -16,10 +16,10 @@ ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 # the whole four-operation handshake — so it needs the other three operations'
 # crates. None of them depends on this one, so the graph stays acyclic.
 [dev-dependencies]
-ring_claim = { path = "../ring_claim", version = "0.1.0" }
-ring_consume = { path = "../ring_consume", version = "0.1.0" }
-ring_barrier = { path = "../ring_barrier", version = "0.1.0" }
-ring_gating = { path = "../ring_gating", version = "0.1.0" }
+ring_claim = { path = "../ring_claim" }
+ring_consume = { path = "../ring_consume" }
+ring_barrier = { path = "../ring_barrier" }
+ring_gating = { path = "../ring_gating" }
 
 [target.'cfg(loom)'.dev-dependencies]
 loom = "0.7"

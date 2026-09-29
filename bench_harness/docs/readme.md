@@ -15,9 +15,8 @@ Scope of this crate: family-neutral validation machinery — seeded workloads, a
 byte-parity oracle, and the stage gates that grade the family's write path.
 
 Implemented. The gates under `gate/` run, and the seeded workload generator,
-accumulator semantics, and byte-parity oracle in `src/` were delivered by task
-[129](../task/executed/129_implement_bench_harness.md) at 100% line coverage
-across 12 tests.
+accumulator semantics, and byte-parity oracle in `src/` were delivered by
+task 129 at 100% line coverage across 12 tests.
 
 The remaining doc definitions — `algorithm/`, `data_structure/`, `item/`,
 `pattern/`, `pitfall/`, `type/`, and the rest — are not yet written. They are

@@ -25,7 +25,7 @@
 
 | ID | Name | Kind | Defined In | Status |
 |----|------|------|-----------|--------|
-| — | []() | Module (#1) | `lib.rs` | 🔄 |
+| — | [module/](module/) | Module (#1) | `lib.rs` | 🔄 |
 | — | [use_declaration/](use_declaration/) | Use Declaration (#3) | `lib.rs`, `capacity.rs`, `error.rs` | 🔄 |
 | — | [struct/](struct/) | Struct (#6) | `capacity.rs`, `id.rs` | 🔄 |
 | — | [enum/](enum/) | Enum (#7) | `error.rs`, `policy.rs` | 🔄 |

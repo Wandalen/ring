@@ -153,7 +153,7 @@ reading these seven against each other catches a *stale* one.
 
 A third `unsafe fn` means the surface grew. That is not forbidden, but it
 changes what
-[decision 123](../../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
+decision 123
 ruled, and the ruling must move with it.
 
 A `pub unsafe fn` would move the precondition onto the caller — which, for a
@@ -285,7 +285,7 @@ The two that matter are `ring_publish` and `ring_consume`. Message 960's
 dependency forest gave this crate seven dependencies including both; the
 implementation needed eight, without either. Publication here is a per-slot
 stamp write and a scan rather than a cursor advance
-([decision 124](../../../../docs/decision/124_ring_mpsc_publication_stamped_not_cursor.md)),
+(decision 124),
 so neither crate's shape fits. Both reappearing in this manifest would mean the
 stamp protocol had been quietly replaced by a published-cursor one, and every
 argument in `docs/algorithm/002_batch_drain_by_cursor_swap.md` would be stale.

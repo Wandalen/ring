@@ -1,0 +1,6 @@
+# No rustfmt option matches this codebase's own-line braces (nightly-only
+# `brace_style`, verified inert on stable 1.9.0) or its delimiter spacing
+# (`Vec< T >`, `fn foo( x : i32 )` — no option exists, stable or nightly).
+# `cargo fmt` will still rewrite both regardless of this file.
+tab_spaces = 2
+hard_tabs = false

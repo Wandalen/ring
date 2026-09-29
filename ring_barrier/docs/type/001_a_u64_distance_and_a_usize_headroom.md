@@ -211,7 +211,7 @@ ring_mpsc/src/lib.rs:7
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | Why `ring_seqno`, and its `usize` results, are not on this path |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | Why `ring_seqno`, and its `usize` results, are not on this path |
 
 ### Invariants
 

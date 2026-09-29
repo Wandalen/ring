@@ -104,7 +104,7 @@ is locally defensible and no two agree.
 **Two placements for one idea.** `CursorPair`'s wait lives in a downstream crate
 because `ring_cursor` does not depend on `ring_wait`; `Barrier`'s lives on the
 type because `ring_barrier` does. The placement follows the dependency edge, not
-the design — which is what [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seq.md)
+the design — which is what [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seqno.md)
 is about from the other direction.
 
 ### BR20 — No Third Rung Has a Production Caller
@@ -261,7 +261,7 @@ ring_wait/src/lib.rs:  pub fn wait_until< F >( kind : WaitKind, spins : usize, m
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | The edge that lets the wait live on the type |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | The edge that lets the wait live on the type |
 
 ### Items
 

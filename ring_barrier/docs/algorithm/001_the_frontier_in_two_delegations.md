@@ -70,7 +70,7 @@ that order. This side needs no clamp, so its arithmetic collapses into the one
 saturating subtraction `Seq` already carries, and the third dependency slot goes
 to `ring_wait` instead.
 
-That is [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seq.md)
+That is [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seqno.md)
 stated as an algorithm: **the two halves differ by exactly one clamp, and the
 clamp is what costs a crate.**
 
@@ -237,7 +237,7 @@ describes. Now prints: `The returned sequence is the frontier as re-read immedia
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | Why the third dependency is `ring_wait` and not `ring_seqno` |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | Why the third dependency is `ring_wait` and not `ring_seqno` |
 
 ### Invariants
 

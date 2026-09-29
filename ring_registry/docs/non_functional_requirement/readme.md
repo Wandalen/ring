@@ -63,7 +63,7 @@ echo '  -- every sentence in the compiled crate about allocation --'
 command grep -n -i 'alloc' ring_registry/src/lib.rs | cut -c1-88 | sed 's/^/    /'
 echo '  -- the family idiom, and the two crates that write it --'
 command grep -rn 'No atomic, no lock, no allocation' --include=lib.rs ring_*/src/ |
-  sed 's|||' | cut -c1-88 | sed 's/^/    /'
+  cut -c1-88 | sed 's/^/    /'
 echo '  -- and whether the family benchmark knows this crate --'
 printf '    ring_* dependencies declared by ring_bench: %s\n' \
   "$( command grep -c '^ring_' ring_bench/Cargo.toml || true )"

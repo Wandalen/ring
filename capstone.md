@@ -10,10 +10,7 @@ many-producer/single-consumer, hard-latency-budget workloads.
 
 - **Repo:** [`Wandalen/ring`](https://github.com/Wandalen/ring), branch `master`
 - **Start here:** [`readme.md`](readme.md) — architecture, the 11-tier
-  dependency graph, and the build-vs-buy rationale (the origin monorepo's
-  [`faq.md`](https://github.com/Wandalen/codename_space_sandbox/blob/master/faq.md)
-  has the longer version: what was measured, what was adopted instead of
-  rejected, what the closest open-source alternatives are)
+  dependency graph, and the build-vs-buy rationale
 
 This is a real codebase, not a toy: unsafe is `deny`-by-default with a
 3-crate allowlist (`ring_spsc`, `ring_mpsc`, `ring_core` —
@@ -27,9 +24,9 @@ can fail, not a claim that sounds true.
 **Two things to know before anyone opens an editor:**
 
 1. `git log` here has exactly **one commit** (`f0eb4c1`, "initial commit").
-   The crate family was extracted out of a larger monorepo
-   (`codename_space_sandbox`) as a fresh squashed snapshot — there's no
-   history to `git blame` past that commit.
+   The crate family was extracted out of a larger internal monorepo as a
+   fresh squashed snapshot — there's no history to `git blame` past that
+   commit.
 2. As of 2026-09-29 (the day of extraction), the working tree still had a
    large post-extraction fixup sitting uncommitted (every crate's
    `Cargo.toml`/`src/lib.rs`, a rescoped gate-family declaration, a new
@@ -128,10 +125,8 @@ with `--no-default-features`.
 ### 7. Continuous benchmark reporting
 
 **The gap:** `ring_bench` (a `criterion` harness) exists and is how the
-original build-vs-buy decision got made (the origin monorepo's
-`docs/decision/121_workstream_008_contract_gaps_ruled.md`, per the FAQ
-linked above), but its results live in whoever's terminal last ran it.
-There's no regression detection and no public report.
+original build-vs-buy decision got made, but its results live in whoever's
+terminal last ran it. There's no regression detection and no public report.
 
 **Deliverables:** a `criterion` HTML report published somewhere durable
 (GitHub Pages is the easy option), a CI benchmark job comparing the
@@ -170,10 +165,7 @@ templates, no "five minutes to your first build" guide. Second, content
 drift from the move itself — the family's own internal freshness gate
 (`bench_harness/gate/corpus/recipes.py`, "G15") was still reporting ~362
 problems (325 stale-output, 35 unverifiable-by-design, 2 missing-recipe) as
-of the extraction; separately, the origin monorepo's own `readme.md` never
-got updated to say `ring` left entirely (it still links to a `ring/readme.md`
-that no longer exists there) — worth checking whether a courtesy PR back
-to `codename_space_sandbox` is in scope for this team.
+of the extraction.
 
 **Deliverables:** `CONTRIBUTING.md` + a real quickstart; the G15 problem
 count driven toward zero (`bench_harness/docs/guide/002_the_four_verdicts.md`

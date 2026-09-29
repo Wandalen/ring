@@ -33,7 +33,7 @@ echo '  -- the instruction it bottoms out in --'
 command grep -m1 -F '    counter.fetch_add( n, Ordering::Relaxed );' ring_stats/src/lib.rs
 echo '  -- which half the one production caller takes --'
 command grep 'ring_overflow::\|would_resolve( self' ring_core/src/lib.rs
-echo '  -- benches/ directories under , across 33 crates --'
+echo '  -- benches/ directories under any crate root, across 33 crates --'
 ls -d */benches 2>/dev/null | wc -l
 ```
 
@@ -47,7 +47,7 @@ Live output:
   -- which half the one production caller takes --
 use ring_overflow::{ would_resolve, Resolution };
       Err( record ) => match would_resolve( self.overflow )
-  -- benches/ directories under , across 33 crates --
+  -- benches/ directories under any crate root, across 33 crates --
 0
 ```
 

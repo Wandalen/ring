@@ -184,7 +184,7 @@ fn a_non_blocking_wait_looks_exactly_once()
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | The dependency that supplies the contract |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | The dependency that supplies the contract |
 
 ### Invariants
 

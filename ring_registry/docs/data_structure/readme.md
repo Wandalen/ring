@@ -62,7 +62,7 @@ echo '  -- the struct, and the one field it holds --'
 command grep -m1 -A4 -F '#[ derive( Debug ) ]' ring_registry/src/lib.rs
 echo '  -- every map in the thirty-three library crates --'
 command grep -rn 'HashMap\|BTreeMap' --include=lib.rs ring_*/src/ |
-  sed 's|||' | cut -c1-86 | sed 's/^/    /'
+  cut -c1-86 | sed 's/^/    /'
 echo '  -- the bound on the wrapper, and the bound on what it wraps --'
 command grep -n '^impl< T' ring_registry/src/lib.rs | sed 's/^/    /'
 command grep -n '^impl< T' ring_handle/src/lib.rs | sed 's/^/    /'

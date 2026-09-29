@@ -13,7 +13,7 @@ ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_slot = { path = "../ring_slot", version = "0.1.0" }
 
 [dev-dependencies]
-ring_store = { path = "../ring_store", version = "0.1.0" }
+ring_store = { path = "../ring_store" }
 
 [lints]
 workspace = true

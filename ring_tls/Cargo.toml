@@ -14,9 +14,9 @@ ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
 ring_batch = { path = "../ring_batch", version = "0.1.0" }
 
 [dev-dependencies]
-ring_store = { path = "../ring_store", version = "0.1.0" }
-ring_event = { path = "../ring_event", version = "0.1.0" }
-ring_slot = { path = "../ring_slot", version = "0.1.0" }
+ring_store = { path = "../ring_store" }
+ring_event = { path = "../ring_event" }
+ring_slot = { path = "../ring_slot" }
 
 [lints]
 workspace = true

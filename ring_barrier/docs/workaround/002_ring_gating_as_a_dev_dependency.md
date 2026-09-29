@@ -212,7 +212,7 @@ workspace = true
 | File | Relationship |
 |------|--------------|
 | [../integration/001_three_dependencies_and_one_dependent.md](../integration/001_three_dependencies_and_one_dependent.md) | The four edges, and the one that is dev-only |
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | The other edge this crate does not have |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | The other edge this crate does not have |
 
 ### Invariants
 

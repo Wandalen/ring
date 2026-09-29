@@ -5,7 +5,7 @@
 - **Purpose**: Place the crate in the family's dependency forest and account for every edge in and out — including the two that exist only in test manifests and the one that should not exist at all.
 - **Responsibility**: Give the edges, what each carries, who calls without depending, and the duplicated computation on the one real outgoing edge.
 - **In Scope**: `[dependencies]`, `[dev-dependencies]`, and reverse edges.
-- **Out of Scope**: Why `ring_wait` is here instead of `ring_seqno` — see [`002`](002_the_dependency_that_is_not_ring_seq.md).
+- **Out of Scope**: Why `ring_wait` is here instead of `ring_seqno` — see [`002`](002_the_dependency_that_is_not_ring_seqno.md).
 
 ### The Edges
 
@@ -151,7 +151,7 @@ somewhere, not an edge to here.
 
 | Absent | Why |
 |--------|-----|
-| `ring_seqno` | Reached transitively through `ring_cursor`; nothing here needs it directly — [`002`](002_the_dependency_that_is_not_ring_seq.md) |
+| `ring_seqno` | Reached transitively through `ring_cursor`; nothing here needs it directly — [`002`](002_the_dependency_that_is_not_ring_seqno.md) |
 | `ring_gating` | A barrier is over a slice, from wherever the cursors live — [`decisions/002`](../decisions/002_a_slice_rather_than_an_aggregate.md) |
 | `ring_publish` | The direction runs the other way: `ring_publish`'s tests depend on this crate |
 | `ring_align` | Reached through `PaddedCursor`; this crate never names an alignment |
@@ -197,7 +197,7 @@ ring_publish/tests/handshake_test.rs
 
 | File | Relationship |
 |------|--------------|
-| [002_the_dependency_that_is_not_ring_seq.md](002_the_dependency_that_is_not_ring_seq.md) | Why the third slot is `ring_wait` |
+| [002_the_dependency_that_is_not_ring_seqno.md](002_the_dependency_that_is_not_ring_seqno.md) | Why the third slot is `ring_wait` |
 
 ### APIs
 

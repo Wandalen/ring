@@ -183,7 +183,7 @@ fn waiting_on_an_empty_barrier_fails_rather_than_hanging()
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | Why the fold is shared and the resolution is not |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | Why the fold is shared and the resolution is not |
 
 ### Invariants
 

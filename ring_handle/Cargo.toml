@@ -20,8 +20,8 @@ crossbeam = [ "ring_core/crossbeam" ]
 ring_core = { path = "../ring_core", version = "0.1.0" }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_config = { path = "../ring_config" }
+ring_types = { path = "../ring_types" }
 trybuild = "1.0"
 
 [lints]

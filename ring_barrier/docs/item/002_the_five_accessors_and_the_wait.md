@@ -80,7 +80,7 @@ anything, so the count of sites that use the wait *as a wait* is still six.
 |--|--|
 | Callers in any `src/` | 0 |
 | Callers in any other crate's tests | 0 |
-| Cost of the method existing | The whole `ring_wait` dependency — [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seq.md) |
+| Cost of the method existing | The whole `ring_wait` dependency — [`integration/002`](../integration/002_the_dependency_that_is_not_ring_seqno.md) |
 | Cost of not having it | Every consumer writes its own spin loop, and the four `WaitKind`s stop being reachable from a barrier at all |
 
 Not a defect, and not obviously premature either: this crate's role is
@@ -213,7 +213,7 @@ ring_publish/src/lib.rs:  /// assert_eq!( publisher.cursor().load( Ordering::Acq
 
 | File | Relationship |
 |------|--------------|
-| [../integration/002_the_dependency_that_is_not_ring_seq.md](../integration/002_the_dependency_that_is_not_ring_seq.md) | The dependency `wait_for` alone justifies |
+| [../integration/002_the_dependency_that_is_not_ring_seqno.md](../integration/002_the_dependency_that_is_not_ring_seqno.md) | The dependency `wait_for` alone justifies |
 
 ### Lifecycles
 

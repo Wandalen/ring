@@ -51,15 +51,15 @@
 //! );
 //! ```
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::fmt;
 use core::sync::atomic::Ordering;
 
 use ring_atomic::SeqCell;
-use ring_core::{ Consumer, Producer };
+use ring_core::{Consumer, Producer};
 use ring_cursor::CursorPair;
-use ring_types::{ Capacity, Seq };
+use ring_types::{Capacity, Seq};
 
 /// The ordering every check reads at.
 ///
@@ -69,7 +69,7 @@ use ring_types::{ Capacity, Seq };
 /// never violated — a false positive in a diagnostic is worse than no
 /// diagnostic, because it sends an investigation somewhere there is nothing to
 /// find.
-const OBSERVE : Ordering = Ordering::Acquire;
+const OBSERVE: Ordering = Ordering::Acquire;
 
 /// Both cursors of a pair, read **producer first**.
 ///
@@ -93,31 +93,26 @@ const OBSERVE : Ordering = Ordering::Acquire;
 /// wanting a quiescent ring, so neither ordering is a defect. What was a defect
 /// was making this choice three times, at three call sites, without making it
 /// once — so it is made here, and the three sites call this.
-fn observe_pair( pair : &CursorPair ) -> ( Seq, Seq )
-{
-  let producer = pair.producer().load( OBSERVE );
-  let consumer = pair.consumer().load( OBSERVE );
-  ( producer, consumer )
+fn observe_pair(pair: &CursorPair) -> (Seq, Seq) {
+  let producer = pair.producer().load(OBSERVE);
+  let consumer = pair.consumer().load(OBSERVE);
+  (producer, consumer)
 }
 
 /// Which of a pair's two cursors a violation is about.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub enum Cursor
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Cursor {
   /// The cursor a producer advances when it publishes.
   Producer,
   /// The cursor a consumer advances when it reads.
   Consumer,
 }
 
-impl fmt::Display for Cursor
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::Producer => f.write_str( "producer" ),
-      Self::Consumer => f.write_str( "consumer" ),
+impl fmt::Display for Cursor {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::Producer => f.write_str("producer"),
+      Self::Consumer => f.write_str("consumer"),
     }
   }
 }
@@ -127,19 +122,17 @@ impl fmt::Display for Cursor
 /// Every variant carries the numbers it was derived from rather than a message,
 /// so a caller can assert on the state rather than on prose, and a report can be
 /// formatted at the site that knows how the report will be read.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum Violation
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Violation {
   /// D1 — the consumer has read past what the producer published.
   ///
   /// **The dangerous one.** The family's arithmetic saturates here, so this
   /// state reads as an empty, healthy ring and `may_claim` returns `true`.
-  ConsumerAheadOfProducer
-  {
+  ConsumerAheadOfProducer {
     /// Where the producer had published to.
-    producer : Seq,
+    producer: Seq,
     /// Where the consumer claimed to have read to — past `producer`.
-    consumer : Seq,
+    consumer: Seq,
   },
 
   /// D2 — the producer is more than a full lap ahead of the consumer.
@@ -147,14 +140,13 @@ pub enum Violation
   /// Unread slots have been overwritten. Less dangerous than
   /// [`Self::ConsumerAheadOfProducer`] only because it leaves evidence: `pending`
   /// exceeds capacity, which no valid state can.
-  ProducerLappedConsumer
-  {
+  ProducerLappedConsumer {
     /// Where the producer has published to.
-    producer : Seq,
+    producer: Seq,
     /// Where the consumer has read to.
-    consumer : Seq,
+    consumer: Seq,
     /// The ring size the two are positions in.
-    capacity : usize,
+    capacity: usize,
   },
 
   /// D3 — a cursor holds a smaller sequence than it did at a previous
@@ -162,14 +154,13 @@ pub enum Violation
   ///
   /// Only reachable through [`Watch`]; a single observation cannot see it,
   /// because every individual pair of sequences is a valid pair of sequences.
-  CursorWentBackwards
-  {
+  CursorWentBackwards {
     /// Which cursor moved.
-    cursor : Cursor,
+    cursor: Cursor,
     /// What it read at the previous observation.
-    was : Seq,
+    was: Seq,
     /// What it reads now.
-    now : Seq,
+    now: Seq,
   },
 
   /// Two public readings of one live ring do not add up to its capacity.
@@ -178,25 +169,20 @@ pub enum Violation
   /// independently; on a quiescent ring their sum is the capacity. A
   /// disagreement means at least one of them is wrong about the ring they both
   /// describe, and a caller holding only one of them cannot tell.
-  ReadingsDisagree
-  {
+  ReadingsDisagree {
     /// What the consumer says is waiting to be read.
-    pending : usize,
+    pending: usize,
     /// What the producer says is free to publish into.
-    free : usize,
+    free: usize,
     /// What the ring says it holds.
-    capacity : usize,
+    capacity: usize,
   },
 }
 
-impl fmt::Display for Violation
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::ConsumerAheadOfProducer { producer, consumer } => write!
-      (
+impl fmt::Display for Violation {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::ConsumerAheadOfProducer { producer, consumer } => write!(
         f,
         "consumer at {} is ahead of producer at {} — the ring reads as empty and permits a claim",
         consumer.0, producer.0
@@ -209,34 +195,26 @@ impl fmt::Display for Violation
       // is deliberately not `#[ non_exhaustive ]`) it absorbed a contradiction
       // into "is 0 ahead of", which reads as a measurement. `checked_sub` makes
       // the contradictory case say so instead of rendering a number.
-      Self::ProducerLappedConsumer { producer, consumer, capacity } =>
-      {
-        match producer.0.checked_sub( consumer.0 )
-        {
-          Some( ahead ) => write!
-          (
-            f,
-            "producer at {} is {ahead} ahead of consumer at {}, past a capacity of {capacity}",
-            producer.0,
-            consumer.0
-          ),
-          None => write!
-          (
-            f,
-            "producer at {} is behind consumer at {} — a lap report its own cursors contradict",
-            producer.0,
-            consumer.0
-          ),
-        }
+      Self::ProducerLappedConsumer {
+        producer,
+        consumer,
+        capacity,
+      } => match producer.0.checked_sub(consumer.0) {
+        Some(ahead) => write!(
+          f,
+          "producer at {} is {ahead} ahead of consumer at {}, past a capacity of {capacity}",
+          producer.0, consumer.0
+        ),
+        None => write!(
+          f,
+          "producer at {} is behind consumer at {} — a lap report its own cursors contradict",
+          producer.0, consumer.0
+        ),
       },
-      Self::CursorWentBackwards { cursor, was, now } => write!
-      (
-        f, "{cursor} cursor went backwards, from {} to {}", was.0, now.0
-      ),
-      Self::ReadingsDisagree { pending, free, capacity } => write!
-      (
-        f, "pending {pending} plus free {free} is not the capacity {capacity}"
-      ),
+      Self::CursorWentBackwards { cursor, was, now } => write!(f, "{cursor} cursor went backwards, from {} to {}", was.0, now.0),
+      Self::ReadingsDisagree { pending, free, capacity } => {
+        write!(f, "pending {pending} plus free {free} is not the capacity {capacity}")
+      }
     }
   }
 }
@@ -267,10 +245,9 @@ impl core::error::Error for Violation {}
 ///
 /// assert!( check( &CursorPair::new( Capacity::new( 4 ).unwrap() ) ).is_ok() );
 /// ```
-pub fn check( pair : &CursorPair ) -> Result< (), Violation >
-{
-  let ( producer, consumer ) = observe_pair( pair );
-  check_seqs( producer, consumer, pair.capacity() )
+pub fn check(pair: &CursorPair) -> Result<(), Violation> {
+  let (producer, consumer) = observe_pair(pair);
+  check_seqs(producer, consumer, pair.capacity())
 }
 
 /// The comparison, over values rather than over cursors.
@@ -278,8 +255,7 @@ pub fn check( pair : &CursorPair ) -> Result< (), Violation >
 /// Split out because [`Watch`] needs the same two questions asked of sequences
 /// it has already read — reading them a second time would compare two different
 /// observations and could report a violation that never existed.
-fn check_seqs( producer : Seq, consumer : Seq, capacity : Capacity ) -> Result< (), Violation >
-{
+fn check_seqs(producer: Seq, consumer: Seq, capacity: Capacity) -> Result<(), Violation> {
   // The subtraction is the D1 check. Written as two independent blocks — a
   // `consumer.0 > producer.0` guard, then a bare `producer.0 - consumer.0` — the
   // second is sound only because the first precedes it, and nothing but their
@@ -293,21 +269,19 @@ fn check_seqs( producer : Seq, consumer : Seq, capacity : Capacity ) -> Result< 
   // `checked_sub` removes the ordering rather than documenting it: D1 is
   // precisely the case where the subtraction has no answer, so there is no
   // second block to put in the wrong place and no operand order to get wrong.
-  let Some( pending ) = producer.0.checked_sub( consumer.0 )
-  else
-  {
-    return Err( Violation::ConsumerAheadOfProducer { producer, consumer } );
+  let Some(pending) = producer.0.checked_sub(consumer.0) else {
+    return Err(Violation::ConsumerAheadOfProducer { producer, consumer });
   };
 
-  if pending > capacity.get() as u64
-  {
-    return Err
-    (
-      Violation::ProducerLappedConsumer { producer, consumer, capacity : capacity.get() }
-    );
+  if pending > capacity.get() as u64 {
+    return Err(Violation::ProducerLappedConsumer {
+      producer,
+      consumer,
+      capacity: capacity.get(),
+    });
   }
 
-  Ok( () )
+  Ok(())
 }
 
 /// A cursor pair watched across observations, so that a cursor going backwards
@@ -351,16 +325,14 @@ fn check_seqs( producer : Seq, consumer : Seq, capacity : Capacity ) -> Result< 
 /// `Clone` is kept: checkpointing a watch before a suspect phase and comparing
 /// afterwards is a real use. Requiring the `.clone()` is what makes the fork a
 /// decision instead of a typo.
-#[ derive( Debug, Clone, PartialEq, Eq ) ]
-pub struct Watch
-{
-  producer : Seq,
-  consumer : Seq,
-  capacity : Capacity,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Watch {
+  producer: Seq,
+  consumer: Seq,
+  capacity: Capacity,
 }
 
-impl Watch
-{
+impl Watch {
   /// Start watching, taking the current observation as the baseline.
   ///
   /// The pair is checked as it stands — a `Watch` started against an already
@@ -387,13 +359,16 @@ impl Watch
   /// # Errors
   ///
   /// Whatever [`check`] finds at this moment.
-  pub fn new( pair : &CursorPair ) -> Result< Self, Violation >
-  {
-    let ( producer, consumer ) = observe_pair( pair );
+  pub fn new(pair: &CursorPair) -> Result<Self, Violation> {
+    let (producer, consumer) = observe_pair(pair);
     let capacity = pair.capacity();
 
-    check_seqs( producer, consumer, capacity )?;
-    Ok( Self { producer, consumer, capacity } )
+    check_seqs(producer, consumer, capacity)?;
+    Ok(Self {
+      producer,
+      consumer,
+      capacity,
+    })
   }
 
   /// Take another observation and compare it with the last one.
@@ -409,51 +384,39 @@ impl Watch
   /// D2 — a cursor that moved backwards explains any ordering violation that
   /// came with it, and reporting the consequence instead of the cause sends an
   /// investigation to the wrong place.
-  pub fn observe( &mut self, pair : &CursorPair ) -> Result< (), Violation >
-  {
-    let ( producer, consumer ) = observe_pair( pair );
+  pub fn observe(&mut self, pair: &CursorPair) -> Result<(), Violation> {
+    let (producer, consumer) = observe_pair(pair);
 
-    if producer.0 < self.producer.0
-    {
-      return Err
-      (
-        Violation::CursorWentBackwards
-        {
-          cursor : Cursor::Producer,
-          was : self.producer,
-          now : producer,
-        }
-      );
+    if producer.0 < self.producer.0 {
+      return Err(Violation::CursorWentBackwards {
+        cursor: Cursor::Producer,
+        was: self.producer,
+        now: producer,
+      });
     }
 
-    if consumer.0 < self.consumer.0
-    {
-      return Err
-      (
-        Violation::CursorWentBackwards
-        {
-          cursor : Cursor::Consumer,
-          was : self.consumer,
-          now : consumer,
-        }
-      );
+    if consumer.0 < self.consumer.0 {
+      return Err(Violation::CursorWentBackwards {
+        cursor: Cursor::Consumer,
+        was: self.consumer,
+        now: consumer,
+      });
     }
 
-    check_seqs( producer, consumer, self.capacity )?;
+    check_seqs(producer, consumer, self.capacity)?;
 
     self.producer = producer;
     self.consumer = consumer;
-    Ok( () )
+    Ok(())
   }
 
   /// The baseline this watch will compare the next observation against.
   ///
   /// Producer first, then consumer. Exposed so a test can assert that a failed
   /// [`Self::observe`] left the baseline alone.
-  #[ must_use ]
-  pub fn last( &self ) -> ( Seq, Seq )
-  {
-    ( self.producer, self.consumer )
+  #[must_use]
+  pub fn last(&self) -> (Seq, Seq) {
+    (self.producer, self.consumer)
   }
 }
 
@@ -508,23 +471,20 @@ impl Watch
 /// # Errors
 ///
 /// [`Violation::ReadingsDisagree`], carrying all three numbers.
-pub fn check_ends< T >
-(
-  capacity : Capacity,
-  producer : &Producer< '_, T >,
-  consumer : &Consumer< '_, T >,
-)
--> Result< (), Violation >
+pub fn check_ends<T>(capacity: Capacity, producer: &Producer<'_, T>, consumer: &Consumer<'_, T>) -> Result<(), Violation>
 where
-  T : Send,
+  T: Send,
 {
   let pending = consumer.len();
   let free = producer.free_capacity();
 
-  if pending + free == capacity.get()
-  {
-    return Ok( () );
+  if pending + free == capacity.get() {
+    return Ok(());
   }
 
-  Err( Violation::ReadingsDisagree { pending, free, capacity : capacity.get() } )
+  Err(Violation::ReadingsDisagree {
+    pending,
+    free,
+    capacity: capacity.get(),
+  })
 }

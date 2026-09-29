@@ -45,9 +45,8 @@ DECL_ROOT="$GATE_DIR/declared"
 # the census before a later crate relocation and adding it would silently
 # widen what G18 and G22 grade, and `strip_crate_root` below relies on paths
 # under it staying absolute so that `family_bin_sources` can drop them from
-# G1's join. G11 adds it explicitly, for its own reason. Where a declared name
-# may be *found* is a separate question with a separate answer — see
-# RESOLVE_ROOTS.
+# G1's join. Where a declared name may be *found* is a separate question with
+# a separate answer — see RESOLVE_ROOTS.
 CRATE_ROOTS=( "$REPO/module" "$REPO/ring" "$REPO/substrate" )
 
 # Where a declared crate name may be found, as opposed to what the census

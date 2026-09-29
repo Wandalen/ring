@@ -14,8 +14,8 @@
 //! kept the item. [`Resolution`] below is the type that makes the alternative
 //! outcomes explicit rather than leaving them to a boolean.
 
-#![ no_std ]
-#![ deny( missing_docs ) ]
+#![no_std]
+#![deny(missing_docs)]
 
 // `no_std` here is an assertion, not a convenience. This crate, `ring_stats`,
 // and `ring_types` between them import `core::fmt` and `core::sync::atomic` and
@@ -28,7 +28,7 @@
 // `std` one is a `std` crate.
 
 use ring_stats::RingStats;
-use ring_types::{ OverflowPolicy, RingError };
+use ring_types::{OverflowPolicy, RingError};
 
 /// What a full-ring publish did.
 ///
@@ -51,9 +51,8 @@ use ring_types::{ OverflowPolicy, RingError };
 // adding `Default` here compiles and passes the whole suite. `ALL` below is what
 // makes the *count* enforced; this comment is the only thing standing between
 // the derive list and the reader who would otherwise "fix" it.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub enum Resolution
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Resolution {
   /// The incoming item was discarded; the ring's contents are unchanged.
   DroppedIncoming,
   /// The oldest unread item was discarded to make room; the incoming item was
@@ -74,8 +73,7 @@ pub enum Resolution
   Refused,
 }
 
-impl Resolution
-{
+impl Resolution {
   /// Every variant, for exhaustive iteration.
   ///
   /// Mirrors `OverflowPolicy::ALL`, and exists for the same reason: a fourth
@@ -90,7 +88,7 @@ impl Resolution
   /// assert_eq!( Resolution::ALL.len(), 3 );
   /// assert!( Resolution::ALL.contains( &Resolution::Refused ) );
   /// ```
-  pub const ALL : [ Self; 3 ] = [ Self::DroppedIncoming, Self::EvictedOldest, Self::Refused ];
+  pub const ALL: [Self; 3] = [Self::DroppedIncoming, Self::EvictedOldest, Self::Refused];
 
   /// Whether an item was lost without the caller being told.
   ///
@@ -106,11 +104,9 @@ impl Resolution
   /// classified as losing nothing and accepting nothing, silently, by a
   /// predicate that never mentioned it. Spelled this way it stops compiling
   /// instead, which is the whole point of a closed enum.
-  #[ must_use ]
-  pub const fn lost_an_item( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn lost_an_item(self) -> bool {
+    match self {
       Self::DroppedIncoming | Self::EvictedOldest => true,
       Self::Refused => false,
     }
@@ -133,11 +129,9 @@ impl Resolution
   /// assert!( !Resolution::Refused.accepted_incoming() );
   /// ```
   /// Exhaustive for the reason given on [`Resolution::lost_an_item`].
-  #[ must_use ]
-  pub const fn accepted_incoming( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn accepted_incoming(self) -> bool {
+    match self {
       Self::EvictedOldest => true,
       Self::DroppedIncoming | Self::Refused => false,
     }
@@ -188,19 +182,17 @@ impl Resolution
 /// backs off and calls again on the same full-ring event adds a second increment
 /// to `dropped( Fail )` for one arrival. Retry loops should call
 /// [`would_resolve`] to decide and `resolve` once to record.
-pub fn resolve( policy : OverflowPolicy, stats : &RingStats ) -> Result< Resolution, RingError >
-{
+pub fn resolve(policy: OverflowPolicy, stats: &RingStats) -> Result<Resolution, RingError> {
   // Counts an event, not a loss: this runs on every policy, including `Fail`,
   // whose own share is retrievable separately via `stats.dropped(
   // OverflowPolicy::Fail )` — `Resolution::Refused.lost_an_item()` is `false`,
   // so this call and that predicate answer different questions about the
   // same arrival.
-  stats.record_drop( policy, 1 );
-  match policy
-  {
-    OverflowPolicy::DropNewest => Ok( Resolution::DroppedIncoming ),
-    OverflowPolicy::DropOldest => Ok( Resolution::EvictedOldest ),
-    OverflowPolicy::Fail => Err( RingError::Full ),
+  stats.record_drop(policy, 1);
+  match policy {
+    OverflowPolicy::DropNewest => Ok(Resolution::DroppedIncoming),
+    OverflowPolicy::DropOldest => Ok(Resolution::EvictedOldest),
+    OverflowPolicy::Fail => Err(RingError::Full),
   }
 }
 
@@ -224,11 +216,9 @@ pub fn resolve( policy : OverflowPolicy, stats : &RingStats ) -> Result< Resolut
 /// assert_eq!( would_resolve( OverflowPolicy::Fail ), Resolution::Refused );
 /// assert_eq!( would_resolve( OverflowPolicy::DropOldest ), Resolution::EvictedOldest );
 /// ```
-#[ must_use ]
-pub const fn would_resolve( policy : OverflowPolicy ) -> Resolution
-{
-  match policy
-  {
+#[must_use]
+pub const fn would_resolve(policy: OverflowPolicy) -> Resolution {
+  match policy {
     OverflowPolicy::DropNewest => Resolution::DroppedIncoming,
     OverflowPolicy::DropOldest => Resolution::EvictedOldest,
     OverflowPolicy::Fail => Resolution::Refused,

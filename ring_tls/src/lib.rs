@@ -36,12 +36,13 @@
 //! It also does not decide *when* to flush. The buffer reports full and refuses
 //! the push; the policy that reacts is `ring_flush`'s (feature 176).
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::sync::atomic::Ordering;
+
 use ring_atomic::SeqCell;
-use ring_batch::{ claim, BatchClaim };
-use ring_types::{ RingError, Seq };
+use ring_batch::{BatchClaim, claim};
+use ring_types::{RingError, Seq};
 
 /// A thread's private staging area: append cheaply, land once.
 ///
@@ -65,15 +66,13 @@ use ring_types::{ RingError, Seq };
 /// assert_eq!( flush.count(), 64 );
 /// assert_eq!( cursor.counts().total, 1, "64 items, one atomic operation" );
 /// ```
-#[ derive( Debug ) ]
-pub struct TlsBuffer< T >
-{
-  items : Vec< T >,
-  limit : usize,
+#[derive(Debug)]
+pub struct TlsBuffer<T> {
+  items: Vec<T>,
+  limit: usize,
 }
 
-impl< T > TlsBuffer< T >
-{
+impl<T> TlsBuffer<T> {
   /// A buffer that accepts `limit` items before refusing.
   ///
   /// Bounded on purpose. An unbounded staging buffer converts back-pressure
@@ -89,10 +88,12 @@ impl< T > TlsBuffer< T >
   /// assert_eq!( buffer.capacity(), 4 );
   /// assert!( buffer.is_empty() );
   /// ```
-  #[ must_use ]
-  pub fn with_capacity( limit : usize ) -> Self
-  {
-    Self { items : Vec::with_capacity( limit ), limit }
+  #[must_use]
+  pub fn with_capacity(limit: usize) -> Self {
+    Self {
+      items: Vec::with_capacity(limit),
+      limit,
+    }
   }
 
   /// Append one item. No atomic, no lock, no allocation.
@@ -121,33 +122,28 @@ impl< T > TlsBuffer< T >
   /// assert_eq!( buffer.push( 1u8 ), Ok( () ) );
   /// assert_eq!( buffer.push( 2u8 ), Err( RingError::Full ) );
   /// ```
-  pub fn push( &mut self, item : T ) -> Result< (), RingError >
-  {
-    if self.items.len() >= self.limit
-    {
-      return Err( RingError::Full );
+  pub fn push(&mut self, item: T) -> Result<(), RingError> {
+    if self.items.len() >= self.limit {
+      return Err(RingError::Full);
     }
     let reserved = self.items.capacity();
-    self.items.push( item );
-    debug_assert!
-    (
+    self.items.push(item);
+    debug_assert!(
       self.items.capacity() == reserved,
       "push must never grow TlsBuffer's allocation past its with_capacity reservation"
     );
-    Ok( () )
+    Ok(())
   }
 
   /// Items staged and not yet flushed.
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.items.len()
   }
 
   /// Whether nothing is staged.
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.items.is_empty()
   }
 
@@ -164,16 +160,14 @@ impl< T > TlsBuffer< T >
   /// buffer.push( 0u8 ).unwrap();
   /// assert!( buffer.is_full() );
   /// ```
-  #[ must_use ]
-  pub fn is_full( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_full(&self) -> bool {
     self.items.len() >= self.limit
   }
 
   /// How many items this buffer accepts before refusing.
-  #[ must_use ]
-  pub const fn capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> usize {
     self.limit
   }
 
@@ -191,8 +185,7 @@ impl< T > TlsBuffer< T >
   /// buffer.discard();
   /// assert!( buffer.is_empty() );
   /// ```
-  pub fn discard( &mut self )
-  {
+  pub fn discard(&mut self) {
     self.items.clear();
   }
 
@@ -225,9 +218,8 @@ impl< T > TlsBuffer< T >
   /// assert_eq!( taken, vec![ 'a', 'b' ] );
   /// assert!( buffer.is_empty(), "drain leaves the buffer writable" );
   /// ```
-  pub fn drain( &mut self ) -> impl Iterator< Item = T > + '_
-  {
-    self.items.drain( .. )
+  pub fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
+    self.items.drain(..)
   }
 
   /// Claim one contiguous run for everything staged, and hand back the items
@@ -267,17 +259,20 @@ impl< T > TlsBuffer< T >
   /// assert_eq!( landed, vec![ ( Seq( 100 ), 'a' ), ( Seq( 101 ), 'b' ) ] );
   /// assert!( buffer.is_empty() );
   /// ```
-  pub fn flush_into< C >( &mut self, cursor : &C, order : Ordering ) -> Flush< '_, T >
+  pub fn flush_into<C>(&mut self, cursor: &C, order: Ordering) -> Flush<'_, T>
   where
-    C : SeqCell,
+    C: SeqCell,
   {
-    debug_assert!
-    (
-      matches!( order, Ordering::Release | Ordering::AcqRel | Ordering::SeqCst ),
+    debug_assert!(
+      matches!(order, Ordering::Release | Ordering::AcqRel | Ordering::SeqCst),
       "flush_into's order must include Release semantics ({order:?} given) or the flushed items are not visible to a consumer reading the cursor"
     );
-    let claim = claim( cursor, self.items.len(), order );
-    Flush { claim, next : claim.start().0, items : self.items.drain( .. ) }
+    let claim = claim(cursor, self.items.len(), order);
+    Flush {
+      claim,
+      next: claim.start().0,
+      items: self.items.drain(..),
+    }
   }
 }
 
@@ -289,47 +284,40 @@ impl< T > TlsBuffer< T >
 ///
 /// Dropping this without consuming it still empties the buffer and still leaves
 /// the cursor advanced; see [`TlsBuffer::flush_into`].
-#[ derive( Debug ) ]
-pub struct Flush< 'a, T >
-{
-  claim : BatchClaim,
-  next : u64,
-  items : std::vec::Drain< 'a, T >,
+#[derive(Debug)]
+pub struct Flush<'a, T> {
+  claim: BatchClaim,
+  next: u64,
+  items: std::vec::Drain<'a, T>,
 }
 
-impl< T > Flush< '_, T >
-{
+impl<T> Flush<'_, T> {
   /// The sequence range this flush claimed.
   ///
   /// Available before consuming the iterator, so a caller can gate on the range
   /// — check it against a consumer barrier, say — before it starts writing.
-  #[ must_use ]
-  pub const fn claim( &self ) -> BatchClaim
-  {
+  #[must_use]
+  pub const fn claim(&self) -> BatchClaim {
     self.claim
   }
 }
 
-impl< T > Iterator for Flush< '_, T >
-{
-  type Item = ( Seq, T );
+impl<T> Iterator for Flush<'_, T> {
+  type Item = (Seq, T);
 
-  fn next( &mut self ) -> Option< Self::Item >
-  {
-    if self.next >= self.claim.end().0
-    {
+  fn next(&mut self) -> Option<Self::Item> {
+    if self.next >= self.claim.end().0 {
       return None;
     }
     let item = self.items.next()?;
-    let seq = Seq( self.next );
+    let seq = Seq(self.next);
     self.next += 1;
-    Some( ( seq, item ) )
+    Some((seq, item))
   }
 
-  fn size_hint( &self ) -> ( usize, Option< usize > )
-  {
+  fn size_hint(&self) -> (usize, Option<usize>) {
     self.items.size_hint()
   }
 }
 
-impl< T > ExactSizeIterator for Flush< '_, T > {}
+impl<T> ExactSizeIterator for Flush<'_, T> {}

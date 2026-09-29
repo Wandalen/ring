@@ -39,16 +39,15 @@ use core::fmt;
 /// says nothing about which traits must keep holding when they are.
 /// Pitfall: a derive on a wrapper is a constraint on the wrapped type's future,
 /// and nothing in either declaration points at the other.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-#[ non_exhaustive ]
-pub enum RingError
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RingError {
   /// A capacity of zero was requested. A ring with no slots can never accept
   /// a publish, so this is rejected at construction rather than at first use.
   CapacityZero,
   /// A capacity that is not a power of two was requested; the offending value
   /// is carried so the caller can report it.
-  CapacityNotPowerOfTwo( usize ),
+  CapacityNotPowerOfTwo(usize),
   /// The ring has no free slot and its [`crate::OverflowPolicy`] is
   /// [`crate::OverflowPolicy::Fail`].
   Full,
@@ -62,12 +61,11 @@ pub enum RingError
   NameUnknown,
   /// A batch of the requested length cannot be served — the ring's whole
   /// capacity is smaller than the request, so no amount of draining helps.
-  BatchTooLarge
-  {
+  BatchTooLarge {
     /// Slots asked for.
-    requested : usize,
+    requested: usize,
     /// Slots the ring has in total.
-    capacity : usize,
+    capacity: usize,
   },
   /// The configured [`crate::OverflowPolicy`] is one this backend cannot
   /// honour.
@@ -80,8 +78,7 @@ pub enum RingError
   PolicyUnsupported,
 }
 
-impl RingError
-{
+impl RingError {
   /// Whether this error is a mistake in how the ring was configured, rather
   /// than a condition arising from traffic.
   ///
@@ -107,20 +104,11 @@ impl RingError
   //   the enum's own doc section exists because it already happened once (`BN26`).
   //   A predicate whose default answer flips the caller's response (retry vs. fix)
   //   is exactly the wrong place to let that growth go unnoticed.
-  #[ must_use ]
-  pub const fn is_configuration( self ) -> bool
-  {
-    match self
-    {
-      Self::CapacityZero
-      | Self::CapacityNotPowerOfTwo( _ )
-      | Self::BatchTooLarge { .. }
-      | Self::PolicyUnsupported => true,
-      Self::Full
-      | Self::Empty
-      | Self::Closed
-      | Self::NameTaken
-      | Self::NameUnknown => false,
+  #[must_use]
+  pub const fn is_configuration(self) -> bool {
+    match self {
+      Self::CapacityZero | Self::CapacityNotPowerOfTwo(_) | Self::BatchTooLarge { .. } | Self::PolicyUnsupported => true,
+      Self::Full | Self::Empty | Self::Closed | Self::NameTaken | Self::NameUnknown => false,
     }
   }
 
@@ -142,14 +130,12 @@ impl RingError
   // Pitfall: the two predicates disagreeing about whether growth is a compile
   //   error would itself be a defect; both are fixed together so neither is the
   //   one a future variant slips through.
-  #[ must_use ]
-  pub const fn is_transient( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn is_transient(self) -> bool {
+    match self {
       Self::Full | Self::Empty => true,
       Self::CapacityZero
-      | Self::CapacityNotPowerOfTwo( _ )
+      | Self::CapacityNotPowerOfTwo(_)
       | Self::Closed
       | Self::NameTaken
       | Self::NameUnknown
@@ -159,24 +145,20 @@ impl RingError
   }
 }
 
-impl fmt::Display for RingError
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::CapacityZero => write!( f, "ring capacity must be at least 1" ),
-      Self::CapacityNotPowerOfTwo( n ) => write!( f, "ring capacity {n} is not a power of two" ),
-      Self::Full => write!( f, "ring is full" ),
-      Self::Empty => write!( f, "ring is empty" ),
-      Self::Closed => write!( f, "ring is closed" ),
-      Self::NameTaken => write!( f, "a ring is already registered under this name" ),
-      Self::NameUnknown => write!( f, "no ring is registered under this name" ),
-      Self::BatchTooLarge { requested, capacity } =>
-      {
-        write!( f, "batch of {requested} exceeds ring capacity {capacity}" )
+impl fmt::Display for RingError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::CapacityZero => write!(f, "ring capacity must be at least 1"),
+      Self::CapacityNotPowerOfTwo(n) => write!(f, "ring capacity {n} is not a power of two"),
+      Self::Full => write!(f, "ring is full"),
+      Self::Empty => write!(f, "ring is empty"),
+      Self::Closed => write!(f, "ring is closed"),
+      Self::NameTaken => write!(f, "a ring is already registered under this name"),
+      Self::NameUnknown => write!(f, "no ring is registered under this name"),
+      Self::BatchTooLarge { requested, capacity } => {
+        write!(f, "batch of {requested} exceeds ring capacity {capacity}")
       }
-      Self::PolicyUnsupported => write!( f, "this backend cannot honour the configured overflow policy" ),
+      Self::PolicyUnsupported => write!(f, "this backend cannot honour the configured overflow policy"),
     }
   }
 }

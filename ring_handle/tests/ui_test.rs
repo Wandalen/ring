@@ -39,7 +39,7 @@
 //! program is still rejected for the same reason, which is the only thing this
 //! suite actually guarantees.
 
-#![ cfg( test ) ]
+#![cfg(test)]
 
 /// The seven programs that must not compile.
 ///
@@ -56,15 +56,14 @@
 /// **Five of the seven are additions**, and they are the ones covering the
 /// edits that actually get made. The two the acceptance table names cover the
 /// edit nobody makes: a drain on `Producer` is obviously wrong to its author.
-#[ test ]
-fn the_forbidden_programs_are_rejected()
-{
+#[test]
+fn the_forbidden_programs_are_rejected() {
   let cases = trybuild::TestCases::new();
-  cases.compile_fail( "tests/ui/producer_drains.rs" );
-  cases.compile_fail( "tests/ui/consumer_publishes.rs" );
-  cases.compile_fail( "tests/ui/producer_clones.rs" );
-  cases.compile_fail( "tests/ui/consumer_clones.rs" );
-  cases.compile_fail( "tests/ui/producer_shared_across_threads.rs" );
-  cases.compile_fail( "tests/ui/producer_try_clones.rs" );
-  cases.compile_fail( "tests/ui/ring_used_after_split.rs" );
+  cases.compile_fail("tests/ui/producer_drains.rs");
+  cases.compile_fail("tests/ui/consumer_publishes.rs");
+  cases.compile_fail("tests/ui/producer_clones.rs");
+  cases.compile_fail("tests/ui/consumer_clones.rs");
+  cases.compile_fail("tests/ui/producer_shared_across_threads.rs");
+  cases.compile_fail("tests/ui/producer_try_clones.rs");
+  cases.compile_fail("tests/ui/ring_used_after_split.rs");
 }

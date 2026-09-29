@@ -49,13 +49,12 @@
 //! is no legitimate second option to offer, so offering one would only be a way
 //! to get it wrong.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::sync::atomic::Ordering;
-use ring_align::{ on_distinct_lines, CacheAligned };
-use ring_atomic::AtomicSeq;
-use ring_types::{ Capacity, Seq };
 
+use ring_align::{CacheAligned, on_distinct_lines};
+use ring_atomic::AtomicSeq;
 /// Re-exported from `ring_atomic`, because a [`PaddedCursor`] is unusable
 /// without it.
 ///
@@ -66,6 +65,7 @@ use ring_types::{ Capacity, Seq };
 /// crates have business with the atomic layer beyond the cursor they were
 /// handed.
 pub use ring_atomic::SeqCell;
+use ring_types::{Capacity, Seq};
 
 /// The ordering every gating read in the family uses.
 ///
@@ -85,7 +85,7 @@ pub use ring_atomic::SeqCell;
 /// use core::sync::atomic::Ordering;
 /// assert_eq!( ring_cursor::GATING, Ordering::Acquire );
 /// ```
-pub const GATING : Ordering = Ordering::Acquire;
+pub const GATING: Ordering = Ordering::Acquire;
 
 /// The position of the furthest-behind cursor, or `None` when there are none.
 ///
@@ -115,10 +115,9 @@ pub const GATING : Ordering = Ordering::Acquire;
 /// cursors[ 1 ].store( Seq( 12 ), Ordering::Release );
 /// assert_eq!( ring_cursor::slowest( &cursors ), Some( Seq( 9 ) ) );
 /// ```
-#[ must_use ]
-pub fn slowest( cursors : &[ PaddedCursor ] ) -> Option< Seq >
-{
-  cursors.iter().map( | c | c.load( GATING ) ).min()
+#[must_use]
+pub fn slowest(cursors: &[PaddedCursor]) -> Option<Seq> {
+  cursors.iter().map(|c| c.load(GATING)).min()
 }
 
 /// One atomic sequence with a cache line to itself.
@@ -139,11 +138,10 @@ pub fn slowest( cursors : &[ PaddedCursor ] ) -> Option< Seq >
 /// assert_eq!( core::mem::size_of::< PaddedCursor >(), 64 );
 /// assert_eq!( core::mem::align_of::< PaddedCursor >(), 64 );
 /// ```
-#[ derive( Debug, Default ) ]
-pub struct PaddedCursor( CacheAligned< AtomicSeq > );
+#[derive(Debug, Default)]
+pub struct PaddedCursor(CacheAligned<AtomicSeq>);
 
-impl PaddedCursor
-{
+impl PaddedCursor {
   /// A cursor at `value`.
   ///
   /// `const` in an ordinary build, and not under `--cfg loom` — inherited from
@@ -154,19 +152,17 @@ impl PaddedCursor
   /// use ring_types::Seq;
   /// let _ = PaddedCursor::new( Seq( 1 ) );
   /// ```
-  #[ cfg( not( loom ) ) ]
-  #[ must_use ]
-  pub const fn new( value : Seq ) -> Self
-  {
-    Self( CacheAligned::new( AtomicSeq::new( value ) ) )
+  #[cfg(not(loom))]
+  #[must_use]
+  pub const fn new(value: Seq) -> Self {
+    Self(CacheAligned::new(AtomicSeq::new(value)))
   }
 
   /// A cursor at `value` — the `--cfg loom` build, where it is not `const`.
-  #[ cfg( loom ) ]
-  #[ must_use ]
-  pub fn new( value : Seq ) -> Self
-  {
-    Self( CacheAligned::new( AtomicSeq::new( value ) ) )
+  #[cfg(loom)]
+  #[must_use]
+  pub fn new(value: Seq) -> Self {
+    Self(CacheAligned::new(AtomicSeq::new(value)))
   }
 
   /// Where this cursor sits in memory.
@@ -182,10 +178,9 @@ impl PaddedCursor
   /// let cursor = PaddedCursor::default();
   /// assert_eq!( cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary" );
   /// ```
-  #[ must_use ]
-  pub fn addr( &self ) -> usize
-  {
-    core::ptr::from_ref( self ) as usize
+  #[must_use]
+  pub fn addr(&self) -> usize {
+    core::ptr::from_ref(self) as usize
   }
 }
 
@@ -195,27 +190,21 @@ impl PaddedCursor
 // would notice — every assertion here is about layout or arithmetic, never
 // about cost; the assumption is cheap by convention across the crate
 // boundary, with no contract enforcing it on either side.
-impl SeqCell for PaddedCursor
-{
-  fn load( &self, order : Ordering ) -> Seq
-  {
-    self.0.get().load( order )
+impl SeqCell for PaddedCursor {
+  fn load(&self, order: Ordering) -> Seq {
+    self.0.get().load(order)
   }
 
-  fn store( &self, value : Seq, order : Ordering )
-  {
-    self.0.get().store( value, order );
+  fn store(&self, value: Seq, order: Ordering) {
+    self.0.get().store(value, order);
   }
 
-  fn fetch_add( &self, n : u64, order : Ordering ) -> Seq
-  {
-    self.0.get().fetch_add( n, order )
+  fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+    self.0.get().fetch_add(n, order)
   }
 
-  fn compare_exchange( &self, current : Seq, new : Seq, success : Ordering, failure : Ordering )
-  -> Result< Seq, Seq >
-  {
-    self.0.get().compare_exchange( current, new, success, failure )
+  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self.0.get().compare_exchange(current, new, success, failure)
   }
 }
 
@@ -242,16 +231,14 @@ impl SeqCell for PaddedCursor
 /// assert!( !pair.may_claim() );
 /// assert_eq!( pair.pending(), 4 );
 /// ```
-#[ derive( Debug ) ]
-pub struct CursorPair
-{
-  producer : PaddedCursor,
-  consumer : PaddedCursor,
-  capacity : Capacity,
+#[derive(Debug)]
+pub struct CursorPair {
+  producer: PaddedCursor,
+  consumer: PaddedCursor,
+  capacity: Capacity,
 }
 
-impl CursorPair
-{
+impl CursorPair {
   /// Both cursors at zero, for a ring of `capacity` slots.
   ///
   /// `const` in an ordinary build, and not under `--cfg loom` — inherited from
@@ -264,27 +251,23 @@ impl CursorPair
   /// let pair = CursorPair::new( Capacity::new( 8 ).unwrap() );
   /// assert_eq!( pair.capacity().get(), 8 );
   /// ```
-  #[ cfg( not( loom ) ) ]
-  #[ must_use ]
-  pub const fn new( capacity : Capacity ) -> Self
-  {
-    Self
-    {
-      producer : PaddedCursor::new( Seq::ZERO ),
-      consumer : PaddedCursor::new( Seq::ZERO ),
+  #[cfg(not(loom))]
+  #[must_use]
+  pub const fn new(capacity: Capacity) -> Self {
+    Self {
+      producer: PaddedCursor::new(Seq::ZERO),
+      consumer: PaddedCursor::new(Seq::ZERO),
       capacity,
     }
   }
 
   /// Both cursors at zero — the `--cfg loom` build, where it is not `const`.
-  #[ cfg( loom ) ]
-  #[ must_use ]
-  pub fn new( capacity : Capacity ) -> Self
-  {
-    Self
-    {
-      producer : PaddedCursor::new( Seq::ZERO ),
-      consumer : PaddedCursor::new( Seq::ZERO ),
+  #[cfg(loom)]
+  #[must_use]
+  pub fn new(capacity: Capacity) -> Self {
+    Self {
+      producer: PaddedCursor::new(Seq::ZERO),
+      consumer: PaddedCursor::new(Seq::ZERO),
       capacity,
     }
   }
@@ -306,9 +289,8 @@ impl CursorPair
   /// let pair = CursorPair::new( Capacity::new( 2 ).unwrap() );
   /// assert_eq!( pair.producer().load( Ordering::Acquire ), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub const fn producer( &self ) -> &PaddedCursor
-  {
+  #[must_use]
+  pub const fn producer(&self) -> &PaddedCursor {
     &self.producer
   }
 
@@ -328,9 +310,8 @@ impl CursorPair
   /// pair.consumer().store( Seq( 1 ), Ordering::Release );
   /// assert_eq!( pair.consumer().load( Ordering::Acquire ), Seq( 1 ) );
   /// ```
-  #[ must_use ]
-  pub const fn consumer( &self ) -> &PaddedCursor
-  {
+  #[must_use]
+  pub const fn consumer(&self) -> &PaddedCursor {
     &self.consumer
   }
 
@@ -342,9 +323,8 @@ impl CursorPair
   ///
   /// assert_eq!( CursorPair::new( Capacity::new( 16 ).unwrap() ).capacity().get(), 16 );
   /// ```
-  #[ must_use ]
-  pub const fn capacity( &self ) -> Capacity
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> Capacity {
     self.capacity
   }
 
@@ -363,10 +343,9 @@ impl CursorPair
   /// pair.producer().store( Seq( 3 ), Ordering::Release );
   /// assert_eq!( pair.free_slots(), 1 );
   /// ```
-  #[ must_use ]
-  pub fn free_slots( &self ) -> usize
-  {
-    ring_seqno::free_slots( self.producer.load( GATING ), self.consumer.load( GATING ), self.capacity )
+  #[must_use]
+  pub fn free_slots(&self) -> usize {
+    ring_seqno::free_slots(self.producer.load(GATING), self.consumer.load(GATING), self.capacity)
   }
 
   /// How many published items the consumer has not yet read.
@@ -382,10 +361,9 @@ impl CursorPair
   /// pair.consumer().store( Seq( 2 ), Ordering::Release );
   /// assert_eq!( pair.pending(), 3 );
   /// ```
-  #[ must_use ]
-  pub fn pending( &self ) -> u64
-  {
-    ring_seqno::pending( self.producer.load( GATING ), self.consumer.load( GATING ) )
+  #[must_use]
+  pub fn pending(&self) -> u64 {
+    ring_seqno::pending(self.producer.load(GATING), self.consumer.load(GATING))
   }
 
   /// Whether a producer may claim without overwriting a slot the consumer has
@@ -412,10 +390,9 @@ impl CursorPair
   /// pair.consumer().store( Seq( 1 ), Ordering::Release );
   /// assert!( pair.may_claim(), "the consumer moved on" );
   /// ```
-  #[ must_use ]
-  pub fn may_claim( &self ) -> bool
-  {
-    ring_seqno::may_claim( self.producer.load( GATING ), self.consumer.load( GATING ), self.capacity )
+  #[must_use]
+  pub fn may_claim(&self) -> bool {
+    ring_seqno::may_claim(self.producer.load(GATING), self.consumer.load(GATING), self.capacity)
   }
 
   /// Whether the two cursors actually occupy different cache lines.
@@ -433,9 +410,8 @@ impl CursorPair
   /// let pair = CursorPair::new( Capacity::new( 2 ).unwrap() );
   /// assert!( pair.on_distinct_lines() );
   /// ```
-  #[ must_use ]
-  pub fn on_distinct_lines( &self ) -> bool
-  {
-    on_distinct_lines( self.producer.addr(), self.consumer.addr() )
+  #[must_use]
+  pub fn on_distinct_lines(&self) -> bool {
+    on_distinct_lines(self.producer.addr(), self.consumer.addr())
   }
 }

@@ -1,30 +1,27 @@
 //! Deciding whether two completed table states agree, and where they stop.
 
-use crate::accumulator::{ Accumulator, Write };
+use crate::accumulator::{Accumulator, Write};
 
 /// What the oracle found when it compared two tables.
 ///
 /// The diverging case carries the offset rather than a bare `false`, because
 /// *where* two write paths stop agreeing is the reading that identifies which
 /// one is wrong. A boolean would make every candidate fail the same way.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub enum Parity
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Parity {
   /// Every byte agrees, and both tables are the same length.
   Identical,
   /// The tables first disagree at this byte offset.
   ///
   /// When one table is a prefix of the other, the offset is the length of the
   /// shorter one — the first position at which only one table has a byte.
-  Diverges
-  {
+  Diverges {
     /// Byte offset of the first disagreement.
-    offset : usize,
+    offset: usize,
   },
 }
 
-impl Parity
-{
+impl Parity {
   /// Whether the tables agreed.
   ///
   /// ```
@@ -45,11 +42,9 @@ impl Parity
   // Pitfall: a caller gating "did the tables agree?" on this predicate would
   //   treat a new kind of disagreement as agreement — silently wrong in the
   //   direction that hides a real divergence from the oracle's own caller.
-  #[ must_use ]
-  pub const fn is_identical( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn is_identical(self) -> bool {
+    match self {
       Self::Identical => true,
       Self::Diverges { .. } => false,
     }
@@ -63,13 +58,11 @@ impl Parity
   /// assert_eq!( Parity::Identical.offset(), None );
   /// assert_eq!( Parity::Diverges { offset : 4 }.offset(), Some( 4 ) );
   /// ```
-  #[ must_use ]
-  pub const fn offset( self ) -> Option< usize >
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn offset(self) -> Option<usize> {
+    match self {
       Self::Identical => None,
-      Self::Diverges { offset } => Some( offset ),
+      Self::Diverges { offset } => Some(offset),
     }
   }
 }
@@ -90,18 +83,15 @@ impl Parity
 /// assert_eq!( oracle.compare( &[ 1, 2 ], &[ 1, 2 ] ), Parity::Identical );
 /// assert_eq!( oracle.compare( &[ 1, 2 ], &[ 1, 9 ] ), Parity::Diverges { offset : 1 } );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub struct ByteParity
-{
-  semantics : Accumulator,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct ByteParity {
+  semantics: Accumulator,
 }
 
-impl ByteParity
-{
+impl ByteParity {
   /// An oracle comparing under `semantics`.
-  #[ must_use ]
-  pub const fn new( semantics : Accumulator ) -> Self
-  {
+  #[must_use]
+  pub const fn new(semantics: Accumulator) -> Self {
     Self { semantics }
   }
 
@@ -112,9 +102,8 @@ impl ByteParity
   ///
   /// assert_eq!( ByteParity::new( Accumulator::Delta ).semantics(), Accumulator::Delta );
   /// ```
-  #[ must_use ]
-  pub const fn semantics( self ) -> Accumulator
-  {
+  #[must_use]
+  pub const fn semantics(self) -> Accumulator {
     self.semantics
   }
 
@@ -131,26 +120,20 @@ impl ByteParity
   /// assert_eq!( oracle.compare( &[], &[] ), Parity::Identical );
   /// assert_eq!( oracle.compare( &[ 1 ], &[ 1, 2 ] ), Parity::Diverges { offset : 1 } );
   /// ```
-  #[ must_use ]
-  pub fn compare( self, left : &[ u8 ], right : &[ u8 ] ) -> Parity
-  {
-    let shared = left.len().min( right.len() );
+  #[must_use]
+  pub fn compare(self, left: &[u8], right: &[u8]) -> Parity {
+    let shared = left.len().min(right.len());
 
-    for offset in 0..shared
-    {
-      if left[ offset ] != right[ offset ]
-      {
+    for offset in 0..shared {
+      if left[offset] != right[offset] {
         return Parity::Diverges { offset };
       }
     }
 
-    if left.len() == right.len()
-    {
+    if left.len() == right.len() {
       Parity::Identical
-    }
-    else
-    {
-      Parity::Diverges { offset : shared }
+    } else {
+      Parity::Diverges { offset: shared }
     }
   }
 
@@ -169,9 +152,8 @@ impl ByteParity
   /// assert!( ByteParity::new( Accumulator::Delta ).compare_writes( 1, &forward, &reverse ).is_identical() );
   /// assert!( !ByteParity::new( Accumulator::Set ).compare_writes( 1, &forward, &reverse ).is_identical() );
   /// ```
-  #[ must_use ]
-  pub fn compare_writes( self, cells : usize, left : &[ Write ], right : &[ Write ] ) -> Parity
-  {
-    self.compare( &self.semantics.fold( cells, left ), &self.semantics.fold( cells, right ) )
+  #[must_use]
+  pub fn compare_writes(self, cells: usize, left: &[Write], right: &[Write]) -> Parity {
+    self.compare(&self.semantics.fold(cells, left), &self.semantics.fold(cells, right))
   }
 }

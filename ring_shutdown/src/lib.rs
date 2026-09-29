@@ -30,13 +30,13 @@
 //! `docs/feature/184_` textually, which is the only crate→feature edge the
 //! family records.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use core::sync::atomic::{ AtomicBool, Ordering };
+use core::sync::atomic::{AtomicBool, Ordering};
 
-use ring_core::{ Consumer, Producer };
+use ring_core::{Consumer, Producer};
 use ring_cursor::CursorPair;
-use ring_types::{ RingError, WaitKind };
+use ring_types::{RingError, WaitKind};
 
 /// The close flag, and the only piece of state this crate owns.
 ///
@@ -56,29 +56,27 @@ use ring_types::{ RingError, WaitKind };
 /// stopped.reopen();
 /// assert!( !shutdown.is_closed() );
 /// ```
-#[ derive( Debug ) ]
-pub struct Shutdown
-{
-  closed : AtomicBool,
+#[derive(Debug)]
+pub struct Shutdown {
+  closed: AtomicBool,
 }
 
-impl Shutdown
-{
+impl Shutdown {
   /// A new, open shutdown.
-  #[ must_use ]
-  pub const fn new() -> Self
-  {
-    Self { closed : AtomicBool::new( false ) }
+  #[must_use]
+  pub const fn new() -> Self {
+    Self {
+      closed: AtomicBool::new(false),
+    }
   }
 
   /// Whether the ring has been closed to further publication.
   ///
   /// `Acquire`, so a reader that sees `true` also sees everything the closing
   /// thread wrote before closing.
-  #[ must_use ]
-  pub fn is_closed( &self ) -> bool
-  {
-    self.closed.load( Ordering::Acquire )
+  #[must_use]
+  pub fn is_closed(&self) -> bool {
+    self.closed.load(Ordering::Acquire)
   }
 
   /// Stop accepting publications, and get the token that permits draining.
@@ -98,11 +96,10 @@ impl Shutdown
   /// let _ = shutdown.close();         // no complaint
   /// assert!( shutdown.is_closed() );
   /// ```
-  #[ must_use = "a Stopped is the only route to a drain; bind it, or bind `_` to close and nothing else" ]
-  pub fn close( &self ) -> Stopped< '_ >
-  {
-    self.closed.store( true, Ordering::Release );
-    Stopped { shutdown : self }
+  #[must_use = "a Stopped is the only route to a drain; bind it, or bind `_` to close and nothing else"]
+  pub fn close(&self) -> Stopped<'_> {
+    self.closed.store(true, Ordering::Release);
+    Stopped { shutdown: self }
   }
 
   /// Whether a publish may proceed.
@@ -126,9 +123,8 @@ impl Shutdown
   /// assert_eq!( shutdown.admit(), Err( RingError::Closed ) );
   /// assert!( !RingError::Closed.is_transient() );
   /// ```
-  pub fn admit( &self ) -> Result< (), RingError >
-  {
-    if self.is_closed() { Err( RingError::Closed ) } else { Ok( () ) }
+  pub fn admit(&self) -> Result<(), RingError> {
+    if self.is_closed() { Err(RingError::Closed) } else { Ok(()) }
   }
 
   /// Wrap a producer so that every push consults this flag first.
@@ -136,16 +132,16 @@ impl Shutdown
   /// The wrapper is the difference between a rule and a guarantee. A caller
   /// holding a [`Guarded`] cannot publish into a closed ring, because the only
   /// push it has performs the check.
-  pub const fn guard< 'a, T >( &'a self, producer : Producer< 'a, T > ) -> Guarded< 'a, T >
-  {
-    Guarded { producer, shutdown : self }
+  pub const fn guard<'a, T>(&'a self, producer: Producer<'a, T>) -> Guarded<'a, T> {
+    Guarded {
+      producer,
+      shutdown: self,
+    }
   }
 }
 
-impl Default for Shutdown
-{
-  fn default() -> Self
-  {
+impl Default for Shutdown {
+  fn default() -> Self {
     Self::new()
   }
 }
@@ -157,14 +153,12 @@ impl Default for Shutdown
 /// called on*, and a drain written against that specific token no longer
 /// compiles afterward. A `Stopped` obtained from an earlier [`Shutdown::close`]
 /// call is a distinct value and outlives this one's reopen.
-#[ derive( Debug ) ]
-pub struct Stopped< 'a >
-{
-  shutdown : &'a Shutdown,
+#[derive(Debug)]
+pub struct Stopped<'a> {
+  shutdown: &'a Shutdown,
 }
 
-impl< 'a > Stopped< 'a >
-{
+impl<'a> Stopped<'a> {
   /// The shutdown this token proves closed.
   ///
   /// # What this hands out
@@ -181,9 +175,8 @@ impl< 'a > Stopped< 'a >
   /// `&self` constructor cannot supply — see
   /// `docs/pattern/002_a_proof_token_must_be_scarce.md`, which states the rule
   /// `docs/pattern/001_proof_token_orders_two_operations.md` is missing.
-  #[ must_use ]
-  pub const fn shutdown( &self ) -> &'a Shutdown
-  {
+  #[must_use]
+  pub const fn shutdown(&self) -> &'a Shutdown {
     self.shutdown
   }
 
@@ -211,8 +204,7 @@ impl< 'a > Stopped< 'a >
   /// assert_eq!( stopped.drain_all( &mut consumer, &mut recovered ), 3 );
   /// assert_eq!( recovered, [ 1, 2, 3 ] );
   /// ```
-  pub fn drain_all< T : Send >( &self, consumer : &mut Consumer< '_, T >, out : &mut Vec< T > ) -> usize
-  {
+  pub fn drain_all<T: Send>(&self, consumer: &mut Consumer<'_, T>, out: &mut Vec<T>) -> usize {
     // A `while` rather than a `loop` with an inner `return`, for a reason that
     // is about measurement rather than about style: `llvm-cov` opens a region
     // on a bare `loop` line and never attributes a hit to it, so the line reads
@@ -220,11 +212,10 @@ impl< 'a > Stopped< 'a >
     // and 81/81 with this, for the identical suite, `cargo tarpaulin --engine
     // llvm`. Recorded in `tests/manual/readme.md` D2.
     let mut total = 0;
-    let mut taken = consumer.try_recv_batch( out );
-    while taken > 0
-    {
+    let mut taken = consumer.try_recv_batch(out);
+    while taken > 0 {
       total += taken;
-      taken = consumer.try_recv_batch( out );
+      taken = consumer.try_recv_batch(out);
     }
     total
   }
@@ -268,29 +259,24 @@ impl< 'a > Stopped< 'a >
   /// assert_eq!( stopped.drain_all_bounded( &mut consumer, &mut recovered, 4 ), Ok( 3 ) );
   /// assert_eq!( recovered, [ 1, 2, 3 ] );
   /// ```
-  pub fn drain_all_bounded< T : Send >
-  (
+  pub fn drain_all_bounded<T: Send>(
     &self,
-    consumer : &mut Consumer< '_, T >,
-    out : &mut Vec< T >,
-    budget : usize,
-  )
-  -> Result< usize, RingError >
-  {
+    consumer: &mut Consumer<'_, T>,
+    out: &mut Vec<T>,
+    budget: usize,
+  ) -> Result<usize, RingError> {
     let mut total = 0;
     // `budget.max( 1 )` matches `ring_wait::wait_until`'s reading of its own
     // `spins`: a budget of zero means one attempt, not none, so a caller who
     // computes the number cannot accidentally ask for no work at all.
-    for _ in 0..budget.max( 1 )
-    {
-      let taken = consumer.try_recv_batch( out );
-      if taken == 0
-      {
-        return Ok( total );
+    for _ in 0..budget.max(1) {
+      let taken = consumer.try_recv_batch(out);
+      if taken == 0 {
+        return Ok(total);
       }
       total += taken;
     }
-    Err( RingError::Empty )
+    Err(RingError::Empty)
   }
 
   /// Drop every remaining record, returning how many were dropped.
@@ -298,12 +284,10 @@ impl< 'a > Stopped< 'a >
   /// The teardown counterpart of [`Stopped::drain_all`], for a caller who
   /// needs the ring empty rather than the records. Each record is dropped
   /// individually as it is taken, so a `T` with a `Drop` impl still runs it.
-  pub fn discard_all< T : Send >( &self, consumer : &mut Consumer< '_, T > ) -> usize
-  {
+  pub fn discard_all<T: Send>(&self, consumer: &mut Consumer<'_, T>) -> usize {
     let mut total = 0;
-    while let Some( record ) = consumer.try_recv()
-    {
-      drop( record );
+    while let Some(record) = consumer.try_recv() {
+      drop(record);
       total += 1;
     }
     total
@@ -313,9 +297,8 @@ impl< 'a > Stopped< 'a >
   ///
   /// Taking `self` by value is the point: a drain is only sound while the ring
   /// is closed, so the proof that it is closed must not survive reopening.
-  pub fn reopen( self )
-  {
-    self.shutdown.closed.store( false, Ordering::Release );
+  pub fn reopen(self) {
+    self.shutdown.closed.store(false, Ordering::Release);
   }
 }
 
@@ -325,17 +308,15 @@ impl< 'a > Stopped< 'a >
 /// intact in both — `ring_core`'s own refusal contract, extended by one case.
 /// The distinction is the one a producer acts on: [`Refusal::Full`] clears
 /// when the consumer drains, [`Refusal::Closed`] never does.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum Refusal< T >
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refusal<T> {
   /// The ring had no free slot. Retry after the consumer drains.
-  Full( T ),
+  Full(T),
   /// The ring is closed. Retrying cannot help.
-  Closed( T ),
+  Closed(T),
 }
 
-impl< T > Refusal< T >
-{
+impl<T> Refusal<T> {
   /// The record that was not published.
   ///
   /// The attribute is not decoration. This is the only method on the crate
@@ -344,12 +325,10 @@ impl< T > Refusal< T >
   /// computation. Discarding this one destroys a record that is no longer in
   /// the ring, no longer in the caller's hands, and no longer anywhere else —
   /// the exact loss [`Refusal`] exists to prevent, in one statement.
-  #[ must_use = "this is the record itself, not a copy — dropping it loses it" ]
-  pub fn into_record( self ) -> T
-  {
-    match self
-    {
-      Self::Full( record ) | Self::Closed( record ) => record,
+  #[must_use = "this is the record itself, not a copy — dropping it loses it"]
+  pub fn into_record(self) -> T {
+    match self {
+      Self::Full(record) | Self::Closed(record) => record,
     }
   }
 
@@ -365,24 +344,20 @@ impl< T > Refusal< T >
   // Pitfall: a producer deciding "retry, or give up?" on this predicate would
   //   retry against a refusal that can never clear, the exact distinction
   //   [`Refusal`]'s own doc says this type exists to preserve.
-  #[ must_use ]
-  pub const fn is_closed( &self ) -> bool
-  {
-    match self
-    {
-      Self::Closed( _ ) => true,
-      Self::Full( _ ) => false,
+  #[must_use]
+  pub const fn is_closed(&self) -> bool {
+    match self {
+      Self::Closed(_) => true,
+      Self::Full(_) => false,
     }
   }
 
   /// The equivalent [`RingError`], for a caller reporting rather than retrying.
-  #[ must_use ]
-  pub const fn reason( &self ) -> RingError
-  {
-    match self
-    {
-      Self::Full( _ ) => RingError::Full,
-      Self::Closed( _ ) => RingError::Closed,
+  #[must_use]
+  pub const fn reason(&self) -> RingError {
+    match self {
+      Self::Full(_) => RingError::Full,
+      Self::Closed(_) => RingError::Closed,
     }
   }
 }
@@ -406,15 +381,13 @@ impl< T > Refusal< T >
 /// let _ = shutdown.close();
 /// assert!( guarded.try_push( 8 ).unwrap_err().is_closed() );
 /// ```
-#[ derive( Debug ) ]
-pub struct Guarded< 'a, T >
-{
-  producer : Producer< 'a, T >,
-  shutdown : &'a Shutdown,
+#[derive(Debug)]
+pub struct Guarded<'a, T> {
+  producer: Producer<'a, T>,
+  shutdown: &'a Shutdown,
 }
 
-impl< 'a, T : Send > Guarded< 'a, T >
-{
+impl<'a, T: Send> Guarded<'a, T> {
   /// Publish one record, or hand it back with the reason.
   ///
   /// # Errors
@@ -430,13 +403,11 @@ impl< 'a, T : Send > Guarded< 'a, T >
   /// `Fail`, and also under `DropOldest` on a build without the `crossbeam`
   /// feature (`ring_core`'s own default) — eviction is a `crossbeam`-gated
   /// code path; without it, `DropOldest` refuses instead of evicting.
-  pub fn try_push( &mut self, record : T ) -> Result< (), Refusal< T > >
-  {
-    if self.shutdown.is_closed()
-    {
-      return Err( Refusal::Closed( record ) );
+  pub fn try_push(&mut self, record: T) -> Result<(), Refusal<T>> {
+    if self.shutdown.is_closed() {
+      return Err(Refusal::Closed(record));
     }
-    self.producer.try_push( record ).map_err( Refusal::Full )
+    self.producer.try_push(record).map_err(Refusal::Full)
   }
 
   /// Publish from `records` until one is refused, returning how many landed.
@@ -444,20 +415,17 @@ impl< 'a, T : Send > Guarded< 'a, T >
   /// Stops at the first refusal of either kind. A closed ring accepts nothing,
   /// so this returns `0` without consuming from the iterator — the check
   /// happens before the first read.
-  pub fn try_push_batch( &mut self, records : &mut impl Iterator< Item = T > ) -> usize
-  {
-    if self.shutdown.is_closed()
-    {
+  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
+    if self.shutdown.is_closed() {
       return 0;
     }
-    self.producer.try_push_batch( records )
+    self.producer.try_push_batch(records)
   }
 
   /// Room in the ring, with `ring_core`'s own split contract — binding at
   /// SPSC, advisory elsewhere. Guarding does not change that.
-  #[ must_use ]
-  pub fn free_capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub fn free_capacity(&self) -> usize {
     self.producer.free_capacity()
   }
 
@@ -471,9 +439,8 @@ impl< 'a, T : Send > Guarded< 'a, T >
   /// record. Only the close half of this predicate implies a refusal; the
   /// occupancy half inherits `free_capacity`'s advisory contract at MPSC and
   /// crossbeam on top of that.
-  #[ must_use ]
-  pub fn is_blocked( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_blocked(&self) -> bool {
     self.shutdown.is_closed() || self.producer.is_full()
   }
 
@@ -494,15 +461,13 @@ impl< 'a, T : Send > Guarded< 'a, T >
   /// holder still cannot publish into a closed ring. What it does not say, and
   /// what a reader takes away anyway, is that holding a `Guarded` is the
   /// constrained position. On this path it is the unconstrained one.
-  #[ must_use ]
-  pub const fn shutdown( &self ) -> &'a Shutdown
-  {
+  #[must_use]
+  pub const fn shutdown(&self) -> &'a Shutdown {
     self.shutdown
   }
 
   /// Give up the guarantee and take the raw producer back.
-  pub fn into_inner( self ) -> Producer< 'a, T >
-  {
+  pub fn into_inner(self) -> Producer<'a, T> {
     self.producer
   }
 }
@@ -515,10 +480,9 @@ impl< 'a, T : Send > Guarded< 'a, T >
 /// function — the `?` consumes the `Result` and leaves a bare `Wake` in
 /// statement position, which is precisely the merge of "room appeared" and
 /// "stop" this type was introduced to make unspellable.
-#[ must_use = "a Wake::Closed means stop, not publish" ]
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub enum Wake
-{
+#[must_use = "a Wake::Closed means stop, not publish"]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Wake {
   /// The condition the caller was waiting for became true, as of the instant
   /// this was observed. Like [`Wake::Closed`], this is a statement about a
   /// past instant, not a current guarantee — by the time the caller acts on
@@ -528,8 +492,7 @@ pub enum Wake
   Closed,
 }
 
-impl Wake
-{
+impl Wake {
   /// Whether the wait ended because the condition was met.
   // Fix(wake_is_ready_classification_not_exhaustive): was `matches!( self,
   //   Self::Ready )`, so a third `Wake` variant would silently read `false` —
@@ -540,11 +503,9 @@ impl Wake
   // Pitfall: this type's own doc names the exact failure mode a wrong default
   //   here would reintroduce — merging "room appeared" and "stop" back into
   //   one bare bool, which is what `Wake` was introduced to make unspellable.
-  #[ must_use ]
-  pub const fn is_ready( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn is_ready(self) -> bool {
+    match self {
       Self::Ready => true,
       Self::Closed => false,
     }
@@ -571,10 +532,8 @@ impl Wake
 /// let _ = shutdown.close();
 /// assert!( wait_for_close( &shutdown, WaitKind::None, 1 ).is_ok() );
 /// ```
-pub fn wait_for_close( shutdown : &Shutdown, kind : WaitKind, spins : usize )
--> Result< usize, RingError >
-{
-  ring_wait::wait_until( kind, spins, || shutdown.is_closed() )
+pub fn wait_for_close(shutdown: &Shutdown, kind: WaitKind, spins: usize) -> Result<usize, RingError> {
+  ring_wait::wait_until(kind, spins, || shutdown.is_closed())
 }
 
 /// Wait for room to publish, giving up early if the ring closes.
@@ -599,33 +558,22 @@ pub fn wait_for_close( shutdown : &Shutdown, kind : WaitKind, spins : usize )
 ///
 /// assert_eq!( for_space_or_close( &pair, &shutdown, WaitKind::None, 1 ), Ok( Wake::Ready ) );
 /// ```
-pub fn for_space_or_close
-(
-  pair : &CursorPair,
-  shutdown : &Shutdown,
-  kind : WaitKind,
-  spins : usize,
-)
--> Result< Wake, RingError >
-{
+pub fn for_space_or_close(pair: &CursorPair, shutdown: &Shutdown, kind: WaitKind, spins: usize) -> Result<Wake, RingError> {
   let mut closed = false;
-  let outcome = ring_wait::wait_until( kind, spins, ||
-  {
-    if shutdown.is_closed()
-    {
+  let outcome = ring_wait::wait_until(kind, spins, || {
+    if shutdown.is_closed() {
       closed = true;
       return true;
     }
     pair.may_claim()
-  } );
+  });
 
-  match outcome
-  {
+  match outcome {
     // The close is reported even when room also appeared: a producer told to
     // stop must stop, and a `Ready` here would send it back to publish.
-    Ok( _ ) if closed => Ok( Wake::Closed ),
-    Ok( _ ) => Ok( Wake::Ready ),
-    Err( _ ) => Err( RingError::Full ),
+    Ok(_) if closed => Ok(Wake::Closed),
+    Ok(_) => Ok(Wake::Ready),
+    Err(_) => Err(RingError::Full),
   }
 }
 
@@ -656,10 +604,9 @@ pub fn for_space_or_close
 /// assert!( !shutdown.is_closed(), "reset leaves the ring open" );
 /// assert_eq!( consumer.len(), 0 );
 /// ```
-pub fn reset< T : Send >( shutdown : &Shutdown, consumer : &mut Consumer< '_, T > ) -> usize
-{
+pub fn reset<T: Send>(shutdown: &Shutdown, consumer: &mut Consumer<'_, T>) -> usize {
   let stopped = shutdown.close();
-  let discarded = stopped.discard_all( consumer );
+  let discarded = stopped.discard_all(consumer);
   stopped.reopen();
   discarded
 }

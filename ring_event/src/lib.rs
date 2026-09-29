@@ -30,9 +30,9 @@
 //! family exists to avoid. An associated type with a lifetime lets one function
 //! serve both without either paying for the other's shape.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_slot::{ BytesSlot, Slot, TypedSlot };
+use ring_slot::{BytesSlot, Slot, TypedSlot};
 use ring_types::RingError;
 
 /// A payload that knows how to enter a slot of shape `S`.
@@ -49,8 +49,7 @@ use ring_types::RingError;
 /// 7u32.fill( &mut slot ).unwrap();
 /// assert_eq!( slot.get(), Some( &7 ) );
 /// ```
-pub trait Fill< S >
-{
+pub trait Fill<S> {
   /// Write `self` into `slot`, replacing whatever it held.
   ///
   /// # Errors
@@ -59,28 +58,24 @@ pub trait Fill< S >
   /// payload longer than the slot, which is a configuration error rather than
   /// back-pressure: no amount of draining makes the payload fit. A typed
   /// payload cannot fail, and says so by never returning `Err`.
-  fn fill( self, slot : &mut S ) -> Result< (), RingError >;
+  fn fill(self, slot: &mut S) -> Result<(), RingError>;
 }
 
-impl< T > Fill< TypedSlot< T > > for T
-{
-  fn fill( self, slot : &mut TypedSlot< T > ) -> Result< (), RingError >
-  {
+impl<T> Fill<TypedSlot<T>> for T {
+  fn fill(self, slot: &mut TypedSlot<T>) -> Result<(), RingError> {
     // Discarding the displaced value is `fill`'s documented contract — "write
     // `self` into `slot`, replacing whatever it held" — not an oversight. A
     // caller that needs the old record calls `TypedSlot::set` directly and
     // binds it; this trait exists to give both slot shapes one signature, and
     // `BytesSlot` has nothing to hand back.
-    slot.set( self );
-    Ok( () )
+    slot.set(self);
+    Ok(())
   }
 }
 
-impl< const N : usize > Fill< BytesSlot< N > > for &[ u8 ]
-{
-  fn fill( self, slot : &mut BytesSlot< N > ) -> Result< (), RingError >
-  {
-    slot.write( self )
+impl<const N: usize> Fill<BytesSlot<N>> for &[u8] {
+  fn fill(self, slot: &mut BytesSlot<N>) -> Result<(), RingError> {
+    slot.write(self)
   }
 }
 
@@ -99,10 +94,11 @@ impl< const N : usize > Fill< BytesSlot< N > > for &[ u8 ]
 /// slot.set( 3u8 );
 /// assert_eq!( slot.peek(), Some( &3 ) );
 /// ```
-pub trait Peek
-{
+pub trait Peek {
   /// What a reader is handed when the slot holds something.
-  type Out< 'a > where Self : 'a;
+  type Out<'a>
+  where
+    Self: 'a;
 
   /// The slot's contents, or `None` when nothing was published into it.
   ///
@@ -120,26 +116,25 @@ pub trait Peek
   /// "somebody published nothing" must read it there rather than from the slot.
   /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
   /// cheaper way to send a payload-free signal.
-  fn peek( &self ) -> Option< Self::Out< '_ > >;
+  fn peek(&self) -> Option<Self::Out<'_>>;
 }
 
-impl< T > Peek for TypedSlot< T >
-{
-  type Out< 'a > = &'a T where T : 'a;
+impl<T> Peek for TypedSlot<T> {
+  type Out<'a>
+    = &'a T
+  where
+    T: 'a;
 
-  fn peek( &self ) -> Option< &T >
-  {
+  fn peek(&self) -> Option<&T> {
     self.get()
   }
 }
 
-impl< const N : usize > Peek for BytesSlot< N >
-{
-  type Out< 'a > = &'a [ u8 ];
+impl<const N: usize> Peek for BytesSlot<N> {
+  type Out<'a> = &'a [u8];
 
-  fn peek( &self ) -> Option< &[ u8 ] >
-  {
-    if self.is_empty() { None } else { Some( self.read() ) }
+  fn peek(&self) -> Option<&[u8]> {
+    if self.is_empty() { None } else { Some(self.read()) }
   }
 }
 
@@ -169,11 +164,11 @@ impl< const N : usize > Peek for BytesSlot< N >
 /// publish_into( &mut bytes, &b"hi"[ .. ] ).unwrap();
 /// assert_eq!( drain_from( &bytes ), Some( &b"hi"[ .. ] ) );
 /// ```
-pub fn publish_into< S, P >( slot : &mut S, payload : P ) -> Result< (), RingError >
+pub fn publish_into<S, P>(slot: &mut S, payload: P) -> Result<(), RingError>
 where
-  P : Fill< S >,
+  P: Fill<S>,
 {
-  payload.fill( slot )
+  payload.fill(slot)
 }
 
 /// Read `slot` — the one read path both shapes take.
@@ -203,9 +198,9 @@ where
 /// recycle( &mut slot );
 /// assert!( slot.is_empty(), "this is the call that does" );
 /// ```
-pub fn drain_from< S >( slot : &S ) -> Option< S::Out< '_ > >
+pub fn drain_from<S>(slot: &S) -> Option<S::Out<'_>>
 where
-  S : Peek,
+  S: Peek,
 {
   slot.peek()
 }
@@ -225,9 +220,9 @@ where
 /// recycle( &mut slot );
 /// assert_eq!( drain_from( &slot ), None );
 /// ```
-pub fn recycle< S >( slot : &mut S )
+pub fn recycle<S>(slot: &mut S)
 where
-  S : Slot,
+  S: Slot,
 {
   slot.clear();
 }

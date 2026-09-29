@@ -91,17 +91,16 @@
 //! manifest field left empty clamps to one producer and selects SPSC.
 //! → `docs/pitfall/001`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::fmt;
 
+pub use ring_config::RingConfig;
 use ring_core::Ring;
 use ring_handle::Split;
+pub use ring_registry::Registry;
 use ring_registry::RegistryError;
 use ring_types::RingError;
-
-pub use ring_config::RingConfig;
-pub use ring_registry::Registry;
 
 /// A ring that is not yet built, and the only supported way to build one.
 ///
@@ -113,11 +112,10 @@ pub use ring_registry::Registry;
 /// It is a type rather than a free function because it is one of five names on
 /// the family's export Contract, and a consumer needs a noun to import and to
 /// name in their own documentation.
-#[ derive( Debug, Clone ) ]
+#[derive(Debug, Clone)]
 pub struct Factory;
 
-impl Factory
-{
+impl Factory {
   /// Build a ring from a configuration.
   ///
   /// Returns the [`Split`] that owns it. Call `ends()` then `split()` on that
@@ -146,10 +144,9 @@ impl Factory
   ///   BuildError::Unsupported( RingError::PolicyUnsupported ),
   /// );
   /// ```
-  pub fn build< S : Send >( &self, cfg : RingConfig ) -> Result< Split< S >, BuildError >
-  {
-    let ring = Ring::new( &cfg ).map_err( BuildError::Unsupported )?;
-    Ok( Split::new( ring ) )
+  pub fn build<S: Send>(&self, cfg: RingConfig) -> Result<Split<S>, BuildError> {
+    let ring = Ring::new(&cfg).map_err(BuildError::Unsupported)?;
+    Ok(Split::new(ring))
   }
 
   /// Build a ring and register it under a name.
@@ -190,27 +187,18 @@ impl Factory
   /// assert_eq!( again.unwrap_err(), BuildError::NameTaken );
   /// assert_eq!( registry.len(), 1 );
   /// ```
-  pub fn build_named< S : Send >
-  (
-    &self,
-    cfg : RingConfig,
-    name : &str,
-    registry : &mut Registry< S >,
-  )
-  -> Result< (), BuildError >
-  {
-    let split = self.build( cfg )?;
+  pub fn build_named<S: Send>(&self, cfg: RingConfig, name: &str, registry: &mut Registry<S>) -> Result<(), BuildError> {
+    let split = self.build(cfg)?;
 
     // The refused `Split` comes back in the error payload and is dropped as
     // this arm ends. That is what makes the "no ring was exposed" guarantee
     // free rather than checked — the caller never held it.
-    match registry.register( name, split )
-    {
-      Ok( () ) => Ok( () ),
+    match registry.register(name, split) {
+      Ok(()) => Ok(()),
       // The name is discarded rather than carried into `BuildError`: the caller
       // passed it in and still has it. Carrying it would also put a `String` in
       // a `Copy` error type for no new information.
-      Err( ( RegistryError::NameTaken { .. }, _refused ) ) => Err( BuildError::NameTaken ),
+      Err((RegistryError::NameTaken { .. }, _refused)) => Err(BuildError::NameTaken),
     }
   }
 
@@ -235,11 +223,10 @@ impl Factory
   /// that reads `cfg` and picks between them at runtime. That would
   /// reintroduce exactly the second input `docs/invariant/001` forbids, and
   /// nothing in either signature stops it from being written.
-  #[ cfg( feature = "crossbeam" ) ]
-  pub fn build_crossbeam< S : Send >( &self, cfg : RingConfig ) -> Result< Split< S >, BuildError >
-  {
-    let ring = Ring::new_crossbeam( &cfg ).map_err( BuildError::Unsupported )?;
-    Ok( Split::new( ring ) )
+  #[cfg(feature = "crossbeam")]
+  pub fn build_crossbeam<S: Send>(&self, cfg: RingConfig) -> Result<Split<S>, BuildError> {
+    let ring = Ring::new_crossbeam(&cfg).map_err(BuildError::Unsupported)?;
+    Ok(Split::new(ring))
   }
 }
 
@@ -249,9 +236,8 @@ impl Factory
 /// could plausibly make happen elsewhere: `RingConfig::new` rejects a bad
 /// capacity, `with_batch` and `with_producers` clamp rather than fail, and
 /// nothing anywhere checks the wait strategy.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum BuildError
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BuildError {
   /// A ring is already registered under this name.
   ///
   /// Reachable only from [`Factory::build_named`], and only after the build
@@ -266,17 +252,14 @@ pub enum BuildError
   /// this payload stays inside the export Contract's five crates. From
   /// `build_named`, this variant means the build phase itself failed and the
   /// registry was never consulted — the mirror image of `NameTaken`.
-  Unsupported( RingError ),
+  Unsupported(RingError),
 }
 
-impl fmt::Display for BuildError
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::NameTaken => write!( f, "a ring is already registered under this name" ),
-      Self::Unsupported( error ) => write!( f, "the backend refused the configuration: {error}" ),
+impl fmt::Display for BuildError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::NameTaken => write!(f, "a ring is already registered under this name"),
+      Self::Unsupported(error) => write!(f, "the backend refused the configuration: {error}"),
     }
   }
 }

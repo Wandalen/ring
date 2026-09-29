@@ -49,10 +49,11 @@
 //! indistinguishable, which is exactly the misreading a diagnostic must not
 //! invite.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::fmt;
 use std::sync::Mutex;
+
 use ring_types::Seq;
 
 /// The kind of sequence operation an entry records.
@@ -65,9 +66,8 @@ use ring_types::Seq;
 /// use ring_trace::TraceOp;
 /// assert_eq!( TraceOp::ALL.len(), 5 );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub enum TraceOp
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TraceOp {
   /// A producer took ownership of one or more sequences.
   Claim,
   /// A producer made a claimed sequence visible to consumers.
@@ -80,17 +80,9 @@ pub enum TraceOp
   Drop,
 }
 
-impl TraceOp
-{
+impl TraceOp {
   /// Every discriminant, for a test that must cover all of them.
-  pub const ALL : [ Self; 5 ] =
-  [
-    Self::Claim,
-    Self::Publish,
-    Self::Consume,
-    Self::Commit,
-    Self::Drop,
-  ];
+  pub const ALL: [Self; 5] = [Self::Claim, Self::Publish, Self::Consume, Self::Commit, Self::Drop];
 
   /// This operation's name.
   ///
@@ -102,11 +94,9 @@ impl TraceOp
   /// use ring_trace::TraceOp;
   /// assert_eq!( TraceOp::Claim.name(), "claim" );
   /// ```
-  #[ must_use ]
-  pub const fn name( self ) -> &'static str
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn name(self) -> &'static str {
+    match self {
       Self::Claim => "claim",
       Self::Publish => "publish",
       Self::Consume => "consume",
@@ -116,11 +106,9 @@ impl TraceOp
   }
 }
 
-impl fmt::Display for TraceOp
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    f.write_str( self.name() )
+impl fmt::Display for TraceOp {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    f.write_str(self.name())
   }
 }
 
@@ -145,37 +133,32 @@ impl fmt::Display for TraceOp
 /// let entry = TraceEntry { op : TraceOp::Claim, seq : Seq( 8 ), count : 64 };
 /// assert_eq!( entry.end(), Seq( 72 ) );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub struct TraceEntry
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TraceEntry {
   /// What happened.
-  pub op : TraceOp,
+  pub op: TraceOp,
   /// The first sequence involved.
-  pub seq : Seq,
+  pub seq: Seq,
   /// How many consecutive sequences the operation covered.
-  pub count : usize,
+  pub count: usize,
 }
 
-impl TraceEntry
-{
+impl TraceEntry {
   /// One past the last sequence this entry covers.
   ///
   /// Saturates rather than wrapping: a bare `+` here would print a range that
   /// reads backwards, or panic under debug assertions, the moment a caller
   /// traces the one `Seq` the family publishes by name —
   /// `ring_mpsc::UNSTAMPED` (`Seq(u64::MAX)`). See `pitfall/001` TR41.
-  #[ must_use ]
-  pub const fn end( &self ) -> Seq
-  {
-    Seq( self.seq.0.saturating_add( self.count as u64 ) )
+  #[must_use]
+  pub const fn end(&self) -> Seq {
+    Seq(self.seq.0.saturating_add(self.count as u64))
   }
 }
 
-impl fmt::Display for TraceEntry
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    write!( f, "{} {}..{}", self.op, self.seq.0, self.end().0 )
+impl fmt::Display for TraceEntry {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{} {}..{}", self.op, self.seq.0, self.end().0)
   }
 }
 
@@ -198,27 +181,29 @@ impl fmt::Display for TraceEntry
 /// on.record( TraceOp::Publish, Seq( 0 ), 1 );
 /// assert_eq!( on.len(), 1 );
 /// ```
-#[ derive( Debug ) ]
-pub struct Trace
-{
-  enabled : bool,
-  entries : Mutex< Vec< TraceEntry > >,
+#[derive(Debug)]
+pub struct Trace {
+  enabled: bool,
+  entries: Mutex<Vec<TraceEntry>>,
 }
 
-impl Trace
-{
+impl Trace {
   /// A trace that records.
-  #[ must_use ]
-  pub const fn enabled() -> Self
-  {
-    Self { enabled : true, entries : Mutex::new( Vec::new() ) }
+  #[must_use]
+  pub const fn enabled() -> Self {
+    Self {
+      enabled: true,
+      entries: Mutex::new(Vec::new()),
+    }
   }
 
   /// A trace that discards — the default a ring is built with.
-  #[ must_use ]
-  pub const fn disabled() -> Self
-  {
-    Self { enabled : false, entries : Mutex::new( Vec::new() ) }
+  #[must_use]
+  pub const fn disabled() -> Self {
+    Self {
+      enabled: false,
+      entries: Mutex::new(Vec::new()),
+    }
   }
 
   /// Whether this trace records.
@@ -228,9 +213,8 @@ impl Trace
   /// assert!( Trace::enabled().is_enabled() );
   /// assert!( !Trace::disabled().is_enabled() );
   /// ```
-  #[ must_use ]
-  pub const fn is_enabled( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_enabled(&self) -> bool {
     self.enabled
   }
 
@@ -251,14 +235,12 @@ impl Trace
   /// Carries `#[ inline ]` so the disabled path — a single `bool` read and a
   /// return — can be inlined into cross-crate call sites instead of paying for
   /// an un-inlined call on every producer/consumer step (→ `algorithm/001`).
-  #[ inline ]
-  pub fn record( &self, op : TraceOp, seq : Seq, count : usize )
-  {
-    if !self.enabled
-    {
+  #[inline]
+  pub fn record(&self, op: TraceOp, seq: Seq, count: usize) {
+    if !self.enabled {
       return;
     }
-    self.entries_guard().push( TraceEntry { op, seq, count } );
+    self.entries_guard().push(TraceEntry { op, seq, count });
   }
 
   /// The log, with poisoning recovered rather than propagated.
@@ -273,25 +255,22 @@ impl Trace
   /// A future method that hands out the guard itself, or takes a callback to
   /// invoke under the lock, would change that and needs its own reachability
   /// argument before it can rely on the same recovery. See `pitfall/002` TR43.
-  fn entries_guard( &self ) -> std::sync::MutexGuard< '_, Vec< TraceEntry > >
-  {
-    self.entries.lock().unwrap_or_else( std::sync::PoisonError::into_inner )
+  fn entries_guard(&self) -> std::sync::MutexGuard<'_, Vec<TraceEntry>> {
+    self.entries.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
   }
 
   /// How many entries have been recorded.
   ///
   /// Zero forever on a disabled trace — the second half of feature 185's
   /// `ring_trace` clause, readable without draining the log.
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.entries_guard().len()
   }
 
   /// Whether nothing has been recorded.
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.len() == 0
   }
 
@@ -311,9 +290,8 @@ impl Trace
   /// let ops : Vec< _ > = trace.entries().iter().map( |e| e.op ).collect();
   /// assert_eq!( ops, vec![ TraceOp::Claim, TraceOp::Publish ] );
   /// ```
-  #[ must_use ]
-  pub fn entries( &self ) -> Vec< TraceEntry >
-  {
+  #[must_use]
+  pub fn entries(&self) -> Vec<TraceEntry> {
     self.entries_guard().clone()
   }
 
@@ -334,10 +312,9 @@ impl Trace
   /// assert_eq!( trace.count_of( TraceOp::Drop ), 1 );
   /// assert_eq!( trace.count_of( TraceOp::Claim ), 0 );
   /// ```
-  #[ must_use ]
-  pub fn count_of( &self, op : TraceOp ) -> usize
-  {
-    self.entries_guard().iter().filter( |e| e.op == op ).count()
+  #[must_use]
+  pub fn count_of(&self, op: TraceOp) -> usize {
+    self.entries_guard().iter().filter(|e| e.op == op).count()
   }
 
   /// Discard every entry, keeping the enabled state.
@@ -359,17 +336,14 @@ impl Trace
   /// assert!( trace.is_empty() );
   /// assert!( trace.is_enabled(), "clearing is not disabling" );
   /// ```
-  pub fn clear( &mut self )
-  {
+  pub fn clear(&mut self) {
     self.entries_guard().clear();
   }
 }
 
-impl Default for Trace
-{
+impl Default for Trace {
   /// Disabled — the state a ring that was never asked to trace must be in.
-  fn default() -> Self
-  {
+  fn default() -> Self {
     Self::disabled()
   }
 }

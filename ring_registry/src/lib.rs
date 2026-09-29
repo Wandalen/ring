@@ -37,11 +37,11 @@
 //! needs `&mut`, so retrieval is `get_mut` and there is no immutable `get`.
 //! → `docs/api/001_the_registry_surface.md`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
+use core::fmt;
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
-use core::fmt;
 
 use ring_handle::Split;
 
@@ -51,27 +51,22 @@ use ring_handle::Split;
 /// surface is where a name conflict is the only thing that can go wrong *today*
 /// — retrieval and removal both return `Option`, which is not an error. An enum
 /// leaves room for that to change without a breaking signature.
-#[ derive( Debug, Clone, PartialEq, Eq ) ]
-pub enum RegistryError
-{
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RegistryError {
   /// A ring is already registered under this name.
   ///
   /// Carries the name so a caller reporting the conflict does not have to have
   /// kept it, and so the message is specific without the caller formatting it.
-  NameTaken
-  {
+  NameTaken {
     /// The name that was already live.
-    name : String,
+    name: String,
   },
 }
 
-impl fmt::Display for RegistryError
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::NameTaken { name } => write!( f, "a ring is already registered as {name:?}" ),
+impl fmt::Display for RegistryError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::NameTaken { name } => write!(f, "a ring is already registered as {name:?}"),
     }
   }
 }
@@ -83,27 +78,22 @@ impl core::error::Error for RegistryError {}
 /// Dropping the registry drops every ring, and dropping a ring drops the
 /// records still in it — measured, not assumed, by
 /// `dropping_the_registry_drops_every_record_still_in_every_ring`. Drop order across rings is unspecified and varies — a caller needing one must `remove` them in that order first.
-#[ derive( Debug ) ]
-pub struct Registry< T >
-{
-  rings : HashMap< String, Split< T > >,
+#[derive(Debug)]
+pub struct Registry<T> {
+  rings: HashMap<String, Split<T>>,
 }
 
-impl< T > Default for Registry< T >
-{
-  fn default() -> Self
-  {
+impl<T> Default for Registry<T> {
+  fn default() -> Self {
     Self::new()
   }
 }
 
-impl< T > Registry< T >
-{
+impl<T> Registry<T> {
   /// An empty registry.
-  #[ must_use ]
-  pub fn new() -> Self
-  {
-    Self { rings : HashMap::new() }
+  #[must_use]
+  pub fn new() -> Self {
+    Self { rings: HashMap::new() }
   }
 
   /// Register a ring under a name, taking ownership of it.
@@ -152,29 +142,22 @@ impl< T > Registry< T >
   /// `into_key`; the only method that yields the key by value is
   /// `remove_entry`, which deletes the ring this method must not destroy.
   /// → `docs/workaround/001`.
-  #[ allow( clippy::result_large_err, reason = "the large payload is the caller's ring, handed back rather than destroyed" ) ]
-  pub fn register
-  (
-    &mut self,
-    name : impl Into< String >,
-    ring : Split< T >,
-  )
-  -> Result< (), ( RegistryError, Split< T > ) >
-  {
+  #[allow(
+    clippy::result_large_err,
+    reason = "the large payload is the caller's ring, handed back rather than destroyed"
+  )]
+  pub fn register(&mut self, name: impl Into<String>, ring: Split<T>) -> Result<(), (RegistryError, Split<T>)> {
     let name = name.into();
 
-    match self.rings.entry( name )
-    {
-      Entry::Occupied( occupied ) =>
-      {
+    match self.rings.entry(name) {
+      Entry::Occupied(occupied) => {
         let name = occupied.key().clone();
-        Err( ( RegistryError::NameTaken { name }, ring ) )
-      },
-      Entry::Vacant( vacant ) =>
-      {
-        vacant.insert( ring );
-        Ok( () )
-      },
+        Err((RegistryError::NameTaken { name }, ring))
+      }
+      Entry::Vacant(vacant) => {
+        vacant.insert(ring);
+        Ok(())
+      }
     }
   }
 
@@ -185,9 +168,8 @@ impl< T > Registry< T >
   /// — an immutable `get` would be a method that compiles, returns something,
   /// and permits no operation. [`Self::contains`] is the immutable query that
   /// is actually answerable.
-  pub fn get_mut( &mut self, name : &str ) -> Option< &mut Split< T > >
-  {
-    self.rings.get_mut( name )
+  pub fn get_mut(&mut self, name: &str) -> Option<&mut Split<T>> {
+    self.rings.get_mut(name)
   }
 
   /// Take the ring registered under a name, freeing the name.
@@ -195,29 +177,25 @@ impl< T > Registry< T >
   /// This is what makes "a name that is taken" a temporary condition rather
   /// than a permanent one, and therefore what makes [`Self::register`]'s
   /// refusal recoverable rather than final.
-  pub fn remove( &mut self, name : &str ) -> Option< Split< T > >
-  {
-    self.rings.remove( name )
+  pub fn remove(&mut self, name: &str) -> Option<Split<T>> {
+    self.rings.remove(name)
   }
 
   /// Whether a name is live.
-  #[ must_use ]
-  pub fn contains( &self, name : &str ) -> bool
-  {
-    self.rings.contains_key( name )
+  #[must_use]
+  pub fn contains(&self, name: &str) -> bool {
+    self.rings.contains_key(name)
   }
 
   /// How many rings are registered.
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.rings.len()
   }
 
   /// Whether nothing is registered.
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.rings.is_empty()
   }
 
@@ -228,8 +206,7 @@ impl< T > Registry< T >
   /// an expected list must sort or collect into a set first. An ordered map
   /// would remove that hazard; it is not used because the population is not
   /// known to stay small, not because it costs more today.
-  pub fn names( &self ) -> impl Iterator< Item = &str >
-  {
-    self.rings.keys().map( String::as_str )
+  pub fn names(&self) -> impl Iterator<Item = &str> {
+    self.rings.keys().map(String::as_str)
   }
 }

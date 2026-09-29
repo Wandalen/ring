@@ -15,9 +15,9 @@
 //! configuration must be constructible and inspectable at tier 1, long before
 //! anything at tier 11 exists to consume it.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_types::{ Capacity, OverflowPolicy, RingError, WaitKind };
+use ring_types::{Capacity, OverflowPolicy, RingError, WaitKind};
 
 /// Everything that varies between one ring and another.
 ///
@@ -37,18 +37,16 @@ use ring_types::{ Capacity, OverflowPolicy, RingError, WaitKind };
 /// assert_eq!( cfg.capacity().get(), 1024 );
 /// assert!( cfg.is_multi_producer() );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub struct RingConfig
-{
-  capacity : Capacity,
-  wait : WaitKind,
-  overflow : OverflowPolicy,
-  producers : usize,
-  batch : usize,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RingConfig {
+  capacity: Capacity,
+  wait: WaitKind,
+  overflow: OverflowPolicy,
+  producers: usize,
+  batch: usize,
 }
 
-impl RingConfig
-{
+impl RingConfig {
   /// A configuration of `slots` capacity, with every other field at its
   /// default: spin waiting, drop-newest overflow, one producer, batch of one.
   ///
@@ -61,19 +59,14 @@ impl RingConfig
   /// assert!( RingConfig::new( 64 ).is_ok() );
   /// assert!( RingConfig::new( 63 ).is_err() );
   /// ```
-  pub fn new( slots : usize ) -> Result< Self, RingError >
-  {
-    Ok
-    (
-      Self
-      {
-        capacity : Capacity::new( slots )?,
-        wait : WaitKind::default(),
-        overflow : OverflowPolicy::default(),
-        producers : 1,
-        batch : 1,
-      }
-    )
+  pub fn new(slots: usize) -> Result<Self, RingError> {
+    Ok(Self {
+      capacity: Capacity::new(slots)?,
+      wait: WaitKind::default(),
+      overflow: OverflowPolicy::default(),
+      producers: 1,
+      batch: 1,
+    })
   }
 
   /// Set the wait strategy.
@@ -84,9 +77,8 @@ impl RingConfig
   /// let cfg = RingConfig::new( 8 ).unwrap().with_wait( WaitKind::Park );
   /// assert_eq!( cfg.wait(), WaitKind::Park );
   /// ```
-  #[ must_use ]
-  pub const fn with_wait( mut self, wait : WaitKind ) -> Self
-  {
+  #[must_use]
+  pub const fn with_wait(mut self, wait: WaitKind) -> Self {
     self.wait = wait;
     self
   }
@@ -99,9 +91,8 @@ impl RingConfig
   /// let cfg = RingConfig::new( 8 ).unwrap().with_overflow( OverflowPolicy::Fail );
   /// assert_eq!( cfg.overflow(), OverflowPolicy::Fail );
   /// ```
-  #[ must_use ]
-  pub const fn with_overflow( mut self, overflow : OverflowPolicy ) -> Self
-  {
+  #[must_use]
+  pub const fn with_overflow(mut self, overflow: OverflowPolicy) -> Self {
     self.overflow = overflow;
     self
   }
@@ -117,9 +108,8 @@ impl RingConfig
   /// assert_eq!( RingConfig::new( 8 ).unwrap().with_producers( 0 ).producers(), 1 );
   /// assert_eq!( RingConfig::new( 8 ).unwrap().with_producers( 6 ).producers(), 6 );
   /// ```
-  #[ must_use ]
-  pub const fn with_producers( mut self, producers : usize ) -> Self
-  {
+  #[must_use]
+  pub const fn with_producers(mut self, producers: usize) -> Self {
     self.producers = if producers == 0 { 1 } else { producers };
     self
   }
@@ -135,10 +125,13 @@ impl RingConfig
   /// assert_eq!( cfg.with_batch( 8 ).batch(), 8 );
   /// assert_eq!( cfg.with_batch( 999 ).batch(), 16 );
   /// ```
-  #[ must_use ]
-  pub const fn with_batch( mut self, batch : usize ) -> Self
-  {
-    let capped = if batch > self.capacity.get() { self.capacity.get() } else { batch };
+  #[must_use]
+  pub const fn with_batch(mut self, batch: usize) -> Self {
+    let capped = if batch > self.capacity.get() {
+      self.capacity.get()
+    } else {
+      batch
+    };
     self.batch = if capped == 0 { 1 } else { capped };
     self
   }
@@ -149,9 +142,8 @@ impl RingConfig
   /// use ring_config::RingConfig;
   /// assert_eq!( RingConfig::new( 32 ).unwrap().capacity().get(), 32 );
   /// ```
-  #[ must_use ]
-  pub const fn capacity( &self ) -> Capacity
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> Capacity {
     self.capacity
   }
 
@@ -162,9 +154,8 @@ impl RingConfig
   /// use ring_config::RingConfig;
   /// assert_eq!( RingConfig::new( 8 ).unwrap().wait(), WaitKind::Spin );
   /// ```
-  #[ must_use ]
-  pub const fn wait( &self ) -> WaitKind
-  {
+  #[must_use]
+  pub const fn wait(&self) -> WaitKind {
     self.wait
   }
 
@@ -175,9 +166,8 @@ impl RingConfig
   /// use ring_config::RingConfig;
   /// assert_eq!( RingConfig::new( 8 ).unwrap().overflow(), OverflowPolicy::DropNewest );
   /// ```
-  #[ must_use ]
-  pub const fn overflow( &self ) -> OverflowPolicy
-  {
+  #[must_use]
+  pub const fn overflow(&self) -> OverflowPolicy {
     self.overflow
   }
 
@@ -187,9 +177,8 @@ impl RingConfig
   /// use ring_config::RingConfig;
   /// assert_eq!( RingConfig::new( 8 ).unwrap().producers(), 1 );
   /// ```
-  #[ must_use ]
-  pub const fn producers( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn producers(&self) -> usize {
     self.producers
   }
 
@@ -199,9 +188,8 @@ impl RingConfig
   /// use ring_config::RingConfig;
   /// assert_eq!( RingConfig::new( 8 ).unwrap().batch(), 1 );
   /// ```
-  #[ must_use ]
-  pub const fn batch( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn batch(&self) -> usize {
     self.batch
   }
 
@@ -216,9 +204,8 @@ impl RingConfig
   /// assert!( !RingConfig::new( 8 ).unwrap().is_multi_producer() );
   /// assert!( RingConfig::new( 8 ).unwrap().with_producers( 2 ).is_multi_producer() );
   /// ```
-  #[ must_use ]
-  pub const fn is_multi_producer( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_multi_producer(&self) -> bool {
     self.producers > 1
   }
 
@@ -233,9 +220,8 @@ impl RingConfig
   /// assert!( !cfg.is_tick_safe() );
   /// assert!( cfg.with_wait( WaitKind::None ).is_tick_safe() );
   /// ```
-  #[ must_use ]
-  pub const fn is_tick_safe( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_tick_safe(&self) -> bool {
     self.wait.is_non_blocking()
   }
 }

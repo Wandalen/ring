@@ -164,18 +164,19 @@
 //! system stops the opposite mistake (a `ring_mpsc` shape will not compile
 //! here); it stops nothing in this direction.
 
-#![ deny( missing_docs ) ]
-#![ allow( unsafe_code ) ]
+#![deny(missing_docs)]
+#![allow(unsafe_code)]
 
-use core::cell::{ Cell, UnsafeCell };
+use core::cell::{Cell, UnsafeCell};
 use core::marker::PhantomData;
-use core::ops::{ Deref, DerefMut };
+use core::ops::{Deref, DerefMut};
 use core::sync::atomic::Ordering;
-use ring_store::Buffer;
+
 use ring_config::RingConfig;
-use ring_cursor::{ CursorPair, SeqCell, GATING };
-use ring_slot::{ Slot, TypedSlot };
-use ring_types::{ Capacity, RingError, Seq };
+use ring_cursor::{CursorPair, GATING, SeqCell};
+use ring_slot::{Slot, TypedSlot};
+use ring_store::Buffer;
+use ring_types::{Capacity, RingError, Seq};
 
 /// The ordering an end reads **its own** cursor with.
 ///
@@ -194,7 +195,7 @@ use ring_types::{ Capacity, RingError, Seq };
 /// assert_eq!( ring_spsc::OWN, Ordering::Relaxed );
 /// assert_eq!( ring_cursor::GATING, Ordering::Acquire );
 /// ```
-pub const OWN : Ordering = Ordering::Relaxed;
+pub const OWN: Ordering = Ordering::Relaxed;
 
 /// The ordering a publication and a commit are made visible with.
 ///
@@ -209,7 +210,7 @@ pub const OWN : Ordering = Ordering::Relaxed;
 ///
 /// assert_eq!( ring_spsc::HANDOFF, Ordering::Release );
 /// ```
-pub const HANDOFF : Ordering = Ordering::Release;
+pub const HANDOFF: Ordering = Ordering::Release;
 
 /// A ring one thread writes and one thread reads.
 ///
@@ -235,8 +236,7 @@ pub const HANDOFF : Ordering = Ordering::Release;
 /// assert_eq!( ring.capacity().get(), 4 );
 /// assert!( ring.on_distinct_lines(), "the two cursors do not share a line" );
 /// ```
-pub struct Ring< S >
-{
+pub struct Ring<S> {
   /// The slot array, behind an `UnsafeCell` because the producer writes into it
   /// through a shared reference while the consumer reads from it.
   ///
@@ -256,8 +256,8 @@ pub struct Ring< S >
   /// `ring_store` still knows nothing of this crate: it stores whatever
   /// element type it is given, and every `unsafe` stays here, which is
   /// decision 123's whole point.
-  slots : Buffer< UnsafeCell< S > >,
-  cursors : CursorPair,
+  slots: Buffer<UnsafeCell<S>>,
+  cursors: CursorPair,
 }
 
 // SAFETY: `Ring` is only ever shared between exactly two threads, and only as
@@ -278,10 +278,9 @@ pub struct Ring< S >
 // is reading one crate's SAFETY comment while editing the other's
 // (→ `docs/workaround/002_an_unsafe_impl_sync_on_a_type_whose_ends_are_not_sync.md`
 // SP52).
-unsafe impl< S : Send > Sync for Ring< S > {}
+unsafe impl<S: Send> Sync for Ring<S> {}
 
-impl< S : Slot + Default > Ring< S >
-{
+impl<S: Slot + Default> Ring<S> {
   /// Allocate a ring of `capacity` slots, with both cursors at zero.
   ///
   /// ```
@@ -292,13 +291,11 @@ impl< S : Slot + Default > Ring< S >
   /// let ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 16 ).unwrap() );
   /// assert_eq!( ring.capacity().get(), 16 );
   /// ```
-  #[ must_use ]
-  pub fn new( capacity : Capacity ) -> Self
-  {
-    Self
-    {
-      slots : Buffer::new( capacity ),
-      cursors : CursorPair::new( capacity ),
+  #[must_use]
+  pub fn new(capacity: Capacity) -> Self {
+    Self {
+      slots: Buffer::new(capacity),
+      cursors: CursorPair::new(capacity),
     }
   }
 
@@ -318,15 +315,13 @@ impl< S : Slot + Default > Ring< S >
   /// let ring : Ring< TypedSlot< u8 > > = Ring::with_config( &config );
   /// assert_eq!( ring.capacity(), config.capacity() );
   /// ```
-  #[ must_use ]
-  pub fn with_config( config : &RingConfig ) -> Self
-  {
-    Self::new( config.capacity() )
+  #[must_use]
+  pub fn with_config(config: &RingConfig) -> Self {
+    Self::new(config.capacity())
   }
 }
 
-impl< S > Ring< S >
-{
+impl<S> Ring<S> {
   /// How many slots the ring holds.
   ///
   /// ```
@@ -337,9 +332,8 @@ impl< S > Ring< S >
   /// let ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 64 ).unwrap() );
   /// assert_eq!( ring.capacity().get(), 64 );
   /// ```
-  #[ must_use ]
-  pub const fn capacity( &self ) -> Capacity
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> Capacity {
     self.cursors.capacity()
   }
 
@@ -357,9 +351,8 @@ impl< S > Ring< S >
   /// let ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 2 ).unwrap() );
   /// assert!( ring.on_distinct_lines() );
   /// ```
-  #[ must_use ]
-  pub fn on_distinct_lines( &self ) -> bool
-  {
+  #[must_use]
+  pub fn on_distinct_lines(&self) -> bool {
     self.cursors.on_distinct_lines()
   }
 
@@ -390,13 +383,18 @@ impl< S > Ring< S >
   ///   } );
   /// } );
   /// ```
-  pub fn split( &mut self ) -> ( Producer< '_, S >, Consumer< '_, S > )
-  {
-    let shared : &Self = self;
+  pub fn split(&mut self) -> (Producer<'_, S>, Consumer<'_, S>) {
+    let shared: &Self = self;
 
     (
-      Producer { ring : shared, _one_thread : PhantomData },
-      Consumer { ring : shared, _one_thread : PhantomData },
+      Producer {
+        ring: shared,
+        _one_thread: PhantomData,
+      },
+      Consumer {
+        ring: shared,
+        _one_thread: PhantomData,
+      },
     )
   }
 
@@ -413,15 +411,14 @@ impl< S > Ring< S >
   /// The `GATING` load that established the upper bound is also what makes the
   /// producer's write to this slot visible; reading a slot on the strength of a
   /// bound obtained any other way is a data race even if the arithmetic holds.
-  unsafe fn slot( &self, seq : Seq ) -> &S
-  {
+  unsafe fn slot(&self, seq: Seq) -> &S {
     // SAFETY: the caller guarantees `seq` is published and not committed, so no
     // `&mut` to this slot exists — the producer's only outstanding `&mut` is to
     // its own claimed sequence, which is at or above the published frontier.
     // `at` yields `&UnsafeCell< S >`, a shared borrow of one slot rather than
     // of the buffer, so the producer's concurrent write to a different slot is
     // not an alias of this borrow.
-    unsafe { &*self.slots.at( seq ).get() }
+    unsafe { &*self.slots.at(seq).get() }
   }
 
   /// The slot `seq` maps to, for writing.
@@ -452,9 +449,8 @@ impl< S > Ring< S >
   /// Returning `&mut S` from `&self` is the one place the two-thread design is
   /// not expressible in safe Rust, and it is why decision 123 sites the opt-out
   /// in this crate.
-  #[ allow( clippy::mut_from_ref ) ]
-  unsafe fn slot_mut( &self, seq : Seq ) -> &mut S
-  {
+  #[allow(clippy::mut_from_ref)]
+  unsafe fn slot_mut(&self, seq: Seq) -> &mut S {
     // SAFETY: the caller is the slot's sole owner under one of the two regimes
     // documented above (the producer end on a claimed-not-yet-published `seq`,
     // or the consumer end on a published-not-yet-committed `seq` reached
@@ -462,24 +458,22 @@ impl< S > Ring< S >
     // live. `at` yields `&UnsafeCell< S >`, so the write permission this deref
     // needs comes from that one slot's cell and claims nothing about any other
     // slot.
-    unsafe { &mut *self.slots.at( seq ).get() }
+    unsafe { &mut *self.slots.at(seq).get() }
   }
 }
 
-impl< S > core::fmt::Debug for Ring< S >
-{
+impl<S> core::fmt::Debug for Ring<S> {
   /// Cursor positions and capacity — never slot contents.
   ///
   /// Formatting the slots would read every one of them, including the ones the
   /// producer may be writing this instant, which is the data race the whole
   /// crate is arranged to avoid. A `Debug` that is unsound to call from the
   /// consumer's thread would be a trap, so it does not exist.
-  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    f.debug_struct( "Ring" )
-      .field( "capacity", &self.cursors.capacity().get() )
-      .field( "produced", &self.cursors.producer().load( GATING ) )
-      .field( "consumed", &self.cursors.consumer().load( GATING ) )
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("Ring")
+      .field("capacity", &self.cursors.capacity().get())
+      .field("produced", &self.cursors.producer().load(GATING))
+      .field("consumed", &self.cursors.consumer().load(GATING))
       .finish_non_exhaustive()
   }
 }
@@ -496,19 +490,17 @@ impl< S > core::fmt::Debug for Ring< S >
 /// this line verbatim in a compiler error, with no dependency edge recording
 /// why (→ `docs/decisions/001_the_switching_cost_argument_undercounts_its_own_blast_radius.md`
 /// SP13).
-#[ derive( Debug ) ]
-pub struct Producer< 'a, S >
-{
-  ring : &'a Ring< S >,
+#[derive(Debug)]
+pub struct Producer<'a, S> {
+  ring: &'a Ring<S>,
   /// `Cell` is `Send` and not `Sync`, so this marker makes the end movable to a
   /// thread and unshareable between two. Without it the end would inherit
   /// `Sync` from `&Ring`, and two threads holding `&Producer` could each claim
   /// the same sequence.
-  _one_thread : PhantomData< Cell< () > >,
+  _one_thread: PhantomData<Cell<()>>,
 }
 
-impl< S > Producer< '_, S >
-{
+impl<S> Producer<'_, S> {
   /// How far this end has published.
   ///
   /// ```
@@ -523,10 +515,9 @@ impl< S > Producer< '_, S >
   /// producer.try_push( 1 ).unwrap();
   /// assert_eq!( producer.position(), Seq( 1 ) );
   /// ```
-  #[ must_use ]
-  pub fn position( &self ) -> Seq
-  {
-    self.ring.cursors.producer().load( OWN )
+  #[must_use]
+  pub fn position(&self) -> Seq {
+    self.ring.cursors.producer().load(OWN)
   }
 
   /// How many pushes are guaranteed to succeed right now.
@@ -572,10 +563,9 @@ impl< S > Producer< '_, S >
   /// claimable) instead of panicking or lying, at zero behavioural cost for
   /// every contract-respecting caller, matching the convention
   /// `ring_seqno::free_slots` already uses for the same computation.
-  #[ must_use ]
-  pub fn free_capacity( &self ) -> usize
-  {
-    self.ring.capacity().get().saturating_sub( self.occupancy() as usize )
+  #[must_use]
+  pub fn free_capacity(&self) -> usize {
+    self.ring.capacity().get().saturating_sub(self.occupancy() as usize)
   }
 
   /// Whether the next claim would fail.
@@ -593,9 +583,8 @@ impl< S > Producer< '_, S >
   /// producer.try_push( 2 ).unwrap();
   /// assert!( producer.is_full() );
   /// ```
-  #[ must_use ]
-  pub fn is_full( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_full(&self) -> bool {
     self.occupancy() as usize == self.ring.capacity().get()
   }
 
@@ -603,12 +592,11 @@ impl< S > Producer< '_, S >
   ///
   /// The one place the asymmetric orderings are spelled out: this end's own
   /// cursor at [`OWN`], the consumer's at [`GATING`].
-  fn occupancy( &self ) -> u64
-  {
-    let produced = self.ring.cursors.producer().load( OWN );
-    let consumed = self.ring.cursors.consumer().load( GATING );
+  fn occupancy(&self) -> u64 {
+    let produced = self.ring.cursors.producer().load(OWN);
+    let consumed = self.ring.cursors.consumer().load(GATING);
 
-    consumed.distance_to( produced )
+    consumed.distance_to(produced)
   }
 
   /// Take the next slot, to be published when the returned value is dropped.
@@ -637,16 +625,14 @@ impl< S > Producer< '_, S >
   ///
   /// assert_eq!( consumer.drain().get( 0 ).map( BytesSlot::read ), Some( &b"hi"[ .. ] ) );
   /// ```
-  pub fn claim( &mut self ) -> Result< Reservation< '_, S >, RingError >
-  {
-    if self.is_full()
-    {
-      return Err( RingError::Full );
+  pub fn claim(&mut self) -> Result<Reservation<'_, S>, RingError> {
+    if self.is_full() {
+      return Err(RingError::Full);
     }
 
-    let seq = self.ring.cursors.producer().load( OWN );
+    let seq = self.ring.cursors.producer().load(OWN);
 
-    Ok( Reservation { ring : self.ring, seq } )
+    Ok(Reservation { ring: self.ring, seq })
   }
 
   /// Claim a slot, write it through `write`, and publish.
@@ -673,16 +659,14 @@ impl< S > Producer< '_, S >
   /// producer.push_with( | slot | slot.write( b"abc" ) ).unwrap().unwrap();
   /// assert_eq!( consumer.drain().get( 0 ).map( BytesSlot::read ), Some( &b"abc"[ .. ] ) );
   /// ```
-  pub fn push_with< R >( &mut self, write : impl FnOnce( &mut S ) -> R ) -> Result< R, RingError >
-  {
+  pub fn push_with<R>(&mut self, write: impl FnOnce(&mut S) -> R) -> Result<R, RingError> {
     let mut reservation = self.claim()?;
 
-    Ok( write( &mut reservation ) )
+    Ok(write(&mut reservation))
   }
 }
 
-impl< T : Send > Producer< '_, TypedSlot< T > >
-{
+impl<T: Send> Producer<'_, TypedSlot<T>> {
   /// Put one record into the ring.
   ///
   /// The fused shape, available where the slot type has a by-value setter. It
@@ -709,15 +693,16 @@ impl< T : Send > Producer< '_, TypedSlot< T > >
   /// assert_eq!( producer.try_push( "first" ), Ok( () ) );
   /// assert_eq!( producer.try_push( "second" ), Err( "second" ), "full, and the record comes back" );
   /// ```
-  pub fn try_push( &mut self, record : T ) -> Result< (), T >
-  {
-    let Ok( mut reservation ) = self.claim() else { return Err( record ) };
+  pub fn try_push(&mut self, record: T) -> Result<(), T> {
+    let Ok(mut reservation) = self.claim() else {
+      return Err(record);
+    };
 
     // The slot's previous occupant, if any, was committed by the consumer a lap
     // ago; dropping it here is what makes the ring's storage bounded.
-    drop( reservation.set( record ) );
+    drop(reservation.set(record));
 
-    Ok( () )
+    Ok(())
   }
 }
 
@@ -727,16 +712,14 @@ impl< T : Send > Producer< '_, TypedSlot< T > >
 /// through a temporary. The publish is the drop, which is what makes an
 /// abandoned claim unrepresentable — an early return, a `?`, or an unwind all
 /// publish rather than wedge the ring.
-#[ must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot" ]
-#[ derive( Debug ) ]
-pub struct Reservation< 'a, S >
-{
-  ring : &'a Ring< S >,
-  seq : Seq,
+#[must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot"]
+#[derive(Debug)]
+pub struct Reservation<'a, S> {
+  ring: &'a Ring<S>,
+  seq: Seq,
 }
 
-impl< S > Reservation< '_, S >
-{
+impl<S> Reservation<'_, S> {
   /// The sequence this slot will be published at.
   ///
   /// ```
@@ -750,47 +733,40 @@ impl< S > Reservation< '_, S >
   /// assert_eq!( producer.claim().unwrap().sequence(), Seq::ZERO );
   /// assert_eq!( producer.claim().unwrap().sequence(), Seq( 1 ), "the first one published on drop" );
   /// ```
-  #[ must_use ]
-  pub const fn sequence( &self ) -> Seq
-  {
+  #[must_use]
+  pub const fn sequence(&self) -> Seq {
     self.seq
   }
 }
 
-impl< S > Deref for Reservation< '_, S >
-{
+impl<S> Deref for Reservation<'_, S> {
   type Target = S;
 
-  fn deref( &self ) -> &S
-  {
+  fn deref(&self) -> &S {
     // SAFETY: `slot_mut`'s precondition holds — see `deref_mut`. A shared
     // reference is strictly weaker than the `&mut` that call is entitled to,
     // and it is derived from the same claimed-not-published sequence.
-    unsafe { self.ring.slot_mut( self.seq ) }
+    unsafe { self.ring.slot_mut(self.seq) }
   }
 }
 
-impl< S > DerefMut for Reservation< '_, S >
-{
-  fn deref_mut( &mut self ) -> &mut S
-  {
+impl<S> DerefMut for Reservation<'_, S> {
+  fn deref_mut(&mut self) -> &mut S {
     // SAFETY: `self.seq` is claimed and not published — it is the producer
     // cursor's current value, which `Drop` has not yet advanced, so it is at or
     // above the consumer's exclusive readable bound. `claim` checked it is also
     // at least one lap behind the consumer, so no unread record is being
     // overwritten. This is the only `Reservation`, because `claim` borrows the
     // `Producer` mutably for this value's whole life.
-    unsafe { self.ring.slot_mut( self.seq ) }
+    unsafe { self.ring.slot_mut(self.seq) }
   }
 }
 
-impl< S > Drop for Reservation< '_, S >
-{
+impl<S> Drop for Reservation<'_, S> {
   /// Publish, with the one release store that is the producer path's entire
   /// synchronization.
-  fn drop( &mut self )
-  {
-    self.ring.cursors.producer().store( self.seq.next(), HANDOFF );
+  fn drop(&mut self) {
+    self.ring.cursors.producer().store(self.seq.next(), HANDOFF);
   }
 }
 
@@ -798,16 +774,14 @@ impl< S > Drop for Reservation< '_, S >
 ///
 /// Not `Clone` and not `Sync`, for the same reason as [`Producer`] — a second
 /// consumer does not duplicate records, it silently divides them.
-#[ derive( Debug ) ]
-pub struct Consumer< 'a, S >
-{
-  ring : &'a Ring< S >,
+#[derive(Debug)]
+pub struct Consumer<'a, S> {
+  ring: &'a Ring<S>,
   /// See [`Producer`]'s field of the same name.
-  _one_thread : PhantomData< Cell< () > >,
+  _one_thread: PhantomData<Cell<()>>,
 }
 
-impl< S > Consumer< '_, S >
-{
+impl<S> Consumer<'_, S> {
   /// How far this end has committed.
   ///
   /// ```
@@ -823,10 +797,9 @@ impl< S > Consumer< '_, S >
   /// drop( consumer.drain() );
   /// assert_eq!( consumer.position(), Seq( 1 ) );
   /// ```
-  #[ must_use ]
-  pub fn position( &self ) -> Seq
-  {
-    self.ring.cursors.consumer().load( OWN )
+  #[must_use]
+  pub fn position(&self) -> Seq {
+    self.ring.cursors.consumer().load(OWN)
   }
 
   /// How many published records have not been drained.
@@ -851,13 +824,12 @@ impl< S > Consumer< '_, S >
   /// producer.try_push( 2 ).unwrap();
   /// assert_eq!( consumer.available(), 2 );
   /// ```
-  #[ must_use ]
-  pub fn available( &self ) -> usize
-  {
-    let consumed = self.ring.cursors.consumer().load( OWN );
-    let produced = self.ring.cursors.producer().load( GATING );
+  #[must_use]
+  pub fn available(&self) -> usize {
+    let consumed = self.ring.cursors.consumer().load(OWN);
+    let produced = self.ring.cursors.producer().load(GATING);
 
-    consumed.distance_to( produced ) as usize
+    consumed.distance_to(produced) as usize
   }
 
   /// Whether there is nothing to drain.
@@ -880,10 +852,9 @@ impl< S > Consumer< '_, S >
   /// producer.try_push( 1 ).unwrap();
   /// assert!( !consumer.is_empty() );
   /// ```
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
-    self.ring.cursors.consumer().load( OWN ) == self.ring.cursors.producer().load( GATING )
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
+    self.ring.cursors.consumer().load(OWN) == self.ring.cursors.producer().load(GATING)
   }
 
   /// Take everything published since the last drain.
@@ -911,12 +882,15 @@ impl< S > Consumer< '_, S >
   /// let batch = consumer.drain();
   /// assert_eq!( batch.iter().filter_map( TypedSlot::get ).copied().collect::< Vec< _ > >(), [ 10, 20 ] );
   /// ```
-  pub fn drain( &mut self ) -> Batch< '_, S >
-  {
-    let start = self.ring.cursors.consumer().load( OWN );
-    let produced = self.ring.cursors.producer().load( GATING );
+  pub fn drain(&mut self) -> Batch<'_, S> {
+    let start = self.ring.cursors.consumer().load(OWN);
+    let produced = self.ring.cursors.producer().load(GATING);
 
-    Batch { ring : self.ring, start, len : start.distance_to( produced ) as usize }
+    Batch {
+      ring: self.ring,
+      start,
+      len: start.distance_to(produced) as usize,
+    }
   }
 
   /// Take at most `max` published records.
@@ -939,12 +913,15 @@ impl< S > Consumer< '_, S >
   /// assert_eq!( consumer.drain_up_to( 2 ).len(), 2 );
   /// assert_eq!( consumer.drain_up_to( 2 ).len(), 1, "and the remainder" );
   /// ```
-  pub fn drain_up_to( &mut self, max : usize ) -> Batch< '_, S >
-  {
-    let start = self.ring.cursors.consumer().load( OWN );
-    let produced = self.ring.cursors.producer().load( GATING );
+  pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
+    let start = self.ring.cursors.consumer().load(OWN);
+    let produced = self.ring.cursors.producer().load(GATING);
 
-    Batch { ring : self.ring, start, len : max.min( start.distance_to( produced ) as usize ) }
+    Batch {
+      ring: self.ring,
+      start,
+      len: max.min(start.distance_to(produced) as usize),
+    }
   }
 }
 
@@ -956,17 +933,15 @@ impl< S > Consumer< '_, S >
 /// (→ `docs/api/002_consumer_surface.md`) — a bare `&[ S ]` returned from a
 /// drain that had already committed would point at memory the producer is free
 /// to overwrite.
-#[ must_use = "a batch commits on drop; dropping it immediately discards the records it covers" ]
-#[ derive( Debug ) ]
-pub struct Batch< 'a, S >
-{
-  ring : &'a Ring< S >,
-  start : Seq,
-  len : usize,
+#[must_use = "a batch commits on drop; dropping it immediately discards the records it covers"]
+#[derive(Debug)]
+pub struct Batch<'a, S> {
+  ring: &'a Ring<S>,
+  start: Seq,
+  len: usize,
 }
 
-impl< S > Batch< '_, S >
-{
+impl<S> Batch<'_, S> {
   /// The sequence of the batch's first record.
   ///
   /// ```
@@ -982,16 +957,14 @@ impl< S > Batch< '_, S >
   /// producer.try_push( 2 ).unwrap();
   /// assert_eq!( consumer.drain().start(), Seq( 1 ) );
   /// ```
-  #[ must_use ]
-  pub const fn start( &self ) -> Seq
-  {
+  #[must_use]
+  pub const fn start(&self) -> Seq {
     self.start
   }
 
   /// How many records the batch covers.
-  #[ must_use ]
-  pub const fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn len(&self) -> usize {
     self.len
   }
 
@@ -1007,9 +980,8 @@ impl< S > Batch< '_, S >
   ///
   /// assert!( consumer.drain().is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(&self) -> bool {
     self.len == 0
   }
 
@@ -1029,11 +1001,9 @@ impl< S > Batch< '_, S >
   /// assert_eq!( batch.get( 0 ).and_then( TypedSlot::get ), Some( &9 ) );
   /// assert!( batch.get( 1 ).is_none() );
   /// ```
-  #[ must_use ]
-  pub fn get( &self, offset : usize ) -> Option< &S >
-  {
-    if offset >= self.len
-    {
+  #[must_use]
+  pub fn get(&self, offset: usize) -> Option<&S> {
+    if offset >= self.len {
       return None;
     }
 
@@ -1041,7 +1011,7 @@ impl< S > Batch< '_, S >
     // and not committed when `drain` computed it — its upper bound came from a
     // `GATING` load of the producer cursor, and its lower bound is this end's
     // own cursor, which only this value's `Drop` will advance.
-    Some( unsafe { self.ring.slot( self.start.advanced_by( offset as u64 ) ) } )
+    Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
   }
 
   /// The record `offset` places into the batch, mutably, or `None` past its end.
@@ -1090,18 +1060,16 @@ impl< S > Batch< '_, S >
   /// assert_eq!( batch.get_mut( 0 ).and_then( TypedSlot::take ), None, "taken once" );
   /// assert!( batch.get_mut( 1 ).is_none() );
   /// ```
-  #[ must_use ]
-  pub fn get_mut( &mut self, offset : usize ) -> Option< &mut S >
-  {
-    if offset >= self.len
-    {
+  #[must_use]
+  pub fn get_mut(&mut self, offset: usize) -> Option<&mut S> {
+    if offset >= self.len {
       return None;
     }
 
     // SAFETY: as `get`, plus exclusivity — `&mut self` on the batch is the
     // consumer's own exclusive borrow, and the producer cannot reach this range
     // until this batch's `Drop` advances the consumer cursor past it.
-    Some( unsafe { self.ring.slot_mut( self.start.advanced_by( offset as u64 ) ) } )
+    Some(unsafe { self.ring.slot_mut(self.start.advanced_by(offset as u64)) })
   }
 
   /// The batch's records, in the order they were published.
@@ -1120,19 +1088,20 @@ impl< S > Batch< '_, S >
   /// let drained : Vec< u32 > = consumer.drain().iter().filter_map( TypedSlot::get ).copied().collect();
   /// assert_eq!( drained, [ 1, 2 ] );
   /// ```
-  pub fn iter( &self ) -> impl Iterator< Item = &S >
-  {
-    ( 0..self.len ).filter_map( | offset | self.get( offset ) )
+  pub fn iter(&self) -> impl Iterator<Item = &S> {
+    (0..self.len).filter_map(|offset| self.get(offset))
   }
 }
 
-impl< S > Drop for Batch< '_, S >
-{
+impl<S> Drop for Batch<'_, S> {
   /// Commit, with the one release store that is the consumer path's entire
   /// synchronization — one store for the whole batch, which is why the surface
   /// is batch-shaped.
-  fn drop( &mut self )
-  {
-    self.ring.cursors.consumer().store( self.start.advanced_by( self.len as u64 ), HANDOFF );
+  fn drop(&mut self) {
+    self
+      .ring
+      .cursors
+      .consumer()
+      .store(self.start.advanced_by(self.len as u64), HANDOFF);
   }
 }

@@ -28,13 +28,14 @@
 //! caller owns; what goes in them is `ring_store`'s and `ring_event`'s
 //! business. That split is why this crate needs no storage dependency.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::sync::atomic::Ordering;
+
 use ring_atomic::SeqCell;
 use ring_index::of;
 use ring_seqno::free_slots;
-use ring_types::{ Capacity, RingError, Seq, SlotIndex };
+use ring_types::{Capacity, RingError, Seq, SlotIndex};
 
 /// A contiguous run of sequences one caller owns.
 ///
@@ -51,15 +52,13 @@ use ring_types::{ Capacity, RingError, Seq, SlotIndex };
 /// assert_eq!( claim.len(), 3 );
 /// assert_eq!( claim.sequences().collect::< Vec< _ > >(), vec![ Seq( 10 ), Seq( 11 ), Seq( 12 ) ] );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub struct BatchClaim
-{
-  start : Seq,
-  count : usize,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BatchClaim {
+  start: Seq,
+  count: usize,
 }
 
-impl BatchClaim
-{
+impl BatchClaim {
   /// A claim of `count` sequences beginning at `start`.
   ///
   /// ```
@@ -67,23 +66,20 @@ impl BatchClaim
   /// use ring_types::Seq;
   /// assert_eq!( BatchClaim::new( Seq( 0 ), 0 ).len(), 0 );
   /// ```
-  #[ must_use ]
-  pub const fn new( start : Seq, count : usize ) -> Self
-  {
+  #[must_use]
+  pub const fn new(start: Seq, count: usize) -> Self {
     Self { start, count }
   }
 
   /// The first sequence owned.
-  #[ must_use ]
-  pub const fn start( &self ) -> Seq
-  {
+  #[must_use]
+  pub const fn start(&self) -> Seq {
     self.start
   }
 
   /// How many sequences are owned.
-  #[ must_use ]
-  pub const fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn len(&self) -> usize {
     self.count
   }
 
@@ -98,9 +94,8 @@ impl BatchClaim
   /// use ring_types::Seq;
   /// assert!( BatchClaim::new( Seq( 4 ), 0 ).is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(&self) -> bool {
     self.count == 0
   }
 
@@ -124,10 +119,9 @@ impl BatchClaim
   /// use ring_types::Seq;
   /// assert_eq!( BatchClaim::new( Seq( 10 ), 3 ).end(), Seq( 13 ) );
   /// ```
-  #[ must_use ]
-  pub const fn end( &self ) -> Seq
-  {
-    Seq( self.start.0 + self.count as u64 )
+  #[must_use]
+  pub const fn end(&self) -> Seq {
+    Seq(self.start.0 + self.count as u64)
   }
 
   /// Whether `seq` is inside this claim.
@@ -140,9 +134,8 @@ impl BatchClaim
   /// assert!( claim.contains( Seq( 12 ) ) );
   /// assert!( !claim.contains( Seq( 13 ) ), "end is exclusive" );
   /// ```
-  #[ must_use ]
-  pub const fn contains( &self, seq : Seq ) -> bool
-  {
+  #[must_use]
+  pub const fn contains(&self, seq: Seq) -> bool {
     seq.0 >= self.start.0 && seq.0 < self.end().0
   }
 
@@ -158,9 +151,8 @@ impl BatchClaim
   /// let seqs : Vec< _ > = BatchClaim::new( Seq( 5 ), 4 ).sequences().collect();
   /// assert_eq!( seqs, vec![ Seq( 5 ), Seq( 6 ), Seq( 7 ), Seq( 8 ) ] );
   /// ```
-  pub fn sequences( &self ) -> impl Iterator< Item = Seq > + use< >
-  {
-    ( self.start.0..self.end().0 ).map( Seq )
+  pub fn sequences(&self) -> impl Iterator<Item = Seq> + use<> {
+    (self.start.0..self.end().0).map(Seq)
   }
 
   /// Whether this claim and `other` share any sequence.
@@ -180,11 +172,9 @@ impl BatchClaim
   /// assert!( !a.overlaps( &BatchClaim::new( Seq( 4 ), 4 ) ) );
   /// assert!( a.overlaps( &BatchClaim::new( Seq( 3 ), 4 ) ) );
   /// ```
-  #[ must_use ]
-  pub const fn overlaps( &self, other : &Self ) -> bool
-  {
-    !self.is_empty() && !other.is_empty()
-      && self.start.0 < other.end().0 && other.start.0 < self.end().0
+  #[must_use]
+  pub const fn overlaps(&self, other: &Self) -> bool {
+    !self.is_empty() && !other.is_empty() && self.start.0 < other.end().0 && other.start.0 < self.end().0
   }
 }
 
@@ -216,10 +206,9 @@ impl BatchClaim
 /// assert_eq!( cursor.counts().total, 1, "64 slots, one atomic operation" );
 /// assert_eq!( cursor.load( Ordering::Acquire ), Seq( 64 ) );
 /// ```
-#[ must_use ]
-pub fn claim< C : SeqCell >( cursor : &C, count : usize, order : Ordering ) -> BatchClaim
-{
-  BatchClaim::new( cursor.fetch_add( count as u64, order ), count )
+#[must_use]
+pub fn claim<C: SeqCell>(cursor: &C, count: usize, order: Ordering) -> BatchClaim {
+  BatchClaim::new(cursor.fetch_add(count as u64, order), count)
 }
 
 /// Claim `count` contiguous sequences only if the ring has room for them.
@@ -302,29 +291,27 @@ pub fn claim< C : SeqCell >( cursor : &C, count : usize, order : Ordering ) -> B
 ///   Err( RingError::BatchTooLarge { requested : 9, capacity : 8 } )
 /// );
 /// ```
-pub fn claim_gated< P : SeqCell, C : SeqCell >
-(
-  producer : &P,
-  consumer : &C,
-  count : usize,
-  capacity : Capacity,
-  order : Ordering,
-)
--> Result< BatchClaim, RingError >
-{
-  if count > capacity.get()
-  {
-    return Err( RingError::BatchTooLarge { requested : count, capacity : capacity.get() } );
+pub fn claim_gated<P: SeqCell, C: SeqCell>(
+  producer: &P,
+  consumer: &C,
+  count: usize,
+  capacity: Capacity,
+  order: Ordering,
+) -> Result<BatchClaim, RingError> {
+  if count > capacity.get() {
+    return Err(RingError::BatchTooLarge {
+      requested: count,
+      capacity: capacity.get(),
+    });
   }
 
-  let at = producer.load( Ordering::Acquire );
-  let behind = consumer.load( Ordering::Acquire );
-  if ( free_slots( at, behind, capacity ) as usize ) < count
-  {
-    return Err( RingError::Full );
+  let at = producer.load(Ordering::Acquire);
+  let behind = consumer.load(Ordering::Acquire);
+  if (free_slots(at, behind, capacity) as usize) < count {
+    return Err(RingError::Full);
   }
 
-  Ok( claim( producer, count, order ) )
+  Ok(claim(producer, count, order))
 }
 
 /// The sequences of `claim`, paired with the slot each addresses, in issue
@@ -354,8 +341,6 @@ pub fn claim_gated< P : SeqCell, C : SeqCell >
 ///   ]
 /// );
 /// ```
-pub fn drain_order( claim : &BatchClaim, capacity : Capacity )
--> impl Iterator< Item = ( Seq, SlotIndex ) > + use< >
-{
-  claim.sequences().map( move | seq | ( seq, of( seq, capacity ) ) )
+pub fn drain_order(claim: &BatchClaim, capacity: Capacity) -> impl Iterator<Item = (Seq, SlotIndex)> + use<> {
+  claim.sequences().map(move |seq| (seq, of(seq, capacity)))
 }

@@ -432,17 +432,14 @@ def crate_src_lib( package ):
   resolver was the copy that did not get it.
 
   Finding(crate_src_lib_matches_directory_name_not_package_name): `package` is
-  matched against the *directory* name, so the three crates whose manifest renames
-  them — `spike/game_core` (`space_sandbox_core`), `spike/exact_arithmetic`
-  (`exact_arithmetic_spike`), `spike/temporal_substrate` (`temporal_substrate_spike`)
-  — resolve to None, the same silent shape the Fix above closed. Left as-is rather
-  than fixed: `common.sh`'s `crate_dir()` matches on the directory name too, and one
-  resolver learning package names while the other does not is the disagreement the
-  comment above this function exists to prevent. No gate reaches it today — none of
-  the three is named by any `declared/*/crates.txt`, and the two `spike/` names that
-  are declared (`temporal_substrate`, `exact_arithmetic`) are the substrate packages,
-  which resolve correctly. `addressing_test.py` pins the divergence set at exactly
-  these three, so it fails rather than widens if a fourth is added.
+  matched against the *directory* name, so a crate whose manifest renames it away
+  from its directory resolves to None, the same silent shape the Fix above closed.
+  Left as-is rather than fixed: `common.sh`'s `crate_dir()` matches on the
+  directory name too, and one resolver learning package names while the other
+  does not is the disagreement the comment above this function exists to
+  prevent. `addressing_test.py` pins the divergence set — empty for every crate
+  currently in this repo — so it fails rather than silently widens if a future
+  crate is added under a renamed manifest.
   Fix(crate_src_lib_resolved_the_empty_package_name): an empty `package` returned
   the first *group* directory that happens to hold a `src/lib.rs` of its own —
   `module/frame_spine//src/lib.rs`, note the doubled slash. Root cause: `pathlib`

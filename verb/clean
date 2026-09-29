@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+#@ purpose: Remove build artifacts (target/) and gate scratch logs.
+#@ tags: verb, clean
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+_dry_run=0
+for _arg in "$@"; do
+  case "$_arg" in
+    dry::1) _dry_run=1 ;;
+    *)
+      echo "verb/clean: unrecognized parameter '$_arg' — expected dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if (( _dry_run )); then
+  printf 'cargo clean\n'
+  printf 'rm -f bench_harness/-[0-9][0-9][0-9][0-9]_*.log\n'
+  exit 0
+fi
+
+cargo clean
+rm -f bench_harness/-[0-9][0-9][0-9][0-9]_*.log

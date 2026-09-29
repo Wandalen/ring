@@ -87,12 +87,13 @@ source "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
 # calls — the SRC glob below, the unscanned-files safety net, and
 # strip_crate_root() — from one line instead of three separately-patched call
 # sites, and never reaches another gate: each gate runs as its own bash
-# process, so this mutation dies with this script. G11 solved the same
-# "also scan the demo-crates root" problem with its own separately-named
-# SCAN_ROOTS instead, but its detectors never call strip_crate_root() — they
-# normalize hits with a plain repo-root strip. This gate's allowlist is
-# crate-relative (no tree prefix at all), a spelling only strip_crate_root()
-# produces, so mutating the array it actually reads is what keeps the
+# process, so this mutation dies with this script. A separately-named
+# SCAN_ROOTS array, left for detectors to consult directly instead of widening
+# CRATE_ROOTS, would work too for a gate whose detectors never call
+# strip_crate_root() and normalize hits with a plain repo-root strip instead.
+# This gate's allowlist is crate-relative (no tree prefix at all), a spelling
+# only strip_crate_root() produces, so mutating the array it actually reads is
+# what keeps the
 # allowlist's existing entries valid, not merely what finds more files.
 CRATE_ROOTS+=( "$REPO/spike" )
 
@@ -318,8 +319,7 @@ fi
 # as the hand triage a reader runs on a fresh hit. If the two drift, the hand
 # answer and the gate's answer stop agreeing, and whoever triages by hand reads
 # "clean" on a file this gate would fail — the executable-recipe staleness this
-# repository has already been bitten by, and which G11 guards the same way for
-# its own pattern.
+# repository has already been bitten by.
 #
 # This is not hypothetical for G10 specifically. `sin_cos` was missing from the
 # gate and from the rule's recipe simultaneously, because both were written by

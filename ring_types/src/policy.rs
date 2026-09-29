@@ -18,11 +18,10 @@
 /// assert!( WaitKind::None.is_non_blocking() );
 /// assert!( !WaitKind::Park.is_non_blocking() );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub enum WaitKind
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum WaitKind {
   /// Re-read the cursor in a tight loop. Lowest latency, burns a core.
-  #[ default ]
+  #[default]
   Spin,
   /// Yield to the scheduler between reads. Cheaper than spinning under
   /// oversubscription, higher and less predictable latency.
@@ -34,8 +33,7 @@ pub enum WaitKind
   None,
 }
 
-impl WaitKind
-{
+impl WaitKind {
   /// Every variant, in discriminant order.
   ///
   /// The length constrains this array against its own initialiser, never
@@ -55,7 +53,7 @@ impl WaitKind
   /// use ring_types::WaitKind;
   /// assert_eq!( WaitKind::ALL.len(), 4 );
   /// ```
-  pub const ALL : [ Self; 4 ] = [ Self::Spin, Self::Yield, Self::Park, Self::None ];
+  pub const ALL: [Self; 4] = [Self::Spin, Self::Yield, Self::Park, Self::None];
 
   /// Whether this strategy can be used on the tick path — true for exactly
   /// [`WaitKind::None`].
@@ -77,11 +75,9 @@ impl WaitKind
   // Pitfall: a caller gating "is it safe to call this from inside a tick?" on
   //   this predicate would silently admit a new blocking strategy onto the
   //   one path that cannot tolerate blocking at all.
-  #[ must_use ]
-  pub const fn is_non_blocking( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn is_non_blocking(self) -> bool {
+    match self {
       Self::None => true,
       Self::Spin | Self::Yield | Self::Park => false,
     }
@@ -101,11 +97,10 @@ impl WaitKind
 /// assert!( OverflowPolicy::Fail.reports_failure() );
 /// assert!( !OverflowPolicy::DropNewest.reports_failure() );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub enum OverflowPolicy
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum OverflowPolicy {
   /// Discard the item being published; the ring's contents are untouched.
-  #[ default ]
+  #[default]
   DropNewest,
   /// Discard the oldest unread item to make room for the new one.
   DropOldest,
@@ -113,8 +108,7 @@ pub enum OverflowPolicy
   Fail,
 }
 
-impl OverflowPolicy
-{
+impl OverflowPolicy {
   /// Every variant, in discriminant order.
   ///
   /// Same split as [`WaitKind::ALL`]: the wildcard-free `match` in
@@ -128,7 +122,7 @@ impl OverflowPolicy
   /// use ring_types::OverflowPolicy;
   /// assert!( OverflowPolicy::ALL.contains( &OverflowPolicy::DropOldest ) );
   /// ```
-  pub const ALL : [ Self; 3 ] = [ Self::DropNewest, Self::DropOldest, Self::Fail ];
+  pub const ALL: [Self; 3] = [Self::DropNewest, Self::DropOldest, Self::Fail];
 
   /// Whether a full-ring publish under this policy returns an error rather
   /// than silently dropping something.
@@ -149,11 +143,9 @@ impl OverflowPolicy
   //   fail-open direction is exactly backwards for an overflow policy, whose
   //   entire contract (see the enum's own doc) is that a caller must be able to
   //   trust what it reports.
-  #[ must_use ]
-  pub const fn reports_failure( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn reports_failure(self) -> bool {
+    match self {
       Self::Fail => true,
       Self::DropNewest | Self::DropOldest => false,
     }
@@ -174,11 +166,9 @@ impl OverflowPolicy
   // Pitfall: a new silently-dropping policy misclassified here would lose data
   //   with no warning raised on its behalf — the one behavior this predicate
   //   exists to flag.
-  #[ must_use ]
-  pub const fn drops_silently( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn drops_silently(self) -> bool {
+    match self {
       Self::DropNewest | Self::DropOldest => true,
       Self::Fail => false,
     }

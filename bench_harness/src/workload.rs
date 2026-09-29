@@ -5,11 +5,10 @@
 /// Both variants produce a fixed eight-byte record, because a table of
 /// fixed-extent cells is what the oracle compares. What varies is how much of
 /// that record is significant.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub enum PayloadArchetype
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum PayloadArchetype {
   /// All eight bytes significant, every item the same width.
-  #[ default ]
+  #[default]
   Uniform,
   /// A variable-width record padded to eight bytes, the significant width
   /// cycling with the item index.
@@ -20,13 +19,12 @@ pub enum PayloadArchetype
 }
 
 /// One generated item.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub struct Item
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Item {
   /// Position in the full sequence, counted from zero.
-  pub index : u64,
+  pub index: u64,
   /// The eight-byte payload, shaped by the workload's archetype.
-  pub payload : [ u8; 8 ],
+  pub payload: [u8; 8],
 }
 
 /// A deterministic item sequence, reproducible from its seed alone.
@@ -47,18 +45,16 @@ pub struct Item
 /// // Different producer counts, same items.
 /// assert_eq!( a.items(), b.items() );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub struct Workload
-{
-  seed : u64,
-  producer_count : usize,
-  item_count : u64,
-  batch_size : u64,
-  archetype : PayloadArchetype,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Workload {
+  seed: u64,
+  producer_count: usize,
+  item_count: u64,
+  batch_size: u64,
+  archetype: PayloadArchetype,
 }
 
-impl Workload
-{
+impl Workload {
   /// A workload of `item_count` items, handed to `producer_count` producers in
   /// batches of `batch_size`.
   ///
@@ -66,60 +62,45 @@ impl Workload
   /// Zero of either describes no workload at all rather than an error worth
   /// returning, and clamping keeps the constructor total — a harness that can
   /// panic while being configured is a harness that cannot grade a bad config.
-  #[ must_use ]
-  pub const fn new
-  (
-    seed : u64,
-    producer_count : usize,
-    item_count : u64,
-    batch_size : u64,
-    archetype : PayloadArchetype,
-  )
-  -> Self
-  {
-    Self
-    {
+  #[must_use]
+  pub const fn new(seed: u64, producer_count: usize, item_count: u64, batch_size: u64, archetype: PayloadArchetype) -> Self {
+    Self {
       seed,
-      producer_count : if producer_count == 0 { 1 } else { producer_count },
+      producer_count: if producer_count == 0 { 1 } else { producer_count },
       item_count,
-      batch_size : if batch_size == 0 { 1 } else { batch_size },
+      batch_size: if batch_size == 0 { 1 } else { batch_size },
       archetype,
     }
   }
 
   /// The seed this workload reproduces from.
-  #[ must_use ]
-  pub const fn seed( self ) -> u64
-  {
+  #[must_use]
+  pub const fn seed(self) -> u64 {
     self.seed
   }
 
   /// How many producers the items are divided among.
-  #[ must_use ]
-  pub const fn producer_count( self ) -> usize
-  {
+  #[must_use]
+  pub const fn producer_count(self) -> usize {
     self.producer_count
   }
 
   /// How many items the full sequence holds.
-  #[ must_use ]
-  pub const fn item_count( self ) -> u64
-  {
+  #[must_use]
+  pub const fn item_count(self) -> u64 {
     self.item_count
   }
 
   /// How many consecutive items one producer takes before the next producer
   /// takes over.
-  #[ must_use ]
-  pub const fn batch_size( self ) -> u64
-  {
+  #[must_use]
+  pub const fn batch_size(self) -> u64 {
     self.batch_size
   }
 
   /// The payload shape each item carries.
-  #[ must_use ]
-  pub const fn archetype( self ) -> PayloadArchetype
-  {
+  #[must_use]
+  pub const fn archetype(self) -> PayloadArchetype {
     self.archetype
   }
 
@@ -133,27 +114,24 @@ impl Workload
   /// assert_eq!( w.item( 3 ).index, 3 );
   /// assert_eq!( w.item( 3 ), w.item( 3 ) );
   /// ```
-  #[ must_use ]
-  pub const fn item( self, index : u64 ) -> Item
-  {
+  #[must_use]
+  pub const fn item(self, index: u64) -> Item {
     // The family's established mixing constant — a neighbouring index differs
     // in every byte rather than in one, so a fold landing one slot over
     // produces an obviously wrong payload instead of a nearly-right one.
-    let mixed = self.seed ^ index.wrapping_mul( 0x9E37_79B9_7F4A_7C15 );
+    let mixed = self.seed ^ index.wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let bytes = mixed.to_le_bytes();
 
-    let significant = match self.archetype
-    {
+    let significant = match self.archetype {
       PayloadArchetype::Uniform => 8,
-      PayloadArchetype::Mixed => 1 + ( index % 8 ) as usize,
+      PayloadArchetype::Mixed => 1 + (index % 8) as usize,
     };
 
-    let mut payload = [ 0_u8; 8 ];
+    let mut payload = [0_u8; 8];
     let mut at = 0;
 
-    while at < significant
-    {
-      payload[ at ] = bytes[ at ];
+    while at < significant {
+      payload[at] = bytes[at];
       at += 1;
     }
 
@@ -161,10 +139,9 @@ impl Workload
   }
 
   /// The full sequence, in index order.
-  #[ must_use ]
-  pub fn items( self ) -> Vec< Item >
-  {
-    ( 0..self.item_count ).map( | index | self.item( index ) ).collect()
+  #[must_use]
+  pub fn items(self) -> Vec<Item> {
+    (0..self.item_count).map(|index| self.item(index)).collect()
   }
 
   /// The items `producer` is responsible for, in index order.
@@ -183,24 +160,21 @@ impl Workload
   /// let indices : Vec< u64 > = w.items_for( 0 ).iter().map( | i | i.index ).collect();
   /// assert_eq!( indices, vec![ 0, 1, 4, 5 ] );
   /// ```
-  #[ must_use ]
-  pub fn items_for( self, producer : usize ) -> Vec< Item >
-  {
-    if producer >= self.producer_count
-    {
+  #[must_use]
+  pub fn items_for(self, producer: usize) -> Vec<Item> {
+    if producer >= self.producer_count {
       return Vec::new();
     }
 
-    ( 0..self.item_count )
-      .filter( | index | self.owner_of( *index ) == producer )
-      .map( | index | self.item( index ) )
+    (0..self.item_count)
+      .filter(|index| self.owner_of(*index) == producer)
+      .map(|index| self.item(index))
       .collect()
   }
 
   /// Which producer owns the item at `index`.
-  #[ must_use ]
-  pub const fn owner_of( self, index : u64 ) -> usize
-  {
-    ( ( index / self.batch_size ) % self.producer_count as u64 ) as usize
+  #[must_use]
+  pub const fn owner_of(self, index: u64) -> usize {
+    ((index / self.batch_size) % self.producer_count as u64) as usize
   }
 }

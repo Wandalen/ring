@@ -19,11 +19,10 @@ use crate::RingError;
 /// assert_eq!( cap.mask(), 7 );
 /// assert!( Capacity::new( 7 ).is_err() );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash ) ]
-pub struct Capacity( usize );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Capacity(usize);
 
-impl Capacity
-{
+impl Capacity {
   /// Validate `slots` as a ring capacity.
   ///
   /// # Errors
@@ -37,17 +36,14 @@ impl Capacity
   /// assert_eq!( Capacity::new( 6 ).unwrap_err(), RingError::CapacityNotPowerOfTwo( 6 ) );
   /// assert!( Capacity::new( 1 ).is_ok() );
   /// ```
-  pub const fn new( slots : usize ) -> Result< Self, RingError >
-  {
-    if slots == 0
-    {
-      return Err( RingError::CapacityZero );
+  pub const fn new(slots: usize) -> Result<Self, RingError> {
+    if slots == 0 {
+      return Err(RingError::CapacityZero);
     }
-    if !slots.is_power_of_two()
-    {
-      return Err( RingError::CapacityNotPowerOfTwo( slots ) );
+    if !slots.is_power_of_two() {
+      return Err(RingError::CapacityNotPowerOfTwo(slots));
     }
-    Ok( Self( slots ) )
+    Ok(Self(slots))
   }
 
   /// The slot count.
@@ -56,9 +52,8 @@ impl Capacity
   /// use ring_types::Capacity;
   /// assert_eq!( Capacity::new( 16 ).unwrap().get(), 16 );
   /// ```
-  #[ must_use ]
-  pub const fn get( self ) -> usize
-  {
+  #[must_use]
+  pub const fn get(self) -> usize {
     self.0
   }
 
@@ -71,9 +66,8 @@ impl Capacity
   /// assert_eq!( Capacity::new( 1 ).unwrap().mask(), 0 );
   /// assert_eq!( Capacity::new( 1024 ).unwrap().mask(), 1023 );
   /// ```
-  #[ must_use ]
-  pub const fn mask( self ) -> usize
-  {
+  #[must_use]
+  pub const fn mask(self) -> usize {
     self.0 - 1
   }
 }

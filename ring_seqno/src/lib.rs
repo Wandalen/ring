@@ -21,9 +21,9 @@
 //! read as a contradiction of feature 167's "never wraps". What wraps is the
 //! index derived downstream, not the sequence handled here.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_types::{ Capacity, Seq };
+use ring_types::{Capacity, Seq};
 
 /// How far apart two sequences are, in laps of a given capacity.
 ///
@@ -45,10 +45,9 @@ use ring_types::{ Capacity, Seq };
 /// assert_eq!( laps_between( Seq( 0 ), Seq( 8 ), cap ), 1 );
 /// assert_eq!( laps_between( Seq( 0 ), Seq( 17 ), cap ), 2 );
 /// ```
-#[ must_use ]
-pub fn laps_between( earlier : Seq, later : Seq, capacity : Capacity ) -> u64
-{
-  earlier.distance_to( later ) / capacity.get() as u64
+#[must_use]
+pub fn laps_between(earlier: Seq, later: Seq, capacity: Capacity) -> u64 {
+  earlier.distance_to(later) / capacity.get() as u64
 }
 
 /// Whether `producer` may claim without overwriting a slot `consumer` has not
@@ -68,10 +67,9 @@ pub fn laps_between( earlier : Seq, later : Seq, capacity : Capacity ) -> u64
 /// assert!( !may_claim( Seq( 4 ), Seq( 0 ), cap ) ); // exactly one lap: no room
 /// assert!( may_claim( Seq( 4 ), Seq( 1 ), cap ) );  // consumer moved on
 /// ```
-#[ must_use ]
-pub fn may_claim( producer : Seq, consumer : Seq, capacity : Capacity ) -> bool
-{
-  consumer.distance_to( producer ) < capacity.get() as u64
+#[must_use]
+pub fn may_claim(producer: Seq, consumer: Seq, capacity: Capacity) -> bool {
+  consumer.distance_to(producer) < capacity.get() as u64
 }
 
 /// How many slots are free for a producer at `producer` given a consumer at
@@ -90,11 +88,10 @@ pub fn may_claim( producer : Seq, consumer : Seq, capacity : Capacity ) -> bool
 /// assert_eq!( free_slots( Seq( 3 ), Seq( 0 ), cap ), 1 );
 /// assert_eq!( free_slots( Seq( 4 ), Seq( 0 ), cap ), 0 );
 /// ```
-#[ must_use ]
-pub fn free_slots( producer : Seq, consumer : Seq, capacity : Capacity ) -> usize
-{
-  let in_flight = consumer.distance_to( producer );
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+#[must_use]
+pub fn free_slots(producer: Seq, consumer: Seq, capacity: Capacity) -> usize {
+  let in_flight = consumer.distance_to(producer);
+  (capacity.get() as u64).saturating_sub(in_flight) as usize
 }
 
 /// How many published items a consumer at `consumer` has not yet read, given a
@@ -107,10 +104,9 @@ pub fn free_slots( producer : Seq, consumer : Seq, capacity : Capacity ) -> usiz
 /// assert_eq!( pending( Seq( 5 ), Seq( 2 ) ), 3 );
 /// assert_eq!( pending( Seq( 2 ), Seq( 2 ) ), 0 );
 /// ```
-#[ must_use ]
-pub fn pending( producer : Seq, consumer : Seq ) -> u64
-{
-  consumer.distance_to( producer )
+#[must_use]
+pub fn pending(producer: Seq, consumer: Seq) -> u64 {
+  consumer.distance_to(producer)
 }
 
 /// The lowest position across a gating set, or `None` for an empty set.
@@ -128,8 +124,7 @@ pub fn pending( producer : Seq, consumer : Seq ) -> u64
 /// assert_eq!( slowest( &[ Seq( 9 ), Seq( 4 ), Seq( 7 ) ] ), Some( Seq( 4 ) ) );
 /// assert_eq!( slowest( &[] ), None );
 /// ```
-#[ must_use ]
-pub fn slowest( cursors : &[ Seq ] ) -> Option< Seq >
-{
+#[must_use]
+pub fn slowest(cursors: &[Seq]) -> Option<Seq> {
   cursors.iter().copied().min()
 }

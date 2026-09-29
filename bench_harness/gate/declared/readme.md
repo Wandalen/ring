@@ -68,14 +68,13 @@ Seven core files, carried by every family:
 | `unsafe_allowlist.txt` | Crates permitted to opt out of the workspace `unsafe-code = "deny"` |
 | `stages.txt` | Which crates and features each stage's own reached-test covers |
 
-Plus one allowlist per repo-wide gate a family declares. Neither is declared by
-`ring` — `ring/gates.txt` names neither G10 nor G11 — so neither file exists
+Plus one allowlist per repo-wide gate a family declares. It is not declared by
+`ring` — `ring/gates.txt` does not name G10 — so the file does not exist
 under `ring/` at all:
 
 | File | Responsibility | Read by |
 |------|-----------------|---------|
 | `pinned_allowlist.txt` | Files permitted to reach libm by either route, each still required to do so | `g10_pinned_math.sh` |
-| `cgtools_allowlist.txt` | Files permitted to define a vector-shaped struct, each still required to carry no arithmetic | `g11_cgtools_exclusive.sh` |
 
 And four directories, all under `ring/` — the only family this repository
 declares:

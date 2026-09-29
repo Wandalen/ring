@@ -24,12 +24,12 @@
 //! - `docs/readme.md` — scope and related crates
 //! - `../../docs/plan/008_ring_write_path_staged.md` — the stages these gates grade
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 mod accumulator;
 mod oracle;
 mod workload;
 
-pub use accumulator::{ Accumulator, Write };
-pub use oracle::{ ByteParity, Parity };
-pub use workload::{ Item, PayloadArchetype, Workload };
+pub use accumulator::{Accumulator, Write};
+pub use oracle::{ByteParity, Parity};
+pub use workload::{Item, PayloadArchetype, Workload};

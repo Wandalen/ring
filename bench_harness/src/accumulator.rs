@@ -7,17 +7,15 @@
 /// [`Accumulator::Delta`] nothing about its position matters. That asymmetry is
 /// the whole subject of this module, and keeping the record itself
 /// order-agnostic is what lets the same slice be folded both ways.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ]
-pub struct Write
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Write {
   /// Which cell of the table this write lands on.
-  pub cell : usize,
+  pub cell: usize,
   /// The value written, or added, depending on the semantics folding it.
-  pub value : u8,
+  pub value: u8,
 }
 
-impl Write
-{
+impl Write {
   /// A write of `value` against `cell`.
   ///
   /// ```
@@ -27,9 +25,8 @@ impl Write
   /// assert_eq!( w.cell, 3 );
   /// assert_eq!( w.value, 7 );
   /// ```
-  #[ must_use ]
-  pub const fn new( cell : usize, value : u8 ) -> Self
-  {
+  #[must_use]
+  pub const fn new(cell: usize, value: u8) -> Self {
     Self { cell, value }
   }
 }
@@ -49,12 +46,11 @@ impl Write
 /// assert_eq!( Accumulator::Set.fold( 1, &writes ), vec![ 4 ] );
 /// assert_eq!( Accumulator::Delta.fold( 1, &writes ), vec![ 7 ] );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub enum Accumulator
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub enum Accumulator {
   /// Last write wins. Order-dependent, and safe only where the correctness of
   /// a write does not depend on the value it replaces.
-  #[ default ]
+  #[default]
   Set,
   /// Writes are summed. Order-independent, because wrapping addition over the
   /// cell is commutative and associative.
@@ -64,8 +60,7 @@ pub enum Accumulator
   Delta,
 }
 
-impl Accumulator
-{
+impl Accumulator {
   /// Every variant, in discriminant order.
   ///
   /// The length constrains this array against its own initialiser, never
@@ -82,7 +77,7 @@ impl Accumulator
   /// use bench_harness::Accumulator;
   /// assert_eq!( Accumulator::ALL.len(), 2 );
   /// ```
-  pub const ALL : [ Self; 2 ] = [ Self::Set, Self::Delta ];
+  pub const ALL: [Self; 2] = [Self::Set, Self::Delta];
 
   /// Whether folding under this semantics is independent of write order.
   ///
@@ -99,11 +94,9 @@ impl Accumulator
   // `tests/oracle_test.rs` only cover variants a developer remembers to add to `ALL`, so
   // they are not a substitute for this. Same shape as `DispatchStrategy`'s
   // `matches!`-based coordination predicates silently misclassifying a new strategy.
-  #[ must_use ]
-  pub const fn is_order_independent( self ) -> bool
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn is_order_independent(self) -> bool {
+    match self {
       Self::Set => false,
       Self::Delta => true,
     }
@@ -122,19 +115,16 @@ impl Accumulator
   /// let writes = [ Write::new( 1, 5 ), Write::new( 9, 1 ) ];
   /// assert_eq!( Accumulator::Delta.fold( 2, &writes ), vec![ 0, 5 ] );
   /// ```
-  #[ must_use ]
-  pub fn fold( self, cells : usize, writes : &[ Write ] ) -> Vec< u8 >
-  {
-    let mut table = vec![ 0_u8; cells ];
+  #[must_use]
+  pub fn fold(self, cells: usize, writes: &[Write]) -> Vec<u8> {
+    let mut table = vec![0_u8; cells];
 
-    for write in writes
-    {
-      let Some( cell ) = table.get_mut( write.cell ) else { continue };
+    for write in writes {
+      let Some(cell) = table.get_mut(write.cell) else { continue };
 
-      match self
-      {
+      match self {
         Self::Set => *cell = write.value,
-        Self::Delta => *cell = cell.wrapping_add( write.value ),
+        Self::Delta => *cell = cell.wrapping_add(write.value),
       }
     }
 

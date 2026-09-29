@@ -170,7 +170,6 @@ evidence.**
 | `g8_oracle_form.sh` | No reached-test asserts against a recorded literal rather than a derived oracle |
 | `g9_lint.sh` | Clippy is clean over every crate in scope, tests included |
 | `g10_pinned_math.sh` | No unpinned transcendental on the deterministic path, repo-wide — called directly or reached through a math-library helper |
-| `g11_cgtools_exclusive.sh` | No third-party math dependency and no hand-rolled vector type, across every crate root this repository scans |
 | `g12_mutation.sh` | Every recorded historical defect, reinstated in place, still turns its crate's suite red |
 | `g13_survey_freshness.sh` | Every crate swept clean, and swept against the source and tests it carries now |
 | `g14_corpus_shape.sh` | The declared doc definitions, the instance and finding floors, and the three counts agreeing |

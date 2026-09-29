@@ -77,41 +77,38 @@
 // `loom::model` closure — so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
-#![ cfg( not( loom ) ) ]
+#![cfg(not(loom))]
 
-use ring_bench::{ AccumulatorSemantics, Candidate, Comparison, Outcome, RunError, Workload, WorkloadError, run };
+use ring_bench::{AccumulatorSemantics, Candidate, Comparison, Outcome, RunError, Workload, WorkloadError, run};
 use ring_factory::RingConfig;
 use ring_types::OverflowPolicy;
 
 /// 256 records into 4096 slots: every candidate keeps everything.
-fn roomy() -> Workload
-{
-  Workload::new( RingConfig::new( 4096 ).unwrap() )
-    .with_records_per_producer( 256 )
+fn roomy() -> Workload {
+  Workload::new(RingConfig::new(4096).unwrap())
+    .with_records_per_producer(256)
     .unwrap()
-    .with_batch( 32 )
+    .with_batch(32)
     .unwrap()
 }
 
 /// 256 records into 16 slots: every candidate drops, by a different mechanism.
-fn cramped() -> Workload
-{
-  Workload::new( RingConfig::new( 16 ).unwrap() )
-    .with_records_per_producer( 256 )
+fn cramped() -> Workload {
+  Workload::new(RingConfig::new(16).unwrap())
+    .with_records_per_producer(256)
     .unwrap()
-    .with_batch( 32 )
+    .with_batch(32)
     .unwrap()
 }
 
 /// Four producers, 1024 records, 4096 slots. Only the unbounded candidates run.
-fn parallel() -> Workload
-{
-  Workload::new( RingConfig::new( 4096 ).unwrap() )
-    .with_producers( 4 )
+fn parallel() -> Workload {
+  Workload::new(RingConfig::new(4096).unwrap())
+    .with_producers(4)
     .unwrap()
-    .with_records_per_producer( 256 )
+    .with_records_per_producer(256)
     .unwrap()
-    .with_batch( 32 )
+    .with_batch(32)
     .unwrap()
 }
 
@@ -122,39 +119,34 @@ fn parallel() -> Workload
 /// records ties every candidate at zero nanoseconds, and zero batch makes the
 /// staged candidate publish nothing while leaving the unstaged ones untouched.
 /// All three produce a report that looks like a result.
-#[ test ]
-fn a_workload_refuses_every_degenerate_dimension()
-{
-  let base = Workload::new( RingConfig::new( 64 ).unwrap() );
+#[test]
+fn a_workload_refuses_every_degenerate_dimension() {
+  let base = Workload::new(RingConfig::new(64).unwrap());
 
-  assert_eq!( base.with_producers( 0 ).unwrap_err(), WorkloadError::ZeroProducers );
-  assert_eq!( base.with_records_per_producer( 0 ).unwrap_err(), WorkloadError::ZeroRecords );
-  assert_eq!( base.with_batch( 0 ).unwrap_err(), WorkloadError::ZeroBatch );
-  assert_eq!( base.with_cells( 0 ).unwrap_err(), WorkloadError::ZeroCells );
+  assert_eq!(base.with_producers(0).unwrap_err(), WorkloadError::ZeroProducers);
+  assert_eq!(base.with_records_per_producer(0).unwrap_err(), WorkloadError::ZeroRecords);
+  assert_eq!(base.with_batch(0).unwrap_err(), WorkloadError::ZeroBatch);
+  assert_eq!(base.with_cells(0).unwrap_err(), WorkloadError::ZeroCells);
 
-  assert_eq!
-  (
+  assert_eq!(
     WorkloadError::ZeroProducers.to_string(),
     "a workload needs at least one producer",
   );
-  assert_eq!
-  (
+  assert_eq!(
     WorkloadError::ZeroRecords.to_string(),
     "a workload needs at least one record per producer",
   );
-  assert_eq!
-  (
+  assert_eq!(
     WorkloadError::ZeroBatch.to_string(),
     "a workload needs a batch size of at least one",
   );
-  assert_eq!
-  (
+  assert_eq!(
     WorkloadError::ZeroCells.to_string(),
     "a workload needs at least one accumulator cell",
   );
 
-  let boxed : Box< dyn core::error::Error > = Box::new( WorkloadError::ZeroBatch );
-  assert!( boxed.to_string().contains( "batch size" ) );
+  let boxed: Box<dyn core::error::Error> = Box::new(WorkloadError::ZeroBatch);
+  assert!(boxed.to_string().contains("batch size"));
 }
 
 /// `RingConfig` has its own `producers` field and it means something else — it
@@ -164,47 +156,43 @@ fn a_workload_refuses_every_degenerate_dimension()
 /// is no setter that moves one without the other, so a four-thread workload
 /// cannot be run against a ring configured single-producer. The batch is tied
 /// the same way, for the same reason.
-#[ test ]
-fn the_producer_count_sets_the_backend_it_needs()
-{
+#[test]
+fn the_producer_count_sets_the_backend_it_needs() {
   let workload = parallel();
 
-  assert_eq!( workload.producers(), 4 );
-  assert_eq!( workload.config().producers(), 4 );
-  assert!( workload.config().is_multi_producer() );
+  assert_eq!(workload.producers(), 4);
+  assert_eq!(workload.config().producers(), 4);
+  assert!(workload.config().is_multi_producer());
 
-  assert_eq!( workload.batch(), 32 );
-  assert_eq!( workload.config().batch(), 32 );
+  assert_eq!(workload.batch(), 32);
+  assert_eq!(workload.config().batch(), 32);
 
-  assert_eq!( workload.records_per_producer(), 256 );
-  assert_eq!( workload.offered(), 1024 );
-  assert_eq!( workload.capacity(), 4096 );
+  assert_eq!(workload.records_per_producer(), 256);
+  assert_eq!(workload.offered(), 1024);
+  assert_eq!(workload.capacity(), 4096);
 
   // Each producer's records are disjoint, so a drained record identifies its
   // writer. Nothing asserts on the values yet; the property is what makes an
   // ordering question askable later of a run already recorded.
-  assert_eq!( workload.records_of( 0 ), 0 .. 256 );
-  assert_eq!( workload.records_of( 3 ), 768 .. 1024 );
+  assert_eq!(workload.records_of(0), 0..256);
+  assert_eq!(workload.records_of(3), 768..1024);
 }
 
 /// Every candidate names itself and states what it admits.
-#[ test ]
-fn every_candidate_declares_a_name_and_a_ceiling()
-{
-  let mut names : Vec< &str > = Candidate::ALL.iter().map( | c | c.name() ).collect();
+#[test]
+fn every_candidate_declares_a_name_and_a_ceiling() {
+  let mut names: Vec<&str> = Candidate::ALL.iter().map(|c| c.name()).collect();
   let unique = names.len();
   names.sort_unstable();
   names.dedup();
-  assert_eq!( names.len(), unique, "two candidates share a name: {names:?}" );
+  assert_eq!(names.len(), unique, "two candidates share a name: {names:?}");
 
-  for candidate in Candidate::ALL
-  {
-    assert!( candidate.admits( 1 ), "{} refuses a single producer", candidate.name() );
+  for candidate in Candidate::ALL {
+    assert!(candidate.admits(1), "{} refuses a single producer", candidate.name());
 
-    match candidate.producer_ceiling()
-    {
-      Some( ceiling ) => assert!( !candidate.admits( ceiling + 1 ) ),
-      None => assert!( candidate.admits( 64 ) ),
+    match candidate.producer_ceiling() {
+      Some(ceiling) => assert!(!candidate.admits(ceiling + 1)),
+      None => assert!(candidate.admits(64)),
     }
   }
 
@@ -220,18 +208,18 @@ fn every_candidate_declares_a_name_and_a_ceiling()
   // asserted against its source by a suite that does not depend on that source.
   // Pitfall: an assertion pinning a transcription reads like an assertion
   // pinning the thing transcribed.
-  assert_eq!( Candidate::MutexQueue.producer_ceiling(), None );
-  assert_eq!( Candidate::DirectMpsc.producer_ceiling(), None );
-  assert_eq!( Candidate::ContractRing.producer_ceiling(), Some( 1 ) );
-  assert_eq!( Candidate::TlsOverRing.producer_ceiling(), Some( 1 ) );
-  assert_eq!( Candidate::DirectSpsc.producer_ceiling(), Some( 1 ) );
+  assert_eq!(Candidate::MutexQueue.producer_ceiling(), None);
+  assert_eq!(Candidate::DirectMpsc.producer_ceiling(), None);
+  assert_eq!(Candidate::ContractRing.producer_ceiling(), Some(1));
+  assert_eq!(Candidate::TlsOverRing.producer_ceiling(), Some(1));
+  assert_eq!(Candidate::DirectSpsc.producer_ceiling(), Some(1));
   // Fix(BN41): the sixth. `OffTheShelf`'s `1` has the same off-crate owner as
   // the other two and had no literal of its own — only the generic loop above,
   // whose `None` branch a widened ceiling would pass.
-  #[ cfg( feature = "crossbeam" ) ]
-  assert_eq!( Candidate::OffTheShelf.producer_ceiling(), Some( 1 ) );
+  #[cfg(feature = "crossbeam")]
+  assert_eq!(Candidate::OffTheShelf.producer_ceiling(), Some(1));
 
-  assert!( format!( "{:?}", Candidate::MutexQueue ).contains( "MutexQueue" ) );
+  assert!(format!("{:?}", Candidate::MutexQueue).contains("MutexQueue"));
 }
 
 /// The Contract door caps at one producer a structure that has no such cap.
@@ -246,51 +234,56 @@ fn every_candidate_declares_a_name_and_a_ceiling()
 /// Feature 186 (`docs/feature/186_ring_benchmark_harness.md`) requires the
 /// candidates be compared "under the same producer counts". Through one door
 /// they cannot be, and this asserts exactly where the door stops.
-#[ test ]
-fn the_contract_door_caps_a_multi_producer_structure_at_one_producer()
-{
+#[test]
+fn the_contract_door_caps_a_multi_producer_structure_at_one_producer() {
   let workload = parallel();
-  assert!( workload.config().is_multi_producer(), "the config asks for the MPSC backend" );
+  assert!(workload.config().is_multi_producer(), "the config asks for the MPSC backend");
 
-  let refused = run( Candidate::ContractRing, &workload ).unwrap_err();
-  assert_eq!
-  (
+  let refused = run(Candidate::ContractRing, &workload).unwrap_err();
+  assert_eq!(
     refused,
-    RunError::ProducerCeiling { candidate : Candidate::ContractRing, requested : 4, ceiling : 1 },
+    RunError::ProducerCeiling {
+      candidate: Candidate::ContractRing,
+      requested: 4,
+      ceiling: 1
+    },
   );
 
   // Same ring, same config, no ceiling — reached below the Contract.
-  let direct = run( Candidate::DirectMpsc, &workload ).unwrap();
-  assert_eq!( direct.producers(), 4 );
-  assert_eq!( direct.offered(), 1024 );
-  assert!( direct.is_lossless(), "4096 slots hold 1024 records" );
-  assert!( direct.conserved() );
+  let direct = run(Candidate::DirectMpsc, &workload).unwrap();
+  assert_eq!(direct.producers(), 4);
+  assert_eq!(direct.offered(), 1024);
+  assert!(direct.is_lossless(), "4096 slots hold 1024 records");
+  assert!(direct.conserved());
 
   // And the baseline, which never had a ceiling to begin with.
-  let mutex = run( Candidate::MutexQueue, &workload ).unwrap();
-  assert!( mutex.is_lossless() );
-  assert!( mutex.conserved() );
+  let mutex = run(Candidate::MutexQueue, &workload).unwrap();
+  assert!(mutex.is_lossless());
+  assert!(mutex.conserved());
 }
 
 /// With room for everything, every candidate keeps everything and gives it back.
-#[ test ]
-fn a_roomy_run_keeps_everything_and_returns_it()
-{
+#[test]
+fn a_roomy_run_keeps_everything_and_returns_it() {
   let workload = roomy();
 
-  for candidate in Candidate::ALL
-  {
-    let outcome = run( *candidate, &workload ).unwrap();
+  for candidate in Candidate::ALL {
+    let outcome = run(*candidate, &workload).unwrap();
 
-    assert_eq!( outcome.candidate(), *candidate );
-    assert_eq!( outcome.producers(), 1 );
-    assert_eq!( outcome.offered(), 256 );
-    assert_eq!( outcome.reported(), 256, "{} refused a record with room to spare", candidate.name() );
-    assert_eq!( outcome.received(), 256, "{} could not return what it took", candidate.name() );
-    assert_eq!( outcome.dropped(), 0 );
-    assert_eq!( outcome.silently_discarded(), 0 );
-    assert!( outcome.is_lossless() );
-    assert!( outcome.conserved() );
+    assert_eq!(outcome.candidate(), *candidate);
+    assert_eq!(outcome.producers(), 1);
+    assert_eq!(outcome.offered(), 256);
+    assert_eq!(
+      outcome.reported(),
+      256,
+      "{} refused a record with room to spare",
+      candidate.name()
+    );
+    assert_eq!(outcome.received(), 256, "{} could not return what it took", candidate.name());
+    assert_eq!(outcome.dropped(), 0);
+    assert_eq!(outcome.silently_discarded(), 0);
+    assert!(outcome.is_lossless());
+    assert!(outcome.conserved());
 
     // Read, never bounded. A duration nobody reads is a duration that can stop
     // being written without any test noticing; a duration anyone bounds is a
@@ -308,35 +301,32 @@ fn a_roomy_run_keeps_everything_and_returns_it()
 /// have been reported lossless by every test above, and would have looked lossy
 /// only on workload dimensions nobody had written. Coverage caught it; no
 /// assertion did.
-#[ test ]
-fn a_partial_final_batch_is_published_rather_than_abandoned()
-{
-  let workload = Workload::new( RingConfig::new( 4096 ).unwrap() )
-    .with_records_per_producer( 250 )
+#[test]
+fn a_partial_final_batch_is_published_rather_than_abandoned() {
+  let workload = Workload::new(RingConfig::new(4096).unwrap())
+    .with_records_per_producer(250)
     .unwrap()
-    .with_batch( 32 )
+    .with_batch(32)
     .unwrap();
 
-  assert_ne!
-  (
+  assert_ne!(
     workload.records_per_producer() % workload.batch(),
     0,
     "the point of this fixture is the 26-record remainder",
   );
 
-  let staged = run( Candidate::TlsOverRing, &workload ).unwrap();
-  assert_eq!( staged.received(), 250, "the last 26 records were staged, not lost" );
-  assert!( staged.is_lossless() );
-  assert!( staged.conserved() );
+  let staged = run(Candidate::TlsOverRing, &workload).unwrap();
+  assert_eq!(staged.received(), 250, "the last 26 records were staged, not lost");
+  assert!(staged.is_lossless());
+  assert!(staged.conserved());
 
   // Every other candidate lands the same odd total, which is what makes the
   // staged one's result an assertion about `drain_final` rather than about the
   // workload being small enough for anything to succeed.
-  for candidate in Candidate::ALL
-  {
-    let outcome = run( *candidate, &workload ).unwrap();
-    assert!( outcome.is_lossless(), "{} lost the partial tail", candidate.name() );
-    assert_eq!( outcome.received(), 250 );
+  for candidate in Candidate::ALL {
+    let outcome = run(*candidate, &workload).unwrap();
+    assert!(outcome.is_lossless(), "{} lost the partial tail", candidate.name());
+    assert_eq!(outcome.received(), 250);
 
     // `conserved()` is the only assertion here that reads `reported`, and it
     // has to run on *this* fixture rather than the dividing ones: a candidate
@@ -345,8 +335,7 @@ fn a_partial_final_batch_is_published_rather_than_abandoned()
     // `TlsOverRing` above left the other five counting their tail unchecked —
     // a survey mutation flipped `MutexQueue`'s closing `+=` to `-=`, putting
     // `reported` 26 below `received`, and all 18 tests stayed green.
-    assert!
-    (
+    assert!(
       outcome.conserved(),
       "{} reported {} for {} records it actually kept",
       candidate.name(),
@@ -363,22 +352,32 @@ fn a_partial_final_batch_is_published_rather_than_abandoned()
 /// `received <= reported <= offered`. Nothing stronger is available: the middle
 /// term can equal the last while the first is a fraction of it, which is the
 /// next test.
-#[ test ]
-fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain()
-{
+#[test]
+fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
   let workload = cramped();
 
-  for candidate in Candidate::ALL
-  {
-    let outcome = run( *candidate, &workload ).unwrap();
+  for candidate in Candidate::ALL {
+    let outcome = run(*candidate, &workload).unwrap();
 
-    assert_eq!( outcome.offered(), 256 );
-    assert!( outcome.reported() <= 256, "{} took more than it was offered", candidate.name() );
-    assert!( outcome.received() <= outcome.reported(), "{} drained more than it took", candidate.name() );
-    assert!( outcome.received() <= 16, "{} drained more than the ring holds", candidate.name() );
-    assert!( !outcome.is_lossless(), "{} kept 256 records in 16 slots", candidate.name() );
-    assert_eq!( outcome.dropped(), 256 - outcome.received() );
-    assert_eq!( outcome.silently_discarded(), outcome.reported() - outcome.received() );
+    assert_eq!(outcome.offered(), 256);
+    assert!(
+      outcome.reported() <= 256,
+      "{} took more than it was offered",
+      candidate.name()
+    );
+    assert!(
+      outcome.received() <= outcome.reported(),
+      "{} drained more than it took",
+      candidate.name()
+    );
+    assert!(
+      outcome.received() <= 16,
+      "{} drained more than the ring holds",
+      candidate.name()
+    );
+    assert!(!outcome.is_lossless(), "{} kept 256 records in 16 slots", candidate.name());
+    assert_eq!(outcome.dropped(), 256 - outcome.received());
+    assert_eq!(outcome.silently_discarded(), outcome.reported() - outcome.received());
   }
 
   // The staged candidate is the one that discards nothing, and the reason is
@@ -396,11 +395,15 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain()
   // stall that read as a measurement. With `batch()` now read through the
   // config it is the clamped 16, one flush fits exactly, and the candidate
   // measures one batch instead of nothing.
-  let staged = run( Candidate::TlsOverRing, &workload ).unwrap();
-  assert_eq!( staged.reported(), 16, "one full batch fits the ring exactly and is published" );
-  assert_eq!( staged.received(), 16, "and is drained — the flush was accepted, not refused" );
-  assert_eq!( staged.silently_discarded(), 0, "the free_capacity pre-check is what rules this out" );
-  assert!( staged.conserved() );
+  let staged = run(Candidate::TlsOverRing, &workload).unwrap();
+  assert_eq!(staged.reported(), 16, "one full batch fits the ring exactly and is published");
+  assert_eq!(staged.received(), 16, "and is drained — the flush was accepted, not refused");
+  assert_eq!(
+    staged.silently_discarded(),
+    0,
+    "the free_capacity pre-check is what rules this out"
+  );
+  assert!(staged.conserved());
 }
 
 /// A `DropNewest` ring reports successes for records it did not keep.
@@ -417,24 +420,21 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain()
 /// a column, it is the harness recommending the candidate that threw the
 /// workload away. That is the verdict `docs/hard_problem/126_measured_write_path_verdicts.md`
 /// exists to make trustworthy, which is why this is asserted rather than noted.
-#[ test ]
-fn a_dropnewest_ring_reports_successes_it_did_not_keep()
-{
+#[test]
+fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
   let workload = cramped();
-  assert_eq!
-  (
+  assert_eq!(
     workload.config().overflow(),
     OverflowPolicy::DropNewest,
     "the default policy, which nobody in this test set",
   );
 
-  let through_the_factory = run( Candidate::ContractRing, &workload ).unwrap();
-  assert_eq!( through_the_factory.reported(), 256, "every push returned Ok" );
-  assert!( through_the_factory.received() <= 16, "the ring has 16 slots" );
-  assert!( through_the_factory.silently_discarded() >= 240 );
-  assert!( !through_the_factory.conserved() );
-  assert!
-  (
+  let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
+  assert_eq!(through_the_factory.reported(), 256, "every push returned Ok");
+  assert!(through_the_factory.received() <= 16, "the ring has 16 slots");
+  assert!(through_the_factory.silently_discarded() >= 240);
+  assert!(!through_the_factory.conserved());
+  assert!(
     !through_the_factory.is_lossless(),
     "the judgement that reading `reported` instead of `received` would invert",
   );
@@ -445,11 +445,10 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep()
   // mapping is invisible to it. Manual stage B5 caught this by reintroducing
   // the original defect and watching all 18 tests stay green.
   let stats = through_the_factory.stats();
-  assert_eq!( stats.claimed(), through_the_factory.received() as u64 );
-  assert_eq!( stats.published(), through_the_factory.received() as u64 );
-  assert_eq!( stats.consumed(), through_the_factory.received() as u64 );
-  assert_eq!
-  (
+  assert_eq!(stats.claimed(), through_the_factory.received() as u64);
+  assert_eq!(stats.published(), through_the_factory.received() as u64);
+  assert_eq!(stats.consumed(), through_the_factory.received() as u64);
+  assert_eq!(
     stats.dropped_total(),
     through_the_factory.dropped() as u64,
     "240 records the ring never took, not 0",
@@ -460,8 +459,7 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep()
   // which was tried and left this line green while the three assertions above
   // caught it. The 240-leak reading needs `claimed` and `published` to diverge,
   // which no mapping in this harness's history did.
-  assert_eq!
-  (
+  assert_eq!(
     stats.in_flight(),
     0,
     "the two slot counters agree, as every mapping this harness has used makes them",
@@ -471,26 +469,24 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep()
   // mutex queue checks its own length, the two direct backends return `Err`
   // because the policy is applied above them in `ring_core` and never reaches
   // them, and the staged candidate refuses before it writes.
-  for candidate in
-  [
+  for candidate in [
     Candidate::MutexQueue,
     Candidate::DirectSpsc,
     Candidate::DirectMpsc,
     Candidate::TlsOverRing,
-  ]
-  {
-    let outcome = run( candidate, &workload ).unwrap();
-    assert!( outcome.conserved(), "{} absorbed a record it reported", candidate.name() );
-    assert_eq!( outcome.silently_discarded(), 0 );
+  ] {
+    let outcome = run(candidate, &workload).unwrap();
+    assert!(outcome.conserved(), "{} absorbed a record it reported", candidate.name());
+    assert_eq!(outcome.silently_discarded(), 0);
   }
 
   // The mixed run is the dangerous one: some candidates report their drops and
   // some absorb them, so a ranking read off `reported` is not merely imprecise,
   // it is ordered wrong.
-  let comparison = Comparison::run( workload );
-  assert!( !comparison.conserved() );
-  assert!( comparison.silently_discarded() >= 240 );
-  assert!( comparison.fastest().is_none(), "no candidate kept the workload" );
+  let comparison = Comparison::run(workload);
+  assert!(!comparison.conserved());
+  assert!(comparison.silently_discarded() >= 240);
+  assert!(comparison.fastest().is_none(), "no candidate kept the workload");
 }
 
 /// Under `OverflowPolicy::Fail` the gap closes and every candidate agrees.
@@ -498,27 +494,21 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep()
 /// The counterpart to the test above, and the reason the gap is reported rather
 /// than designed out: it is a property of the configuration, not of the paths.
 /// Same capacity, same records, one field changed.
-#[ test ]
-fn a_failing_policy_closes_the_gap_for_every_candidate()
-{
-  let workload = Workload::new
-  (
-    RingConfig::new( 16 ).unwrap().with_overflow( OverflowPolicy::Fail )
-  )
-  .with_records_per_producer( 256 )
-  .unwrap()
-  .with_batch( 32 )
-  .unwrap();
+#[test]
+fn a_failing_policy_closes_the_gap_for_every_candidate() {
+  let workload = Workload::new(RingConfig::new(16).unwrap().with_overflow(OverflowPolicy::Fail))
+    .with_records_per_producer(256)
+    .unwrap()
+    .with_batch(32)
+    .unwrap();
 
-  let comparison = Comparison::run( workload );
-  assert!( comparison.conserved(), "every candidate reported exactly what it kept" );
-  assert_eq!( comparison.silently_discarded(), 0 );
-  assert!( comparison.fastest().is_none(), "16 slots still cannot hold 256 records" );
+  let comparison = Comparison::run(workload);
+  assert!(comparison.conserved(), "every candidate reported exactly what it kept");
+  assert_eq!(comparison.silently_discarded(), 0);
+  assert!(comparison.fastest().is_none(), "16 slots still cannot hold 256 records");
 
-  for outcome in comparison.outcomes()
-  {
-    assert_eq!
-    (
+  for outcome in comparison.outcomes() {
+    assert_eq!(
       outcome.reported(),
       outcome.received(),
       "{} diverged under Fail",
@@ -533,21 +523,20 @@ fn a_failing_policy_closes_the_gap_for_every_candidate()
 /// harness that ranks purely by elapsed time ranks the worst candidate first
 /// and prints a plausible number while doing it. Note what is asserted: that
 /// the *set* of eligible candidates is right, never which one wins.
-#[ test ]
-fn a_path_that_dropped_records_is_not_eligible_to_be_fastest()
-{
-  let roomy_run = Comparison::run( roomy() );
-  assert!( roomy_run.conserved() );
-  let fastest = roomy_run.fastest().expect( "every candidate was lossless" );
-  assert!( fastest.is_lossless() );
-  assert_eq!( roomy_run.outcomes().len(), Candidate::ALL.len() );
-  assert!( roomy_run.refusals().is_empty() );
+#[test]
+fn a_path_that_dropped_records_is_not_eligible_to_be_fastest() {
+  let roomy_run = Comparison::run(roomy());
+  assert!(roomy_run.conserved());
+  let fastest = roomy_run.fastest().expect("every candidate was lossless");
+  assert!(fastest.is_lossless());
+  assert_eq!(roomy_run.outcomes().len(), Candidate::ALL.len());
+  assert!(roomy_run.refusals().is_empty());
 
-  let cramped_run = Comparison::run( cramped() );
-  assert!( cramped_run.outcomes().iter().all( | o | !o.is_lossless() ) );
-  assert!( cramped_run.fastest().is_none(), "no candidate kept the workload" );
+  let cramped_run = Comparison::run(cramped());
+  assert!(cramped_run.outcomes().iter().all(|o| !o.is_lossless()));
+  assert!(cramped_run.fastest().is_none(), "no candidate kept the workload");
 
-  assert_eq!( cramped_run.workload().capacity(), 16 );
+  assert_eq!(cramped_run.workload().capacity(), 16);
 }
 
 /// A candidate the producer count excludes is listed as refused, not omitted.
@@ -556,28 +545,31 @@ fn a_path_that_dropped_records_is_not_eligible_to_be_fastest()
 /// refusal list says which paths could not be reached at this producer count
 /// and why — which, given the previous test's finding, is the more interesting
 /// half of a four-producer run.
-#[ test ]
-fn a_comparison_lists_refusals_rather_than_shortening_the_table()
-{
-  let comparison = Comparison::run( parallel() );
+#[test]
+fn a_comparison_lists_refusals_rather_than_shortening_the_table() {
+  let comparison = Comparison::run(parallel());
 
-  let ran : Vec< Candidate > = comparison.outcomes().iter().map( Outcome::candidate ).collect();
-  assert!( ran.contains( &Candidate::MutexQueue ) );
-  assert!( ran.contains( &Candidate::DirectMpsc ) );
-  assert!( !ran.contains( &Candidate::ContractRing ) );
+  let ran: Vec<Candidate> = comparison.outcomes().iter().map(Outcome::candidate).collect();
+  assert!(ran.contains(&Candidate::MutexQueue));
+  assert!(ran.contains(&Candidate::DirectMpsc));
+  assert!(!ran.contains(&Candidate::ContractRing));
 
-  assert_eq!
-  (
+  assert_eq!(
     comparison.outcomes().len() + comparison.refusals().len(),
     Candidate::ALL.len(),
     "every candidate is accounted for exactly once",
   );
 
-  for refusal in comparison.refusals()
-  {
-    assert!
-    (
-      matches!( refusal, RunError::ProducerCeiling { requested : 4, ceiling : 1, .. } ),
+  for refusal in comparison.refusals() {
+    assert!(
+      matches!(
+        refusal,
+        RunError::ProducerCeiling {
+          requested: 4,
+          ceiling: 1,
+          ..
+        }
+      ),
       "unexpected refusal: {refusal}",
     );
   }
@@ -595,38 +587,35 @@ fn a_comparison_lists_refusals_rather_than_shortening_the_table()
 /// So the property is: everything a downstream reader would treat as a fact is
 /// reproducible, and the single quantity that is not is the one nobody is
 /// allowed to assert on.
-#[ test ]
-fn a_comparison_of_the_same_workload_repeats_its_counts()
-{
-  let first = Comparison::run( cramped() );
-  let second = Comparison::run( cramped() );
+#[test]
+fn a_comparison_of_the_same_workload_repeats_its_counts() {
+  let first = Comparison::run(cramped());
+  let second = Comparison::run(cramped());
 
-  assert_eq!( first.outcomes().len(), second.outcomes().len() );
-  assert_eq!( first.refusals(), second.refusals() );
-  assert_eq!( first.conserved(), second.conserved() );
+  assert_eq!(first.outcomes().len(), second.outcomes().len());
+  assert_eq!(first.refusals(), second.refusals());
+  assert_eq!(first.conserved(), second.conserved());
 
-  for ( a, b ) in first.outcomes().iter().zip( second.outcomes() )
-  {
-    assert_eq!( a.candidate(), b.candidate() );
-    assert_eq!( a.offered(), b.offered(), "{:?}", a.candidate() );
-    assert_eq!( a.reported(), b.reported(), "{:?}", a.candidate() );
-    assert_eq!( a.received(), b.received(), "{:?}", a.candidate() );
-    assert_eq!( a.dropped(), b.dropped(), "{:?}", a.candidate() );
-    assert_eq!( a.silently_discarded(), b.silently_discarded(), "{:?}", a.candidate() );
-    assert_eq!( a.is_lossless(), b.is_lossless(), "{:?}", a.candidate() );
+  for (a, b) in first.outcomes().iter().zip(second.outcomes()) {
+    assert_eq!(a.candidate(), b.candidate());
+    assert_eq!(a.offered(), b.offered(), "{:?}", a.candidate());
+    assert_eq!(a.reported(), b.reported(), "{:?}", a.candidate());
+    assert_eq!(a.received(), b.received(), "{:?}", a.candidate());
+    assert_eq!(a.dropped(), b.dropped(), "{:?}", a.candidate());
+    assert_eq!(a.silently_discarded(), b.silently_discarded(), "{:?}", a.candidate());
+    assert_eq!(a.is_lossless(), b.is_lossless(), "{:?}", a.candidate());
   }
 
   // The durations are read and deliberately not compared: a value nobody reads
   // can stop being written, and a value compared across runs is a flaky test.
-  for outcome in first.outcomes()
-  {
+  for outcome in first.outcomes() {
     let _ = outcome.write_nanos();
   }
 
   // Eligibility is deterministic even though the winner is not. On the cramped
   // workload nothing is eligible, which is itself the stable fact.
-  assert!( first.fastest().is_none() );
-  assert!( second.fastest().is_none() );
+  assert!(first.fastest().is_none());
+  assert!(second.fastest().is_none());
 }
 
 /// Feature 185's counters carry the run's own totals, written after the clock.
@@ -645,22 +634,21 @@ fn a_comparison_of_the_same_workload_repeats_its_counts()
 /// 16. A record the ring never took never occupied a slot, so it was never
 /// claimed either: all three lifecycle counters take `received`, and the
 /// records that did not survive are recorded once, as drops.
-#[ test ]
-fn the_counters_are_the_runs_own_totals()
-{
+#[test]
+fn the_counters_are_the_runs_own_totals() {
   let workload = cramped();
   let policy = workload.config().overflow();
-  let outcome = run( Candidate::MutexQueue, &workload ).unwrap();
+  let outcome = run(Candidate::MutexQueue, &workload).unwrap();
 
-  assert!( outcome.received() > 0, "the queue kept something" );
-  assert!( outcome.dropped() > 0, "16 slots, 256 records" );
+  assert!(outcome.received() > 0, "the queue kept something");
+  assert!(outcome.dropped() > 0, "16 slots, 256 records");
 
   let stats = outcome.stats();
-  assert_eq!( stats.claimed(), outcome.received() as u64 );
-  assert_eq!( stats.published(), outcome.received() as u64 );
-  assert_eq!( stats.consumed(), outcome.received() as u64 );
-  assert_eq!( stats.dropped( policy ), outcome.dropped() as u64 );
-  assert_eq!( stats.dropped_total(), outcome.dropped() as u64 );
+  assert_eq!(stats.claimed(), outcome.received() as u64);
+  assert_eq!(stats.published(), outcome.received() as u64);
+  assert_eq!(stats.consumed(), outcome.received() as u64);
+  assert_eq!(stats.dropped(policy), outcome.dropped() as u64);
+  assert_eq!(stats.dropped_total(), outcome.dropped() as u64);
 
   // A slot claimed, published, and drained is a slot nobody still holds. The
   // assertion is on the ring's own vocabulary, not on the workload's: it would
@@ -672,15 +660,15 @@ fn the_counters_are_the_runs_own_totals()
   // assertion that guards the mapping is in
   // `a_dropnewest_ring_reports_successes_it_did_not_keep`, on the one candidate
   // where `reported` and `received` differ (BN11).
-  assert_eq!( stats.in_flight(), 0 );
+  assert_eq!(stats.in_flight(), 0);
 
   // Never recorded: no candidate blocks, so there is no wait to time. Asserting
   // the zero keeps the omission deliberate rather than forgotten.
-  assert_eq!( stats.wait_nanos(), 0 );
+  assert_eq!(stats.wait_nanos(), 0);
 
   // The offered total survives on the outcome rather than in the counters,
   // which is the whole reason `Outcome` carries it separately.
-  assert_eq!( outcome.received() + outcome.dropped(), outcome.offered() );
+  assert_eq!(outcome.received() + outcome.dropped(), outcome.offered());
 }
 
 /// A refused policy relays the crate that refused it, not a copy of its ruling.
@@ -692,32 +680,38 @@ fn the_counters_are_the_runs_own_totals()
 /// `RunError::Build`, and the staged candidate — which builds its ring
 /// directly, because `ring_flush::Flusher` needs a `ring_core::Producer` the
 /// Contract cannot hand it — arrives as `RunError::Ring`.
-#[ test ]
-fn a_policy_refusal_names_the_crate_that_refused()
-{
-  let evicting = Workload::new
-  (
-    RingConfig::new( 64 ).unwrap().with_overflow( OverflowPolicy::DropOldest )
-  )
-  .with_records_per_producer( 32 )
-  .unwrap();
+#[test]
+fn a_policy_refusal_names_the_crate_that_refused() {
+  let evicting = Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest))
+    .with_records_per_producer(32)
+    .unwrap();
 
-  let built = run( Candidate::ContractRing, &evicting ).unwrap_err();
-  let direct = run( Candidate::TlsOverRing, &evicting ).unwrap_err();
+  let built = run(Candidate::ContractRing, &evicting).unwrap_err();
+  let direct = run(Candidate::TlsOverRing, &evicting).unwrap_err();
 
-  assert!( matches!( built, RunError::Build { candidate : Candidate::ContractRing, .. } ) );
-  assert!( matches!( direct, RunError::Ring { candidate : Candidate::TlsOverRing, .. } ) );
+  assert!(matches!(
+    built,
+    RunError::Build {
+      candidate: Candidate::ContractRing,
+      ..
+    }
+  ));
+  assert!(matches!(
+    direct,
+    RunError::Ring {
+      candidate: Candidate::TlsOverRing,
+      ..
+    }
+  ));
 
   // Fix(BN25): the two assertions above are variant tags, and this test's name
   // is a claim about what a reader sees. These two are the claim.
-  assert!
-  (
-    built.to_string().starts_with( "contract_ring: " ),
+  assert!(
+    built.to_string().starts_with("contract_ring: "),
     "a relayed refusal renders without its candidate: {built}",
   );
-  assert!
-  (
-    direct.to_string().starts_with( "tls_over_ring: " ),
+  assert!(
+    direct.to_string().starts_with("tls_over_ring: "),
     "a relayed refusal renders without its candidate: {direct}",
   );
 }
@@ -735,22 +729,17 @@ fn a_policy_refusal_names_the_crate_that_refused()
 /// rather than described. The pending records three candidate answers; this
 /// test is the evidence any of them needs, and it belongs here because this is
 /// the first crate that reaches both doors with one config.
-#[ test ]
-fn the_direct_doors_ignore_the_policy_the_contract_door_refuses()
-{
-  let evicting = Workload::new
-  (
-    RingConfig::new( 64 ).unwrap().with_overflow( OverflowPolicy::DropOldest )
-  )
-  .with_records_per_producer( 32 )
-  .unwrap();
+#[test]
+fn the_direct_doors_ignore_the_policy_the_contract_door_refuses() {
+  let evicting = Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest))
+    .with_records_per_producer(32)
+    .unwrap();
 
-  assert!( run( Candidate::ContractRing, &evicting ).is_err(), "the factory refuses" );
+  assert!(run(Candidate::ContractRing, &evicting).is_err(), "the factory refuses");
 
-  for candidate in [ Candidate::DirectSpsc, Candidate::DirectMpsc ]
-  {
-    let outcome = run( candidate, &evicting ).unwrap();
-    assert!( outcome.is_lossless(), "{} built and filled a ring anyway", candidate.name() );
+  for candidate in [Candidate::DirectSpsc, Candidate::DirectMpsc] {
+    let outcome = run(candidate, &evicting).unwrap();
+    assert!(outcome.is_lossless(), "{} built and filled a ring anyway", candidate.name());
   }
 }
 
@@ -758,30 +747,25 @@ fn the_direct_doors_ignore_the_policy_the_contract_door_refuses()
 /// chains: `core::error::Error::source()` is unimplemented family-wide
 /// (`RunError` and its three wrapped error types alike), so a caller
 /// holding a `Box< dyn Error >` learns nothing beyond what `Display` says.
-#[ test ]
-fn every_error_renders()
-{
-  let ceiling = RunError::ProducerCeiling
-  {
-    candidate : Candidate::DirectSpsc,
-    requested : 8,
-    ceiling : 1,
+#[test]
+fn every_error_renders() {
+  let ceiling = RunError::ProducerCeiling {
+    candidate: Candidate::DirectSpsc,
+    requested: 8,
+    ceiling: 1,
   };
-  assert_eq!( ceiling.to_string(), "direct_spsc admits 1 producer(s), asked for 8" );
+  assert_eq!(ceiling.to_string(), "direct_spsc admits 1 producer(s), asked for 8");
 
-  let evicting = Workload::new
-  (
-    RingConfig::new( 64 ).unwrap().with_overflow( OverflowPolicy::DropOldest )
-  );
-  let build = run( Candidate::ContractRing, &evicting ).unwrap_err();
-  let ring = run( Candidate::TlsOverRing, &evicting ).unwrap_err();
-  assert!( build.to_string().contains( "polic" ), "{build}" );
-  assert!( ring.to_string().contains( "polic" ), "{ring}" );
+  let evicting = Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest));
+  let build = run(Candidate::ContractRing, &evicting).unwrap_err();
+  let ring = run(Candidate::TlsOverRing, &evicting).unwrap_err();
+  assert!(build.to_string().contains("polic"), "{build}");
+  assert!(ring.to_string().contains("polic"), "{ring}");
 
-  let boxed : Box< dyn core::error::Error > = Box::new( ceiling );
-  assert!( boxed.to_string().contains( "direct_spsc" ) );
+  let boxed: Box<dyn core::error::Error> = Box::new(ceiling);
+  assert!(boxed.to_string().contains("direct_spsc"));
 
-  assert!( format!( "{ceiling:?}" ).contains( "ProducerCeiling" ) );
+  assert!(format!("{ceiling:?}").contains("ProducerCeiling"));
 }
 
 /// The flush relay is unreachable while the batch ties the buffer.
@@ -797,61 +781,52 @@ fn every_error_renders()
 /// in either type enforces it. Kept and named as dead, rather than replaced by
 /// an `expect` that would turn a future configuration mistake into a panic
 /// inside a measurement.
-#[ test ]
-fn the_flush_relay_is_unreachable_while_the_batch_ties_the_buffer()
-{
+#[test]
+fn the_flush_relay_is_unreachable_while_the_batch_ties_the_buffer() {
   let workload = roomy();
-  assert_eq!
-  (
+  assert_eq!(
     workload.batch(),
     workload.config().batch(),
     "the buffer's capacity and the flush trigger are the same number",
   );
 
   // Constructed directly, since no workload produces it.
-  let relay = RunError::Flush
-  {
-    candidate : Candidate::TlsOverRing,
-    error : ring_flush::ConfigError::ZeroBatch,
+  let relay = RunError::Flush {
+    candidate: Candidate::TlsOverRing,
+    error: ring_flush::ConfigError::ZeroBatch,
   };
-  assert_eq!( relay.to_string(), "tls_over_ring: OnBatch( 0 ) fires on every append" );
+  assert_eq!(relay.to_string(), "tls_over_ring: OnBatch( 0 ) fires on every append");
 }
 
 /// The report names every candidate that ran and every one that did not.
-#[ test ]
-fn the_report_names_every_candidate_and_every_refusal()
-{
-  let roomy_report = Comparison::run( roomy() ).report();
-  for candidate in Candidate::ALL
-  {
-    assert!( roomy_report.contains( candidate.name() ), "missing {}", candidate.name() );
+#[test]
+fn the_report_names_every_candidate_and_every_refusal() {
+  let roomy_report = Comparison::run(roomy()).report();
+  for candidate in Candidate::ALL {
+    assert!(roomy_report.contains(candidate.name()), "missing {}", candidate.name());
   }
-  assert!( roomy_report.contains( "fastest lossless: " ) );
-  assert!( roomy_report.contains( "capacity 4096" ) );
+  assert!(roomy_report.contains("fastest lossless: "));
+  assert!(roomy_report.contains("capacity 4096"));
 
-  let cramped_report = Comparison::run( cramped() ).report();
-  assert!( cramped_report.contains( "every candidate dropped records" ) );
+  let cramped_report = Comparison::run(cramped()).report();
+  assert!(cramped_report.contains("every candidate dropped records"));
 
-  let parallel_report = Comparison::run( parallel() ).report();
-  assert!( parallel_report.contains( "refused: contract_ring" ) );
-  assert!( parallel_report.contains( "4 producer(s) x 256 records" ) );
+  let parallel_report = Comparison::run(parallel()).report();
+  assert!(parallel_report.contains("refused: contract_ring"));
+  assert!(parallel_report.contains("4 producer(s) x 256 records"));
 
   // Fix(BN25): "every refusal" in this test's name used to be one refusal —
   // `ProducerCeiling`, the only variant that carried a name. A `DropOldest`
   // workload refuses two candidates through two relaying variants, and both
   // lines must now carry a candidate for the report to be keyed on names.
-  let evicting = Comparison::run
-  (
-    Workload::new
-    (
-      RingConfig::new( 64 ).unwrap().with_overflow( OverflowPolicy::DropOldest )
-    )
-    .with_records_per_producer( 32 )
-    .unwrap()
+  let evicting = Comparison::run(
+    Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest))
+      .with_records_per_producer(32)
+      .unwrap(),
   )
   .report();
-  assert!( evicting.contains( "refused: contract_ring: " ), "{evicting}" );
-  assert!( evicting.contains( "refused: tls_over_ring: " ), "{evicting}" );
+  assert!(evicting.contains("refused: contract_ring: "), "{evicting}");
+  assert!(evicting.contains("refused: tls_over_ring: "), "{evicting}");
 }
 
 /// The candidate list is written down somewhere other than its own declaration.
@@ -877,33 +852,29 @@ fn the_report_names_every_candidate_and_every_refusal()
 /// **Pitfall.** Asserting a collection's length against its own `len()` proves
 /// the collection exists. To check a list, compare it to a list written
 /// somewhere else.
-#[ test ]
-fn the_candidate_list_matches_a_copy_written_outside_the_declaration()
-{
-  const COMMON : [ &str; 5 ] =
-    [ "mutex_queue", "contract_ring", "tls_over_ring", "direct_spsc", "direct_mpsc" ];
+#[test]
+fn the_candidate_list_matches_a_copy_written_outside_the_declaration() {
+  const COMMON: [&str; 5] = ["mutex_queue", "contract_ring", "tls_over_ring", "direct_spsc", "direct_mpsc"];
 
-  let names : Vec< &str > = Candidate::ALL.iter().map( | c | c.name() ).collect();
+  let names: Vec<&str> = Candidate::ALL.iter().map(|c| c.name()).collect();
 
-  assert_eq!
-  (
-    &names[ ..COMMON.len() ],
-    &COMMON[ .. ],
+  assert_eq!(
+    &names[..COMMON.len()],
+    &COMMON[..],
     "the five candidates both cfg arms declare, in the order fastest() breaks ties by",
   );
 
-  #[ cfg( feature = "crossbeam" ) ]
-  assert_eq!
-  (
+  #[cfg(feature = "crossbeam")]
+  assert_eq!(
     names.len(),
     COMMON.len() + 1,
     "the crossbeam arm appends off_the_shelf rather than inserting it",
   );
-  #[ cfg( feature = "crossbeam" ) ]
-  assert_eq!( names[ COMMON.len() ], "off_the_shelf" );
+  #[cfg(feature = "crossbeam")]
+  assert_eq!(names[COMMON.len()], "off_the_shelf");
 
-  #[ cfg( not( feature = "crossbeam" ) ) ]
-  assert_eq!( names.len(), COMMON.len(), "the default arm declares exactly the five" );
+  #[cfg(not(feature = "crossbeam"))]
+  assert_eq!(names.len(), COMMON.len(), "the default arm declares exactly the five");
 }
 
 /// The name the example switches on is a name a `Candidate` actually returns.
@@ -928,15 +899,13 @@ fn the_candidate_list_matches_a_copy_written_outside_the_declaration()
 /// **Pitfall.** "Fieldless enum, nothing to validate" is about the type. It says
 /// nothing about the strings the type hands out, which can be load-bearing
 /// identifiers in files no test runs.
-#[ test ]
-fn the_example_switches_on_a_name_a_candidate_returns()
-{
-  let source = include_str!( "../examples/comparison.rs" );
-  let literal = format!( "== \"{}\"", Candidate::ContractRing.name() );
+#[test]
+fn the_example_switches_on_a_name_a_candidate_returns() {
+  let source = include_str!("../examples/comparison.rs");
+  let literal = format!("== \"{}\"", Candidate::ContractRing.name());
 
-  assert!
-  (
-    source.contains( &literal ),
+  assert!(
+    source.contains(&literal),
     "examples/comparison.rs no longer compares against {literal}",
   );
 }
@@ -971,29 +940,23 @@ fn the_example_switches_on_a_name_a_candidate_returns()
 ///
 /// When a validating type already stores a value, a second copy outside it is
 /// the unvalidated one — and it is the copy every caller reads.
-#[ test ]
-fn the_batch_reported_is_the_batch_the_config_carries()
-{
-  for ( name, workload ) in
-    [ ( "roomy", roomy() ), ( "cramped", cramped() ), ( "parallel", parallel() ) ]
-  {
-    assert_eq!
-    (
+#[test]
+fn the_batch_reported_is_the_batch_the_config_carries() {
+  for (name, workload) in [("roomy", roomy()), ("cramped", cramped()), ("parallel", parallel())] {
+    assert_eq!(
       workload.batch(),
       workload.config().batch(),
       "{name}: the reported batch and the config's batch are one value",
     );
-    assert!
-    (
+    assert!(
       workload.batch() <= workload.capacity(),
       "{name}: RingConfig documents batch as at most the capacity",
     );
   }
 
   let cramped = cramped();
-  assert_eq!( cramped.capacity(), 16 );
-  assert_eq!
-  (
+  assert_eq!(cramped.capacity(), 16);
+  assert_eq!(
     cramped.batch(),
     16,
     "the fixture asks for 32 against 16 slots; the clamp is what this test exists to see",
@@ -1033,30 +996,25 @@ fn the_batch_reported_is_the_batch_the_config_carries()
 ///
 /// A safety argument that names a compiler behaviour is really naming a profile
 /// setting; check that the setting is set.
-#[ test ]
-fn both_ordering_subtractions_are_guarded_unconditionally()
-{
-  let source = include_str!( "../src/lib.rs" );
+#[test]
+fn both_ordering_subtractions_are_guarded_unconditionally() {
+  let source = include_str!("../src/lib.rs");
 
-  for guard in
-  [
+  for guard in [
     "assert!( self.received <= self.offered, \"received exceeded offered\" );",
     "assert!( self.received <= self.reported, \"received exceeded reported\" );",
-  ]
-  {
-    assert!( source.contains( guard ), "src/lib.rs no longer contains {guard}" );
+  ] {
+    assert!(source.contains(guard), "src/lib.rs no longer contains {guard}");
   }
 
-  assert!
-  (
-    !source.contains( "debug_assert!( self.received" ),
+  assert!(
+    !source.contains("debug_assert!( self.received"),
     "a debug_assert here would reinstate exactly the profile dependence BN22 names",
   );
 
-  let manifest = include_str!( "../Cargo.toml" );
-  assert!
-  (
-    !manifest.contains( "overflow-checks" ),
+  let manifest = include_str!("../Cargo.toml");
+  assert!(
+    !manifest.contains("overflow-checks"),
     "if this crate ever sets overflow-checks, revisit whether the guards are still the honest mechanism",
   );
 }
@@ -1104,21 +1062,23 @@ fn both_ordering_subtractions_are_guarded_unconditionally()
 /// as BN22 — no suite can build a violating value to make either guard fire.
 /// This test pins presence and ordering, not triggering, exactly like
 /// `both_ordering_subtractions_are_guarded_unconditionally`.
-#[ test ]
-fn the_record_drop_input_is_guarded_before_the_subtraction_runs()
-{
-  let source = include_str!( "../src/lib.rs" );
+#[test]
+fn the_record_drop_input_is_guarded_before_the_subtraction_runs() {
+  let source = include_str!("../src/lib.rs");
 
   let guard = "assert!( received <= offered, \"received exceeded offered\" );";
   let call = "stats.record_drop( workload.config().overflow(), ( offered - received ) as u64 );";
 
-  let guard_pos = source.find( guard ).expect( "src/lib.rs no longer guards the subtraction feeding record_drop" );
-  let call_pos = source.find( call ).expect( "src/lib.rs no longer contains the record_drop call site" );
-  assert!( guard_pos < call_pos, "the guard must run before record_drop, not after" );
+  let guard_pos = source
+    .find(guard)
+    .expect("src/lib.rs no longer guards the subtraction feeding record_drop");
+  let call_pos = source
+    .find(call)
+    .expect("src/lib.rs no longer contains the record_drop call site");
+  assert!(guard_pos < call_pos, "the guard must run before record_drop, not after");
 
-  assert!
-  (
-    !source.contains( "debug_assert!( received <= offered" ),
+  assert!(
+    !source.contains("debug_assert!( received <= offered"),
     "a debug_assert here would reinstate exactly the profile dependence BN22 named for the other two guards",
   );
 }
@@ -1155,23 +1115,28 @@ fn the_record_drop_input_is_guarded_before_the_subtraction_runs()
 ///
 /// `#[ non_exhaustive ]` reserves the right to add variants; it does not
 /// reserve the right to add one that breaks a derive.
-#[ test ]
-fn both_halves_of_the_copy_coupling_are_named()
-{
-  const fn requires_copy< T : Copy >() {}
+#[test]
+fn both_halves_of_the_copy_coupling_are_named() {
+  const fn requires_copy<T: Copy>() {}
 
-  requires_copy::< RunError >();
-  requires_copy::< ring_factory::BuildError >();
-  requires_copy::< ring_types::RingError >();
-  requires_copy::< ring_flush::ConfigError >();
+  requires_copy::<RunError>();
+  requires_copy::<ring_factory::BuildError>();
+  requires_copy::<ring_types::RingError>();
+  requires_copy::<ring_flush::ConfigError>();
 
-  for ( label, source, needle ) in
-  [
-    ( "ring_types", include_str!( "../../ring_types/src/error.rs" ), "ring_bench::RunError" ),
-    ( "ring_bench", include_str!( "../src/lib.rs" ), "ring_flush::ConfigError` are all pinned `Copy`" ),
-  ]
-  {
-    assert!( source.contains( needle ), "{label} no longer records the coupling" );
+  for (label, source, needle) in [
+    (
+      "ring_types",
+      include_str!("../../ring_types/src/error.rs"),
+      "ring_bench::RunError",
+    ),
+    (
+      "ring_bench",
+      include_str!("../src/lib.rs"),
+      "ring_flush::ConfigError` are all pinned `Copy`",
+    ),
+  ] {
+    assert!(source.contains(needle), "{label} no longer records the coupling");
   }
 }
 
@@ -1182,22 +1147,21 @@ fn both_halves_of_the_copy_coupling_are_named()
 /// `Workload` that never calls `with_semantics`/`with_cells` must keep
 /// measuring exactly that — this is the axis's own backward-compatibility
 /// guarantee, pinned as a test rather than left implicit in `new`'s body.
-#[ test ]
-fn the_accumulator_axis_defaults_to_set_and_one_cell()
-{
+#[test]
+fn the_accumulator_axis_defaults_to_set_and_one_cell() {
   let workload = roomy();
-  assert_eq!( workload.semantics(), AccumulatorSemantics::Set );
-  assert_eq!( workload.cells(), 1 );
+  assert_eq!(workload.semantics(), AccumulatorSemantics::Set);
+  assert_eq!(workload.cells(), 1);
 
-  let delta = workload.with_semantics( AccumulatorSemantics::Delta ).with_cells( 4 ).unwrap();
-  assert_eq!( delta.semantics(), AccumulatorSemantics::Delta );
-  assert_eq!( delta.cells(), 4 );
+  let delta = workload.with_semantics(AccumulatorSemantics::Delta).with_cells(4).unwrap();
+  assert_eq!(delta.semantics(), AccumulatorSemantics::Delta);
+  assert_eq!(delta.cells(), 4);
 
   // Setting the new axis perturbs nothing the old one reads.
-  assert_eq!( delta.producers(), workload.producers() );
-  assert_eq!( delta.records_per_producer(), workload.records_per_producer() );
-  assert_eq!( delta.batch(), workload.batch() );
-  assert_eq!( delta.capacity(), workload.capacity() );
+  assert_eq!(delta.producers(), workload.producers());
+  assert_eq!(delta.records_per_producer(), workload.records_per_producer());
+  assert_eq!(delta.batch(), workload.batch());
+  assert_eq!(delta.capacity(), workload.capacity());
 }
 
 /// Every candidate agrees on the `Delta` table for the same workload — the
@@ -1210,22 +1174,23 @@ fn the_accumulator_axis_defaults_to_set_and_one_cell()
 /// This is the `Delta` half at the widest eligible producer count — see
 /// `delta_sums_correctly_across_many_producers_without_a_lock` for the
 /// multi-producer case, which only the two unbounded candidates can run.
-#[ test ]
-fn every_candidate_agrees_on_the_delta_table_at_one_producer()
-{
-  let workload = roomy().with_semantics( AccumulatorSemantics::Delta ).with_cells( 1 ).unwrap();
+#[test]
+fn every_candidate_agrees_on_the_delta_table_at_one_producer() {
+  let workload = roomy().with_semantics(AccumulatorSemantics::Delta).with_cells(1).unwrap();
 
-  for candidate in Candidate::ALL
-  {
-    let outcome = run( *candidate, &workload ).unwrap();
-    assert!( outcome.is_lossless(), "{} lost records before the table could be checked", candidate.name() );
+  for candidate in Candidate::ALL {
+    let outcome = run(*candidate, &workload).unwrap();
+    assert!(
+      outcome.is_lossless(),
+      "{} lost records before the table could be checked",
+      candidate.name()
+    );
 
     // Producer 0 is even, so every one of its 256 records carries delta +1.
     // Summed, that is 256 — and Delta sums regardless of the order the drain
     // happened to produce them in, which is what "byte-identical" means here.
-    assert_eq!
-    (
-      outcome.table().cells()[ 0 ],
+    assert_eq!(
+      outcome.table().cells()[0],
       256_i64,
       "{} disagreed with the closed-form sum",
       candidate.name(),
@@ -1244,28 +1209,28 @@ fn every_candidate_agrees_on_the_delta_table_at_one_producer()
 /// `docs/decision/050_deferred_mutation_accumulator_scope.md` names this
 /// exactly: `Set` is safe for idempotent overwrites and unsafe the moment a
 /// destination accumulates more than one write it needed to keep.
-#[ test ]
-fn set_semantics_keeps_only_the_last_write_when_one_cell_is_shared()
-{
-  let workload = roomy().with_cells( 1 ).unwrap();
-  assert_eq!( workload.semantics(), AccumulatorSemantics::Set, "Set is the default this test relies on" );
+#[test]
+fn set_semantics_keeps_only_the_last_write_when_one_cell_is_shared() {
+  let workload = roomy().with_cells(1).unwrap();
+  assert_eq!(
+    workload.semantics(),
+    AccumulatorSemantics::Set,
+    "Set is the default this test relies on"
+  );
 
-  for candidate in Candidate::ALL
-  {
-    let outcome = run( *candidate, &workload ).unwrap();
-    assert!( outcome.is_lossless() );
-    assert_eq!( outcome.received(), 256 );
+  for candidate in Candidate::ALL {
+    let outcome = run(*candidate, &workload).unwrap();
+    assert!(outcome.is_lossless());
+    assert_eq!(outcome.received(), 256);
 
-    assert_eq!
-    (
-      outcome.table().cells()[ 0 ],
+    assert_eq!(
+      outcome.table().cells()[0],
       1_i64,
       "{} kept more than the last write under Set — the axis stopped distinguishing",
       candidate.name(),
     );
-    assert_ne!
-    (
-      outcome.table().cells()[ 0 ],
+    assert_ne!(
+      outcome.table().cells()[0],
       outcome.received() as i64,
       "{} accidentally summed under Set, which is Delta's job",
       candidate.name(),
@@ -1289,30 +1254,31 @@ fn set_semantics_keeps_only_the_last_write_when_one_cell_is_shared()
 /// balance is correct regardless of which side's write physically lands last.
 /// Net delta is `+1` per record, so 100 records per producer nets `100`
 /// regardless of how five threads interleaved to produce it.
-#[ test ]
-fn delta_sums_correctly_across_many_producers_without_a_lock()
-{
-  let workload = Workload::new( RingConfig::new( 4096 ).unwrap() )
-    .with_producers( 5 )
+#[test]
+fn delta_sums_correctly_across_many_producers_without_a_lock() {
+  let workload = Workload::new(RingConfig::new(4096).unwrap())
+    .with_producers(5)
     .unwrap()
-    .with_records_per_producer( 100 )
+    .with_records_per_producer(100)
     .unwrap()
-    .with_semantics( AccumulatorSemantics::Delta )
-    .with_cells( 1 )
+    .with_semantics(AccumulatorSemantics::Delta)
+    .with_cells(1)
     .unwrap();
 
-  for candidate in [ Candidate::MutexQueue, Candidate::DirectMpsc ]
-  {
-    let outcome = run( candidate, &workload ).unwrap();
-    assert!( outcome.is_lossless(), "{} dropped records under a 4096-slot ring", candidate.name() );
-    assert_eq!( outcome.offered(), 500 );
+  for candidate in [Candidate::MutexQueue, Candidate::DirectMpsc] {
+    let outcome = run(candidate, &workload).unwrap();
+    assert!(
+      outcome.is_lossless(),
+      "{} dropped records under a 4096-slot ring",
+      candidate.name()
+    );
+    assert_eq!(outcome.offered(), 500);
 
     // 3 even producers (0, 2, 4) at +1 each, 2 odd (1, 3) at -1 each, 100
     // records apiece: (3 - 2) * 100 = 100 — correct no matter which producer's
     // write the scheduler happened to land last.
-    assert_eq!
-    (
-      outcome.table().cells()[ 0 ],
+    assert_eq!(
+      outcome.table().cells()[0],
       100_i64,
       "{} produced a scheduling-dependent sum, which Delta exists to rule out",
       candidate.name(),
@@ -1333,38 +1299,33 @@ fn delta_sums_correctly_across_many_producers_without_a_lock()
 /// names the property and exercises it on the fixtures most likely to stress
 /// it: heavy overflow (many records never land) and multiple producers (many
 /// records interleave), crossed with both semantics.
-#[ test ]
-fn every_drained_record_decodes_to_a_producer_the_workload_describes()
-{
-  let overflow = cramped().with_cells( 1 ).unwrap();
-  let contention = Workload::new( RingConfig::new( 4096 ).unwrap() )
-    .with_producers( 4 )
+#[test]
+fn every_drained_record_decodes_to_a_producer_the_workload_describes() {
+  let overflow = cramped().with_cells(1).unwrap();
+  let contention = Workload::new(RingConfig::new(4096).unwrap())
+    .with_producers(4)
     .unwrap()
-    .with_records_per_producer( 256 )
+    .with_records_per_producer(256)
     .unwrap()
-    .with_cells( 4 )
+    .with_cells(4)
     .unwrap();
 
-  for semantics in [ AccumulatorSemantics::Set, AccumulatorSemantics::Delta ]
-  {
+  for semantics in [AccumulatorSemantics::Set, AccumulatorSemantics::Delta] {
     // No `unwrap_or_else`/panic handling needed to prove the point: a torn
     // read would panic inside `run` itself, before `unwrap` ever sees a
     // value — a run that returns at all already decoded every record it drained.
-    let single_producer = overflow.with_semantics( semantics );
-    for candidate in Candidate::ALL
-    {
-      let outcome = run( *candidate, &single_producer ).unwrap();
-      assert!( outcome.table().cells()[ 0 ].unsigned_abs() <= outcome.received() as u64 );
+    let single_producer = overflow.with_semantics(semantics);
+    for candidate in Candidate::ALL {
+      let outcome = run(*candidate, &single_producer).unwrap();
+      assert!(outcome.table().cells()[0].unsigned_abs() <= outcome.received() as u64);
     }
 
-    let many_producers = contention.with_semantics( semantics );
-    for candidate in [ Candidate::MutexQueue, Candidate::DirectMpsc ]
-    {
-      let outcome = run( candidate, &many_producers ).unwrap();
-      assert!( outcome.is_lossless() );
-      for cell in outcome.table().cells()
-      {
-        assert!( cell.unsigned_abs() <= outcome.received() as u64 );
+    let many_producers = contention.with_semantics(semantics);
+    for candidate in [Candidate::MutexQueue, Candidate::DirectMpsc] {
+      let outcome = run(candidate, &many_producers).unwrap();
+      assert!(outcome.is_lossless());
+      for cell in outcome.table().cells() {
+        assert!(cell.unsigned_abs() <= outcome.received() as u64);
       }
     }
   }
@@ -1382,29 +1343,30 @@ fn every_drained_record_decodes_to_a_producer_the_workload_describes()
 /// writes the ring never took; it folds `received`, so the table is exactly as
 /// correct as the drain that fed it, regardless of how the drop policy
 /// discarded the other 240.
-#[ test ]
-fn the_overflow_gap_never_reaches_the_accumulator_table()
-{
-  let workload = cramped().with_semantics( AccumulatorSemantics::Delta ).with_cells( 1 ).unwrap();
+#[test]
+fn the_overflow_gap_never_reaches_the_accumulator_table() {
+  let workload = cramped().with_semantics(AccumulatorSemantics::Delta).with_cells(1).unwrap();
 
-  let through_the_factory = run( Candidate::ContractRing, &workload ).unwrap();
-  assert_eq!( through_the_factory.reported(), 256, "contract_ring still reports Ok for a discard" );
-  assert_eq!( through_the_factory.received(), 16, "the ring holds 16" );
-  assert_eq!
-  (
-    through_the_factory.table().cells()[ 0 ],
+  let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
+  assert_eq!(
+    through_the_factory.reported(),
+    256,
+    "contract_ring still reports Ok for a discard"
+  );
+  assert_eq!(through_the_factory.received(), 16, "the ring holds 16");
+  assert_eq!(
+    through_the_factory.table().cells()[0],
     16_i64,
     "contract_ring folded the 240 phantom successes into the table",
   );
 
-  #[ cfg( feature = "crossbeam" ) ]
+  #[cfg(feature = "crossbeam")]
   {
-    let off_the_shelf = run( Candidate::OffTheShelf, &workload ).unwrap();
-    assert_eq!( off_the_shelf.reported(), 256, "off_the_shelf still reports Ok for a discard" );
-    assert_eq!( off_the_shelf.received(), 16, "the ring holds 16" );
-    assert_eq!
-    (
-      off_the_shelf.table().cells()[ 0 ],
+    let off_the_shelf = run(Candidate::OffTheShelf, &workload).unwrap();
+    assert_eq!(off_the_shelf.reported(), 256, "off_the_shelf still reports Ok for a discard");
+    assert_eq!(off_the_shelf.received(), 16, "the ring holds 16");
+    assert_eq!(
+      off_the_shelf.table().cells()[0],
       16_i64,
       "off_the_shelf folded the 240 phantom successes into the table",
     );
@@ -1460,54 +1422,60 @@ fn the_overflow_gap_never_reaches_the_accumulator_table()
 /// section itself (`len` then `push_back`) looks far too trivial to ever
 /// panic — the risk is not this call's own logic, it is that *some* other
 /// holder, anywhere, might.
-#[ test ]
-fn a_lock_poisoned_by_a_panicking_holder_recovers_instead_of_propagating()
-{
+#[test]
+fn a_lock_poisoned_by_a_panicking_holder_recovers_instead_of_propagating() {
   use std::collections::VecDeque;
   use std::sync::Mutex;
 
   // Mirrors `commit_batch`'s own guarded type exactly — `ring_bench::Record`
   // is the same `u64` alias `commit_batch` stages records as.
-  let queue : Mutex< VecDeque< ring_bench::Record > > = Mutex::new( VecDeque::new() );
-  queue.lock().unwrap().push_back( 1 );
+  let queue: Mutex<VecDeque<ring_bench::Record>> = Mutex::new(VecDeque::new());
+  queue.lock().unwrap().push_back(1);
 
   // Suppress the panic hook's stderr backtrace for the two intentional
   // panics below — the same courtesy `ring_claim/tests/claim_test.rs` extends
   // around its own forced unwind.
   let hook = std::panic::take_hook();
-  std::panic::set_hook( Box::new( | _ | {} ) );
+  std::panic::set_hook(Box::new(|_| {}));
 
   let queue_ref = &queue;
-  let poisoned = std::thread::scope( | scope |
-  {
-    scope.spawn( move ||
-    {
-      let _guard = queue_ref.lock().unwrap();
-      panic!( "simulated allocator failure inside the guarded critical section" );
-    } )
-    .join()
-  } );
+  let poisoned = std::thread::scope(|scope| {
+    scope
+      .spawn(move || {
+        let _guard = queue_ref.lock().unwrap();
+        panic!("simulated allocator failure inside the guarded critical section");
+      })
+      .join()
+  });
 
-  assert!( poisoned.is_err(), "the spawned holder must actually have panicked while locked" );
-  assert!( queue.is_poisoned(), "a panic while holding the lock must poison it for every later locker" );
+  assert!(
+    poisoned.is_err(),
+    "the spawned holder must actually have panicked while locked"
+  );
+  assert!(
+    queue.is_poisoned(),
+    "a panic while holding the lock must poison it for every later locker"
+  );
 
   // The bug: the crate's pre-fix `.expect( "no producer panics while holding
   // the lock" )` would panic here too, cascading the first thread's unrelated
   // panic into this completely separate access.
-  let old_pattern_would_panic = std::panic::catch_unwind( ||
-  {
-    drop( queue.lock().expect( "no producer panics while holding the lock" ) );
-  } );
-  assert!
-  (
+  let old_pattern_would_panic = std::panic::catch_unwind(|| {
+    drop(queue.lock().expect("no producer panics while holding the lock"));
+  });
+  assert!(
     old_pattern_would_panic.is_err(),
     "the pre-fix `.expect(...)` idiom must panic on a poisoned lock — this is the bug",
   );
 
-  std::panic::set_hook( hook );
+  std::panic::set_hook(hook);
 
   // The fix: `.unwrap_or_else( PoisonError::into_inner )`, `commit_batch`'s
   // own idiom after this fix, recovers the stale-but-valid guard instead.
-  let recovered = queue.lock().unwrap_or_else( std::sync::PoisonError::into_inner );
-  assert_eq!( recovered.len(), 1, "the queue's prior state survives an unrelated sibling panic" );
+  let recovered = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+  assert_eq!(
+    recovered.len(),
+    1,
+    "the queue's prior state survives an unrelated sibling panic"
+  );
 }

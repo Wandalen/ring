@@ -44,10 +44,10 @@
 //! `Park` strategy makes it a hung thread that never even burns CPU to show it.
 //! Returning [`RingError::Empty`] hands the caller a decision it can act on.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_cursor::CursorPair;
-use ring_types::{ RingError, WaitKind };
+use ring_types::{RingError, WaitKind};
 
 /// The default number of attempts [`wait_until`] makes before giving up.
 ///
@@ -59,7 +59,7 @@ use ring_types::{ RingError, WaitKind };
 /// ```
 /// assert_eq!( ring_wait::DEFAULT_SPINS, 1024 );
 /// ```
-pub const DEFAULT_SPINS : usize = 1024;
+pub const DEFAULT_SPINS: usize = 1024;
 
 /// How many times a [`WaitKind`] re-reads before it is worth escalating to a
 /// more expensive strategy.
@@ -78,13 +78,11 @@ pub const DEFAULT_SPINS : usize = 1024;
 /// assert_eq!( escalation_hint( WaitKind::Park ), None, "nothing cheaper to escalate to" );
 /// assert_eq!( escalation_hint( WaitKind::None ), None, "None never waits, so never escalates" );
 /// ```
-#[ must_use ]
-pub const fn escalation_hint( kind : WaitKind ) -> Option< WaitKind >
-{
-  match kind
-  {
-    WaitKind::Spin => Some( WaitKind::Yield ),
-    WaitKind::Yield => Some( WaitKind::Park ),
+#[must_use]
+pub const fn escalation_hint(kind: WaitKind) -> Option<WaitKind> {
+  match kind {
+    WaitKind::Spin => Some(WaitKind::Yield),
+    WaitKind::Yield => Some(WaitKind::Park),
     WaitKind::Park | WaitKind::None => None,
   }
 }
@@ -108,28 +106,22 @@ pub const fn escalation_hint( kind : WaitKind ) -> Option< WaitKind >
 /// assert!( pause( WaitKind::Spin, 0 ), "spin says keep going" );
 /// assert!( !pause( WaitKind::None, 0 ), "None says stop after the first look" );
 /// ```
-pub fn pause( kind : WaitKind, attempt : usize ) -> bool
-{
-  match kind
-  {
-    WaitKind::Spin =>
-    {
+pub fn pause(kind: WaitKind, attempt: usize) -> bool {
+  match kind {
+    WaitKind::Spin => {
       // A pause hint rather than an empty loop body: it tells the CPU this is
       // a spin-wait, which cuts the memory-order-violation penalty on leaving
       // the loop and stops the core from starving its hyperthread sibling.
-      for _ in 0..=( attempt % 8 )
-      {
+      for _ in 0..=(attempt % 8) {
         core::hint::spin_loop();
       }
       true
     }
-    WaitKind::Yield =>
-    {
+    WaitKind::Yield => {
       std::thread::yield_now();
       true
     }
-    WaitKind::Park =>
-    {
+    WaitKind::Park => {
       // Sleeping rather than `thread::park` on purpose. Parking requires the
       // publisher to hold the waiter's handle and unpark it, which is a
       // registration relationship this crate deliberately does not have —
@@ -137,7 +129,7 @@ pub fn pause( kind : WaitKind, attempt : usize ) -> bool
       // cost profile (idle rather than spinning) without inventing that
       // relationship here, and the sleep length is what a real unpark would
       // make unnecessary.
-      std::thread::sleep( std::time::Duration::from_micros( 50 ) );
+      std::thread::sleep(std::time::Duration::from_micros(50));
       true
     }
     WaitKind::None => false,
@@ -175,22 +167,19 @@ pub fn pause( kind : WaitKind, attempt : usize ) -> bool
 /// # Panics
 ///
 /// Never. The budget is a `usize` count and the loop is bounded by it.
-pub fn wait_until< F >( kind : WaitKind, spins : usize, mut ready : F ) -> Result< usize, RingError >
+pub fn wait_until<F>(kind: WaitKind, spins: usize, mut ready: F) -> Result<usize, RingError>
 where
-  F : FnMut() -> bool,
+  F: FnMut() -> bool,
 {
-  for attempt in 0..spins.max( 1 )
-  {
-    if ready()
-    {
-      return Ok( attempt );
+  for attempt in 0..spins.max(1) {
+    if ready() {
+      return Ok(attempt);
     }
-    if !pause( kind, attempt )
-    {
+    if !pause(kind, attempt) {
       break;
     }
   }
-  Err( RingError::Empty )
+  Err(RingError::Empty)
 }
 
 /// [`wait_until`] with the [`DEFAULT_SPINS`] budget.
@@ -206,11 +195,11 @@ where
 /// assert_eq!( wait( WaitKind::None, || true ), Ok( 0 ) );
 /// assert!( wait( WaitKind::None, || false ).is_err() );
 /// ```
-pub fn wait< F >( kind : WaitKind, ready : F ) -> Result< usize, RingError >
+pub fn wait<F>(kind: WaitKind, ready: F) -> Result<usize, RingError>
 where
-  F : FnMut() -> bool,
+  F: FnMut() -> bool,
 {
-  wait_until( kind, DEFAULT_SPINS, ready )
+  wait_until(kind, DEFAULT_SPINS, ready)
 }
 
 /// Wait until the ring has room for a producer to claim.
@@ -235,9 +224,8 @@ where
 /// pair.producer().store( Seq( 4 ), Ordering::Release );
 /// assert!( for_space( &pair, WaitKind::None, 1 ).is_err(), "a full one does not" );
 /// ```
-pub fn for_space( pair : &CursorPair, kind : WaitKind, spins : usize ) -> Result< usize, RingError >
-{
-  wait_until( kind, spins, || pair.may_claim() ).map_err( | _ | RingError::Full )
+pub fn for_space(pair: &CursorPair, kind: WaitKind, spins: usize) -> Result<usize, RingError> {
+  wait_until(kind, spins, || pair.may_claim()).map_err(|_| RingError::Full)
 }
 
 /// Wait until the ring holds at least `count` unread items.
@@ -261,8 +249,6 @@ pub fn for_space( pair : &CursorPair, kind : WaitKind, spins : usize ) -> Result
 /// assert!( for_data( &pair, 3, WaitKind::None, 1 ).is_ok() );
 /// assert!( for_data( &pair, 4, WaitKind::None, 1 ).is_err(), "three is not four" );
 /// ```
-pub fn for_data( pair : &CursorPair, count : u64, kind : WaitKind, spins : usize )
--> Result< usize, RingError >
-{
-  wait_until( kind, spins, || pair.pending() >= count )
+pub fn for_data(pair: &CursorPair, count: u64, kind: WaitKind, spins: usize) -> Result<usize, RingError> {
+  wait_until(kind, spins, || pair.pending() >= count)
 }

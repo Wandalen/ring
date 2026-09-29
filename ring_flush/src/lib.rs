@@ -51,7 +51,7 @@
 //! stated trigger and at no other point, asserted by a scripted sequence
 //! against a recorded flush log — see `tests/flush_test.rs`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_core::Producer;
 use ring_tls::TlsBuffer;
@@ -78,15 +78,14 @@ use ring_types::RingError;
 /// assert_eq!( FlushPolicy::OnBatch( 8 ), FlushPolicy::OnBatch( 8 ) );
 /// assert_ne!( FlushPolicy::OnFull, FlushPolicy::OnBarrier );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum FlushPolicy
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlushPolicy {
   /// Flush when the buffer cannot accept another record.
   OnFull,
   /// Flush when the driver is told the stage barrier has been reached.
   OnBarrier,
   /// Flush when `n` records have accumulated since the last flush.
-  OnBatch( usize ),
+  OnBatch(usize),
 }
 
 /// Why a flush fired.
@@ -96,9 +95,8 @@ pub enum FlushPolicy
 /// an `OnBatch` policy that *also* fires when full — the entries are
 /// indistinguishable from correct ones. Recording why each flush fired is what
 /// turns the log from a count into evidence.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum FlushCause
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FlushCause {
   /// The buffer could accept no more records.
   Full,
   /// A barrier was announced to the driver.
@@ -121,26 +119,23 @@ pub enum FlushCause
 ///
 /// Not a `Result`: three of the four are ordinary outcomes. `Rejected` is the
 /// backpressure the design expects, not a bug.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-#[ must_use = "an ignored outcome is exactly how a misconfigured OnBarrier stays silent" ]
-pub enum FlushOutcome
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use = "an ignored outcome is exactly how a misconfigured OnBarrier stays silent"]
+pub enum FlushOutcome {
   /// The policy was consulted and its trigger did not hold.
   NotTriggered,
   /// The trigger held; the buffer held no records.
   TriggeredEmpty,
   /// The trigger held; `count` records were moved into the ring.
-  Flushed
-  {
+  Flushed {
     /// How many records landed.
-    count : usize,
+    count: usize,
   },
   /// The trigger held; the ring could not accept the batch. The records are
   /// **still staged** and the call is safe to retry.
-  Rejected
-  {
+  Rejected {
     /// How many records remain staged.
-    staged : usize,
+    staged: usize,
   },
 }
 
@@ -152,19 +147,17 @@ pub enum FlushOutcome
 /// them. Each unvalidated case would degrade into *a different, working policy*
 /// — and a program producing a benchmark verdict about the wrong policy is
 /// worse than one that refuses to start.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum ConfigError
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConfigError {
   /// `OnBatch( 0 )` would fire on every append — a fourth policy by accident.
   ZeroBatch,
   /// `OnBatch( n )` with `n` above the buffer's capacity could never fire, and
   /// would degrade into `OnFull`.
-  BatchExceedsCapacity
-  {
+  BatchExceedsCapacity {
     /// The requested batch size.
-    requested : usize,
+    requested: usize,
     /// The buffer's capacity in records.
-    capacity : usize,
+    capacity: usize,
   },
 }
 
@@ -175,16 +168,12 @@ pub enum ConfigError
 // binding refusal or fold it into a `Box< dyn Error >` alongside the other two.
 // Found by `ring_bench`, which is the first crate to hold all three at once;
 // see that crate's `docs/integration/001`.
-impl core::fmt::Display for ConfigError
-{
-  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    match self
-    {
-      Self::ZeroBatch => f.write_str( "OnBatch( 0 ) fires on every append" ),
-      Self::BatchExceedsCapacity { requested, capacity } =>
-      {
-        write!( f, "OnBatch( {requested} ) never fires in a {capacity}-record buffer" )
+impl core::fmt::Display for ConfigError {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    match self {
+      Self::ZeroBatch => f.write_str("OnBatch( 0 ) fires on every append"),
+      Self::BatchExceedsCapacity { requested, capacity } => {
+        write!(f, "OnBatch( {requested} ) never fires in a {capacity}-record buffer")
       }
     }
   }
@@ -201,19 +190,17 @@ impl core::error::Error for ConfigError {}
 /// opposite things about whether the ring had room. Carrying the outcome makes
 /// the count derivable ([`FlushEntry::count`]) and makes the requirement that
 /// log and outcome agree true by construction rather than asserted and hoped.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub struct FlushEntry
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FlushEntry {
   /// Which policy was in effect.
-  pub policy : FlushPolicy,
+  pub policy: FlushPolicy,
   /// Why this flush fired.
-  pub cause : FlushCause,
+  pub cause: FlushCause,
   /// What the drive call that produced this entry returned.
-  pub outcome : FlushOutcome,
+  pub outcome: FlushOutcome,
 }
 
-impl FlushEntry
-{
+impl FlushEntry {
   /// How many records moved. Zero for a trigger that found the buffer empty or
   /// one the ring refused.
   // Fix(flush_entry_count_catchall_not_exhaustive): was `_ => 0` behind the one
@@ -226,15 +213,11 @@ impl FlushEntry
   // Pitfall: a caller summing `count()` across a log to reconcile how much data
   //   moved would silently under-count the moment such a variant existed,
   //   with nothing at this call site pointing at why the total came up short.
-  #[ must_use ]
-  pub const fn count( &self ) -> usize
-  {
-    match self.outcome
-    {
+  #[must_use]
+  pub const fn count(&self) -> usize {
+    match self.outcome {
       FlushOutcome::Flushed { count } => count,
-      FlushOutcome::NotTriggered
-      | FlushOutcome::TriggeredEmpty
-      | FlushOutcome::Rejected { .. } => 0,
+      FlushOutcome::NotTriggered | FlushOutcome::TriggeredEmpty | FlushOutcome::Rejected { .. } => 0,
     }
   }
 }
@@ -278,19 +261,16 @@ impl FlushEntry
 /// records firings; `is_empty()` is then the assertion that discharges "and at
 /// no other point" directly, rather than a filter over entries that would have
 /// to be written correctly to mean anything.
-#[ derive( Debug, Clone, Default, PartialEq, Eq ) ]
-pub struct FlushLog
-{
-  entries : Vec< FlushEntry >,
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct FlushLog {
+  entries: Vec<FlushEntry>,
 }
 
-impl FlushLog
-{
+impl FlushLog {
   /// An empty log.
-  #[ must_use ]
-  pub const fn new() -> Self
-  {
-    Self { entries : Vec::new() }
+  #[must_use]
+  pub const fn new() -> Self {
+    Self { entries: Vec::new() }
   }
 
   /// Every flush recorded so far, in the order it happened.
@@ -298,31 +278,27 @@ impl FlushLog
   /// Ordering is `Vec` position. There is no timestamp, deliberately: reading a
   /// clock is forbidden anywhere near this path, and position already carries
   /// the ordering a test needs.
-  #[ must_use ]
-  pub fn entries( &self ) -> &[ FlushEntry ]
-  {
+  #[must_use]
+  pub fn entries(&self) -> &[FlushEntry] {
     &self.entries
   }
 
   /// How many flushes have been recorded.
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.entries.len()
   }
 
   /// Whether no flush has been recorded.
   ///
   /// The assertion that discharges the "and at no other point" clause.
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.entries.is_empty()
   }
 
   /// Forget every entry, keeping the allocation. Used between scenarios.
-  pub fn clear( &mut self )
-  {
+  pub fn clear(&mut self) {
     self.entries.clear();
   }
 }
@@ -349,21 +325,19 @@ impl FlushLog
 /// Two named methods rather than `drive( at_barrier : bool )`, because a reader
 /// auditing whether barriers are announced correctly can grep for
 /// `drive_at_barrier` and cannot grep for `true`.
-#[ derive( Debug ) ]
-pub struct Flusher< 'a, T >
-{
-  buffer : TlsBuffer< T >,
-  producer : Producer< 'a, T >,
-  policy : FlushPolicy,
-  log : Option< FlushLog >,
+#[derive(Debug)]
+pub struct Flusher<'a, T> {
+  buffer: TlsBuffer<T>,
+  producer: Producer<'a, T>,
+  policy: FlushPolicy,
+  log: Option<FlushLog>,
 }
 
 /// The `Send` bound is inherited, not local. Every `ring_core::Producer` method
 /// requires it, so a `Flusher` over a non-`Send` record type can be constructed
 /// but can do nothing — putting the bound here makes that a compile error at
 /// the type rather than a puzzling `E0599` at the call.
-impl< 'a, T : Send > Flusher< 'a, T >
-{
+impl<'a, T: Send> Flusher<'a, T> {
   /// Bind a policy to a buffer and the producer its records will reach.
   ///
   /// **This is where validation happens** — a [`FlushPolicy`] value alone
@@ -404,47 +378,40 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// let refused = Flusher::new( buffer, producer, FlushPolicy::OnBatch( 0 ) );
   /// assert_eq!( refused.unwrap_err(), ConfigError::ZeroBatch );
   /// ```
-  pub fn new
-  (
-    buffer : TlsBuffer< T >,
-    producer : Producer< 'a, T >,
-    policy : FlushPolicy,
-  )
-  -> Result< Self, ConfigError >
-  {
-    if let FlushPolicy::OnBatch( n ) = policy
-    {
-      if n == 0
-      {
-        return Err( ConfigError::ZeroBatch );
+  pub fn new(buffer: TlsBuffer<T>, producer: Producer<'a, T>, policy: FlushPolicy) -> Result<Self, ConfigError> {
+    if let FlushPolicy::OnBatch(n) = policy {
+      if n == 0 {
+        return Err(ConfigError::ZeroBatch);
       }
 
-      if n > buffer.capacity()
-      {
-        return Err
-        (
-          ConfigError::BatchExceedsCapacity { requested : n, capacity : buffer.capacity() }
-        );
+      if n > buffer.capacity() {
+        return Err(ConfigError::BatchExceedsCapacity {
+          requested: n,
+          capacity: buffer.capacity(),
+        });
       }
     }
 
-    Ok( Self { buffer, producer, policy, log : None } )
+    Ok(Self {
+      buffer,
+      producer,
+      policy,
+      log: None,
+    })
   }
 
   /// Record every flush this driver performs.
   ///
   /// Opt-in, and absent by default — see [`FlushLog`] for why that replaced a
   /// compilation boundary rather than needing one.
-  pub fn with_log( mut self ) -> Self
-  {
-    self.log = Some( FlushLog::new() );
+  pub fn with_log(mut self) -> Self {
+    self.log = Some(FlushLog::new());
     self
   }
 
   /// The bound policy. `Copy`; no interior state is exposed.
-  #[ must_use ]
-  pub const fn policy( &self ) -> FlushPolicy
-  {
+  #[must_use]
+  pub const fn policy(&self) -> FlushPolicy {
     self.policy
   }
 
@@ -454,9 +421,8 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// the owning thread can change the count. It is useful for diagnostics and
   /// for deciding whether a drive is worthwhile; it is not a basis for a
   /// correctness decision.
-  #[ must_use ]
-  pub fn staged( &self ) -> usize
-  {
+  #[must_use]
+  pub fn staged(&self) -> usize {
     self.buffer.len()
   }
 
@@ -475,24 +441,20 @@ impl< 'a, T : Send > Flusher< 'a, T >
   ///
   /// Advisory in the same way `staged` is: an append on the owning thread can
   /// consume the headroom between the read and the use.
-  #[ must_use ]
-  pub fn buffer_capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub fn buffer_capacity(&self) -> usize {
     self.buffer.capacity()
   }
 
   /// The recorded flushes, if this driver was built with a log.
-  #[ must_use ]
-  pub fn log( &self ) -> Option< &FlushLog >
-  {
+  #[must_use]
+  pub fn log(&self) -> Option<&FlushLog> {
     self.log.as_ref()
   }
 
   /// Forget every recorded entry, if there is a log. Used between scenarios.
-  pub fn clear_log( &mut self )
-  {
-    if let Some( log ) = self.log.as_mut()
-    {
+  pub fn clear_log(&mut self) {
+    if let Some(log) = self.log.as_mut() {
       log.clear();
     }
   }
@@ -527,9 +489,8 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// returns. Retrying with the same value is therefore not possible; the fix
   /// is `ring_tls`'s (a widened `push( item : T ) -> Result< (), ( RingError,
   /// T ) >`), which this signature would need to widen with.
-  pub fn append( &mut self, record : T ) -> Result< (), RingError >
-  {
-    self.buffer.push( record )
+  pub fn append(&mut self, record: T) -> Result<(), RingError> {
+    self.buffer.push(record)
   }
 
   /// Drive without announcing a barrier.
@@ -539,11 +500,9 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// here — this is the only route by which a misconfigured `OnBarrier` becomes
   /// observable, and a `drive` that fired for it would be the silent
   /// degeneration the whole design guards against.
-  pub fn drive( &mut self ) -> FlushOutcome
-  {
-    match self.trigger( false )
-    {
-      Some( cause ) => self.run( cause ),
+  pub fn drive(&mut self) -> FlushOutcome {
+    match self.trigger(false) {
+      Some(cause) => self.run(cause),
       None => FlushOutcome::NotTriggered,
     }
   }
@@ -556,11 +515,9 @@ impl< 'a, T : Send > Flusher< 'a, T >
   ///
   /// **This crate believes the announcement and cannot check it** — see
   /// [`Flusher`]'s own note.
-  pub fn drive_at_barrier( &mut self ) -> FlushOutcome
-  {
-    match self.trigger( true )
-    {
-      Some( cause ) => self.run( cause ),
+  pub fn drive_at_barrier(&mut self) -> FlushOutcome {
+    match self.trigger(true) {
+      Some(cause) => self.run(cause),
       None => FlushOutcome::NotTriggered,
     }
   }
@@ -577,9 +534,8 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// **A [`FlushOutcome::Rejected`] here must be retried**, and nothing in this
   /// crate will do it. Rust has no linear types; a [`Flusher`] can be dropped
   /// with records staged, and they are gone.
-  pub fn drain_final( &mut self ) -> FlushOutcome
-  {
-    self.run( FlushCause::Shutdown )
+  pub fn drain_final(&mut self) -> FlushOutcome {
+    self.run(FlushCause::Shutdown)
   }
 
   /// Which cause fires, if any. Reads the policy by value; touches no atomic.
@@ -596,13 +552,29 @@ impl< 'a, T : Send > Flusher< 'a, T >
   // Pitfall: `trigger` returning `None` for a real policy is indistinguishable
   //   from that policy's condition simply not holding yet; a caller has no
   //   signal that the policy was never wired up at all.
-  fn trigger( &self, at_barrier : bool ) -> Option< FlushCause >
-  {
-    match self.policy
-    {
-      FlushPolicy::OnFull => if self.buffer.is_full() { Some( FlushCause::Full ) } else { None },
-      FlushPolicy::OnBarrier => if at_barrier { Some( FlushCause::Barrier ) } else { None },
-      FlushPolicy::OnBatch( n ) => if self.buffer.len() >= n { Some( FlushCause::Batch ) } else { None },
+  fn trigger(&self, at_barrier: bool) -> Option<FlushCause> {
+    match self.policy {
+      FlushPolicy::OnFull => {
+        if self.buffer.is_full() {
+          Some(FlushCause::Full)
+        } else {
+          None
+        }
+      }
+      FlushPolicy::OnBarrier => {
+        if at_barrier {
+          Some(FlushCause::Barrier)
+        } else {
+          None
+        }
+      }
+      FlushPolicy::OnBatch(n) => {
+        if self.buffer.len() >= n {
+          Some(FlushCause::Batch)
+        } else {
+          None
+        }
+      }
     }
   }
 
@@ -612,28 +584,25 @@ impl< 'a, T : Send > Flusher< 'a, T >
   /// capacity check happens **before the buffer is touched at all**, so the
   /// rejection path cannot reach the drain; and the drain is a single
   /// expression, so no later edit can move a reset above it.
-  fn run( &mut self, cause : FlushCause ) -> FlushOutcome
-  {
+  fn run(&mut self, cause: FlushCause) -> FlushOutcome {
     let staged = self.buffer.len();
 
-    if staged == 0
-    {
-      return self.record( cause, FlushOutcome::TriggeredEmpty );
+    if staged == 0 {
+      return self.record(cause, FlushOutcome::TriggeredEmpty);
     }
 
     // Step 2 — Claim. The only step that can fail, and it fails before the
     // buffer is read. `free_capacity` is a snapshot, but on a ring this
     // `Flusher` is the sole producer of it can only grow between here and the
     // push: the consumer's drain frees space and nothing else consumes it.
-    if self.producer.free_capacity() < staged
-    {
-      return self.record( cause, FlushOutcome::Rejected { staged } );
+    if self.producer.free_capacity() < staged {
+      return self.record(cause, FlushOutcome::Rejected { staged });
     }
 
     // Steps 1, 3 and 4 — seal, drain, reset. `TlsBuffer::drain` empties the
     // buffer as the iterator drops, so the reset is not a separate statement
     // that could be reordered above the push.
-    let count = self.producer.try_push_batch( &mut self.buffer.drain() );
+    let count = self.producer.try_push_batch(&mut self.buffer.drain());
 
     // `count < staged` is not asserted here, and the omission is deliberate.
     // It is reachable only by violating this crate's contract — a second
@@ -643,15 +612,17 @@ impl< 'a, T : Send > Flusher< 'a, T >
     // `debug_assert!` would promise a guarantee that evaporates in exactly the
     // build where the race is likely, and no runtime check can restore records
     // that are already gone. What is reported is what landed.
-    self.record( cause, FlushOutcome::Flushed { count } )
+    self.record(cause, FlushOutcome::Flushed { count })
   }
 
   /// Derive the log entry from the outcome, so the two cannot disagree.
-  fn record( &mut self, cause : FlushCause, outcome : FlushOutcome ) -> FlushOutcome
-  {
-    if let Some( log ) = self.log.as_mut()
-    {
-      log.entries.push( FlushEntry { policy : self.policy, cause, outcome } );
+  fn record(&mut self, cause: FlushCause, outcome: FlushOutcome) -> FlushOutcome {
+    if let Some(log) = self.log.as_mut() {
+      log.entries.push(FlushEntry {
+        policy: self.policy,
+        cause,
+        outcome,
+      });
     }
 
     outcome

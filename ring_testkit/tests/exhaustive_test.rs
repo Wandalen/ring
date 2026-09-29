@@ -27,30 +27,29 @@
 //! `ring_mpsc`) settled on the same shape for the same reason. What is being
 //! explored is the *handshake* — a claim, a publish, a read — not throughput.
 
-#![ cfg( loom ) ]
+#![cfg(loom)]
 
 use loom::sync::Arc;
-use loom::sync::atomic::{ AtomicUsize, Ordering };
+use loom::sync::atomic::{AtomicUsize, Ordering};
 use ring_config::RingConfig;
 use ring_core::Ring;
-use ring_testkit::{ audit_received, leak_ends };
+use ring_testkit::{audit_received, leak_ends};
 
 /// The declared bound: two slots.
-const CAPACITY : usize = 2;
+const CAPACITY: usize = 2;
 
 /// What the producer writes alongside the record. Any value a zeroed cell
 /// cannot hold by accident — zero would be indistinguishable from "never
 /// written".
-const WRITTEN : usize = 0xABC;
+const WRITTEN: usize = 0xABC;
 
 /// The two ends of a fresh ring, both `'static`.
 ///
 /// Constructed inside the model closure, never outside it: the cursors are
 /// loom atomics under this cfg and panic if touched with no model running.
-fn ends() -> ( ring_core::Producer< 'static, u32 >, ring_core::Consumer< 'static, u32 > )
-{
-  let config = RingConfig::new( CAPACITY ).expect( "a power of two" );
-  leak_ends( Ring::new( &config ).expect( "the default policy is accepted" ) )
+fn ends() -> (ring_core::Producer<'static, u32>, ring_core::Consumer<'static, u32>) {
+  let config = RingConfig::new(CAPACITY).expect("a power of two");
+  leak_ends(Ring::new(&config).expect("the default policy is accepted"))
 }
 
 /// **The reached-test.** No interleaving delivers a record that was never
@@ -59,34 +58,32 @@ fn ends() -> ( ring_core::Producer< 'static, u32 >, ring_core::Consumer< 'static
 /// The consumer takes one look rather than spinning: every point at which that
 /// look could land is a separate execution loom already runs, so a retry loop
 /// would multiply executions without adding an observation.
-#[ test ]
-fn no_interleaving_delivers_a_record_that_was_not_published()
-{
-  loom::model( ||
-  {
-    let ( mut producer, mut consumer ) = ends();
+#[test]
+fn no_interleaving_delivers_a_record_that_was_not_published() {
+  loom::model(|| {
+    let (mut producer, mut consumer) = ends();
 
-    let producing = loom::thread::spawn( move ||
-    {
-      producer.try_push( 0 ).expect( "an empty ring admits one" );
-    } );
+    let producing = loom::thread::spawn(move || {
+      producer.try_push(0).expect("an empty ring admits one");
+    });
 
-    let draining = loom::thread::spawn( move ||
-    {
+    let draining = loom::thread::spawn(move || {
       let mut received = Vec::new();
-      if let Some( record ) = consumer.try_recv() { received.push( record ); }
+      if let Some(record) = consumer.try_recv() {
+        received.push(record);
+      }
 
-      assert!( received.len() <= 1, "drained {} past the only push ever made", received.len() );
-      assert_eq!
-      (
-        audit_received( &received, 1 ), Ok( () ),
+      assert!(received.len() <= 1, "drained {} past the only push ever made", received.len());
+      assert_eq!(
+        audit_received(&received, 1),
+        Ok(()),
         "a drain saw records that could not have been published: {received:?}",
       );
-    } );
+    });
 
-    producing.join().expect( "the producer thread" );
-    draining.join().expect( "the drain thread" );
-  } );
+    producing.join().expect("the producer thread");
+    draining.join().expect("the drain thread");
+  });
 }
 
 /// A delivered record carries the write that preceded its publish.
@@ -95,42 +92,38 @@ fn no_interleaving_delivers_a_record_that_was_not_published()
 /// the model explores. A publish that does not *release* lets the drain reach
 /// its assertion with `payload` still zero — which is the failure this model
 /// exists to rule out, and the reason a sampled test cannot stand in for it.
-#[ test ]
-fn a_delivered_record_carries_the_write_that_preceded_it()
-{
-  loom::model( ||
-  {
-    let ( mut producer, mut consumer ) = ends();
-    let payload = Arc::new( AtomicUsize::new( 0 ) );
+#[test]
+fn a_delivered_record_carries_the_write_that_preceded_it() {
+  loom::model(|| {
+    let (mut producer, mut consumer) = ends();
+    let payload = Arc::new(AtomicUsize::new(0));
 
-    let producing = loom::thread::spawn(
-    {
-      let payload = Arc::clone( &payload );
-      move ||
-      {
-        payload.store( WRITTEN, Ordering::Relaxed );
-        producer.try_push( 0 ).expect( "an empty ring admits one" );
+    let producing = loom::thread::spawn({
+      let payload = Arc::clone(&payload);
+      move || {
+        payload.store(WRITTEN, Ordering::Relaxed);
+        producer.try_push(0).expect("an empty ring admits one");
       }
-    } );
+    });
 
-    let draining = loom::thread::spawn(
-    {
-      let payload = Arc::clone( &payload );
-      move ||
-      {
-        if consumer.try_recv().is_none() { return; }
+    let draining = loom::thread::spawn({
+      let payload = Arc::clone(&payload);
+      move || {
+        if consumer.try_recv().is_none() {
+          return;
+        }
 
-        assert_eq!
-        (
-          payload.load( Ordering::Relaxed ), WRITTEN,
+        assert_eq!(
+          payload.load(Ordering::Relaxed),
+          WRITTEN,
           "a delivered record did not carry the write that preceded its publish",
         );
       }
-    } );
+    });
 
-    producing.join().expect( "the producer thread" );
-    draining.join().expect( "the drain thread" );
-  } );
+    producing.join().expect("the producer thread");
+    draining.join().expect("the drain thread");
+  });
 }
 
 /// The consumer never observes further than the producer published.
@@ -140,24 +133,24 @@ fn a_delivered_record_carries_the_write_that_preceded_it()
 /// consumer is being offered a slot the producer has not finished with, which
 /// is a different bug from delivering the wrong record and would survive the
 /// value check on a ring whose slots happened to be zeroed.
-#[ test ]
-fn the_consumer_never_sees_further_than_the_producer_published()
-{
-  loom::model( ||
-  {
-    let ( mut producer, consumer ) = ends();
+#[test]
+fn the_consumer_never_sees_further_than_the_producer_published() {
+  loom::model(|| {
+    let (mut producer, consumer) = ends();
 
-    let producing = loom::thread::spawn( move ||
-    {
-      producer.try_push( 0 ).expect( "an empty ring admits one" );
-    } );
+    let producing = loom::thread::spawn(move || {
+      producer.try_push(0).expect("an empty ring admits one");
+    });
 
-    let observing = loom::thread::spawn( move ||
-    {
-      assert!( consumer.len() <= 1, "the ring reported {} records after one push", consumer.len() );
-    } );
+    let observing = loom::thread::spawn(move || {
+      assert!(
+        consumer.len() <= 1,
+        "the ring reported {} records after one push",
+        consumer.len()
+      );
+    });
 
-    producing.join().expect( "the producer thread" );
-    observing.join().expect( "the observing thread" );
-  } );
+    producing.join().expect("the producer thread");
+    observing.join().expect("the observing thread");
+  });
 }

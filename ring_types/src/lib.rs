@@ -23,8 +23,8 @@
 //! (the vocabulary half), `docs/feature/173_wait_kind_and_strategies.md` and
 //! `docs/feature/174_overflow_policy_enum_and_handlers.md` (the enum halves).
 
-#![ no_std ]
-#![ deny( missing_docs ) ]
+#![no_std]
+#![deny(missing_docs)]
 
 // Core-only, and now says so. Rationale at `ring_overflow/src/lib.rs`'s own
 // attribute — the property is transitive, so it is asserted in all three of this
@@ -39,5 +39,5 @@ mod policy;
 
 pub use capacity::Capacity;
 pub use error::RingError;
-pub use id::{ Seq, SlotIndex };
-pub use policy::{ OverflowPolicy, WaitKind };
+pub use id::{Seq, SlotIndex};
+pub use policy::{OverflowPolicy, WaitKind};

@@ -58,14 +58,14 @@
 //! `ring_publish/tests/handshake_test.rs` is what uses it, and is run with
 //! `RUSTFLAGS="--cfg loom" cargo test -p ring_publish --test handshake_test`.
 
-#![ deny( missing_docs ) ]
-
-#[ cfg( loom ) ]
-use loom::sync::atomic::{ AtomicU64, AtomicUsize };
-#[ cfg( not( loom ) ) ]
-use core::sync::atomic::{ AtomicU64, AtomicUsize };
+#![deny(missing_docs)]
 
 use core::sync::atomic::Ordering;
+#[cfg(not(loom))]
+use core::sync::atomic::{AtomicU64, AtomicUsize};
+
+#[cfg(loom)]
+use loom::sync::atomic::{AtomicU64, AtomicUsize};
 use ring_types::Seq;
 
 /// A shared cell holding one sequence.
@@ -104,13 +104,12 @@ use ring_types::Seq;
 /// Root cause: a requirement satisfied by composition rather than declared.
 /// Pitfall: object safety is not object *usability* — check what the `dyn` form
 /// auto-implements, not only that it compiles.
-pub trait SeqCell : Sync
-{
+pub trait SeqCell: Sync {
   /// Read the current sequence.
-  fn load( &self, order : Ordering ) -> Seq;
+  fn load(&self, order: Ordering) -> Seq;
 
   /// Overwrite the sequence.
-  fn store( &self, value : Seq, order : Ordering );
+  fn store(&self, value: Seq, order: Ordering);
 
   /// Advance by `n` and return the sequence as it was *before* the advance —
   /// which is the first sequence the caller now owns.
@@ -136,8 +135,8 @@ pub trait SeqCell : Sync
   /// nothing in the signature or the contract rules it out.
   /// Pitfall: an unreachable-by-counting state is still reachable in one call
   /// by anyone who seeds the cursor.
-  #[ must_use = "the returned sequence is the claim — dropping it claims a range nobody will use" ]
-  fn fetch_add( &self, n : u64, order : Ordering ) -> Seq;
+  #[must_use = "the returned sequence is the claim — dropping it claims a range nobody will use"]
+  fn fetch_add(&self, n: u64, order: Ordering) -> Seq;
 
   /// Advance from `current` to `new` only if the cell still reads `current`.
   ///
@@ -145,8 +144,7 @@ pub trait SeqCell : Sync
   ///
   /// The sequence actually found, when it was not `current` — the multi-producer
   /// claim's retry input.
-  fn compare_exchange( &self, current : Seq, new : Seq, success : Ordering, failure : Ordering )
-  -> Result< Seq, Seq >;
+  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq>;
 }
 
 /// The production sequence cell: one `AtomicU64`, no bookkeeping.
@@ -161,25 +159,22 @@ pub trait SeqCell : Sync
 /// cell.store( Seq( 9 ), Ordering::Release );
 /// assert_eq!( cell.load( Ordering::Acquire ), Seq( 9 ) );
 /// ```
-#[ derive( Debug ) ]
-pub struct AtomicSeq( AtomicU64 );
+#[derive(Debug)]
+pub struct AtomicSeq(AtomicU64);
 
-impl Default for AtomicSeq
-{
+impl Default for AtomicSeq {
   /// A cell at [`Seq::ZERO`].
   ///
   /// Written out rather than derived so that it does not depend on whichever
   /// `AtomicU64` is in scope having its own `Default` — one of the two comes
   /// from `loom` and its trait impls are its own business, not something this
   /// crate should be pinned to.
-  fn default() -> Self
-  {
-    Self::new( Seq::ZERO )
+  fn default() -> Self {
+    Self::new(Seq::ZERO)
   }
 }
 
-impl AtomicSeq
-{
+impl AtomicSeq {
   /// A cell holding `value`.
   ///
   /// `const` in an ordinary build. Not under `--cfg loom`, whose atomics carry
@@ -191,46 +186,39 @@ impl AtomicSeq
   /// use ring_types::Seq;
   /// let _ = AtomicSeq::new( Seq( 1 ) );
   /// ```
-  #[ cfg( not( loom ) ) ]
-  #[ must_use ]
-  pub const fn new( value : Seq ) -> Self
-  {
-    Self( AtomicU64::new( value.0 ) )
+  #[cfg(not(loom))]
+  #[must_use]
+  pub const fn new(value: Seq) -> Self {
+    Self(AtomicU64::new(value.0))
   }
 
   /// A cell holding `value` — the `--cfg loom` build, where it is not `const`.
-  #[ cfg( loom ) ]
-  #[ must_use ]
-  pub fn new( value : Seq ) -> Self
-  {
-    Self( AtomicU64::new( value.0 ) )
+  #[cfg(loom)]
+  #[must_use]
+  pub fn new(value: Seq) -> Self {
+    Self(AtomicU64::new(value.0))
   }
 }
 
-impl SeqCell for AtomicSeq
-{
-  fn load( &self, order : Ordering ) -> Seq
-  {
-    Seq( self.0.load( order ) )
+impl SeqCell for AtomicSeq {
+  fn load(&self, order: Ordering) -> Seq {
+    Seq(self.0.load(order))
   }
 
-  fn store( &self, value : Seq, order : Ordering )
-  {
-    self.0.store( value.0, order );
+  fn store(&self, value: Seq, order: Ordering) {
+    self.0.store(value.0, order);
   }
 
-  fn fetch_add( &self, n : u64, order : Ordering ) -> Seq
-  {
-    Seq( self.0.fetch_add( n, order ) )
+  fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+    Seq(self.0.fetch_add(n, order))
   }
 
-  fn compare_exchange( &self, current : Seq, new : Seq, success : Ordering, failure : Ordering )
-  -> Result< Seq, Seq >
-  {
-    self.0
-      .compare_exchange( current.0, new.0, success, failure )
-      .map( Seq )
-      .map_err( Seq )
+  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self
+      .0
+      .compare_exchange(current.0, new.0, success, failure)
+      .map(Seq)
+      .map_err(Seq)
   }
 }
 
@@ -268,19 +256,18 @@ impl SeqCell for AtomicSeq
 /// audit cannot audit them.
 /// Pitfall: an invariant that holds by construction proves the construction,
 /// not the data.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Default ) ]
-pub struct OpCounts
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct OpCounts {
   /// Reads served.
-  pub loads : usize,
+  pub loads: usize,
   /// Writes served.
-  pub stores : usize,
+  pub stores: usize,
   /// Advances served — the batch claim's own operation.
-  pub fetch_adds : usize,
+  pub fetch_adds: usize,
   /// Compare-exchanges served, successful or not — the contended claim's.
-  pub compare_exchanges : usize,
+  pub compare_exchanges: usize,
   /// Every operation above, summed.
-  pub total : usize,
+  pub total: usize,
 }
 
 /// A sequence cell that behaves exactly like [`AtomicSeq`] and counts what it
@@ -314,27 +301,23 @@ pub struct OpCounts
 /// assert_eq!( cell.counts().fetch_adds, 1 );
 /// assert_eq!( cell.counts().total, 1 );
 /// ```
-#[ derive( Debug ) ]
-pub struct CountingSeq
-{
-  cell : AtomicSeq,
-  loads : AtomicUsize,
-  stores : AtomicUsize,
-  fetch_adds : AtomicUsize,
-  compare_exchanges : AtomicUsize,
+#[derive(Debug)]
+pub struct CountingSeq {
+  cell: AtomicSeq,
+  loads: AtomicUsize,
+  stores: AtomicUsize,
+  fetch_adds: AtomicUsize,
+  compare_exchanges: AtomicUsize,
 }
 
-impl Default for CountingSeq
-{
+impl Default for CountingSeq {
   /// A counting cell at [`Seq::ZERO`], with every count at zero.
-  fn default() -> Self
-  {
-    Self::new( Seq::ZERO )
+  fn default() -> Self {
+    Self::new(Seq::ZERO)
   }
 }
 
-impl CountingSeq
-{
+impl CountingSeq {
   /// A counting cell holding `value`, with every count at zero.
   ///
   /// `const` in an ordinary build, and not under `--cfg loom`, for the reason
@@ -345,32 +328,28 @@ impl CountingSeq
   /// use ring_types::Seq;
   /// assert_eq!( CountingSeq::new( Seq( 2 ) ).counts().total, 0 );
   /// ```
-  #[ cfg( not( loom ) ) ]
-  #[ must_use ]
-  pub const fn new( value : Seq ) -> Self
-  {
-    Self
-    {
-      cell : AtomicSeq::new( value ),
-      loads : AtomicUsize::new( 0 ),
-      stores : AtomicUsize::new( 0 ),
-      fetch_adds : AtomicUsize::new( 0 ),
-      compare_exchanges : AtomicUsize::new( 0 ),
+  #[cfg(not(loom))]
+  #[must_use]
+  pub const fn new(value: Seq) -> Self {
+    Self {
+      cell: AtomicSeq::new(value),
+      loads: AtomicUsize::new(0),
+      stores: AtomicUsize::new(0),
+      fetch_adds: AtomicUsize::new(0),
+      compare_exchanges: AtomicUsize::new(0),
     }
   }
 
   /// A counting cell holding `value` — the `--cfg loom` build, not `const`.
-  #[ cfg( loom ) ]
-  #[ must_use ]
-  pub fn new( value : Seq ) -> Self
-  {
-    Self
-    {
-      cell : AtomicSeq::new( value ),
-      loads : AtomicUsize::new( 0 ),
-      stores : AtomicUsize::new( 0 ),
-      fetch_adds : AtomicUsize::new( 0 ),
-      compare_exchanges : AtomicUsize::new( 0 ),
+  #[cfg(loom)]
+  #[must_use]
+  pub fn new(value: Seq) -> Self {
+    Self {
+      cell: AtomicSeq::new(value),
+      loads: AtomicUsize::new(0),
+      stores: AtomicUsize::new(0),
+      fetch_adds: AtomicUsize::new(0),
+      compare_exchanges: AtomicUsize::new(0),
     }
   }
 
@@ -405,20 +384,18 @@ impl CountingSeq
   /// makes the struct look like a single observation.
   /// Pitfall: a cross-field assertion on this type fails intermittently, and
   /// its author will look for the cause in the code under test.
-  #[ must_use ]
-  pub fn counts( &self ) -> OpCounts
-  {
-    let loads = self.loads.load( Ordering::Relaxed );
-    let stores = self.stores.load( Ordering::Relaxed );
-    let fetch_adds = self.fetch_adds.load( Ordering::Relaxed );
-    let compare_exchanges = self.compare_exchanges.load( Ordering::Relaxed );
-    OpCounts
-    {
+  #[must_use]
+  pub fn counts(&self) -> OpCounts {
+    let loads = self.loads.load(Ordering::Relaxed);
+    let stores = self.stores.load(Ordering::Relaxed);
+    let fetch_adds = self.fetch_adds.load(Ordering::Relaxed);
+    let compare_exchanges = self.compare_exchanges.load(Ordering::Relaxed);
+    OpCounts {
       loads,
       stores,
       fetch_adds,
       compare_exchanges,
-      total : loads + stores + fetch_adds + compare_exchanges,
+      total: loads + stores + fetch_adds + compare_exchanges,
     }
   }
 
@@ -442,11 +419,9 @@ impl CountingSeq
   /// assert_eq!( cell.counts().total, 0 );
   /// assert_eq!( cell.load( Ordering::Acquire ), Seq( 5 ), "the sequence survives" );
   /// ```
-  pub fn reset_counts( &self )
-  {
-    for counter in [ &self.loads, &self.stores, &self.fetch_adds, &self.compare_exchanges ]
-    {
-      counter.store( 0, Ordering::Relaxed );
+  pub fn reset_counts(&self) {
+    for counter in [&self.loads, &self.stores, &self.fetch_adds, &self.compare_exchanges] {
+      counter.store(0, Ordering::Relaxed);
     }
   }
 }
@@ -470,30 +445,24 @@ impl CountingSeq
 /// the updates.
 /// Pitfall: "the counts are exact" is a statement about quiescence, and every
 /// test that establishes it is a test taken at rest.
-impl SeqCell for CountingSeq
-{
-  fn load( &self, order : Ordering ) -> Seq
-  {
-    self.loads.fetch_add( 1, Ordering::Relaxed );
-    self.cell.load( order )
+impl SeqCell for CountingSeq {
+  fn load(&self, order: Ordering) -> Seq {
+    self.loads.fetch_add(1, Ordering::Relaxed);
+    self.cell.load(order)
   }
 
-  fn store( &self, value : Seq, order : Ordering )
-  {
-    self.stores.fetch_add( 1, Ordering::Relaxed );
-    self.cell.store( value, order );
+  fn store(&self, value: Seq, order: Ordering) {
+    self.stores.fetch_add(1, Ordering::Relaxed);
+    self.cell.store(value, order);
   }
 
-  fn fetch_add( &self, n : u64, order : Ordering ) -> Seq
-  {
-    self.fetch_adds.fetch_add( 1, Ordering::Relaxed );
-    self.cell.fetch_add( n, order )
+  fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+    self.fetch_adds.fetch_add(1, Ordering::Relaxed);
+    self.cell.fetch_add(n, order)
   }
 
-  fn compare_exchange( &self, current : Seq, new : Seq, success : Ordering, failure : Ordering )
-  -> Result< Seq, Seq >
-  {
-    self.compare_exchanges.fetch_add( 1, Ordering::Relaxed );
-    self.cell.compare_exchange( current, new, success, failure )
+  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
+    self.cell.compare_exchange(current, new, success, failure)
   }
 }

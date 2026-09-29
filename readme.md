@@ -123,3 +123,9 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | [`ring_debug/`](ring_debug/readme.md) | Runtime invariant checks over a live ring |
 | [`ring_testkit/`](ring_testkit/readme.md) | Determinism-test fixtures driving scripted claim and drain sequences |
 | [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements — mutex, ring, and thread-local staging |
+
+## Tooling
+
+| Directory | Responsibility |
+|-----------|-----------------|
+| [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...) — not a crate, no `Cargo.toml` |

@@ -36,10 +36,10 @@
 //! moves, and a retry loop that could not tell them apart would spin forever on
 //! the second. `RingError::is_configuration` is the caller's test.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_cursor::PaddedCursor;
-use ring_types::{ Capacity, RingError, Seq };
+use ring_types::{Capacity, RingError, Seq};
 
 /// The consumer cursors a producer is gated by, and the ring size they are
 /// positions in.
@@ -65,15 +65,13 @@ use ring_types::{ Capacity, RingError, Seq };
 /// set.cursor( 1 ).unwrap().store( Seq( 3 ), Ordering::Release );
 /// assert_eq!( set.slowest(), Some( Seq( 3 ) ) );
 /// ```
-#[ derive( Debug ) ]
-pub struct GatingSet
-{
-  cursors : Vec< PaddedCursor >,
-  capacity : Capacity,
+#[derive(Debug)]
+pub struct GatingSet {
+  cursors: Vec<PaddedCursor>,
+  capacity: Capacity,
 }
 
-impl GatingSet
-{
+impl GatingSet {
   /// A set of `consumers` cursors, all at zero, gating a ring of `capacity`
   /// slots.
   ///
@@ -88,11 +86,10 @@ impl GatingSet
   /// assert!( ungated.is_empty() );
   /// assert_eq!( ungated.slowest(), None );
   /// ```
-  #[ must_use ]
-  pub fn new( capacity : Capacity, consumers : usize ) -> Self
-  {
-    let mut cursors = Vec::with_capacity( consumers );
-    cursors.resize_with( consumers, PaddedCursor::default );
+  #[must_use]
+  pub fn new(capacity: Capacity, consumers: usize) -> Self {
+    let mut cursors = Vec::with_capacity(consumers);
+    cursors.resize_with(consumers, PaddedCursor::default);
     Self { cursors, capacity }
   }
 
@@ -103,9 +100,8 @@ impl GatingSet
   /// use ring_types::Capacity;
   /// assert_eq!( GatingSet::new( Capacity::new( 2 ).unwrap(), 3 ).len(), 3 );
   /// ```
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.cursors.len()
   }
 
@@ -116,9 +112,8 @@ impl GatingSet
   /// use ring_types::Capacity;
   /// assert!( GatingSet::new( Capacity::new( 2 ).unwrap(), 0 ).is_empty() );
   /// ```
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.cursors.is_empty()
   }
 
@@ -137,10 +132,9 @@ impl GatingSet
   /// assert!( set.cursor( 0 ).is_some() );
   /// assert!( set.cursor( 1 ).is_none() );
   /// ```
-  #[ must_use ]
-  pub fn cursor( &self, index : usize ) -> Option< &PaddedCursor >
-  {
-    self.cursors.get( index )
+  #[must_use]
+  pub fn cursor(&self, index: usize) -> Option<&PaddedCursor> {
+    self.cursors.get(index)
   }
 
   /// Every cursor in the set.
@@ -150,9 +144,8 @@ impl GatingSet
   /// use ring_types::Capacity;
   /// assert_eq!( GatingSet::new( Capacity::new( 4 ).unwrap(), 3 ).cursors().len(), 3 );
   /// ```
-  #[ must_use ]
-  pub fn cursors( &self ) -> &[ PaddedCursor ]
-  {
+  #[must_use]
+  pub fn cursors(&self) -> &[PaddedCursor] {
     &self.cursors
   }
 
@@ -163,9 +156,8 @@ impl GatingSet
   /// use ring_types::Capacity;
   /// assert_eq!( GatingSet::new( Capacity::new( 16 ).unwrap(), 1 ).capacity().get(), 16 );
   /// ```
-  #[ must_use ]
-  pub const fn capacity( &self ) -> Capacity
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> Capacity {
     self.capacity
   }
 
@@ -192,10 +184,9 @@ impl GatingSet
   /// }
   /// assert_eq!( set.slowest(), Some( Seq( 4 ) ) );
   /// ```
-  #[ must_use ]
-  pub fn slowest( &self ) -> Option< Seq >
-  {
-    ring_cursor::slowest( &self.cursors )
+  #[must_use]
+  pub fn slowest(&self) -> Option<Seq> {
+    ring_cursor::slowest(&self.cursors)
   }
 
   /// How many slots a producer at `producer` may claim right now.
@@ -217,13 +208,11 @@ impl GatingSet
   /// set.cursor( 0 ).unwrap().store( Seq( 2 ), Ordering::Release );
   /// assert_eq!( set.headroom( Seq( 4 ) ), 2, "the consumer released two slots" );
   /// ```
-  #[ must_use ]
-  pub fn headroom( &self, producer : Seq ) -> usize
-  {
-    self.slowest().map_or( self.capacity.get(), | slowest |
-    {
-      ring_seqno::free_slots( producer, slowest, self.capacity )
-    } )
+  #[must_use]
+  pub fn headroom(&self, producer: Seq) -> usize {
+    self.slowest().map_or(self.capacity.get(), |slowest| {
+      ring_seqno::free_slots(producer, slowest, self.capacity)
+    })
   }
 
   /// Whether a producer at `producer` may claim `count` contiguous slots.
@@ -237,10 +226,9 @@ impl GatingSet
   /// assert!( !set.admits( Seq::ZERO, 5 ), "wider than the ring" );
   /// assert!( !set.admits( Seq( 2 ), 3 ), "only two slots left" );
   /// ```
-  #[ must_use ]
-  pub fn admits( &self, producer : Seq, count : usize ) -> bool
-  {
-    count <= self.headroom( producer )
+  #[must_use]
+  pub fn admits(&self, producer: Seq, count: usize) -> bool {
+    count <= self.headroom(producer)
   }
 
   /// Admit a claim of `count` slots at `producer`, or say why not.
@@ -279,17 +267,17 @@ impl GatingSet
   /// assert_eq!( set.check( Seq( 3 ), 2 ), Err( RingError::Full ) );
   /// assert!( !RingError::Full.is_configuration(), "but do retry this one" );
   /// ```
-  pub fn check( &self, producer : Seq, count : usize ) -> Result< (), RingError >
-  {
-    if count > self.capacity.get()
-    {
-      return Err( RingError::BatchTooLarge { requested : count, capacity : self.capacity.get() } );
+  pub fn check(&self, producer: Seq, count: usize) -> Result<(), RingError> {
+    if count > self.capacity.get() {
+      return Err(RingError::BatchTooLarge {
+        requested: count,
+        capacity: self.capacity.get(),
+      });
     }
-    if count > self.headroom( producer )
-    {
-      return Err( RingError::Full );
+    if count > self.headroom(producer) {
+      return Err(RingError::Full);
     }
-    Ok( () )
+    Ok(())
   }
 
   /// The sequence a producer must not reach or pass.
@@ -316,9 +304,8 @@ impl GatingSet
   /// set.cursor( 0 ).unwrap().store( Seq( 5 ), Ordering::Release );
   /// assert_eq!( set.limit(), Some( Seq( 13 ) ) );
   /// ```
-  #[ must_use ]
-  pub fn limit( &self ) -> Option< Seq >
-  {
-    self.slowest().map( | s | s.advanced_by( self.capacity.get() as u64 ) )
+  #[must_use]
+  pub fn limit(&self) -> Option<Seq> {
+    self.slowest().map(|s| s.advanced_by(self.capacity.get() as u64))
   }
 }

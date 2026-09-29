@@ -20,11 +20,11 @@
 //! delegated to `ring_index`. No `unsafe` — a `Box<[S]>` of `Default` slots is
 //! allocated in one go, which is what "exactly N slots once" asks for.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_index::of;
 use ring_slot::Slot;
-use ring_types::{ Capacity, Seq, SlotIndex };
+use ring_types::{Capacity, Seq, SlotIndex};
 
 /// A fixed array of slots, addressed by index.
 ///
@@ -54,15 +54,13 @@ use ring_types::{ Capacity, Seq, SlotIndex };
 /// `Debug` that prints cursor positions only, never slot contents — a type that
 /// embeds a `Buffer` and derives `Debug` in turn inherits this cost and this
 /// leak silently (-> docs/type/001 BF47).
-#[ derive( Debug ) ]
-pub struct Buffer< S >
-{
-  slots : Box< [ S ] >,
-  capacity : Capacity,
+#[derive(Debug)]
+pub struct Buffer<S> {
+  slots: Box<[S]>,
+  capacity: Capacity,
 }
 
-impl< S : Default > Buffer< S >
-{
+impl<S: Default> Buffer<S> {
   /// Allocate exactly `capacity` empty slots, once.
   ///
   /// Bounded on `Default` alone rather than on `Slot`, because allocation needs
@@ -83,17 +81,18 @@ impl< S : Default > Buffer< S >
   /// let buffer : Buffer< BytesSlot< 8 > > = Buffer::new( Capacity::new( 16 ).unwrap() );
   /// assert_eq!( buffer.len(), 16 );
   /// ```
-  #[ must_use ]
-  pub fn new( capacity : Capacity ) -> Self
-  {
-    let mut slots = Vec::with_capacity( capacity.get() );
-    slots.resize_with( capacity.get(), S::default );
-    Self { slots : slots.into_boxed_slice(), capacity }
+  #[must_use]
+  pub fn new(capacity: Capacity) -> Self {
+    let mut slots = Vec::with_capacity(capacity.get());
+    slots.resize_with(capacity.get(), S::default);
+    Self {
+      slots: slots.into_boxed_slice(),
+      capacity,
+    }
   }
 }
 
-impl< S : Slot + Default > Buffer< S >
-{
+impl<S: Slot + Default> Buffer<S> {
   /// Empty every slot, keeping the allocation.
   ///
   /// A reset for a recycled ring: reallocating would defeat the allocation
@@ -115,10 +114,8 @@ impl< S : Slot + Default > Buffer< S >
   /// buffer.clear();
   /// assert!( buffer.get( SlotIndex( 0 ) ).is_empty() );
   /// ```
-  pub fn clear( &mut self )
-  {
-    for slot in &mut self.slots
-    {
+  pub fn clear(&mut self) {
+    for slot in &mut self.slots {
       slot.clear();
     }
   }
@@ -133,19 +130,16 @@ impl< S : Slot + Default > Buffer< S >
   /// let buffer : Buffer< TypedSlot< u8 > > = Buffer::new( Capacity::new( 2 ).unwrap() );
   /// assert!( buffer.all_empty() );
   /// ```
-  #[ must_use ]
-  pub fn all_empty( &self ) -> bool
-  {
-    self.slots.iter().all( Slot::is_empty )
+  #[must_use]
+  pub fn all_empty(&self) -> bool {
+    self.slots.iter().all(Slot::is_empty)
   }
 }
 
-impl< S > Buffer< S >
-{
+impl<S> Buffer<S> {
   /// The capacity this buffer was built with.
-  #[ must_use ]
-  pub const fn capacity( &self ) -> Capacity
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> Capacity {
     self.capacity
   }
 
@@ -163,9 +157,8 @@ impl< S > Buffer< S >
   /// let buffer : Buffer< TypedSlot< u8 > > = Buffer::new( Capacity::new( 8 ).unwrap() );
   /// assert_eq!( buffer.len(), buffer.capacity().get() );
   /// ```
-  #[ must_use ]
-  pub const fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn len(&self) -> usize {
     self.slots.len()
   }
 
@@ -183,9 +176,8 @@ impl< S > Buffer< S >
   /// let buffer : Buffer< TypedSlot< u8 > > = Buffer::new( Capacity::new( 1 ).unwrap() );
   /// assert!( !buffer.is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(&self) -> bool {
     self.slots.is_empty()
   }
 
@@ -199,10 +191,9 @@ impl< S > Buffer< S >
   /// the caller's responsibility, and one that reached here out of range is a
   /// caller that mixed two rings' capacities, which is a defect rather than a
   /// condition to handle.
-  #[ must_use ]
-  pub fn get( &self, index : SlotIndex ) -> &S
-  {
-    &self.slots[ index.get() ]
+  #[must_use]
+  pub fn get(&self, index: SlotIndex) -> &S {
+    &self.slots[index.get()]
   }
 
   /// Mutably borrow the slot at `index`.
@@ -210,10 +201,9 @@ impl< S > Buffer< S >
   /// # Panics
   ///
   /// As [`Buffer::get`].
-  #[ must_use ]
-  pub fn get_mut( &mut self, index : SlotIndex ) -> &mut S
-  {
-    &mut self.slots[ index.get() ]
+  #[must_use]
+  pub fn get_mut(&mut self, index: SlotIndex) -> &mut S {
+    &mut self.slots[index.get()]
   }
 
   /// Borrow the slot a sequence addresses, folding through `ring_index`.
@@ -241,18 +231,16 @@ impl< S > Buffer< S >
   /// // 6 folds to slot 2.
   /// assert_eq!( buffer.get( SlotIndex( 2 ) ).get(), Some( &1 ) );
   /// ```
-  #[ must_use ]
-  pub fn at( &self, seq : Seq ) -> &S
-  {
-    self.get( of( seq, self.capacity ) )
+  #[must_use]
+  pub fn at(&self, seq: Seq) -> &S {
+    self.get(of(seq, self.capacity))
   }
 
   /// Mutably borrow the slot a sequence addresses.
-  #[ must_use ]
-  pub fn at_mut( &mut self, seq : Seq ) -> &mut S
-  {
-    let index = of( seq, self.capacity );
-    self.get_mut( index )
+  #[must_use]
+  pub fn at_mut(&mut self, seq: Seq) -> &mut S {
+    let index = of(seq, self.capacity);
+    self.get_mut(index)
   }
 
   /// Iterate every slot in index order.
@@ -265,36 +253,30 @@ impl< S > Buffer< S >
   /// let buffer : Buffer< TypedSlot< u8 > > = Buffer::new( Capacity::new( 4 ).unwrap() );
   /// assert_eq!( buffer.iter().filter( | s | s.is_empty() ).count(), 4 );
   /// ```
-  pub fn iter( &self ) -> core::slice::Iter< '_, S >
-  {
+  pub fn iter(&self) -> core::slice::Iter<'_, S> {
     self.slots.iter()
   }
 
   /// Mutably iterate every slot in index order.
-  pub fn iter_mut( &mut self ) -> core::slice::IterMut< '_, S >
-  {
+  pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, S> {
     self.slots.iter_mut()
   }
 }
 
-impl< 'a, S > IntoIterator for &'a Buffer< S >
-{
+impl<'a, S> IntoIterator for &'a Buffer<S> {
   type Item = &'a S;
-  type IntoIter = core::slice::Iter< 'a, S >;
+  type IntoIter = core::slice::Iter<'a, S>;
 
-  fn into_iter( self ) -> Self::IntoIter
-  {
+  fn into_iter(self) -> Self::IntoIter {
     self.iter()
   }
 }
 
-impl< 'a, S > IntoIterator for &'a mut Buffer< S >
-{
+impl<'a, S> IntoIterator for &'a mut Buffer<S> {
   type Item = &'a mut S;
-  type IntoIter = core::slice::IterMut< 'a, S >;
+  type IntoIter = core::slice::IterMut<'a, S>;
 
-  fn into_iter( self ) -> Self::IntoIter
-  {
+  fn into_iter(self) -> Self::IntoIter {
     self.iter_mut()
   }
 }

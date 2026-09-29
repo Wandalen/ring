@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#@ purpose: Static analysis — clippy, warnings as errors. crate::<name> narrows to one package.
+#@ tags: verb, lint
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+_crate=""
+_dry_run=0
+for _arg in "$@"; do
+  case "$_arg" in
+    crate::*) _crate="${_arg#crate::}" ;;
+    dry::1)   _dry_run=1 ;;
+    *)
+      echo "verb/lint: unrecognized parameter '$_arg' — expected crate::<name> or dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -n "$_crate" ]]; then
+  _cmd=( cargo clippy -p "$_crate" --all-targets --all-features -- -D warnings )
+else
+  _cmd=( cargo clippy --all-targets --all-features -- -D warnings )
+fi
+
+if (( _dry_run )); then
+  printf '%s\n' "${_cmd[*]}"
+  exit 0
+fi
+
+exec "${_cmd[@]}"

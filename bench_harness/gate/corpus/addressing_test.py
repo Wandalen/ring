@@ -36,15 +36,14 @@ import addressing
 _PACKAGE_NAME = re.compile( r'^\s*name\s*=\s*"([^"]+)"', re.M )
 
 # Crates whose manifest name differs from their directory name. `crate_src_lib`
-# matches the directory, so these resolve to None — see its own
+# matches the directory, so any such crate would resolve to None — see its own
 # Finding(crate_src_lib_matches_directory_name_not_package_name). Pinned as an
-# exact set rather than skipped as a class: a fourth is a new instance of the
-# same silent-None shape and must fail here, not be absorbed.
-_NAME_DIFFERS_FROM_DIR = {
-  'space_sandbox_core',
-  'exact_arithmetic_spike',
-  'temporal_substrate_spike',
-}
+# exact set rather than skipped as a class: an entry is a new instance of the
+# same silent-None shape and must fail here, not be absorbed. Empty in this
+# repo — none of its 34 crates diverge — but kept as a set, not removed, so a
+# future divergence is caught by `test_name_differs_from_dir_set_has_not_grown`
+# rather than silently passing the class check below.
+_NAME_DIFFERS_FROM_DIR = set()
 
 
 def _is_scratch( rel ):
@@ -172,9 +171,9 @@ class CrateResolverTest( unittest.TestCase ):
     self.assertIsNone( addressing.crate_src_lib( '' ) )
 
   def test_name_differs_from_dir_set_has_not_grown( self ):
-    """Pins the known divergence. These three are excluded from the assertions
-    above, so an unpinned set would let a fourth crate be added and silently
-    inherit the exclusion instead of being noticed.
+    """Pins the known divergence — empty in this repo. Any entry excluded from
+    the assertions above would silently inherit the exclusion instead of being
+    noticed, so the set stays pinned rather than open-ended even at zero size.
     """
     live = {
       name for ( name, crate, _depth ) in self.manifests

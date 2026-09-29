@@ -36,7 +36,7 @@
 //! precisely the cardinality violation `ring_spsc` cannot otherwise detect.
 //! Recorded in `docs/invariant/001`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_core::Ring;
 
@@ -59,21 +59,18 @@ use ring_core::Ring;
 /// producer.try_push( 1 ).unwrap();
 /// assert_eq!( consumer.try_recv(), Some( 1 ) );
 /// ```
-#[ derive( Debug ) ]
-pub struct Split< T >
-{
-  ring : Ring< T >,
+#[derive(Debug)]
+pub struct Split<T> {
+  ring: Ring<T>,
 }
 
-impl< T : Send > Split< T >
-{
+impl<T: Send> Split<T> {
   /// Give up the ring.
   ///
   /// The ring is moved in and is not reachable again — not through a getter,
   /// not through `Deref`, and not by splitting twice, since [`Split::ends`]
   /// borrows exclusively.
-  pub const fn new( ring : Ring< T > ) -> Self
-  {
+  pub const fn new(ring: Ring<T>) -> Self {
     Self { ring }
   }
 
@@ -82,29 +79,25 @@ impl< T : Send > Split< T >
   /// The two-step shape is inherited: the pair borrows from the `Ends` value,
   /// so the caller has to hold it. Collapsing the steps would need a
   /// self-referential struct.
-  pub fn ends( &mut self ) -> Ends< '_, T >
-  {
-    Ends { inner : self.ring.ends() }
+  pub fn ends(&mut self) -> Ends<'_, T> {
+    Ends { inner: self.ring.ends() }
   }
 }
 
 /// The two ends, before they are separated.
-#[ derive( Debug ) ]
-pub struct Ends< 'a, T >
-{
-  inner : ring_core::Ends< 'a, T >,
+#[derive(Debug)]
+pub struct Ends<'a, T> {
+  inner: ring_core::Ends<'a, T>,
 }
 
-impl< 'a, T : Send > Ends< 'a, T >
-{
+impl<'a, T: Send> Ends<'a, T> {
   /// Separate the ends into a publishing handle and a draining one.
   ///
   /// Exactly one of each. There is no operation here that yields a second
   /// producer, which is the difference from `ring_core::Producer::try_clone`.
-  pub fn split( &'a mut self ) -> ( Producer< 'a, T >, Consumer< 'a, T > )
-  {
-    let ( producer, consumer ) = self.inner.split();
-    ( Producer { inner : producer }, Consumer { inner : consumer } )
+  pub fn split(&'a mut self) -> (Producer<'a, T>, Consumer<'a, T>) {
+    let (producer, consumer) = self.inner.split();
+    (Producer { inner: producer }, Consumer { inner: consumer })
   }
 }
 
@@ -115,14 +108,12 @@ impl< 'a, T : Send > Ends< 'a, T >
 /// The absences are the contract; the present methods are ordinary forwarding.
 /// See `docs/api/001` for the full absent-operations table and what each
 /// addition would cost.
-#[ derive( Debug ) ]
-pub struct Producer< 'a, T >
-{
-  inner : ring_core::Producer< 'a, T >,
+#[derive(Debug)]
+pub struct Producer<'a, T> {
+  inner: ring_core::Producer<'a, T>,
 }
 
-impl< T : Send > Producer< '_, T >
-{
+impl<T: Send> Producer<'_, T> {
   /// Publish one record, or hand it back.
   ///
   /// Never blocks. On a full ring the ring's own `OverflowPolicy` decides:
@@ -134,18 +125,16 @@ impl< T : Send > Producer< '_, T >
   /// # Errors
   ///
   /// Returns the record when the ring is full and the policy refuses.
-  pub fn try_push( &mut self, record : T ) -> Result< (), T >
-  {
-    self.inner.try_push( record )
+  pub fn try_push(&mut self, record: T) -> Result<(), T> {
+    self.inner.try_push(record)
   }
 
   /// Publish as many records as the ring will take, and report how many.
   ///
   /// Partial acceptance is the normal case; the iterator is left positioned at
   /// the first record that did not fit.
-  pub fn try_push_batch( &mut self, records : &mut impl Iterator< Item = T > ) -> usize
-  {
-    self.inner.try_push_batch( records )
+  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
+    self.inner.try_push_batch(records)
   }
 
   /// How much room there is, as a lower bound.
@@ -153,16 +142,14 @@ impl< T : Send > Producer< '_, T >
   /// Binding at SPSC cardinality, where this is the only producer; advisory at
   /// MPSC, where another producer may take the room first. One signature, two
   /// contracts, selected by a config field — see `docs/api/001`.
-  #[ must_use ]
-  pub fn free_capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub fn free_capacity(&self) -> usize {
     self.inner.free_capacity()
   }
 
   /// Whether there is no room at all.
-  #[ must_use ]
-  pub fn is_full( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_full(&self) -> bool {
     self.inner.is_full()
   }
 }
@@ -174,27 +161,23 @@ impl< T : Send > Producer< '_, T >
 /// Because there is exactly one of these, whoever holds it *is* the consume
 /// point — which is why where this value lives is a correctness question and
 /// not only a design one. See `docs/lifecycle/002`.
-#[ derive( Debug ) ]
-pub struct Consumer< 'a, T >
-{
-  inner : ring_core::Consumer< 'a, T >,
+#[derive(Debug)]
+pub struct Consumer<'a, T> {
+  inner: ring_core::Consumer<'a, T>,
 }
 
-impl< 'a, T : Send > Consumer< 'a, T >
-{
+impl<'a, T: Send> Consumer<'a, T> {
   /// Take one record, if one is waiting.
   ///
   /// `Option` rather than `Result`: an empty ring is not a failure, and
   /// modelling it as one makes every caller unwrap a non-failure.
-  pub fn try_recv( &mut self ) -> Option< T >
-  {
+  pub fn try_recv(&mut self) -> Option<T> {
     self.inner.try_recv()
   }
 
   /// Take whatever is waiting into `out`, and report how many moved.
-  pub fn try_recv_batch( &mut self, out : &mut Vec< T > ) -> usize
-  {
-    self.inner.try_recv_batch( out )
+  pub fn try_recv_batch(&mut self, out: &mut Vec<T>) -> usize {
+    self.inner.try_recv_batch(out)
   }
 
   /// Take the records published *before this call*, as an iterator.
@@ -220,10 +203,12 @@ impl< 'a, T : Send > Consumer< 'a, T >
   /// let taken : Vec< u32 > = consumer.drain().collect();
   /// assert_eq!( taken, vec![ 0, 1, 2 ] );
   /// ```
-  pub fn drain( &mut self ) -> Drain< '_, 'a, T >
-  {
+  pub fn drain(&mut self) -> Drain<'_, 'a, T> {
     let remaining = self.inner.len();
-    Drain { consumer : self, remaining }
+    Drain {
+      consumer: self,
+      remaining,
+    }
   }
 
   /// How many records are waiting, as a lower bound.
@@ -231,45 +216,38 @@ impl< 'a, T : Send > Consumer< 'a, T >
   /// It can only grow, never shrink, because this is the only consumer — the
   /// opposite direction from `Producer::free_capacity`'s bound at MPSC
   /// cardinality. The two read as duals and are not.
-  #[ must_use ]
-  pub fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub fn len(&self) -> usize {
     self.inner.len()
   }
 
   /// Whether nothing is waiting.
-  #[ must_use ]
-  pub fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub fn is_empty(&self) -> bool {
     self.inner.is_empty()
   }
 }
 
 /// The iterator [`Consumer::drain`] returns, bounded at the call that made it.
-#[ derive( Debug ) ]
-pub struct Drain< 'c, 'a, T >
-{
-  consumer : &'c mut Consumer< 'a, T >,
-  remaining : usize,
+#[derive(Debug)]
+pub struct Drain<'c, 'a, T> {
+  consumer: &'c mut Consumer<'a, T>,
+  remaining: usize,
 }
 
-impl< T : Send > Iterator for Drain< '_, '_, T >
-{
+impl<T: Send> Iterator for Drain<'_, '_, T> {
   type Item = T;
 
-  fn next( &mut self ) -> Option< T >
-  {
-    if self.remaining == 0
-    {
+  fn next(&mut self) -> Option<T> {
+    if self.remaining == 0 {
       return None;
     }
     let record = self.consumer.try_recv()?;
     self.remaining -= 1;
-    Some( record )
+    Some(record)
   }
 
-  fn size_hint( &self ) -> ( usize, Option< usize > )
-  {
-    ( 0, Some( self.remaining ) )
+  fn size_hint(&self) -> (usize, Option<usize>) {
+    (0, Some(self.remaining))
   }
 }

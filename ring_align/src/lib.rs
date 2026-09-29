@@ -19,7 +19,7 @@
 //! removed it, on the ground that a permission nobody exercises is a bound
 //! looser than the code actually is.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 /// Bytes in a cache line on the family's target platforms.
 ///
@@ -31,7 +31,7 @@
 /// ```
 /// assert_eq!( ring_align::CACHE_LINE, 64 );
 /// ```
-pub const CACHE_LINE : usize = 64;
+pub const CACHE_LINE: usize = 64;
 
 // `on_distinct_lines` below computes `a / CACHE_LINE` as a line index. That
 // equals the true line index only because lines are naturally aligned, which
@@ -40,8 +40,7 @@ pub const CACHE_LINE : usize = 64;
 // AL1). `ring_types::Capacity::new` asserts the analogous precondition for
 // its own number; this is the compile-time form; a `pub const` needs no
 // runtime `Result`.
-const _ : () = assert!
-(
+const _: () = assert!(
   CACHE_LINE.is_power_of_two(),
   "CACHE_LINE must be a power of two: on_distinct_lines divides by it to compute a line index"
 );
@@ -62,21 +61,19 @@ const _ : () = assert!
 /// assert_eq!( core::mem::align_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// assert_eq!( core::mem::size_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// ```
-#[ derive( Debug, Clone, Copy, Default, PartialEq, Eq ) ]
-#[ repr( align( 64 ) ) ]
-pub struct CacheAligned< T >( T );
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[repr(align(64))]
+pub struct CacheAligned<T>(T);
 
-impl< T > CacheAligned< T >
-{
+impl<T> CacheAligned<T> {
   /// Wrap a value so it occupies a cache line alone.
   ///
   /// ```
   /// use ring_align::CacheAligned;
   /// assert_eq!( *CacheAligned::new( 1u32 ).get(), 1 );
   /// ```
-  pub const fn new( value : T ) -> Self
-  {
-    Self( value )
+  pub const fn new(value: T) -> Self {
+    Self(value)
   }
 
   /// Borrow the wrapped value.
@@ -86,8 +83,7 @@ impl< T > CacheAligned< T >
   /// let a = CacheAligned::new( 5u8 );
   /// assert_eq!( *a.get(), 5 );
   /// ```
-  pub const fn get( &self ) -> &T
-  {
+  pub const fn get(&self) -> &T {
     &self.0
   }
 
@@ -99,8 +95,7 @@ impl< T > CacheAligned< T >
   /// *a.get_mut() = 9;
   /// assert_eq!( *a.get(), 9 );
   /// ```
-  pub const fn get_mut( &mut self ) -> &mut T
-  {
+  pub const fn get_mut(&mut self) -> &mut T {
     &mut self.0
   }
 
@@ -110,8 +105,7 @@ impl< T > CacheAligned< T >
   /// use ring_align::CacheAligned;
   /// assert_eq!( CacheAligned::new( 3u16 ).into_inner(), 3 );
   /// ```
-  pub fn into_inner( self ) -> T
-  {
+  pub fn into_inner(self) -> T {
     self.0
   }
 }
@@ -132,8 +126,7 @@ impl< T > CacheAligned< T >
 /// assert!( on_distinct_lines( 63, 64 ) );    // straddling the boundary
 /// assert!( !on_distinct_lines( 128, 130 ) ); // both in line 2
 /// ```
-#[ must_use ]
-pub const fn on_distinct_lines( a : usize, b : usize ) -> bool
-{
+#[must_use]
+pub const fn on_distinct_lines(a: usize, b: usize) -> bool {
   a / CACHE_LINE != b / CACHE_LINE
 }

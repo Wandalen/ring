@@ -65,11 +65,11 @@
 //! nothing. A ring wired that way runs, passes every single-threaded test, and
 //! overwrites unread slots on the first lap.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_barrier::Barrier;
-use ring_cursor::{ PaddedCursor, SeqCell, GATING };
-use ring_types::{ RingError, Seq };
+use ring_cursor::{GATING, PaddedCursor, SeqCell};
+use ring_types::{RingError, Seq};
 
 /// The ordering a commit is made visible at.
 ///
@@ -77,7 +77,7 @@ use ring_types::{ RingError, Seq };
 /// must not observe this consumer's advance before the reads that justified it.
 /// A `Relaxed` store here lets the producer see freed slots and overwrite them
 /// while the reads that freed them are still in flight.
-const COMMIT : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+const COMMIT: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
 
 /// A contiguous run of sequences a consumer may read.
 ///
@@ -94,15 +94,13 @@ const COMMIT : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Rele
 /// assert_eq!( run.len(), 3 );
 /// assert_eq!( run.sequences().collect::< Vec< _ > >(), vec![ Seq( 2 ), Seq( 3 ), Seq( 4 ) ] );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub struct Available
-{
-  start : Seq,
-  len : u64,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Available {
+  start: Seq,
+  len: u64,
 }
 
-impl Available
-{
+impl Available {
   /// A run of `len` sequences beginning at `start`.
   ///
   /// ```
@@ -110,9 +108,8 @@ impl Available
   /// use ring_types::Seq;
   /// assert!( Available::new( Seq::ZERO, 0 ).is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn new( start : Seq, len : u64 ) -> Self
-  {
+  #[must_use]
+  pub const fn new(start: Seq, len: u64) -> Self {
     Self { start, len }
   }
 
@@ -123,9 +120,8 @@ impl Available
   /// use ring_types::Seq;
   /// assert_eq!( Available::new( Seq( 7 ), 2 ).start(), Seq( 7 ) );
   /// ```
-  #[ must_use ]
-  pub const fn start( self ) -> Seq
-  {
+  #[must_use]
+  pub const fn start(self) -> Seq {
     self.start
   }
 
@@ -136,10 +132,9 @@ impl Available
   /// use ring_types::Seq;
   /// assert_eq!( Available::new( Seq( 7 ), 2 ).end(), Seq( 9 ) );
   /// ```
-  #[ must_use ]
-  pub const fn end( self ) -> Seq
-  {
-    self.start.advanced_by( self.len )
+  #[must_use]
+  pub const fn end(self) -> Seq {
+    self.start.advanced_by(self.len)
   }
 
   /// How many sequences are readable.
@@ -149,9 +144,8 @@ impl Available
   /// use ring_types::Seq;
   /// assert_eq!( Available::new( Seq::ZERO, 4 ).len(), 4 );
   /// ```
-  #[ must_use ]
-  pub const fn len( self ) -> u64
-  {
+  #[must_use]
+  pub const fn len(self) -> u64 {
     self.len
   }
 
@@ -163,9 +157,8 @@ impl Available
   /// assert!( Available::new( Seq( 3 ), 0 ).is_empty() );
   /// assert!( !Available::new( Seq( 3 ), 1 ).is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(self) -> bool {
     self.len == 0
   }
 
@@ -178,9 +171,8 @@ impl Available
   /// let seen : Vec< u64 > = Available::new( Seq( 5 ), 2 ).sequences().map( | s | s.0 ).collect();
   /// assert_eq!( seen, vec![ 5, 6 ] );
   /// ```
-  pub fn sequences( self ) -> impl Iterator< Item = Seq >
-  {
-    ( self.start.0..self.end().0 ).map( Seq )
+  pub fn sequences(self) -> impl Iterator<Item = Seq> {
+    (self.start.0..self.end().0).map(Seq)
   }
 }
 
@@ -205,15 +197,13 @@ impl Available
 /// assert!( consumer.available().is_empty(), "caught up" );
 /// assert_eq!( position.load( Ordering::Acquire ), Seq( 3 ), "the producer sees it" );
 /// ```
-#[ derive( Debug ) ]
-pub struct Consumer< 'a >
-{
-  cursor : &'a PaddedCursor,
-  barrier : Barrier< 'a >,
+#[derive(Debug)]
+pub struct Consumer<'a> {
+  cursor: &'a PaddedCursor,
+  barrier: Barrier<'a>,
 }
 
-impl< 'a > Consumer< 'a >
-{
+impl<'a> Consumer<'a> {
   /// A consumer reporting into `cursor`, bounded by `barrier`.
   ///
   /// `cursor` is not reset: a consumer built over a cursor that has already
@@ -232,9 +222,8 @@ impl< 'a > Consumer< 'a >
   ///
   /// assert_eq!( Consumer::new( &position, Barrier::over( &published ) ).position(), Seq( 7 ) );
   /// ```
-  #[ must_use ]
-  pub const fn new( cursor : &'a PaddedCursor, barrier : Barrier< 'a > ) -> Self
-  {
+  #[must_use]
+  pub const fn new(cursor: &'a PaddedCursor, barrier: Barrier<'a>) -> Self {
     Self { cursor, barrier }
   }
 
@@ -265,9 +254,8 @@ impl< 'a > Consumer< 'a >
   /// assert_eq!( consumer.cursor().load( Ordering::Acquire ), Seq::ZERO );
   /// assert!( core::ptr::eq( consumer.cursor(), &position ), "the very same cursor" );
   /// ```
-  #[ must_use ]
-  pub const fn cursor( &self ) -> &'a PaddedCursor
-  {
+  #[must_use]
+  pub const fn cursor(&self) -> &'a PaddedCursor {
     self.cursor
   }
 
@@ -283,9 +271,8 @@ impl< 'a > Consumer< 'a >
   ///
   /// assert_eq!( Consumer::new( &position, Barrier::over( &published ) ).barrier().len(), 2 );
   /// ```
-  #[ must_use ]
-  pub const fn barrier( &self ) -> Barrier< 'a >
-  {
+  #[must_use]
+  pub const fn barrier(&self) -> Barrier<'a> {
     self.barrier
   }
 
@@ -302,10 +289,9 @@ impl< 'a > Consumer< 'a >
   ///
   /// assert_eq!( Consumer::new( &position, Barrier::over( &published ) ).position(), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub fn position( &self ) -> Seq
-  {
-    self.cursor.load( GATING )
+  #[must_use]
+  pub fn position(&self) -> Seq {
+    self.cursor.load(GATING)
   }
 
   /// The run of sequences readable right now.
@@ -331,16 +317,15 @@ impl< 'a > Consumer< 'a >
   /// let run = consumer.available();
   /// assert_eq!( ( run.start(), run.end() ), ( Seq::ZERO, Seq( 5 ) ) );
   /// ```
-  #[ must_use ]
-  pub fn available( &self ) -> Available
-  {
+  #[must_use]
+  pub fn available(&self) -> Available {
     let position = self.position();
     let readable = self
       .barrier
       .frontier()
-      .map_or( 0, | frontier | ring_seqno::pending( frontier, position ) );
+      .map_or(0, |frontier| ring_seqno::pending(frontier, position));
 
-    Available::new( position, readable )
+    Available::new(position, readable)
   }
 
   /// At most `max` of what is available, for a consumer with a batch limit.
@@ -360,11 +345,10 @@ impl< 'a > Consumer< 'a >
   /// assert_eq!( consumer.available_up_to( 4 ).len(), 4 );
   /// assert_eq!( consumer.available_up_to( 100 ).len(), 9, "capped by what is there" );
   /// ```
-  #[ must_use ]
-  pub fn available_up_to( &self, max : u64 ) -> Available
-  {
+  #[must_use]
+  pub fn available_up_to(&self, max: u64) -> Available {
     let run = self.available();
-    Available::new( run.start(), run.len().min( max ) )
+    Available::new(run.start(), run.len().min(max))
   }
 
   /// Report that everything before `through` has been read.
@@ -421,16 +405,14 @@ impl< 'a > Consumer< 'a >
   /// // ... read the slots in `run` ...
   /// assert_eq!( consumer.commit( run.end() ), Ok( Seq( 4 ) ) );
   /// ```
-  pub fn commit( &self, through : Seq ) -> Result< Seq, RingError >
-  {
+  pub fn commit(&self, through: Seq) -> Result<Seq, RingError> {
     let run = self.available();
-    if through < run.start() || through > run.end()
-    {
-      return Err( RingError::Empty );
+    if through < run.start() || through > run.end() {
+      return Err(RingError::Empty);
     }
 
-    self.cursor.store( through, COMMIT );
-    Ok( through )
+    self.cursor.store(through, COMMIT);
+    Ok(through)
   }
 
   /// Commit everything currently available, and report how far that reached.
@@ -464,14 +446,12 @@ impl< 'a > Consumer< 'a >
   // occur. Two stores, kept in step by hand, was judged the smaller cost —
   // which means anything added to `commit` later (a debug assertion, a
   // counter, a trace hook) must be added here too, by hand.
-  pub fn commit_available( &self ) -> Seq
-  {
+  pub fn commit_available(&self) -> Seq {
     let run = self.available();
     let end = run.end();
-    debug_assert!( end >= run.start(), "available() must never return end < start" );
-    if end != run.start()
-    {
-      self.cursor.store( end, COMMIT );
+    debug_assert!(end >= run.start(), "available() must never return end < start");
+    if end != run.start() {
+      self.cursor.store(end, COMMIT);
     }
     end
   }

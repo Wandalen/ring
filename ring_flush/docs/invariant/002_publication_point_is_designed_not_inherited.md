@@ -146,16 +146,16 @@ Live output:
 
 ```
   -- the gates that exist --
-    g1_coverage.sh     g2_docs.sh     g3_features.sh     g4_manual.sh     g5_export_surface.sh     g6_unsafe.sh     g7_determinism.sh     g8_oracle_form.sh     g9_lint.sh     g10_pinned_math.sh     g11_cgtools_exclusive.sh     g12_mutation.sh     g13_survey_freshness.sh     g14_corpus_shape.sh     g15_corpus_recipes.sh     g16_corpus_citations.sh     g17_corpus_vocabulary.sh     g18_family_coverage.sh     g19_measured_columns.sh     g20_corpus_disposition.sh     g21_corpus_addressing.sh     g22_exemption_expiry.sh 
-    count: 22
+    g1_coverage.sh     g2_docs.sh     g3_features.sh     g4_manual.sh     g5_export_surface.sh     g6_unsafe.sh     g7_determinism.sh     g8_oracle_form.sh     g9_lint.sh     g10_pinned_math.sh     g12_mutation.sh     g13_survey_freshness.sh     g14_corpus_shape.sh     g15_corpus_recipes.sh     g16_corpus_citations.sh     g17_corpus_vocabulary.sh     g18_family_coverage.sh     g19_measured_columns.sh     g20_corpus_disposition.sh     g21_corpus_addressing.sh     g22_exemption_expiry.sh 
+    count: 21
   -- what P5 says about that directory --
     55: already houses six of. Its absence is a gap, not an impossibility.
   -- and whether any of them looks at a call site rather than a manifest --
     gates naming ring_tls at all: 0
 ```
 
-Twenty-two gates. P5 says the directory "already houses six of" this kind of
-thing, which was true when it was written, and the growth to twenty-two happened
+Twenty-one gates. P5 says the directory "already houses six of" this kind of
+thing, which was true when it was written, and the growth to twenty-one happened
 without the one gate this invariant specified being among them. The three most
 recent — `g20_corpus_disposition.sh`, `g21_corpus_addressing.sh`, and
 `g22_exemption_expiry.sh` — were added while someone was reading this very
@@ -166,8 +166,8 @@ add gates while looking straight at a specification for one it is not adding.
 ("`ring_tls`'s consolidator surface has exactly one caller in the workspace"),
 argues it is mechanically decidable, and describes the implementation as a
 reverse-dependency grep plus a source scan. That is more design than several of
-the twenty-two gates needed. It closes with "its absence is a gap, not an
-impossibility," which is correct and has now been correct across sixteen
+the twenty-one gates needed. It closes with "its absence is a gap, not an
+impossibility," which is correct and has now been correct across fifteen
 additions.
 
 **No gate names `ring_tls`**, so the absence is not partial — nothing in the gate

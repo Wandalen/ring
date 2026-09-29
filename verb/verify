@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#@ purpose: Full pre-push gate — alias for `test level::5` (nextest, doctests, clippy,
+#@          udeps, audit, and the family's own corpus/quality gate suite).
+#@ tags: verb, verify
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+for _arg in "$@"; do
+  case "$_arg" in
+    dry::1) ;;
+    *)
+      echo "verb/verify: unrecognized parameter '$_arg' — expected dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+exec ./verb/test level::5 "$@"

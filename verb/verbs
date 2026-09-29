@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#@ purpose: List all verbs with their purpose line. Meta verb — no dry::1.
+#@ tags: verb, verbs
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")"
+
+for f in *; do
+  [[ -f "$f" && -x "$f" ]] || continue
+  _purpose="$(grep -m1 '^#@ purpose:' "$f" | sed -E 's/^#@ purpose: //')"
+  printf '%-12s %s\n' "$f" "$_purpose"
+done

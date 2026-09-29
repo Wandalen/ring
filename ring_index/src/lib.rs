@@ -24,9 +24,9 @@
 //! a `Capacity` cannot exist unless it is a power of two, [`of`] needs no check
 //! and no error path: it is total.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_types::{ Capacity, Seq, SlotIndex };
+use ring_types::{Capacity, Seq, SlotIndex};
 
 /// The slot a sequence addresses.
 ///
@@ -44,10 +44,9 @@ use ring_types::{ Capacity, Seq, SlotIndex };
 /// assert_eq!( of( Seq( 8 ), cap ), SlotIndex( 0 ) );   // one lap on
 /// assert_eq!( of( Seq( 13 ), cap ), SlotIndex( 5 ) );
 /// ```
-#[ must_use ]
-pub fn of( seq : Seq, capacity : Capacity ) -> SlotIndex
-{
-  SlotIndex( ( seq.0 as usize ) & capacity.mask() )
+#[must_use]
+pub fn of(seq: Seq, capacity: Capacity) -> SlotIndex {
+  SlotIndex((seq.0 as usize) & capacity.mask())
 }
 
 /// Whether two sequences address the same slot — true exactly when they are a
@@ -69,10 +68,9 @@ pub fn of( seq : Seq, capacity : Capacity ) -> SlotIndex
 /// assert!( aliases( Seq( 1 ), Seq( 9 ), cap ) );
 /// assert!( !aliases( Seq( 1 ), Seq( 2 ), cap ) );
 /// ```
-#[ must_use ]
-pub fn aliases( a : Seq, b : Seq, capacity : Capacity ) -> bool
-{
-  of( a, capacity ) == of( b, capacity )
+#[must_use]
+pub fn aliases(a: Seq, b: Seq, capacity: Capacity) -> bool {
+  of(a, capacity) == of(b, capacity)
 }
 
 /// The slots a contiguous run of `count` sequences starting at `start`
@@ -114,8 +112,7 @@ pub fn aliases( a : Seq, b : Seq, capacity : Capacity ) -> bool
 /// assert_eq!( run( Seq( 2 ), 4, cap ), vec![ SlotIndex( 2 ), SlotIndex( 3 ), SlotIndex( 0 ), SlotIndex( 1 ) ] );
 /// assert_eq!( run( Seq( 0 ), 0, cap ), vec![] );
 /// ```
-#[ must_use ]
-pub fn run( start : Seq, count : usize, capacity : Capacity ) -> Vec< SlotIndex >
-{
-  ( 0..count as u64 ).map( | n | of( start.advanced_by( n ), capacity ) ).collect()
+#[must_use]
+pub fn run(start: Seq, count: usize, capacity: Capacity) -> Vec<SlotIndex> {
+  (0..count as u64).map(|n| of(start.advanced_by(n), capacity)).collect()
 }

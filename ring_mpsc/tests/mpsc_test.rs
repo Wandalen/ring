@@ -43,23 +43,22 @@
 //! ordinary suite under an ordinary build, the models under
 //! `RUSTFLAGS="--cfg loom"`, and both again under the weakened publish above.
 
-#![ cfg( test ) ]
+#![cfg(test)]
 
-#[ cfg( not( loom ) ) ]
-mod threaded
-{
-  use core::sync::atomic::{ AtomicUsize, Ordering };
+#[cfg(not(loom))]
+mod threaded {
+  use core::sync::atomic::{AtomicUsize, Ordering};
   use std::collections::HashSet;
   use std::sync::Mutex;
+
   use ring_atomic::SeqCell;
   use ring_config::RingConfig;
-  use ring_mpsc::{ Consumer, Producer, Reserved, Ring, COMMIT, OBSERVE, OWN, PUBLISH, UNSTAMPED };
-  use ring_slot::{ BytesSlot, Slot, TypedSlot };
-  use ring_types::{ Capacity, RingError, Seq };
+  use ring_mpsc::{COMMIT, Consumer, OBSERVE, OWN, PUBLISH, Producer, Reserved, Ring, UNSTAMPED};
+  use ring_slot::{BytesSlot, Slot, TypedSlot};
+  use ring_types::{Capacity, RingError, Seq};
 
-  fn capacity( slots : usize ) -> Capacity
-  {
-    Capacity::new( slots ).expect( "a power of two" )
+  fn capacity(slots: usize) -> Capacity {
+    Capacity::new(slots).expect("a power of two")
   }
 
   /// How long a thread in the concurrent test may make no progress before it
@@ -71,7 +70,7 @@ mod threaded
   /// spun on `RingError::Full` forever and the whole suite hung instead of
   /// failing — a test that cannot report the defect it was written to catch.
   /// Every wait below is bounded so the failure arrives as a message.
-  const PATIENCE : std::time::Duration = std::time::Duration::from_secs( 30 );
+  const PATIENCE: std::time::Duration = std::time::Duration::from_secs(30);
 
   // ───────────────────────────────────────────────────────────────────────────
   // Feature 172's reached-test.
@@ -90,65 +89,55 @@ mod threaded
   ///   it issued them. Nothing constrains the interleaving *between* producers —
   ///   that is what concurrent claiming means — but a mechanism that reordered
   ///   one producer's own items would have granted its sequences out of order.
-  #[ test ]
-  fn four_producers_exchange_one_hundred_thousand_items_with_byte_parity()
-  {
-    const PRODUCERS : u64 = 4;
-    const PER_PRODUCER : u64 = 25_000;
-    const TOTAL : usize = ( PRODUCERS * PER_PRODUCER ) as usize;
+  #[test]
+  fn four_producers_exchange_one_hundred_thousand_items_with_byte_parity() {
+    const PRODUCERS: u64 = 4;
+    const PER_PRODUCER: u64 = 25_000;
+    const TOTAL: usize = (PRODUCERS * PER_PRODUCER) as usize;
 
     // The payload encodes both its producer and its position within that
     // producer's stream, so one `u64` carries everything all three claims need.
-    let encode = | producer : u64, index : u64 | producer * PER_PRODUCER + index;
+    let encode = |producer: u64, index: u64| producer * PER_PRODUCER + index;
 
-    let mut ring : Ring< TypedSlot< u64 > > = Ring::new( capacity( 1024 ) );
+    let mut ring: Ring<TypedSlot<u64>> = Ring::new(capacity(1024));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    let granted : Mutex< Vec< Seq > > = Mutex::new( Vec::with_capacity( TOTAL ) );
-    let received : Mutex< Vec< u64 > > = Mutex::new( Vec::with_capacity( TOTAL ) );
+    let granted: Mutex<Vec<Seq>> = Mutex::new(Vec::with_capacity(TOTAL));
+    let received: Mutex<Vec<u64>> = Mutex::new(Vec::with_capacity(TOTAL));
 
-    std::thread::scope( | scope |
-    {
-      for id in 0 .. PRODUCERS
-      {
+    std::thread::scope(|scope| {
+      for id in 0..PRODUCERS {
         // No rebind needed: `Producer` is `Copy`, so `move` copies it into each
         // closure rather than moving the one handle into the first.
         let granted = &granted;
 
-        scope.spawn( move ||
-        {
-          let mut mine = Vec::with_capacity( PER_PRODUCER as usize );
+        scope.spawn(move || {
+          let mut mine = Vec::with_capacity(PER_PRODUCER as usize);
 
-          for index in 0 .. PER_PRODUCER
-          {
-            let value = encode( id, index );
+          for index in 0..PER_PRODUCER {
+            let value = encode(id, index);
             let deadline = std::time::Instant::now() + PATIENCE;
 
-            loop
-            {
-              match producer.claim()
-              {
-                Ok( mut reserved ) =>
-                {
-                  mine.push( reserved.sequence() );
-                  reserved.set( value );
+            loop {
+              match producer.claim() {
+                Ok(mut reserved) => {
+                  mine.push(reserved.sequence());
+                  reserved.set(value);
                   break;
-                },
+                }
                 // Back-pressure: the consumer has not caught up. Retrying is
                 // the whole of the `Fail` policy's contract — but not forever,
                 // or a dead consumer becomes a hang rather than a failure.
-                Err( RingError::Full ) =>
-                {
-                  assert!
-                  (
+                Err(RingError::Full) => {
+                  assert!(
                     std::time::Instant::now() < deadline,
                     "producer {id} stalled at item {index}: back-pressure never cleared, \
                      which means the consumer stopped draining"
                   );
                   std::thread::yield_now();
-                },
-                Err( other ) => panic!( "unexpected claim failure: {other:?}" ),
+                }
+                Err(other) => panic!("unexpected claim failure: {other:?}"),
               }
             }
           }
@@ -170,25 +159,21 @@ mod threaded
           // live sibling threads racing on it while that function's own
           // `thread::scope` block runs — "it can't outlive the test" does not
           // mean "it can't poison a sibling mid-test."
-          granted.lock().unwrap_or_else( std::sync::PoisonError::into_inner ).extend( mine );
-        } );
+          granted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(mine);
+        });
       }
 
       let received = &received;
 
-      scope.spawn( move ||
-      {
-        let mut drained = Vec::with_capacity( TOTAL );
+      scope.spawn(move || {
+        let mut drained = Vec::with_capacity(TOTAL);
         let mut deadline = std::time::Instant::now() + PATIENCE;
 
-        while drained.len() < TOTAL
-        {
+        while drained.len() < TOTAL {
           let mut batch = consumer.drain();
 
-          if batch.is_empty()
-          {
-            assert!
-            (
+          if batch.is_empty() {
+            assert!(
               std::time::Instant::now() < deadline,
               "consumer stalled after {} of {TOTAL} records: nothing further became visible",
               drained.len()
@@ -199,18 +184,15 @@ mod threaded
 
           let start = batch.start();
 
-          for offset in 0 .. batch.len()
-          {
-            let value = batch
-              .get_mut( offset )
-              .and_then( TypedSlot::take )
-              .unwrap_or_else( || panic!
-              (
+          for offset in 0..batch.len() {
+            let value = batch.get_mut(offset).and_then(TypedSlot::take).unwrap_or_else(|| {
+              panic!(
                 "sequence {:?} was drained as published but its slot was empty — \
                  the stamp became visible before the payload write it was supposed to release",
-                start.advanced_by( offset as u64 )
-              ) );
-            drained.push( value );
+                start.advanced_by(offset as u64)
+              )
+            });
+            drained.push(value);
           }
 
           deadline = std::time::Instant::now() + PATIENCE;
@@ -218,9 +200,12 @@ mod threaded
 
         // Fix(mpsc_test_granted_received_lock_poison_recovery): same hazard as
         // `granted` above, for the consumer thread's own `received` lock.
-        received.lock().unwrap_or_else( std::sync::PoisonError::into_inner ).extend( drained );
-      } );
-    } );
+        received
+          .lock()
+          .unwrap_or_else(std::sync::PoisonError::into_inner)
+          .extend(drained);
+      });
+    });
 
     // Fix(mpsc_test_granted_received_lock_poison_recovery): `into_inner` can
     // observe the same poisoning `granted`/`received` above already guard
@@ -228,36 +213,30 @@ mod threaded
     // already have re-panicked on any real thread panic before execution
     // reaches here, an invariant this file should not have to keep proving
     // by inspection every time the threading above changes.
-    let granted = granted.into_inner().unwrap_or_else( std::sync::PoisonError::into_inner );
-    let received = received.into_inner().unwrap_or_else( std::sync::PoisonError::into_inner );
+    let granted = granted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let received = received.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // Claim 1 — byte-parity as a multiset.
-    assert_eq!( received.len(), TOTAL, "every offered item arrived exactly once" );
+    assert_eq!(received.len(), TOTAL, "every offered item arrived exactly once");
     let mut sorted = received.clone();
     sorted.sort_unstable();
-    let expected : Vec< u64 > = ( 0 .. TOTAL as u64 ).collect();
-    assert_eq!( sorted, expected, "the multiset of received items is the multiset offered" );
+    let expected: Vec<u64> = (0..TOTAL as u64).collect();
+    assert_eq!(sorted, expected, "the multiset of received items is the multiset offered");
 
     // Claim 2 — no sequence granted twice.
-    assert_eq!( granted.len(), TOTAL );
-    let distinct : HashSet< Seq > = granted.iter().copied().collect();
-    assert_eq!( distinct.len(), TOTAL, "no two producers were granted the same sequence" );
+    assert_eq!(granted.len(), TOTAL);
+    let distinct: HashSet<Seq> = granted.iter().copied().collect();
+    assert_eq!(distinct.len(), TOTAL, "no two producers were granted the same sequence");
 
     // Claim 3 — each producer's own items stayed in its issue order.
-    for id in 0 .. PRODUCERS
-    {
-      let lo = encode( id, 0 );
-      let hi = encode( id, PER_PRODUCER - 1 );
-      let mine : Vec< u64 > = received
-        .iter()
-        .copied()
-        .filter( | value | ( lo ..= hi ).contains( value ) )
-        .collect();
+    for id in 0..PRODUCERS {
+      let lo = encode(id, 0);
+      let hi = encode(id, PER_PRODUCER - 1);
+      let mine: Vec<u64> = received.iter().copied().filter(|value| (lo..=hi).contains(value)).collect();
 
-      assert_eq!( mine.len(), PER_PRODUCER as usize );
-      assert!
-      (
-        mine.windows( 2 ).all( | pair | pair[ 0 ] < pair[ 1 ] ),
+      assert_eq!(mine.len(), PER_PRODUCER as usize);
+      assert!(
+        mine.windows(2).all(|pair| pair[0] < pair[1]),
         "producer {id}'s own items arrived out of its issue order"
       );
     }
@@ -302,90 +281,77 @@ mod threaded
   ///   make `RingError::Full` all but certain, and the assertion turns that
   ///   near-certainty into a checked fact about the run that actually
   ///   happened, rather than a claim resting on the thread count alone.
-  #[ test ]
-  fn producers_under_measured_contention_at_small_capacity_show_no_torn_or_duplicated_records()
-  {
-    const PRODUCERS : u64 = 8;
-    const PER_PRODUCER : u64 = 4_000;
-    const TOTAL : usize = ( PRODUCERS * PER_PRODUCER ) as usize;
-    const WORDS : usize = 8;
+  #[test]
+  fn producers_under_measured_contention_at_small_capacity_show_no_torn_or_duplicated_records() {
+    const PRODUCERS: u64 = 8;
+    const PER_PRODUCER: u64 = 4_000;
+    const TOTAL: usize = (PRODUCERS * PER_PRODUCER) as usize;
+    const WORDS: usize = 8;
 
-    let encode = | producer : u64, index : u64 | producer * PER_PRODUCER + index;
+    let encode = |producer: u64, index: u64| producer * PER_PRODUCER + index;
 
-    let mut ring : Ring< TypedSlot< [ u64 ; WORDS ] > > = Ring::new( capacity( 8 ) );
+    let mut ring: Ring<TypedSlot<[u64; WORDS]>> = Ring::new(capacity(8));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    let granted : Mutex< Vec< Seq > > = Mutex::new( Vec::with_capacity( TOTAL ) );
-    let received : Mutex< Vec< u64 > > = Mutex::new( Vec::with_capacity( TOTAL ) );
-    let full_retries = AtomicUsize::new( 0 );
+    let granted: Mutex<Vec<Seq>> = Mutex::new(Vec::with_capacity(TOTAL));
+    let received: Mutex<Vec<u64>> = Mutex::new(Vec::with_capacity(TOTAL));
+    let full_retries = AtomicUsize::new(0);
     let full_retries = &full_retries;
 
-    std::thread::scope( | scope |
-    {
-      for id in 0 .. PRODUCERS
-      {
+    std::thread::scope(|scope| {
+      for id in 0..PRODUCERS {
         let granted = &granted;
 
-        scope.spawn( move ||
-        {
-          let mut mine = Vec::with_capacity( PER_PRODUCER as usize );
+        scope.spawn(move || {
+          let mut mine = Vec::with_capacity(PER_PRODUCER as usize);
 
-          for index in 0 .. PER_PRODUCER
-          {
-            let value = encode( id, index );
-            let record = [ value ; WORDS ];
+          for index in 0..PER_PRODUCER {
+            let value = encode(id, index);
+            let record = [value; WORDS];
             let deadline = std::time::Instant::now() + PATIENCE;
 
-            loop
-            {
-              match producer.claim()
-              {
-                Ok( mut reserved ) =>
-                {
-                  mine.push( reserved.sequence() );
-                  reserved.set( record );
+            loop {
+              match producer.claim() {
+                Ok(mut reserved) => {
+                  mine.push(reserved.sequence());
+                  reserved.set(record);
                   break;
-                },
-                Err( RingError::Full ) =>
-                {
+                }
+                Err(RingError::Full) => {
                   // The measured counter this test exists to provide: a real,
                   // observed collision against capacity, not an inference
                   // from thread count.
-                  full_retries.fetch_add( 1, Ordering::Relaxed );
-                  assert!
-                  (
+                  full_retries.fetch_add(1, Ordering::Relaxed);
+                  assert!(
                     std::time::Instant::now() < deadline,
                     "producer {id} stalled at item {index}: back-pressure never cleared"
                   );
                   std::thread::yield_now();
-                },
-                Err( other ) => panic!( "unexpected claim failure: {other:?}" ),
+                }
+                Err(other) => panic!("unexpected claim failure: {other:?}"),
               }
             }
           }
 
-          granted.lock().unwrap_or_else( std::sync::PoisonError::into_inner ).extend( mine );
-        } );
+          granted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(mine);
+        });
       }
 
       let received = &received;
 
-      scope.spawn( move ||
-      {
-        let mut drained = Vec::with_capacity( TOTAL );
+      scope.spawn(move || {
+        let mut drained = Vec::with_capacity(TOTAL);
         let mut deadline = std::time::Instant::now() + PATIENCE;
 
-        while drained.len() < TOTAL
-        {
+        while drained.len() < TOTAL {
           let mut batch = consumer.drain();
 
-          if batch.is_empty()
-          {
-            assert!
-            (
+          if batch.is_empty() {
+            assert!(
               std::time::Instant::now() < deadline,
-              "consumer stalled after {} of {TOTAL} records", drained.len()
+              "consumer stalled after {} of {TOTAL} records",
+              drained.len()
             );
             std::thread::yield_now();
             continue;
@@ -393,80 +359,72 @@ mod threaded
 
           let start = batch.start();
 
-          for offset in 0 .. batch.len()
-          {
-            let record = batch
-              .get_mut( offset )
-              .and_then( TypedSlot::take )
-              .unwrap_or_else( || panic!
-              (
+          for offset in 0..batch.len() {
+            let record = batch.get_mut(offset).and_then(TypedSlot::take).unwrap_or_else(|| {
+              panic!(
                 "sequence {:?} was drained as published but its slot was empty",
-                start.advanced_by( offset as u64 )
-              ) );
+                start.advanced_by(offset as u64)
+              )
+            });
 
             // Self-consistency: every word of a genuinely single-owner record
             // is identical. A claim-exclusivity bug letting a second
             // producer's write land in this slot would need all eight words
             // to agree by chance to hide from this check.
-            let first = record[ 0 ];
-            assert!
-            (
-              record.iter().all( | word | *word == first ),
+            let first = record[0];
+            assert!(
+              record.iter().all(|word| *word == first),
               "sequence {:?} carries an internally inconsistent record {record:?} — \
                two producers' writes landed in the same slot",
-              start.advanced_by( offset as u64 )
+              start.advanced_by(offset as u64)
             );
 
-            drained.push( first );
+            drained.push(first);
           }
 
           deadline = std::time::Instant::now() + PATIENCE;
         }
 
-        received.lock().unwrap_or_else( std::sync::PoisonError::into_inner ).extend( drained );
-      } );
-    } );
+        received
+          .lock()
+          .unwrap_or_else(std::sync::PoisonError::into_inner)
+          .extend(drained);
+      });
+    });
 
-    let granted = granted.into_inner().unwrap_or_else( std::sync::PoisonError::into_inner );
-    let received = received.into_inner().unwrap_or_else( std::sync::PoisonError::into_inner );
+    let granted = granted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let received = received.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
 
     // The measured-contention assertion: this is the whole point of the test.
     // A pass here is direct evidence that producers actually collided against
     // capacity during this run, not an assumption resting on thread count.
-    assert!
-    (
-      full_retries.load( Ordering::Relaxed ) > 0,
+    assert!(
+      full_retries.load(Ordering::Relaxed) > 0,
       "zero RingError::Full observed across {PRODUCERS} producers at capacity 8 — \
        this run measured no contention at all, so it proves nothing about it"
     );
 
     // Claim 1 — byte-parity as a multiset.
-    assert_eq!( received.len(), TOTAL, "every offered item arrived exactly once" );
+    assert_eq!(received.len(), TOTAL, "every offered item arrived exactly once");
     let mut sorted = received.clone();
     sorted.sort_unstable();
-    let expected : Vec< u64 > = ( 0 .. TOTAL as u64 ).collect();
-    assert_eq!( sorted, expected, "the multiset of received items is the multiset offered" );
+    let expected: Vec<u64> = (0..TOTAL as u64).collect();
+    assert_eq!(sorted, expected, "the multiset of received items is the multiset offered");
 
     // Claim 2 — no sequence granted twice.
-    assert_eq!( granted.len(), TOTAL );
-    let distinct : HashSet< Seq > = granted.iter().copied().collect();
-    assert_eq!( distinct.len(), TOTAL, "no two producers were granted the same sequence" );
+    assert_eq!(granted.len(), TOTAL);
+    let distinct: HashSet<Seq> = granted.iter().copied().collect();
+    assert_eq!(distinct.len(), TOTAL, "no two producers were granted the same sequence");
 
     // Claim 3 — each producer's own items stayed in its issue order.
-    for id in 0 .. PRODUCERS
-    {
-      let lo = encode( id, 0 );
-      let hi = encode( id, PER_PRODUCER - 1 );
-      let mine : Vec< u64 > = received
-        .iter()
-        .copied()
-        .filter( | value | ( lo ..= hi ).contains( value ) )
-        .collect();
+    for id in 0..PRODUCERS {
+      let lo = encode(id, 0);
+      let hi = encode(id, PER_PRODUCER - 1);
+      let mine: Vec<u64> = received.iter().copied().filter(|value| (lo..=hi).contains(value)).collect();
 
-      assert_eq!( mine.len(), PER_PRODUCER as usize );
-      assert!
-      (
-        mine.windows( 2 ).all( | pair | pair[ 0 ] < pair[ 1 ] ),
+      assert_eq!(mine.len(), PER_PRODUCER as usize);
+      assert!(
+        mine.windows(2).all(|pair| pair[0] < pair[1]),
         "producer {id}'s own items arrived out of its issue order"
       );
     }
@@ -489,20 +447,19 @@ mod threaded
   /// doc tests, which is the only executable form a negative has, and there
   /// rather than here because rustdoc collects doc tests from the library
   /// target only.
-  #[ test ]
-  fn the_producer_is_send_and_sync_and_copy_which_is_what_multi_producer_means()
-  {
-    fn assert_send< T : Send >() {}
-    fn assert_sync< T : Sync >() {}
-    fn assert_copy< T : Copy >() {}
+  #[test]
+  fn the_producer_is_send_and_sync_and_copy_which_is_what_multi_producer_means() {
+    fn assert_send<T: Send>() {}
+    fn assert_sync<T: Sync>() {}
+    fn assert_copy<T: Copy>() {}
 
-    assert_send::< Producer< 'static, TypedSlot< u8 > > >();
-    assert_sync::< Producer< 'static, TypedSlot< u8 > > >();
-    assert_copy::< Producer< 'static, TypedSlot< u8 > > >();
+    assert_send::<Producer<'static, TypedSlot<u8>>>();
+    assert_sync::<Producer<'static, TypedSlot<u8>>>();
+    assert_copy::<Producer<'static, TypedSlot<u8>>>();
 
     // The consumer crosses a thread boundary once, at the split. It is `Send`
     // for that and no more.
-    assert_send::< Consumer< 'static, TypedSlot< u8 > > >();
+    assert_send::<Consumer<'static, TypedSlot<u8>>>();
   }
 
   /// The claim cursor and the consumer cursor do not share a cache line.
@@ -512,14 +469,13 @@ mod threaded
   /// sibling change dropping the alignment would put the single most contended
   /// write in the crate on the same line as the consumer's commit, and break
   /// nothing that compiles.
-  #[ test ]
-  fn the_claim_cursor_and_the_consumer_cursor_are_on_distinct_cache_lines()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 8 ) );
+  #[test]
+  fn the_claim_cursor_and_the_consumer_cursor_are_on_distinct_cache_lines() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(8));
     let mut ends = ring.ends();
-    let ( producer, _consumer ) = ends.split();
+    let (producer, _consumer) = ends.split();
 
-    assert!( producer.on_distinct_lines() );
+    assert!(producer.on_distinct_lines());
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -535,68 +491,65 @@ mod threaded
   /// rather than the first gap would deliver sequence 3 before sequence 1
   /// existed — element counts would still reconcile, and total order would be
   /// silently broken.
-  #[ test ]
-  fn the_drain_stops_at_the_first_unpublished_sequence_not_the_highest_published()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 8 ) );
+  #[test]
+  fn the_drain_stops_at_the_first_unpublished_sequence_not_the_highest_published() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(8));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    let mut first = producer.claim().expect( "room" );
-    let mut second = producer.claim().expect( "room" );
-    let mut third = producer.claim().expect( "room" );
-    first.set( 1 );
-    second.set( 2 );
-    third.set( 3 );
+    let mut first = producer.claim().expect("room");
+    let mut second = producer.claim().expect("room");
+    let mut third = producer.claim().expect("room");
+    first.set(1);
+    second.set(2);
+    third.set(3);
 
     // Publish out of order: 1 and 2 land, 0 does not.
-    drop( third );
-    drop( second );
+    drop(third);
+    drop(second);
 
-    assert_eq!( consumer.available(), 0, "a hole at sequence 0 hides 1 and 2" );
-    assert_eq!( producer.ring().published_through(), None );
-    assert!( consumer.drain().is_empty() );
+    assert_eq!(consumer.available(), 0, "a hole at sequence 0 hides 1 and 2");
+    assert_eq!(producer.ring().published_through(), None);
+    assert!(consumer.drain().is_empty());
 
-    drop( first );
+    drop(first);
 
-    assert_eq!( consumer.available(), 3, "closing the hole reveals all three at once" );
-    assert_eq!( producer.ring().published_through(), Some( Seq( 2 ) ) );
+    assert_eq!(consumer.available(), 3, "closing the hole reveals all three at once");
+    assert_eq!(producer.ring().published_through(), Some(Seq(2)));
 
     let mut batch = consumer.drain();
-    let drained : Vec< u8 > = ( 0 .. batch.len() )
-      .map( | offset | batch.get_mut( offset ).and_then( TypedSlot::take ).expect( "published" ) )
+    let drained: Vec<u8> = (0..batch.len())
+      .map(|offset| batch.get_mut(offset).and_then(TypedSlot::take).expect("published"))
       .collect();
-    assert_eq!( drained, vec![ 1, 2, 3 ], "and in sequence order, not publication order" );
+    assert_eq!(drained, vec![1, 2, 3], "and in sequence order, not publication order");
   }
 
   /// The watermark is recomputed on every drain, not cached.
-  #[ test ]
-  fn a_second_drain_sees_what_was_published_after_the_first()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_second_drain_sees_what_was_published_after_the_first() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
+    producer.push(1).expect("room");
 
     // `committed` is asserted everywhere else in this suite against `Seq::ZERO`
     // and nowhere against anything else, which makes it indistinguishable from
     // a method that returns the default and never reads the cursor at all. A
     // watermark is only a watermark if it moves; this is the one place that
     // says so.
-    assert_eq!( consumer.ring().committed(), Seq::ZERO, "nothing has been drained yet" );
-    assert_eq!( consumer.drain().len(), 1 );
-    assert_eq!
-    (
+    assert_eq!(consumer.ring().committed(), Seq::ZERO, "nothing has been drained yet");
+    assert_eq!(consumer.drain().len(), 1);
+    assert_eq!(
       consumer.ring().committed(),
-      Seq( 1 ),
+      Seq(1),
       "the drain advanced the consumer cursor past the record it took",
     );
 
-    producer.push( 2 ).expect( "room" );
+    producer.push(2).expect("room");
     let mut batch = consumer.drain();
-    assert_eq!( batch.start(), Seq( 1 ) );
-    assert_eq!( batch.get_mut( 0 ).and_then( TypedSlot::take ), Some( 2 ) );
+    assert_eq!(batch.start(), Seq(1));
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(2));
   }
 
   /// An unwritten claim publishes an empty record, not a torn one.
@@ -607,85 +560,80 @@ mod threaded
   /// panic between claim and write. It does not: the slot was left `Default` by
   /// the consumer that drained it, so the observable result is one empty record
   /// — defined, drainable, and distinguishable from a written one.
-  #[ test ]
-  fn a_claim_dropped_without_a_write_publishes_an_empty_record()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_claim_dropped_without_a_write_publishes_an_empty_record() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    drop( producer.claim().expect( "room" ) );
-    producer.push( 7 ).expect( "room" );
+    drop(producer.claim().expect("room"));
+    producer.push(7).expect("room");
 
     let mut batch = consumer.drain();
-    assert_eq!( batch.len(), 2, "the skipped write still occupies its sequence" );
-    assert_eq!( batch.get( 0 ).and_then( TypedSlot::get ), None, "empty, not torn" );
-    assert_eq!( batch.get_mut( 1 ).and_then( TypedSlot::take ), Some( 7 ) );
+    assert_eq!(batch.len(), 2, "the skipped write still occupies its sequence");
+    assert_eq!(batch.get(0).and_then(TypedSlot::get), None, "empty, not torn");
+    assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(7));
   }
 
   /// A claim never published wedges the ring — the cost the guard exists to
   /// remove, demonstrated by holding a guard rather than by leaking one.
-  #[ test ]
-  fn an_unpublished_claim_blocks_every_later_sequence_while_it_is_held()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn an_unpublished_claim_blocks_every_later_sequence_while_it_is_held() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, consumer ) = ends.split();
+    let (producer, consumer) = ends.split();
 
-    let held = producer.claim().expect( "room" );
-    producer.push( 1 ).expect( "room" );
-    producer.push( 2 ).expect( "room" );
+    let held = producer.claim().expect("room");
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
 
-    assert_eq!( consumer.available(), 0, "two published records, none reachable" );
+    assert_eq!(consumer.available(), 0, "two published records, none reachable");
 
-    drop( held );
+    drop(held);
 
-    assert_eq!( consumer.available(), 3 );
+    assert_eq!(consumer.available(), 3);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Back-pressure — the `Fail` policy, and the capacity bound it enforces.
   // ───────────────────────────────────────────────────────────────────────────
 
-  #[ test ]
-  fn a_claim_past_capacity_reports_full_rather_than_overwriting()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 2 ) );
+  #[test]
+  fn a_claim_past_capacity_reports_full_rather_than_overwriting() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(2));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
-    producer.push( 2 ).expect( "room" );
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
 
-    assert_eq!( producer.push( 3 ), Err( RingError::Full ) );
-    assert_eq!( producer.free_capacity(), 0 );
+    assert_eq!(producer.push(3), Err(RingError::Full));
+    assert_eq!(producer.free_capacity(), 0);
 
     // The two published records are untouched — this is what distinguishes the
     // `Fail` policy from `DropOldest`, and it is the exactly-once clause of
     // `docs/invariant/001_single_consumer_total_order.md` at the overflow edge.
     let mut batch = consumer.drain();
-    assert_eq!( batch.len(), 2 );
-    assert_eq!( batch.get_mut( 0 ).and_then( TypedSlot::take ), Some( 1 ) );
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(1));
   }
 
-  #[ test ]
-  fn a_commit_restores_exactly_the_capacity_it_released()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_commit_restores_exactly_the_capacity_it_released() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    for value in 1 ..= 4
-    {
-      producer.push( value ).expect( "room" );
+    for value in 1..=4 {
+      producer.push(value).expect("room");
     }
-    assert_eq!( producer.free_capacity(), 0 );
+    assert_eq!(producer.free_capacity(), 0);
 
-    drop( consumer.drain_up_to( 2 ) );
-    assert_eq!( producer.free_capacity(), 2 );
+    drop(consumer.drain_up_to(2));
+    assert_eq!(producer.free_capacity(), 2);
 
-    drop( consumer.drain() );
-    assert_eq!( producer.free_capacity(), 4 );
+    drop(consumer.drain());
+    assert_eq!(producer.free_capacity(), 4);
   }
 
   /// The batch holds the slots until it is dropped, not until it is read.
@@ -693,53 +641,50 @@ mod threaded
   /// This is what makes `COMMIT`'s `Release` meaningful: were the cursor
   /// advanced at scan time, a producer could overwrite a slot the caller was
   /// still reading through `get`.
-  #[ test ]
-  fn a_live_batch_still_holds_its_slots_against_reuse()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 2 ) );
+  #[test]
+  fn a_live_batch_still_holds_its_slots_against_reuse() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(2));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
-    producer.push( 2 ).expect( "room" );
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
 
     let batch = consumer.drain();
-    assert_eq!( producer.free_capacity(), 0, "drained but not committed is still occupied" );
-    assert_eq!( batch.get( 0 ).and_then( TypedSlot::get ), Some( &1 ) );
+    assert_eq!(producer.free_capacity(), 0, "drained but not committed is still occupied");
+    assert_eq!(batch.get(0).and_then(TypedSlot::get), Some(&1));
 
-    drop( batch );
-    assert_eq!( producer.free_capacity(), 2 );
+    drop(batch);
+    assert_eq!(producer.free_capacity(), 2);
   }
 
-  #[ test ]
-  fn draining_an_empty_ring_yields_an_empty_batch_and_moves_nothing()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn draining_an_empty_ring_yields_an_empty_batch_and_moves_nothing() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( _producer, mut consumer ) = ends.split();
+    let (_producer, mut consumer) = ends.split();
 
-    assert!( consumer.is_empty() );
+    assert!(consumer.is_empty());
     let batch = consumer.drain();
-    assert!( batch.is_empty() );
-    assert_eq!( batch.len(), 0 );
-    drop( batch );
-    assert_eq!( consumer.position(), Seq::ZERO );
+    assert!(batch.is_empty());
+    assert_eq!(batch.len(), 0);
+    drop(batch);
+    assert_eq!(consumer.position(), Seq::ZERO);
   }
 
-  #[ test ]
-  fn drain_up_to_zero_takes_nothing_and_leaves_the_records_drainable()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn drain_up_to_zero_takes_nothing_and_leaves_the_records_drainable() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
-    assert!( !consumer.is_empty(), "nothing was pending, so taking nothing proves nothing" );
-    assert!( consumer.drain_up_to( 0 ).is_empty() );
-    assert_eq!( consumer.drain().len(), 1 );
+    producer.push(1).expect("room");
+    assert!(!consumer.is_empty(), "nothing was pending, so taking nothing proves nothing");
+    assert!(consumer.drain_up_to(0).is_empty());
+    assert_eq!(consumer.drain().len(), 1);
   }
 
-  #[ test ]
+  #[test]
   /// Fix(weak_len_assert_sweep_1633):
   /// Root Cause: the assertion checked only `.len() == 4`, never the batch's
   /// actual contents or their order.
@@ -758,24 +703,22 @@ mod threaded
   /// not merely how many.
   /// Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn` — a
   /// plain `grep "pub fn"` sweep for its API silently misses it.
-  fn drain_up_to_more_than_capacity_is_capped_rather_than_scanning_past_the_ring()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  fn drain_up_to_more_than_capacity_is_capped_rather_than_scanning_past_the_ring() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    for value in 1 ..= 4
-    {
-      producer.push( value ).expect( "room" );
+    for value in 1..=4 {
+      producer.push(value).expect("room");
     }
 
-    let batch = consumer.drain_up_to( usize::MAX );
-    assert_eq!( batch.len(), 4 );
+    let batch = consumer.drain_up_to(usize::MAX);
+    assert_eq!(batch.len(), 4);
 
-    let values : Vec< u8 > = ( 0 .. batch.len() )
-      .filter_map( | offset | batch.get( offset ).and_then( TypedSlot::get ).copied() )
+    let values: Vec<u8> = (0..batch.len())
+      .filter_map(|offset| batch.get(offset).and_then(TypedSlot::get).copied())
       .collect();
-    assert_eq!( values, vec![ 1, 2, 3, 4 ] );
+    assert_eq!(values, vec![1, 2, 3, 4]);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -789,84 +732,76 @@ mod threaded
   /// different value — so a stale stamp fails the drain's equality test for the
   /// same reason a never-written one does, with no clearing step on the
   /// consumer's hot path.
-  #[ test ]
-  fn a_stale_stamp_from_the_previous_lap_does_not_read_as_published()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 2 ) );
+  #[test]
+  fn a_stale_stamp_from_the_previous_lap_does_not_read_as_published() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(2));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
-    producer.push( 2 ).expect( "room" );
-    drop( consumer.drain() );
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
+    drop(consumer.drain());
 
     // Slot 0 still stamps `Seq( 0 )` from the first lap; the drain is now
     // looking for `Seq( 2 )`.
-    assert_eq!( producer.ring().stamps()[ 0 ].load( Ordering::Relaxed ), Seq::ZERO );
-    assert_eq!( consumer.available(), 0 );
+    assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq::ZERO);
+    assert_eq!(consumer.available(), 0);
 
-    producer.push( 3 ).expect( "room" );
-    assert_eq!( producer.ring().stamps()[ 0 ].load( Ordering::Relaxed ), Seq( 2 ) );
-    assert_eq!( consumer.available(), 1 );
+    producer.push(3).expect("room");
+    assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq(2));
+    assert_eq!(consumer.available(), 1);
   }
 
-  #[ test ]
-  fn every_slot_is_reused_across_many_laps_without_loss_or_duplication()
-  {
-    const LAPS : u64 = 500;
-    const CAPACITY : u64 = 8;
+  #[test]
+  fn every_slot_is_reused_across_many_laps_without_loss_or_duplication() {
+    const LAPS: u64 = 500;
+    const CAPACITY: u64 = 8;
 
-    let mut ring : Ring< TypedSlot< u64 > > = Ring::new( capacity( CAPACITY as usize ) );
+    let mut ring: Ring<TypedSlot<u64>> = Ring::new(capacity(CAPACITY as usize));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
     let mut received = Vec::new();
 
-    for lap in 0 .. LAPS
-    {
-      for index in 0 .. CAPACITY
-      {
-        producer.push( lap * CAPACITY + index ).expect( "the previous lap was drained" );
+    for lap in 0..LAPS {
+      for index in 0..CAPACITY {
+        producer.push(lap * CAPACITY + index).expect("the previous lap was drained");
       }
 
       let mut batch = consumer.drain();
-      assert_eq!( batch.len(), CAPACITY as usize );
+      assert_eq!(batch.len(), CAPACITY as usize);
 
-      for offset in 0 .. batch.len()
-      {
-        received.push( batch.get_mut( offset ).and_then( TypedSlot::take ).expect( "published" ) );
+      for offset in 0..batch.len() {
+        received.push(batch.get_mut(offset).and_then(TypedSlot::take).expect("published"));
       }
     }
 
-    let expected : Vec< u64 > = ( 0 .. LAPS * CAPACITY ).collect();
-    assert_eq!( received, expected );
+    let expected: Vec<u64> = (0..LAPS * CAPACITY).collect();
+    assert_eq!(received, expected);
   }
 
-  #[ test ]
-  fn stamps_start_unstamped_and_there_is_exactly_one_per_slot()
-  {
-    let ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 16 ) );
+  #[test]
+  fn stamps_start_unstamped_and_there_is_exactly_one_per_slot() {
+    let ring: Ring<TypedSlot<u8>> = Ring::new(capacity(16));
 
-    assert_eq!( ring.stamps().len(), 16 );
-    assert!( ring.stamps().iter().all( | s | s.load( Ordering::Relaxed ) == UNSTAMPED ) );
-    assert_eq!( ring.published_through(), None );
-    assert_eq!( ring.committed(), Seq::ZERO );
+    assert_eq!(ring.stamps().len(), 16);
+    assert!(ring.stamps().iter().all(|s| s.load(Ordering::Relaxed) == UNSTAMPED));
+    assert_eq!(ring.published_through(), None);
+    assert_eq!(ring.committed(), Seq::ZERO);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Record accounting — the class of defect no test above can see.
   // ───────────────────────────────────────────────────────────────────────────
 
-  static DROPPED : AtomicUsize = AtomicUsize::new( 0 );
+  static DROPPED: AtomicUsize = AtomicUsize::new(0);
 
-  #[ derive( Default ) ]
+  #[derive(Default)]
   struct Tracked;
 
-  impl Drop for Tracked
-  {
-    fn drop( &mut self )
-    {
-      DROPPED.fetch_add( 1, Ordering::Relaxed );
+  impl Drop for Tracked {
+    fn drop(&mut self) {
+      DROPPED.fetch_add(1, Ordering::Relaxed);
     }
   }
 
@@ -879,192 +814,178 @@ mod threaded
   ///
   /// Two laps at capacity two: the second lap's `set` replaces the first lap's
   /// records, which must destroy exactly the two the consumer left behind.
-  #[ test ]
-  fn every_record_written_is_destroyed_exactly_once()
-  {
-    DROPPED.store( 0, Ordering::Relaxed );
+  #[test]
+  fn every_record_written_is_destroyed_exactly_once() {
+    DROPPED.store(0, Ordering::Relaxed);
 
     {
-      let mut ring : Ring< TypedSlot< Tracked > > = Ring::new( capacity( 2 ) );
+      let mut ring: Ring<TypedSlot<Tracked>> = Ring::new(capacity(2));
       let mut ends = ring.ends();
-      let ( producer, mut consumer ) = ends.split();
+      let (producer, mut consumer) = ends.split();
 
-      for _ in 0 .. 2
-      {
-        producer.push( Tracked ).expect( "room" );
-        producer.push( Tracked ).expect( "room" );
+      for _ in 0..2 {
+        producer.push(Tracked).expect("room");
+        producer.push(Tracked).expect("room");
         // Drained but not taken: the records stay in their slots.
-        drop( consumer.drain() );
+        drop(consumer.drain());
       }
 
-      assert_eq!
-      (
-        DROPPED.load( Ordering::Relaxed ),
+      assert_eq!(
+        DROPPED.load(Ordering::Relaxed),
         2,
         "the second lap's writes destroyed the first lap's undrained records"
       );
     }
 
-    assert_eq!
-    (
-      DROPPED.load( Ordering::Relaxed ),
+    assert_eq!(
+      DROPPED.load(Ordering::Relaxed),
       4,
       "the ring going out of scope destroyed the two records still in it"
     );
   }
 
   /// A record taken out of a batch is moved, not copied.
-  #[ test ]
-  fn a_taken_record_leaves_its_slot_empty()
-  {
-    DROPPED.store( 0, Ordering::Relaxed );
+  #[test]
+  fn a_taken_record_leaves_its_slot_empty() {
+    DROPPED.store(0, Ordering::Relaxed);
 
     {
-      let mut ring : Ring< TypedSlot< Tracked > > = Ring::new( capacity( 2 ) );
+      let mut ring: Ring<TypedSlot<Tracked>> = Ring::new(capacity(2));
       let mut ends = ring.ends();
-      let ( producer, mut consumer ) = ends.split();
+      let (producer, mut consumer) = ends.split();
 
-      producer.push( Tracked ).expect( "room" );
+      producer.push(Tracked).expect("room");
 
       let mut batch = consumer.drain();
-      let taken = batch.get_mut( 0 ).and_then( TypedSlot::take );
-      assert!( taken.is_some() );
-      assert!( batch.get( 0 ).is_some_and( Slot::is_empty ), "the slot is empty after the take" );
-      assert_eq!( DROPPED.load( Ordering::Relaxed ), 0, "still alive in the caller's hand" );
+      let taken = batch.get_mut(0).and_then(TypedSlot::take);
+      assert!(taken.is_some());
+      assert!(batch.get(0).is_some_and(Slot::is_empty), "the slot is empty after the take");
+      assert_eq!(DROPPED.load(Ordering::Relaxed), 0, "still alive in the caller's hand");
 
-      drop( batch );
-      drop( taken );
-      assert_eq!( DROPPED.load( Ordering::Relaxed ), 1 );
+      drop(batch);
+      drop(taken);
+      assert_eq!(DROPPED.load(Ordering::Relaxed), 1);
     }
 
-    assert_eq!( DROPPED.load( Ordering::Relaxed ), 1, "the ring held nothing more to destroy" );
+    assert_eq!(DROPPED.load(Ordering::Relaxed), 1, "the ring held nothing more to destroy");
   }
 
   /// A non-`Copy` payload survives the round trip intact.
-  #[ test ]
-  fn a_heap_payload_arrives_with_its_contents_rather_than_a_shallow_copy()
-  {
-    let mut ring : Ring< TypedSlot< String > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_heap_payload_arrives_with_its_contents_rather_than_a_shallow_copy() {
+    let mut ring: Ring<TypedSlot<String>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( "the first".to_string() ).expect( "room" );
-    producer.push( "the second".to_string() ).expect( "room" );
+    producer.push("the first".to_string()).expect("room");
+    producer.push("the second".to_string()).expect("room");
 
     let mut batch = consumer.drain();
-    assert_eq!( batch.get_mut( 0 ).and_then( TypedSlot::take ).as_deref(), Some( "the first" ) );
-    assert_eq!( batch.get_mut( 1 ).and_then( TypedSlot::take ).as_deref(), Some( "the second" ) );
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take).as_deref(), Some("the first"));
+    assert_eq!(batch.get_mut(1).and_then(TypedSlot::take).as_deref(), Some("the second"));
   }
 
   // ───────────────────────────────────────────────────────────────────────────
   // Surface details.
   // ───────────────────────────────────────────────────────────────────────────
 
-  #[ test ]
-  fn a_bytes_payload_round_trips_its_written_length()
-  {
-    let mut ring : Ring< BytesSlot< 16 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_bytes_payload_round_trips_its_written_length() {
+    let mut ring: Ring<BytesSlot<16>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    let mut reserved = producer.claim().expect( "room" );
-    reserved.write( b"payload" ).expect( "seven bytes fit in sixteen" );
-    drop( reserved );
+    let mut reserved = producer.claim().expect("room");
+    reserved.write(b"payload").expect("seven bytes fit in sixteen");
+    drop(reserved);
 
     let batch = consumer.drain();
-    assert_eq!( batch.get( 0 ).map( BytesSlot::read ), Some( &b"payload"[ .. ] ) );
+    assert_eq!(batch.get(0).map(BytesSlot::read), Some(&b"payload"[..]));
   }
 
-  #[ test ]
-  fn a_config_supplies_the_capacity_and_its_other_fields_are_deliberately_unread()
-  {
+  #[test]
+  fn a_config_supplies_the_capacity_and_its_other_fields_are_deliberately_unread() {
     // `with_producers` is the field a ring might be tempted to trust. It is
     // not read: the claim is a compare-exchange, correct for any number of
     // producers because of its shape rather than because it was told one.
-    let config = RingConfig::new( 8 ).expect( "a power of two" ).with_producers( 64 );
-    let ring : Ring< TypedSlot< u8 > > = Ring::with_config( &config );
+    let config = RingConfig::new(8).expect("a power of two").with_producers(64);
+    let ring: Ring<TypedSlot<u8>> = Ring::with_config(&config);
 
-    assert_eq!( ring.capacity(), config.capacity() );
-    assert_eq!( ring.stamps().len(), 8 );
+    assert_eq!(ring.capacity(), config.capacity());
+    assert_eq!(ring.stamps().len(), 8);
   }
 
-  #[ test ]
-  fn a_capacity_that_is_not_a_power_of_two_is_refused_before_a_ring_exists()
-  {
-    assert!( Capacity::new( 3 ).is_err() );
-    assert!( RingConfig::new( 100 ).is_err() );
+  #[test]
+  fn a_capacity_that_is_not_a_power_of_two_is_refused_before_a_ring_exists() {
+    assert!(Capacity::new(3).is_err());
+    assert!(RingConfig::new(100).is_err());
   }
 
-  #[ test ]
-  fn the_batch_reports_the_sequences_it_covers()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn the_batch_reports_the_sequences_it_covers() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
-    producer.push( 2 ).expect( "room" );
-    drop( consumer.drain_up_to( 1 ) );
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
+    drop(consumer.drain_up_to(1));
 
-    producer.push( 3 ).expect( "room" );
+    producer.push(3).expect("room");
     let batch = consumer.drain();
-    assert_eq!( batch.sequences().collect::< Vec< _ > >(), vec![ Seq( 1 ), Seq( 2 ) ] );
-    assert_eq!( batch.iter().count(), 2 );
+    assert_eq!(batch.sequences().collect::<Vec<_>>(), vec![Seq(1), Seq(2)]);
+    assert_eq!(batch.iter().count(), 2);
   }
 
-  #[ test ]
-  fn reading_past_the_end_of_a_batch_yields_none_rather_than_the_next_lap()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn reading_past_the_end_of_a_batch_yields_none_rather_than_the_next_lap() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
-    producer.push( 1 ).expect( "room" );
+    producer.push(1).expect("room");
 
     let mut batch = consumer.drain();
-    assert!( batch.get( 1 ).is_none() );
-    assert!( batch.get_mut( 1 ).is_none() );
+    assert!(batch.get(1).is_none());
+    assert!(batch.get_mut(1).is_none());
   }
 
-  #[ test ]
-  fn the_claim_advances_before_the_publish_and_the_two_are_separate_cursors()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn the_claim_advances_before_the_publish_and_the_two_are_separate_cursors() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, _consumer ) = ends.split();
+    let (producer, _consumer) = ends.split();
 
-    let reserved = producer.claim().expect( "room" );
-    assert_eq!( producer.claimed(), Seq( 1 ), "claimed" );
-    assert_eq!( producer.ring().published_through(), None, "and not yet published" );
+    let reserved = producer.claim().expect("room");
+    assert_eq!(producer.claimed(), Seq(1), "claimed");
+    assert_eq!(producer.ring().published_through(), None, "and not yet published");
 
-    drop( reserved );
-    assert_eq!( producer.ring().published_through(), Some( Seq::ZERO ) );
+    drop(reserved);
+    assert_eq!(producer.ring().published_through(), Some(Seq::ZERO));
   }
 
-  #[ test ]
-  fn the_orderings_are_the_ones_the_publication_invariant_names()
-  {
+  #[test]
+  fn the_orderings_are_the_ones_the_publication_invariant_names() {
     // `docs/invariant/002_publication_ordering.md` states these as contract, in
     // one place, rather than at each use. This is the assertion that the
     // constants have not drifted from it.
-    assert_eq!( PUBLISH, Ordering::Release );
-    assert_eq!( OBSERVE, Ordering::Acquire );
-    assert_eq!( COMMIT, Ordering::Release );
-    assert_eq!( OWN, Ordering::Relaxed );
-    assert_eq!( ring_cursor::GATING, Ordering::Acquire );
+    assert_eq!(PUBLISH, Ordering::Release);
+    assert_eq!(OBSERVE, Ordering::Acquire);
+    assert_eq!(COMMIT, Ordering::Release);
+    assert_eq!(OWN, Ordering::Relaxed);
+    assert_eq!(ring_cursor::GATING, Ordering::Acquire);
   }
 
-  #[ test ]
-  fn the_debug_rendering_names_the_ring_state_a_reader_would_want()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn the_debug_rendering_names_the_ring_state_a_reader_would_want() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, _consumer ) = ends.split();
-    producer.push( 1 ).expect( "room" );
+    let (producer, _consumer) = ends.split();
+    producer.push(1).expect("room");
 
-    let rendered = format!( "{:?}", producer.ring() );
-    assert!( rendered.contains( "capacity: 4" ), "{rendered}" );
-    assert!( rendered.contains( "published_through: Some" ), "{rendered}" );
+    let rendered = format!("{:?}", producer.ring());
+    assert!(rendered.contains("capacity: 4"), "{rendered}");
+    assert!(rendered.contains("published_through: Some"), "{rendered}");
   }
 
   /// A producer can read back what it wrote before publishing it.
@@ -1073,36 +994,33 @@ mod threaded
   /// and the half every other test exercises; the shared half is what lets a
   /// producer building a record incrementally check its own work — reading a
   /// slot nobody else may touch, since it is claimed and unstamped.
-  #[ test ]
-  fn a_claimed_slot_is_readable_through_the_guard_before_it_is_published()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_claimed_slot_is_readable_through_the_guard_before_it_is_published() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, consumer ) = ends.split();
+    let (producer, consumer) = ends.split();
 
-    let mut reserved = producer.claim().expect( "room" );
-    assert_eq!( reserved.get(), None, "a reclaimed slot starts empty" );
+    let mut reserved = producer.claim().expect("room");
+    assert_eq!(reserved.get(), None, "a reclaimed slot starts empty");
 
-    reserved.set( 42 );
-    assert_eq!( reserved.get(), Some( &42 ), "read back through Deref, not DerefMut" );
-    assert_eq!( consumer.available(), 0, "and still invisible to the consumer" );
+    reserved.set(42);
+    assert_eq!(reserved.get(), Some(&42), "read back through Deref, not DerefMut");
+    assert_eq!(consumer.available(), 0, "and still invisible to the consumer");
   }
 
   /// Both handles name the ring they act on, and it is the same ring.
-  #[ test ]
-  fn both_ends_and_the_handles_they_split_into_name_one_ring()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 8 ) );
+  #[test]
+  fn both_ends_and_the_handles_they_split_into_name_one_ring() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(8));
     let mut ends = ring.ends();
-    assert_eq!( ends.ring().capacity().get(), 8 );
+    assert_eq!(ends.ring().capacity().get(), 8);
 
-    let ( producer, consumer ) = ends.split();
+    let (producer, consumer) = ends.split();
 
-    assert_eq!( producer.ring().capacity().get(), 8 );
-    assert_eq!( consumer.ring().capacity().get(), 8 );
-    assert!
-    (
-      core::ptr::eq( producer.ring(), consumer.ring() ),
+    assert_eq!(producer.ring().capacity().get(), 8);
+    assert_eq!(consumer.ring().capacity().get(), 8);
+    assert!(
+      core::ptr::eq(producer.ring(), consumer.ring()),
       "the two ends address one allocation — that is what the unsafe rests on"
     );
   }
@@ -1116,39 +1034,37 @@ mod threaded
   ///
   /// `clone_on_copy` is allowed rather than obeyed: obeying it would delete the
   /// only call site the explicit impl has, which is the thing under test.
-  #[ test ]
-  #[ allow( clippy::clone_on_copy ) ]
-  fn a_cloned_producer_shares_the_claim_cursor_rather_than_starting_a_new_one()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  #[allow(clippy::clone_on_copy)]
+  fn a_cloned_producer_shares_the_claim_cursor_rather_than_starting_a_new_one() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, mut consumer ) = ends.split();
+    let (producer, mut consumer) = ends.split();
 
     let second = producer.clone();
-    producer.push( 1 ).expect( "room" );
-    second.push( 2 ).expect( "room" );
+    producer.push(1).expect("room");
+    second.push(2).expect("room");
 
-    assert_eq!( producer.claimed(), Seq( 2 ), "one cursor, advanced twice" );
-    assert_eq!( second.claimed(), Seq( 2 ) );
+    assert_eq!(producer.claimed(), Seq(2), "one cursor, advanced twice");
+    assert_eq!(second.claimed(), Seq(2));
 
     let mut batch = consumer.drain();
-    assert_eq!( batch.len(), 2 );
-    assert_eq!( batch.get_mut( 0 ).and_then( TypedSlot::take ), Some( 1 ) );
-    assert_eq!( batch.get_mut( 1 ).and_then( TypedSlot::take ), Some( 2 ) );
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(1));
+    assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(2));
   }
 
-  #[ test ]
-  fn a_reserved_guard_reports_the_sequence_it_will_publish()
-  {
-    let mut ring : Ring< TypedSlot< u8 > > = Ring::new( capacity( 4 ) );
+  #[test]
+  fn a_reserved_guard_reports_the_sequence_it_will_publish() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
-    let ( producer, _consumer ) = ends.split();
+    let (producer, _consumer) = ends.split();
 
-    let first : Reserved< '_, TypedSlot< u8 > > = producer.claim().expect( "room" );
-    let second = producer.claim().expect( "room" );
+    let first: Reserved<'_, TypedSlot<u8>> = producer.claim().expect("room");
+    let second = producer.claim().expect("room");
 
-    assert_eq!( first.sequence(), Seq::ZERO );
-    assert_eq!( second.sequence(), Seq( 1 ) );
+    assert_eq!(first.sequence(), Seq::ZERO);
+    assert_eq!(second.sequence(), Seq(1));
   }
 
   /// A producer thread that panics while holding `granted`'s lock does not
@@ -1194,50 +1110,56 @@ mod threaded
   /// `thread::scope` block — "it cannot outlive the test" says nothing about
   /// whether it can poison a sibling thread *during* the test, which is
   /// exactly the window this defect class targets.
-  #[ test ]
-  fn a_sibling_producer_recovers_a_lock_poisoned_by_another_producers_panic()
-  {
+  #[test]
+  fn a_sibling_producer_recovers_a_lock_poisoned_by_another_producers_panic() {
     // Mirrors `granted`'s own type from the parity test above exactly.
-    let granted : Mutex< Vec< Seq > > = Mutex::new( vec![ Seq::ZERO ] );
+    let granted: Mutex<Vec<Seq>> = Mutex::new(vec![Seq::ZERO]);
 
     // Suppress the panic hook's stderr backtrace for the two intentional
     // panics below.
     let hook = std::panic::take_hook();
-    std::panic::set_hook( Box::new( | _ | {} ) );
+    std::panic::set_hook(Box::new(|_| {}));
 
     let granted_ref = &granted;
-    let poisoned = std::thread::scope( | scope |
-    {
-      scope.spawn( move ||
-      {
-        let _guard = granted_ref.lock().unwrap();
-        panic!( "simulated allocator failure inside one producer's extend" );
-      } )
-      .join()
-    } );
+    let poisoned = std::thread::scope(|scope| {
+      scope
+        .spawn(move || {
+          let _guard = granted_ref.lock().unwrap();
+          panic!("simulated allocator failure inside one producer's extend");
+        })
+        .join()
+    });
 
-    assert!( poisoned.is_err(), "the spawned producer must actually have panicked while locked" );
-    assert!( granted.is_poisoned(), "a panic while holding the lock must poison it for every sibling" );
+    assert!(
+      poisoned.is_err(),
+      "the spawned producer must actually have panicked while locked"
+    );
+    assert!(
+      granted.is_poisoned(),
+      "a panic while holding the lock must poison it for every sibling"
+    );
 
     // The bug: the pre-fix `.expect( "no panic while holding the lock" )`
     // would panic here too, cascading one producer's unrelated panic into a
     // completely different, still-healthy sibling's own access.
-    let old_pattern_would_panic = std::panic::catch_unwind( ||
-    {
-      drop( granted.lock().expect( "no panic while holding the lock" ) );
-    } );
-    assert!
-    (
+    let old_pattern_would_panic = std::panic::catch_unwind(|| {
+      drop(granted.lock().expect("no panic while holding the lock"));
+    });
+    assert!(
       old_pattern_would_panic.is_err(),
       "the pre-fix `.expect(...)` idiom must panic on a poisoned lock — this is the bug",
     );
 
-    std::panic::set_hook( hook );
+    std::panic::set_hook(hook);
 
     // The fix: `.unwrap_or_else( PoisonError::into_inner )`, the real test's
     // own idiom after this fix, recovers the stale-but-valid guard instead.
-    let recovered = granted.lock().unwrap_or_else( std::sync::PoisonError::into_inner );
-    assert_eq!( recovered.as_slice(), &[ Seq::ZERO ], "the prior state survives an unrelated sibling panic" );
+    let recovered = granted.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    assert_eq!(
+      recovered.as_slice(),
+      &[Seq::ZERO],
+      "the prior state survives an unrelated sibling panic"
+    );
   }
 }
 
@@ -1258,15 +1180,14 @@ mod threaded
 /// a loom `AtomicUsize` stored *before* the publish and loaded *after* the
 /// drain: the thing whose visibility is checked is something loom can see.
 /// `ring_publish/tests/handshake_test.rs` establishes the shape.
-#[ cfg( loom ) ]
-mod exhaustive
-{
-  use loom::sync::atomic::{ AtomicUsize, Ordering };
-  use ring_mpsc::{ Ends, Ring };
+#[cfg(loom)]
+mod exhaustive {
+  use loom::sync::atomic::{AtomicUsize, Ordering};
+  use ring_mpsc::{Ends, Ring};
   use ring_slot::TypedSlot;
   use ring_types::Capacity;
 
-  const WRITTEN : usize = 0xABC;
+  const WRITTEN: usize = 0xABC;
 
   /// Ends that outlive the model's threads.
   ///
@@ -1274,13 +1195,11 @@ mod exhaustive
   /// spawns may borrow a local. The ring and its ends are therefore leaked
   /// rather than scoped — one leak per execution, which is what loom's own
   /// harness expects and why its models are kept to two slots.
-  fn leaked_ends() -> &'static mut Ends< 'static, TypedSlot< u8 > >
-  {
-    let capacity = Capacity::new( 2 ).expect( "a power of two" );
-    let ring : &'static mut Ring< TypedSlot< u8 > > =
-      Box::leak( Box::new( Ring::new( capacity ) ) );
+  fn leaked_ends() -> &'static mut Ends<'static, TypedSlot<u8>> {
+    let capacity = Capacity::new(2).expect("a power of two");
+    let ring: &'static mut Ring<TypedSlot<u8>> = Box::leak(Box::new(Ring::new(capacity)));
 
-    Box::leak( Box::new( ring.ends() ) )
+    Box::leak(Box::new(ring.ends()))
   }
 
   /// A drained record never precedes the write that came before its publish.
@@ -1289,71 +1208,60 @@ mod exhaustive
   /// `PUBLISH` from `Release` to `Relaxed` must fail this model — that
   /// mutation is step 1 of `tests/manual/readme.md`'s M9, and a model that
   /// still passes under it is checking nothing.
-  #[ test ]
-  fn a_published_record_is_never_observed_before_the_write_that_preceded_it()
-  {
-    loom::model( ||
-    {
-      let payload = &*Box::leak( Box::new( AtomicUsize::new( 0 ) ) );
-      let ( producer, mut consumer ) = leaked_ends().split();
+  #[test]
+  fn a_published_record_is_never_observed_before_the_write_that_preceded_it() {
+    loom::model(|| {
+      let payload = &*Box::leak(Box::new(AtomicUsize::new(0)));
+      let (producer, mut consumer) = leaked_ends().split();
 
-      let writer = loom::thread::spawn( move ||
-      {
-        payload.store( WRITTEN, Ordering::Relaxed );
-        drop( producer.claim().expect( "an empty ring has room" ) );
-      } );
+      let writer = loom::thread::spawn(move || {
+        payload.store(WRITTEN, Ordering::Relaxed);
+        drop(producer.claim().expect("an empty ring has room"));
+      });
 
-      let reader = loom::thread::spawn( move ||
-      {
-        if consumer.drain().is_empty()
-        {
+      let reader = loom::thread::spawn(move || {
+        if consumer.drain().is_empty() {
           return;
         }
-        assert_eq!
-        (
-          payload.load( Ordering::Relaxed ),
+        assert_eq!(
+          payload.load(Ordering::Relaxed),
           WRITTEN,
           "a drained record did not carry the write that preceded its publish"
         );
-      } );
+      });
 
-      writer.join().expect( "no panic" );
-      reader.join().expect( "no panic" );
-    } );
+      writer.join().expect("no panic");
+      reader.join().expect("no panic");
+    });
   }
 
   /// The consumer never sees further than what was actually published.
   ///
   /// Two producers publishing in either order; the drain must never report
   /// more records than were published, whichever interleaving loom picks.
-  #[ test ]
-  fn the_consumer_never_drains_further_than_the_producers_published()
-  {
-    loom::model( ||
-    {
-      let ( producer, mut consumer ) = leaked_ends().split();
+  #[test]
+  fn the_consumer_never_drains_further_than_the_producers_published() {
+    loom::model(|| {
+      let (producer, mut consumer) = leaked_ends().split();
       let second = producer;
 
-      let first_writer = loom::thread::spawn( move ||
-      {
-        drop( producer.claim().expect( "an empty ring has room" ) );
-      } );
+      let first_writer = loom::thread::spawn(move || {
+        drop(producer.claim().expect("an empty ring has room"));
+      });
 
-      let second_writer = loom::thread::spawn( move ||
-      {
-        drop( second.claim().expect( "a two-slot ring has room for two" ) );
-      } );
+      let second_writer = loom::thread::spawn(move || {
+        drop(second.claim().expect("a two-slot ring has room for two"));
+      });
 
-      let reader = loom::thread::spawn( move ||
-      {
+      let reader = loom::thread::spawn(move || {
         let first = consumer.drain().len();
         let second = consumer.drain().len();
-        assert!( first + second <= 2, "drained {} of at most 2", first + second );
-      } );
+        assert!(first + second <= 2, "drained {} of at most 2", first + second);
+      });
 
-      first_writer.join().expect( "no panic" );
-      second_writer.join().expect( "no panic" );
-      reader.join().expect( "no panic" );
-    } );
+      first_writer.join().expect("no panic");
+      second_writer.join().expect("no panic");
+      reader.join().expect("no panic");
+    });
   }
 }

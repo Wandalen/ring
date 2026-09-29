@@ -60,11 +60,11 @@
 //! The compare-exchange loop re-reads the gate inside the retry, so the
 //! decision to grant and the granting itself are one atomic step.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_cursor::{ PaddedCursor, SeqCell, GATING };
+use ring_cursor::{GATING, PaddedCursor, SeqCell};
 use ring_gating::GatingSet;
-use ring_types::{ RingError, Seq };
+use ring_types::{RingError, Seq};
 
 /// The ordering a successful claim publishes the new cursor value at.
 ///
@@ -72,7 +72,7 @@ use ring_types::{ RingError, Seq };
 /// cursor advance to other producers and an acquire of whatever the producer
 /// whose value we replaced had done. A bare `Release` would let this producer's
 /// slot writes be reordered before it observed the previous producer's claim.
-const CLAIM_SUCCESS : core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
+const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
 
 /// A contiguous range of sequences granted to exactly one producer.
 ///
@@ -90,16 +90,14 @@ const CLAIM_SUCCESS : core::sync::atomic::Ordering = core::sync::atomic::Orderin
 /// assert_eq!( claim.len(), 3 );
 /// assert_eq!( claim.sequences().collect::< Vec< _ > >(), vec![ Seq( 4 ), Seq( 5 ), Seq( 6 ) ] );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-#[ must_use = "a claimed range that is never published strands its slots and stalls every consumer" ]
-pub struct Claim
-{
-  start : Seq,
-  len : usize,
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[must_use = "a claimed range that is never published strands its slots and stalls every consumer"]
+pub struct Claim {
+  start: Seq,
+  len: usize,
 }
 
-impl Claim
-{
+impl Claim {
   /// A claim of `len` sequences beginning at `start`.
   ///
   /// Public because `ring_publish` and the test suites of both crates need to
@@ -114,8 +112,7 @@ impl Claim
   // No `#[ must_use ]` here: `Claim` itself already carries one *with a
   // message*, and a bare attribute on the constructor would only shadow it
   // with a less informative warning.
-  pub const fn new( start : Seq, len : usize ) -> Self
-  {
+  pub const fn new(start: Seq, len: usize) -> Self {
     Self { start, len }
   }
 
@@ -126,9 +123,8 @@ impl Claim
   /// use ring_types::Seq;
   /// assert_eq!( Claim::new( Seq( 9 ), 2 ).start(), Seq( 9 ) );
   /// ```
-  #[ must_use ]
-  pub const fn start( self ) -> Seq
-  {
+  #[must_use]
+  pub const fn start(self) -> Seq {
     self.start
   }
 
@@ -139,10 +135,9 @@ impl Claim
   /// use ring_types::Seq;
   /// assert_eq!( Claim::new( Seq( 9 ), 2 ).end(), Seq( 11 ) );
   /// ```
-  #[ must_use ]
-  pub const fn end( self ) -> Seq
-  {
-    self.start.advanced_by( self.len as u64 )
+  #[must_use]
+  pub const fn end(self) -> Seq {
+    self.start.advanced_by(self.len as u64)
   }
 
   /// How many sequences the range covers.
@@ -152,9 +147,8 @@ impl Claim
   /// use ring_types::Seq;
   /// assert_eq!( Claim::new( Seq::ZERO, 5 ).len(), 5 );
   /// ```
-  #[ must_use ]
-  pub const fn len( self ) -> usize
-  {
+  #[must_use]
+  pub const fn len(self) -> usize {
     self.len
   }
 
@@ -165,9 +159,8 @@ impl Claim
   /// use ring_types::Seq;
   /// assert!( Claim::new( Seq( 3 ), 0 ).is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(self) -> bool {
     self.len == 0
   }
 
@@ -183,9 +176,8 @@ impl Claim
   /// assert!( !claim.contains( Seq( 6 ) ), "half-open" );
   /// assert!( !claim.contains( Seq( 3 ) ) );
   /// ```
-  #[ must_use ]
-  pub const fn contains( self, seq : Seq ) -> bool
-  {
+  #[must_use]
+  pub const fn contains(self, seq: Seq) -> bool {
     // Compared as raw `u64` rather than through `Seq`'s operators: `PartialOrd`
     // is not callable in a `const fn`, and reaching through the newtype for two
     // comparisons is the entire cost of having this one at compile time.
@@ -201,9 +193,8 @@ impl Claim
   /// let seen : Vec< u64 > = Claim::new( Seq( 2 ), 3 ).sequences().map( | s | s.0 ).collect();
   /// assert_eq!( seen, vec![ 2, 3, 4 ] );
   /// ```
-  pub fn sequences( self ) -> impl Iterator< Item = Seq >
-  {
-    ( self.start.0..self.end().0 ).map( Seq )
+  pub fn sequences(self) -> impl Iterator<Item = Seq> {
+    (self.start.0..self.end().0).map(Seq)
   }
 
   /// Whether this range shares any sequence with `other`.
@@ -221,16 +212,13 @@ impl Claim
   /// assert!( first.overlaps( Claim::new( Seq( 3 ), 4 ) ) );
   /// assert!( !first.overlaps( Claim::new( Seq( 0 ), 0 ) ), "an empty claim covers nothing" );
   /// ```
-  #[ must_use ]
-  pub const fn overlaps( self, other : Self ) -> bool
-  {
+  #[must_use]
+  pub const fn overlaps(self, other: Self) -> bool {
     // Raw `u64` comparisons for the same reason `contains` uses them, and with
     // more at stake: this predicate is the one the exclusivity tests assert
     // with, so having it answerable at compile time is worth reaching through
     // the newtype for.
-    !self.is_empty() && !other.is_empty()
-      && self.start.0 < other.end().0
-      && other.start.0 < self.end().0
+    !self.is_empty() && !other.is_empty() && self.start.0 < other.end().0 && other.start.0 < self.end().0
   }
 }
 
@@ -252,15 +240,13 @@ impl Claim
 /// assert_eq!( claim.start(), Seq::ZERO );
 /// assert_eq!( claimer.claimed(), Seq( 3 ) );
 /// ```
-#[ derive( Debug ) ]
-pub struct Claimer< 'a >
-{
-  cursor : PaddedCursor,
-  consumers : &'a GatingSet,
+#[derive(Debug)]
+pub struct Claimer<'a> {
+  cursor: PaddedCursor,
+  consumers: &'a GatingSet,
 }
 
-impl< 'a > Claimer< 'a >
-{
+impl<'a> Claimer<'a> {
   /// A claimer starting at sequence zero, gated by `consumers`.
   ///
   /// ```
@@ -271,10 +257,12 @@ impl< 'a > Claimer< 'a >
   /// let consumers = GatingSet::new( Capacity::new( 8 ).unwrap(), 1 );
   /// assert_eq!( Claimer::new( &consumers ).claimed(), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub fn new( consumers : &'a GatingSet ) -> Self
-  {
-    Self { cursor : PaddedCursor::default(), consumers }
+  #[must_use]
+  pub fn new(consumers: &'a GatingSet) -> Self {
+    Self {
+      cursor: PaddedCursor::default(),
+      consumers,
+    }
   }
 
   /// The producer cursor, for `ring_publish` to read and for a gating set on
@@ -310,9 +298,8 @@ impl< 'a > Claimer< 'a >
   /// let claimer = Claimer::new( &consumers );
   /// assert_eq!( claimer.cursor().load( Ordering::Acquire ), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub const fn cursor( &self ) -> &PaddedCursor
-  {
+  #[must_use]
+  pub const fn cursor(&self) -> &PaddedCursor {
     &self.cursor
   }
 
@@ -326,9 +313,8 @@ impl< 'a > Claimer< 'a >
   /// let consumers = GatingSet::new( Capacity::new( 8 ).unwrap(), 2 );
   /// assert_eq!( Claimer::new( &consumers ).consumers().len(), 2 );
   /// ```
-  #[ must_use ]
-  pub const fn consumers( &self ) -> &'a GatingSet
-  {
+  #[must_use]
+  pub const fn consumers(&self) -> &'a GatingSet {
     self.consumers
   }
 
@@ -349,10 +335,9 @@ impl< 'a > Claimer< 'a >
   /// let _claim = claimer.claim( 2 ).unwrap();
   /// assert_eq!( claimer.claimed(), Seq( 2 ) );
   /// ```
-  #[ must_use ]
-  pub fn claimed( &self ) -> Seq
-  {
-    self.cursor.load( GATING )
+  #[must_use]
+  pub fn claimed(&self) -> Seq {
+    self.cursor.load(GATING)
   }
 
   /// How many slots could be claimed right now.
@@ -377,10 +362,9 @@ impl< 'a > Claimer< 'a >
   /// let _claim = claimer.claim( 3 ).unwrap();
   /// assert_eq!( claimer.headroom(), 1 );
   /// ```
-  #[ must_use ]
-  pub fn headroom( &self ) -> usize
-  {
-    self.consumers.headroom( self.claimed() )
+  #[must_use]
+  pub fn headroom(&self) -> usize {
+    self.consumers.headroom(self.claimed())
   }
 
   /// Claim exactly `count` contiguous sequences, or fail.
@@ -417,15 +401,12 @@ impl< 'a > Claimer< 'a >
   /// consumers.cursor( 0 ).unwrap().store( Seq( 2 ), Ordering::Release );
   /// assert_eq!( claimer.claim( 2 ).unwrap().start(), Seq( 4 ) );
   /// ```
-  pub fn claim( &self, count : usize ) -> Result< Claim, RingError >
-  {
-    if count > self.consumers.capacity().get()
-    {
-      return Err( RingError::BatchTooLarge
-      {
-        requested : count,
-        capacity : self.consumers.capacity().get(),
-      } );
+  pub fn claim(&self, count: usize) -> Result<Claim, RingError> {
+    if count > self.consumers.capacity().get() {
+      return Err(RingError::BatchTooLarge {
+        requested: count,
+        capacity: self.consumers.capacity().get(),
+      });
     }
 
     // The gate is the loop condition, and is therefore re-read on every
@@ -433,17 +414,15 @@ impl< 'a > Claimer< 'a >
     // the headroom computed against the old value is stale and granting on it
     // would overlap that producer's range.
     let mut current = self.claimed();
-    while count <= self.consumers.headroom( current )
-    {
-      let next = current.advanced_by( count as u64 );
-      match self.cursor.compare_exchange( current, next, CLAIM_SUCCESS, GATING )
-      {
-        Ok( _ ) => return Ok( Claim::new( current, count ) ),
-        Err( actual ) => current = actual,
+    while count <= self.consumers.headroom(current) {
+      let next = current.advanced_by(count as u64);
+      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+        Ok(_) => return Ok(Claim::new(current, count)),
+        Err(actual) => current = actual,
       }
     }
 
-    Err( RingError::Full )
+    Err(RingError::Full)
   }
 
   /// Claim as many of `max` sequences as are available, down to one.
@@ -477,23 +456,20 @@ impl< 'a > Claimer< 'a >
   /// assert_eq!( claim.len(), 4, "capped at what the ring holds" );
   /// assert_eq!( claimer.claim_up_to( 1 ), Err( RingError::Full ) );
   /// ```
-  pub fn claim_up_to( &self, max : usize ) -> Result< Claim, RingError >
-  {
+  pub fn claim_up_to(&self, max: usize) -> Result<Claim, RingError> {
     // `granted @ 1..` binds the grant and gates on it in one expression, which
     // is what keeps the headroom re-read in the loop condition rather than
     // duplicated between a pre-loop computation and the retry arm. A grant of
     // zero — no room, or a `max` of zero — exits to the `Full` below.
     let mut current = self.claimed();
-    while let granted @ 1.. = max.min( self.consumers.headroom( current ) )
-    {
-      let next = current.advanced_by( granted as u64 );
-      match self.cursor.compare_exchange( current, next, CLAIM_SUCCESS, GATING )
-      {
-        Ok( _ ) => return Ok( Claim::new( current, granted ) ),
-        Err( actual ) => current = actual,
+    while let granted @ 1.. = max.min(self.consumers.headroom(current)) {
+      let next = current.advanced_by(granted as u64);
+      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+        Ok(_) => return Ok(Claim::new(current, granted)),
+        Err(actual) => current = actual,
       }
     }
 
-    Err( RingError::Full )
+    Err(RingError::Full)
   }
 }

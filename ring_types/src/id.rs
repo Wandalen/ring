@@ -21,13 +21,12 @@
 /// assert!( Seq( 0 ) < Seq( 1 ) );
 /// assert_eq!( Seq( 3 ).next(), Seq( 4 ) );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-pub struct Seq( pub u64 );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Seq(pub u64);
 
-impl Seq
-{
+impl Seq {
   /// The position of a ring that has published nothing.
-  pub const ZERO : Self = Self( 0 );
+  pub const ZERO: Self = Self(0);
 
   /// The next sequence after this one.
   ///
@@ -41,10 +40,9 @@ impl Seq
   /// use ring_types::Seq;
   /// assert_eq!( Seq( 41 ).next(), Seq( 42 ) );
   /// ```
-  #[ must_use ]
-  pub const fn next( self ) -> Self
-  {
-    Self( self.0 + 1 )
+  #[must_use]
+  pub const fn next(self) -> Self {
+    Self(self.0 + 1)
   }
 
   /// This sequence advanced by `n`.
@@ -61,10 +59,9 @@ impl Seq
   /// assert_eq!( Seq( 10 ).advanced_by( 5 ), Seq( 15 ) );
   /// assert_eq!( Seq( 10 ).advanced_by( 0 ), Seq( 10 ) );
   /// ```
-  #[ must_use ]
-  pub const fn advanced_by( self, n : u64 ) -> Self
-  {
-    Self( self.0 + n )
+  #[must_use]
+  pub const fn advanced_by(self, n: u64) -> Self {
+    Self(self.0 + n)
   }
 
   /// How many publications separate this sequence from a later one, or `0`
@@ -78,10 +75,9 @@ impl Seq
   /// assert_eq!( Seq( 4 ).distance_to( Seq( 10 ) ), 6 );
   /// assert_eq!( Seq( 10 ).distance_to( Seq( 4 ) ), 0 );
   /// ```
-  #[ must_use ]
-  pub const fn distance_to( self, later : Self ) -> u64
-  {
-    later.0.saturating_sub( self.0 )
+  #[must_use]
+  pub const fn distance_to(self, later: Self) -> u64 {
+    later.0.saturating_sub(self.0)
   }
 }
 
@@ -95,20 +91,18 @@ impl Seq
 /// use ring_types::SlotIndex;
 /// assert_eq!( SlotIndex( 3 ).get(), 3 );
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-pub struct SlotIndex( pub usize );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SlotIndex(pub usize);
 
-impl SlotIndex
-{
+impl SlotIndex {
   /// The underlying offset.
   ///
   /// ```
   /// use ring_types::SlotIndex;
   /// assert_eq!( SlotIndex( 7 ).get(), 7 );
   /// ```
-  #[ must_use ]
-  pub const fn get( self ) -> usize
-  {
+  #[must_use]
+  pub const fn get(self) -> usize {
     self.0
   }
 }

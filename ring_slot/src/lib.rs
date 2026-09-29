@@ -22,7 +22,7 @@
 //! partially-filled slot reads back exactly what was written and nothing else,
 //! without `MaybeUninit`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use ring_types::RingError;
 
@@ -37,10 +37,9 @@ use ring_types::RingError;
 /// slot.clear();
 /// assert!( slot.is_empty() );
 /// ```
-pub trait Slot
-{
+pub trait Slot {
   /// Whether this slot currently holds nothing.
-  fn is_empty( &self ) -> bool;
+  fn is_empty(&self) -> bool;
 
   /// Return the slot to its empty state.
   ///
@@ -62,7 +61,7 @@ pub trait Slot
   /// written by hand on `BytesSlot` for exactly that reason — but the bytes
   /// are in the process's memory until overwritten, which is the property a
   /// caller handling secrets has to plan around.
-  fn clear( &mut self );
+  fn clear(&mut self);
 }
 
 /// A slot holding one value of a compile-time-known type.
@@ -79,21 +78,19 @@ pub trait Slot
 /// assert_eq!( slot.take(), Some( 42 ) );
 /// assert!( slot.is_empty() );
 /// ```
-#[ derive( Debug, Clone, PartialEq, Eq ) ]
-pub struct TypedSlot< T >( Option< T > );
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TypedSlot<T>(Option<T>);
 
-impl< T > TypedSlot< T >
-{
+impl<T> TypedSlot<T> {
   /// An empty slot.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
   /// assert!( TypedSlot::< u8 >::empty().get().is_none() );
   /// ```
-  #[ must_use ]
-  pub const fn empty() -> Self
-  {
-    Self( None )
+  #[must_use]
+  pub const fn empty() -> Self {
+    Self(None)
   }
 
   /// Place `value` in the slot, returning whatever it held before.
@@ -116,9 +113,8 @@ impl< T > TypedSlot< T >
   /// assert_eq!( slot.set( 1u8 ), None );
   /// assert_eq!( slot.set( 2u8 ), Some( 1 ) );
   /// ```
-  pub fn set( &mut self, value : T ) -> Option< T >
-  {
-    self.0.replace( value )
+  pub fn set(&mut self, value: T) -> Option<T> {
+    self.0.replace(value)
   }
 
   /// Borrow the held value, if any.
@@ -129,8 +125,7 @@ impl< T > TypedSlot< T >
   /// slot.set( 7u8 );
   /// assert_eq!( slot.get(), Some( &7 ) );
   /// ```
-  pub const fn get( &self ) -> Option< &T >
-  {
+  pub const fn get(&self) -> Option<&T> {
     self.0.as_ref()
   }
 
@@ -149,9 +144,8 @@ impl< T > TypedSlot< T >
   /// assert_eq!( slot.take(), Some( 7 ) );
   /// assert_eq!( slot.take(), None );
   /// ```
-  #[ must_use = "this is the only way a payload leaves the slot; dropping it here destroys the record" ]
-  pub fn take( &mut self ) -> Option< T >
-  {
+  #[must_use = "this is the only way a payload leaves the slot; dropping it here destroys the record"]
+  pub fn take(&mut self) -> Option<T> {
     self.0.take()
   }
 }
@@ -164,23 +158,18 @@ impl< T > TypedSlot< T >
 // `ring_spsc` all use it), silently narrowing the ring to payloads that
 // happen to be `Default`. `a_slot_is_default_for_a_payload_that_is_not`
 // fails to compile if this is ever replaced by the derive.
-impl< T > Default for TypedSlot< T >
-{
-  fn default() -> Self
-  {
+impl<T> Default for TypedSlot<T> {
+  fn default() -> Self {
     Self::empty()
   }
 }
 
-impl< T > Slot for TypedSlot< T >
-{
-  fn is_empty( &self ) -> bool
-  {
+impl<T> Slot for TypedSlot<T> {
+  fn is_empty(&self) -> bool {
     self.0.is_none()
   }
 
-  fn clear( &mut self )
-  {
+  fn clear(&mut self) {
     self.0 = None;
   }
 }
@@ -232,11 +221,10 @@ impl< T > Slot for TypedSlot< T >
 /// assert_eq!( slot, BytesSlot::< 16 >::empty(), "clear returns it to a fresh slot's value" );
 /// assert_eq!( format!( "{slot:?}" ), "BytesSlot { payload: [] }" );
 /// ```
-#[ derive( Clone ) ]
-pub struct BytesSlot< const N : usize >
-{
-  bytes : [ u8; N ],
-  len : usize,
+#[derive(Clone)]
+pub struct BytesSlot<const N: usize> {
+  bytes: [u8; N],
+  len: usize,
 }
 
 // Hand-written over `read()` rather than derived over the fields. A derived
@@ -244,18 +232,14 @@ pub struct BytesSlot< const N : usize >
 // reach and that `clear` deliberately does not zero — so it would print a
 // cleared slot's former payload and distinguish two slots no caller can tell
 // apart. Matching `Vec`'s convention: the spare capacity is storage, not value.
-impl< const N : usize > core::fmt::Debug for BytesSlot< N >
-{
-  fn fmt( &self, f : &mut core::fmt::Formatter< '_ > ) -> core::fmt::Result
-  {
-    f.debug_struct( "BytesSlot" ).field( "payload", &self.read() ).finish()
+impl<const N: usize> core::fmt::Debug for BytesSlot<N> {
+  fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+    f.debug_struct("BytesSlot").field("payload", &self.read()).finish()
   }
 }
 
-impl< const N : usize > PartialEq for BytesSlot< N >
-{
-  fn eq( &self, other : &Self ) -> bool
-  {
+impl<const N: usize> PartialEq for BytesSlot<N> {
+  fn eq(&self, other: &Self) -> bool {
     self.read() == other.read()
   }
 }
@@ -263,20 +247,18 @@ impl< const N : usize > PartialEq for BytesSlot< N >
 // Reflexive, symmetric and transitive because slice equality is, and `read()`
 // is a pure function of the receiver. Written out rather than derived so it
 // cannot silently re-acquire the field-wise bound the `PartialEq` above drops.
-impl< const N : usize > Eq for BytesSlot< N > {}
+impl<const N: usize> Eq for BytesSlot<N> {}
 
-impl< const N : usize > BytesSlot< N >
-{
+impl<const N: usize> BytesSlot<N> {
   /// An empty slot of capacity `N`.
   ///
   /// ```
   /// use ring_slot::BytesSlot;
   /// assert_eq!( BytesSlot::< 8 >::empty().capacity(), 8 );
   /// ```
-  #[ must_use ]
-  pub const fn empty() -> Self
-  {
-    Self { bytes : [ 0; N ], len : 0 }
+  #[must_use]
+  pub const fn empty() -> Self {
+    Self { bytes: [0; N], len: 0 }
   }
 
   /// Bytes this slot can hold.
@@ -285,9 +267,8 @@ impl< const N : usize > BytesSlot< N >
   /// use ring_slot::BytesSlot;
   /// assert_eq!( BytesSlot::< 32 >::empty().capacity(), 32 );
   /// ```
-  #[ must_use ]
-  pub const fn capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn capacity(&self) -> usize {
     N
   }
 
@@ -299,9 +280,8 @@ impl< const N : usize > BytesSlot< N >
   /// s.write( b"ab" ).unwrap();
   /// assert_eq!( s.len(), 2 );
   /// ```
-  #[ must_use ]
-  pub const fn len( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn len(&self) -> usize {
     self.len
   }
 
@@ -318,9 +298,8 @@ impl< const N : usize > BytesSlot< N >
   /// s.write( b"a" ).unwrap();
   /// assert!( !s.is_empty() );
   /// ```
-  #[ must_use ]
-  pub const fn is_empty( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_empty(&self) -> bool {
     self.len == 0
   }
 
@@ -343,15 +322,16 @@ impl< const N : usize > BytesSlot< N >
   /// // A failed write leaves the previous contents intact.
   /// assert_eq!( s.read(), b"abcd" );
   /// ```
-  pub fn write( &mut self, payload : &[ u8 ] ) -> Result< (), RingError >
-  {
-    if payload.len() > N
-    {
-      return Err( RingError::BatchTooLarge { requested : payload.len(), capacity : N } );
+  pub fn write(&mut self, payload: &[u8]) -> Result<(), RingError> {
+    if payload.len() > N {
+      return Err(RingError::BatchTooLarge {
+        requested: payload.len(),
+        capacity: N,
+      });
     }
-    self.bytes[ ..payload.len() ].copy_from_slice( payload );
+    self.bytes[..payload.len()].copy_from_slice(payload);
     self.len = payload.len();
-    Ok( () )
+    Ok(())
   }
 
   /// The bytes written, and only those — never the unused tail.
@@ -362,10 +342,9 @@ impl< const N : usize > BytesSlot< N >
   /// s.write( b"xy" ).unwrap();
   /// assert_eq!( s.read(), b"xy" );
   /// ```
-  #[ must_use ]
-  pub fn read( &self ) -> &[ u8 ]
-  {
-    &self.bytes[ ..self.len ]
+  #[must_use]
+  pub fn read(&self) -> &[u8] {
+    &self.bytes[..self.len]
   }
 }
 
@@ -373,23 +352,18 @@ impl< const N : usize > BytesSlot< N >
 // not use the derive even if the bound were harmless: `[ u8; N ]` implements
 // `Default` only at the handful of `N` the standard library enumerates, not at
 // a generic `N`, so `#[ derive( Default ) ]` here does not compile at all.
-impl< const N : usize > Default for BytesSlot< N >
-{
-  fn default() -> Self
-  {
+impl<const N: usize> Default for BytesSlot<N> {
+  fn default() -> Self {
     Self::empty()
   }
 }
 
-impl< const N : usize > Slot for BytesSlot< N >
-{
-  fn is_empty( &self ) -> bool
-  {
-    Self::is_empty( self )
+impl<const N: usize> Slot for BytesSlot<N> {
+  fn is_empty(&self) -> bool {
+    Self::is_empty(self)
   }
 
-  fn clear( &mut self )
-  {
+  fn clear(&mut self) {
     self.len = 0;
   }
 }

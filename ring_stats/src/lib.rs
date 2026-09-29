@@ -37,14 +37,15 @@
 //! rather than a measured one. The methods work and are tested; what does not
 //! exist is the edge that would let a ring report through them.
 
-#![ no_std ]
-#![ deny( missing_docs ) ]
+#![no_std]
+#![deny(missing_docs)]
 
 // Core-only, and now says so. Rationale at `ring_overflow/src/lib.rs`'s own
 // attribute — the property is transitive, so it is asserted in all three of
 // `ring_types`, this crate, and `ring_overflow` or in none of them.
 
-use core::sync::atomic::{ AtomicU64, Ordering };
+use core::sync::atomic::{AtomicU64, Ordering};
+
 use ring_types::OverflowPolicy;
 
 /// One ring's counters.
@@ -78,16 +79,15 @@ use ring_types::OverflowPolicy;
 /// assertion message and a debugger watch all need something.
 /// [`RingStats::snapshot`] is what to reach for when the numbers have to agree
 /// with each other.
-#[ derive( Debug, Default ) ]
-pub struct RingStats
-{
-  claimed : AtomicU64,
-  published : AtomicU64,
-  consumed : AtomicU64,
-  dropped_newest : AtomicU64,
-  dropped_oldest : AtomicU64,
-  failed : AtomicU64,
-  wait_nanos : AtomicU64,
+#[derive(Debug, Default)]
+pub struct RingStats {
+  claimed: AtomicU64,
+  published: AtomicU64,
+  consumed: AtomicU64,
+  dropped_newest: AtomicU64,
+  dropped_oldest: AtomicU64,
+  failed: AtomicU64,
+  wait_nanos: AtomicU64,
 }
 
 // The struct is `COUNTERS` counters and nothing else, checked at compile time.
@@ -96,10 +96,7 @@ pub struct RingStats
 // the point: before it, a counter added to the struct but left out of `reset`'s
 // array was cleared by nothing, read plausibly, stayed monotone, and failed no
 // test in the suite.
-const _ : () = assert!
-(
-  core::mem::size_of::< RingStats >() == RingStats::COUNTERS * core::mem::size_of::< AtomicU64 >()
-);
+const _: () = assert!(core::mem::size_of::<RingStats>() == RingStats::COUNTERS * core::mem::size_of::<AtomicU64>());
 
 /// Every counter of one [`RingStats`], read once and returned together.
 ///
@@ -120,32 +117,30 @@ const _ : () = assert!
 /// one writer that kept the three drop counters within one of each other, three
 /// to five percent of separately-read breakdowns showed a spread the ring never
 /// had, the widest running to 3,325.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-pub struct StatsCounts
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+pub struct StatsCounts {
   /// Slots claimed.
-  pub claimed : u64,
+  pub claimed: u64,
   /// Slots published.
-  pub published : u64,
+  pub published: u64,
   /// Items consumed.
-  pub consumed : u64,
+  pub consumed: u64,
   /// Items dropped under [`OverflowPolicy::DropNewest`].
-  pub dropped_newest : u64,
+  pub dropped_newest: u64,
   /// Items dropped under [`OverflowPolicy::DropOldest`].
-  pub dropped_oldest : u64,
+  pub dropped_oldest: u64,
   /// Publishes refused under [`OverflowPolicy::Fail`] — counted, though nothing
   /// was lost.
-  pub failed : u64,
+  pub failed: u64,
   /// The three drop counters above, summed from those same three reads.
-  pub dropped_total : u64,
+  pub dropped_total: u64,
   /// This value's own `claimed - published`, floored at zero.
-  pub in_flight : u64,
+  pub in_flight: u64,
   /// Nanoseconds spent waiting.
-  pub wait_nanos : u64,
+  pub wait_nanos: u64,
 }
 
-impl StatsCounts
-{
+impl StatsCounts {
   /// In flight, with the caller bug kept apart from a balanced ring.
   ///
   /// `None` means `published` exceeds `claimed` — which the counters permit,
@@ -164,15 +159,13 @@ impl StatsCounts
   /// assert_eq!( s.snapshot().in_flight, 0 );
   /// assert_eq!( s.snapshot().checked_in_flight(), None );
   /// ```
-  #[ must_use ]
-  pub const fn checked_in_flight( &self ) -> Option< u64 >
-  {
-    self.claimed.checked_sub( self.published )
+  #[must_use]
+  pub const fn checked_in_flight(&self) -> Option<u64> {
+    self.claimed.checked_sub(self.published)
   }
 }
 
-impl RingStats
-{
+impl RingStats {
   /// How many counters a `RingStats` holds.
   ///
   /// Rust cannot iterate a struct's fields, so the seven are written out by hand
@@ -189,18 +182,22 @@ impl RingStats
   /// use ring_stats::RingStats;
   /// assert_eq!( RingStats::COUNTERS, 7 );
   /// ```
-  pub const COUNTERS : usize = 7;
+  pub const COUNTERS: usize = 7;
 
   /// Every counter, in declaration order.
   ///
   /// The array's length is [`RingStats::COUNTERS`], so it cannot silently fall
   /// out of step with the struct — see that constant for what happens when an
   /// eighth field arrives.
-  const fn counters( &self ) -> [ &AtomicU64; Self::COUNTERS ]
-  {
+  const fn counters(&self) -> [&AtomicU64; Self::COUNTERS] {
     [
-      &self.claimed, &self.published, &self.consumed,
-      &self.dropped_newest, &self.dropped_oldest, &self.failed, &self.wait_nanos,
+      &self.claimed,
+      &self.published,
+      &self.consumed,
+      &self.dropped_newest,
+      &self.dropped_oldest,
+      &self.failed,
+      &self.wait_nanos,
     ]
   }
 
@@ -210,18 +207,16 @@ impl RingStats
   /// use ring_stats::RingStats;
   /// assert_eq!( RingStats::new().claimed(), 0 );
   /// ```
-  #[ must_use ]
-  pub const fn new() -> Self
-  {
-    Self
-    {
-      claimed : AtomicU64::new( 0 ),
-      published : AtomicU64::new( 0 ),
-      consumed : AtomicU64::new( 0 ),
-      dropped_newest : AtomicU64::new( 0 ),
-      dropped_oldest : AtomicU64::new( 0 ),
-      failed : AtomicU64::new( 0 ),
-      wait_nanos : AtomicU64::new( 0 ),
+  #[must_use]
+  pub const fn new() -> Self {
+    Self {
+      claimed: AtomicU64::new(0),
+      published: AtomicU64::new(0),
+      consumed: AtomicU64::new(0),
+      dropped_newest: AtomicU64::new(0),
+      dropped_oldest: AtomicU64::new(0),
+      failed: AtomicU64::new(0),
+      wait_nanos: AtomicU64::new(0),
     }
   }
 
@@ -233,9 +228,8 @@ impl RingStats
   /// s.record_claim( 3 );
   /// assert_eq!( s.claimed(), 3 );
   /// ```
-  pub fn record_claim( &self, n : u64 )
-  {
-    self.claimed.fetch_add( n, Ordering::Relaxed );
+  pub fn record_claim(&self, n: u64) {
+    self.claimed.fetch_add(n, Ordering::Relaxed);
   }
 
   /// Record `n` slots published.
@@ -246,9 +240,8 @@ impl RingStats
   /// s.record_publish( 2 );
   /// assert_eq!( s.published(), 2 );
   /// ```
-  pub fn record_publish( &self, n : u64 )
-  {
-    self.published.fetch_add( n, Ordering::Relaxed );
+  pub fn record_publish(&self, n: u64) {
+    self.published.fetch_add(n, Ordering::Relaxed);
   }
 
   /// Record `n` items consumed.
@@ -259,9 +252,8 @@ impl RingStats
   /// s.record_consume( 5 );
   /// assert_eq!( s.consumed(), 5 );
   /// ```
-  pub fn record_consume( &self, n : u64 )
-  {
-    self.consumed.fetch_add( n, Ordering::Relaxed );
+  pub fn record_consume(&self, n: u64) {
+    self.consumed.fetch_add(n, Ordering::Relaxed);
   }
 
   /// Record `n` items lost, under the policy that lost them.
@@ -281,15 +273,13 @@ impl RingStats
   /// assert_eq!( s.dropped( OverflowPolicy::Fail ), 1 );
   /// assert_eq!( s.dropped_total(), 3 );
   /// ```
-  pub fn record_drop( &self, policy : OverflowPolicy, n : u64 )
-  {
-    let counter = match policy
-    {
+  pub fn record_drop(&self, policy: OverflowPolicy, n: u64) {
+    let counter = match policy {
       OverflowPolicy::DropNewest => &self.dropped_newest,
       OverflowPolicy::DropOldest => &self.dropped_oldest,
       OverflowPolicy::Fail => &self.failed,
     };
-    counter.fetch_add( n, Ordering::Relaxed );
+    counter.fetch_add(n, Ordering::Relaxed);
   }
 
   /// Record nanoseconds spent waiting for space or data.
@@ -308,44 +298,38 @@ impl RingStats
   /// s.record_wait( 1_500 );
   /// assert_eq!( s.wait_nanos(), 1_500 );
   /// ```
-  pub fn record_wait( &self, nanos : u64 )
-  {
-    self.wait_nanos.fetch_add( nanos, Ordering::Relaxed );
+  pub fn record_wait(&self, nanos: u64) {
+    self.wait_nanos.fetch_add(nanos, Ordering::Relaxed);
   }
 
   /// Slots claimed so far.
-  #[ must_use ]
-  pub fn claimed( &self ) -> u64
-  {
-    self.claimed.load( Ordering::Relaxed )
+  #[must_use]
+  pub fn claimed(&self) -> u64 {
+    self.claimed.load(Ordering::Relaxed)
   }
 
   /// Slots published so far.
-  #[ must_use ]
-  pub fn published( &self ) -> u64
-  {
-    self.published.load( Ordering::Relaxed )
+  #[must_use]
+  pub fn published(&self) -> u64 {
+    self.published.load(Ordering::Relaxed)
   }
 
   /// Items consumed so far.
-  #[ must_use ]
-  pub fn consumed( &self ) -> u64
-  {
-    self.consumed.load( Ordering::Relaxed )
+  #[must_use]
+  pub fn consumed(&self) -> u64 {
+    self.consumed.load(Ordering::Relaxed)
   }
 
   /// Items lost under one policy — except `OverflowPolicy::Fail`, whose count is
   /// refusals, not losses: the item was handed back to the caller, not dropped.
-  #[ must_use ]
-  pub fn dropped( &self, policy : OverflowPolicy ) -> u64
-  {
-    let counter = match policy
-    {
+  #[must_use]
+  pub fn dropped(&self, policy: OverflowPolicy) -> u64 {
+    let counter = match policy {
       OverflowPolicy::DropNewest => &self.dropped_newest,
       OverflowPolicy::DropOldest => &self.dropped_oldest,
       OverflowPolicy::Fail => &self.failed,
     };
-    counter.load( Ordering::Relaxed )
+    counter.load(Ordering::Relaxed)
   }
 
   /// Items lost across every policy — except `OverflowPolicy::Fail`, whose count
@@ -371,20 +355,21 @@ impl RingStats
   // Pitfall: an unbounded `record_*( n : u64 )` counter makes every later sum of
   // its stored value unbounded too; check the fold, not just the individual
   // `fetch_add`, for a matching bound.
-  #[ must_use ]
-  pub fn dropped_total( &self ) -> u64
-  {
-    OverflowPolicy::ALL.iter().map( | p | self.dropped( *p ) ).fold( 0, u64::saturating_add )
+  #[must_use]
+  pub fn dropped_total(&self) -> u64 {
+    OverflowPolicy::ALL
+      .iter()
+      .map(|p| self.dropped(*p))
+      .fold(0, u64::saturating_add)
   }
 
   /// Nanoseconds spent waiting.
   ///
   /// Structurally zero — see [`RingStats::record_wait`] for why nothing writes
   /// it.
-  #[ must_use ]
-  pub fn wait_nanos( &self ) -> u64
-  {
-    self.wait_nanos.load( Ordering::Relaxed )
+  #[must_use]
+  pub fn wait_nanos(&self) -> u64 {
+    self.wait_nanos.load(Ordering::Relaxed)
   }
 
   /// Slots claimed but not yet published — a nonzero reading here at rest means
@@ -423,10 +408,9 @@ impl RingStats
   /// it too, distinguishable from the other two only through
   /// [`StatsCounts::checked_in_flight`]'s `None`. A nonzero reading here, not a
   /// zero one, is what this method can actually tell a caller.
-  #[ must_use ]
-  pub fn in_flight( &self ) -> u64
-  {
-    self.claimed().saturating_sub( self.published() )
+  #[must_use]
+  pub fn in_flight(&self) -> u64 {
+    self.claimed().saturating_sub(self.published())
   }
 
   /// Every counter, read once, returned as one value.
@@ -451,19 +435,17 @@ impl RingStats
   /// assert_eq!( counts.failed, 2 );
   /// assert_eq!( counts.checked_in_flight(), Some( 3 ) );
   /// ```
-  #[ must_use ]
-  pub fn snapshot( &self ) -> StatsCounts
-  {
-    let claimed = self.claimed.load( Ordering::Relaxed );
-    let published = self.published.load( Ordering::Relaxed );
-    let consumed = self.consumed.load( Ordering::Relaxed );
-    let dropped_newest = self.dropped_newest.load( Ordering::Relaxed );
-    let dropped_oldest = self.dropped_oldest.load( Ordering::Relaxed );
-    let failed = self.failed.load( Ordering::Relaxed );
-    let wait_nanos = self.wait_nanos.load( Ordering::Relaxed );
+  #[must_use]
+  pub fn snapshot(&self) -> StatsCounts {
+    let claimed = self.claimed.load(Ordering::Relaxed);
+    let published = self.published.load(Ordering::Relaxed);
+    let consumed = self.consumed.load(Ordering::Relaxed);
+    let dropped_newest = self.dropped_newest.load(Ordering::Relaxed);
+    let dropped_oldest = self.dropped_oldest.load(Ordering::Relaxed);
+    let failed = self.failed.load(Ordering::Relaxed);
+    let wait_nanos = self.wait_nanos.load(Ordering::Relaxed);
 
-    StatsCounts
-    {
+    StatsCounts {
       claimed,
       published,
       consumed,
@@ -473,8 +455,8 @@ impl RingStats
       // Fix(ring_stats_dropped_total_overflow): same class of bug as
       // `dropped_total`'s own fold, one call site over — see the `Fix` comment
       // there for the concrete triggering sequence and root cause.
-      dropped_total : dropped_newest.saturating_add( dropped_oldest ).saturating_add( failed ),
-      in_flight : claimed.saturating_sub( published ),
+      dropped_total: dropped_newest.saturating_add(dropped_oldest).saturating_add(failed),
+      in_flight: claimed.saturating_sub(published),
       wait_nanos,
     }
   }
@@ -507,11 +489,9 @@ impl RingStats
   /// test, common enough to happen. The stated purpose above is exactly the case
   /// where a reader may still be sampling: a shutdown in progress, a monitor not
   /// yet told to stop.
-  pub fn reset( &self )
-  {
-    for counter in self.counters()
-    {
-      counter.store( 0, Ordering::Relaxed );
+  pub fn reset(&self) {
+    for counter in self.counters() {
+      counter.store(0, Ordering::Relaxed);
     }
   }
 }

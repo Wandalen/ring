@@ -51,9 +51,9 @@
 //! itself. A `WaitKind` here would offer a `Park` that can only ever hurt, and
 //! a budget whose exhaustion has no correct handling.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
-use ring_cursor::{ PaddedCursor, SeqCell, GATING };
+use ring_cursor::{GATING, PaddedCursor, SeqCell};
 use ring_types::Seq;
 
 /// The ordering a publication is made visible at.
@@ -63,7 +63,7 @@ use ring_types::Seq;
 /// writes and a consumer's reads of them. Weakening it to `Relaxed` produces a
 /// ring that works on x86, where the hardware supplies the ordering the code
 /// failed to ask for, and races on aarch64.
-const PUBLISH : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
 
 /// The frontier a consumer may read up to.
 ///
@@ -80,14 +80,12 @@ const PUBLISH : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Rel
 /// assert_eq!( publisher.try_publish( Seq::ZERO, 3 ), Ok( Seq( 3 ) ) );
 /// assert_eq!( publisher.published(), Seq( 3 ) );
 /// ```
-#[ derive( Debug, Default ) ]
-pub struct Publisher
-{
-  cursor : PaddedCursor,
+#[derive(Debug, Default)]
+pub struct Publisher {
+  cursor: PaddedCursor,
 }
 
-impl Publisher
-{
+impl Publisher {
   /// A publisher with nothing published.
   ///
   /// ```
@@ -95,9 +93,8 @@ impl Publisher
   /// use ring_types::Seq;
   /// assert_eq!( Publisher::new().published(), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub fn new() -> Self
-  {
+  #[must_use]
+  pub fn new() -> Self {
     Self::default()
   }
 
@@ -112,9 +109,8 @@ impl Publisher
   /// let publisher = Publisher::new();
   /// assert_eq!( publisher.cursor().load( Ordering::Acquire ), Seq::ZERO );
   /// ```
-  #[ must_use ]
-  pub const fn cursor( &self ) -> &PaddedCursor
-  {
+  #[must_use]
+  pub const fn cursor(&self) -> &PaddedCursor {
     &self.cursor
   }
 
@@ -128,10 +124,9 @@ impl Publisher
   /// let _ = publisher.try_publish( Seq::ZERO, 2 );
   /// assert_eq!( publisher.published(), Seq( 2 ) );
   /// ```
-  #[ must_use ]
-  pub fn published( &self ) -> Seq
-  {
-    self.cursor.load( GATING )
+  #[must_use]
+  pub fn published(&self) -> Seq {
+    self.cursor.load(GATING)
   }
 
   /// Publish `len` sequences starting at `start`, if it is this producer's
@@ -157,10 +152,9 @@ impl Publisher
   /// assert_eq!( publisher.try_publish( Seq::ZERO, 4 ), Ok( Seq( 4 ) ) );
   /// assert_eq!( publisher.try_publish( Seq( 4 ), 4 ), Ok( Seq( 8 ) ), "now it is B's turn" );
   /// ```
-  pub fn try_publish( &self, start : Seq, len : usize ) -> Result< Seq, Seq >
-  {
-    let end = start.advanced_by( len as u64 );
-    self.cursor.compare_exchange( start, end, PUBLISH, GATING ).map( | _ | end )
+  pub fn try_publish(&self, start: Seq, len: usize) -> Result<Seq, Seq> {
+    let end = start.advanced_by(len as u64);
+    self.cursor.compare_exchange(start, end, PUBLISH, GATING).map(|_| end)
   }
 
   /// Publish `len` sequences starting at `start`, waiting for this producer's
@@ -196,12 +190,9 @@ impl Publisher
   /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
   /// that. Of the two deadlocks this is the reachable one, and the only
   /// defence against it is that every producer publishes what it claims.
-  pub fn publish( &self, start : Seq, len : usize ) -> Seq
-  {
-    loop
-    {
-      if let Ok( end ) = self.try_publish( start, len )
-      {
+  pub fn publish(&self, start: Seq, len: usize) -> Seq {
+    loop {
+      if let Ok(end) = self.try_publish(start, len) {
         return end;
       }
       core::hint::spin_loop();
@@ -224,9 +215,8 @@ impl Publisher
   /// assert!( publisher.is_published( Seq( 1 ) ) );
   /// assert!( !publisher.is_published( Seq( 2 ) ), "claimed, perhaps, but not published" );
   /// ```
-  #[ must_use ]
-  pub fn is_published( &self, seq : Seq ) -> bool
-  {
+  #[must_use]
+  pub fn is_published(&self, seq: Seq) -> bool {
     seq < self.published()
   }
 }

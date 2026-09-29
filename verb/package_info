@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#@ purpose: Family manifest info as deterministic flat JSON. Meta verb — no dry::1.
+#@          No single crate here is "the" package (34 peer members, no privileged
+#@          one), so this reports the family the workspace root describes instead.
+#@ tags: verb, package_info
+set -euo pipefail
+
+_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_ws_toml="$_root/Cargo.toml"
+
+_edition="$(grep -m1 '^edition' "$_ws_toml" | sed -E 's/^edition *= *"([^"]*)".*/\1/')"
+_license="$(grep -m1 '^license' "$_ws_toml" | sed -E 's/^license *= *"([^"]*)".*/\1/')"
+_repository="$(grep -m1 '^repository' "$_ws_toml" | sed -E 's/^repository *= *"([^"]*)".*/\1/')"
+_crate_count="$(grep -cE '^\s*"(ring_[a-z_]+|bench_harness)",?\s*$' "$_ws_toml")"
+
+printf '\n{\n'
+printf '  "family": "ring",\n'
+printf '  "crate_count": %s,\n'  "$_crate_count"
+printf '  "edition": "%s",\n'    "$_edition"
+printf '  "license": "%s",\n'    "$_license"
+printf '  "repository": "%s",\n' "$_repository"
+printf '  "language": "rust",\n'
+printf '  "package_manager": "cargo"\n'
+printf '}\n\n'

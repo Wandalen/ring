@@ -92,17 +92,17 @@
 //! intra-run distribution; the benefit is that the number it reports is of the
 //! write path and not of the instrumentation. See `docs/pitfall/002`.
 
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 
 use core::fmt;
 use core::ops::Range;
 use std::collections::VecDeque;
 use std::sync::Mutex;
-use std::sync::atomic::{ AtomicUsize, Ordering };
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Instant;
 
-use ring_factory::{ BuildError, Factory, RingConfig };
-use ring_flush::{ ConfigError, FlushOutcome, FlushPolicy, Flusher };
+use ring_factory::{BuildError, Factory, RingConfig};
+use ring_flush::{ConfigError, FlushOutcome, FlushPolicy, Flusher};
 use ring_slot::TypedSlot;
 use ring_stats::RingStats;
 use ring_tls::TlsBuffer;
@@ -133,9 +133,8 @@ pub type Record = u64;
 /// there was nothing to name it against.
 /// `docs/decision/121_workstream_008_contract_gaps_ruled.md` ruling 3 requires
 /// both semantics measured against every candidate; see [`Workload::with_semantics`].
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum AccumulatorSemantics
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AccumulatorSemantics {
   /// Last write wins. What every candidate measured before this axis existed.
   Set,
   /// Every write sums into the cell, regardless of arrival order.
@@ -145,9 +144,8 @@ pub enum AccumulatorSemantics
 // ── Workload ──────────────────────────────────────────────────────────────
 
 /// Why a workload description was refused.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum WorkloadError
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WorkloadError {
   /// Zero producers — nothing would write, and every candidate would tie at
   /// zero.
   ZeroProducers,
@@ -162,16 +160,13 @@ pub enum WorkloadError
   ZeroCells,
 }
 
-impl fmt::Display for WorkloadError
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::ZeroProducers => f.write_str( "a workload needs at least one producer" ),
-      Self::ZeroRecords => f.write_str( "a workload needs at least one record per producer" ),
-      Self::ZeroBatch => f.write_str( "a workload needs a batch size of at least one" ),
-      Self::ZeroCells => f.write_str( "a workload needs at least one accumulator cell" ),
+impl fmt::Display for WorkloadError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::ZeroProducers => f.write_str("a workload needs at least one producer"),
+      Self::ZeroRecords => f.write_str("a workload needs at least one record per producer"),
+      Self::ZeroBatch => f.write_str("a workload needs a batch size of at least one"),
+      Self::ZeroCells => f.write_str("a workload needs at least one accumulator cell"),
     }
   }
 }
@@ -201,18 +196,16 @@ impl core::error::Error for WorkloadError {}
 /// assert_eq!( workload.producers(), 4 );
 /// assert_eq!( workload.config().producers(), 4 );
 /// ```
-#[ derive( Debug, Clone, Copy ) ]
-pub struct Workload
-{
-  config : RingConfig,
-  producers : usize,
-  records_per_producer : usize,
-  cells : usize,
-  semantics : AccumulatorSemantics,
+#[derive(Debug, Clone, Copy)]
+pub struct Workload {
+  config: RingConfig,
+  producers: usize,
+  records_per_producer: usize,
+  cells: usize,
+  semantics: AccumulatorSemantics,
 }
 
-impl Workload
-{
+impl Workload {
   /// A single producer publishing 1024 records in batches of 32, into one
   /// accumulator cell under `Set` semantics.
   ///
@@ -221,10 +214,15 @@ impl Workload
   /// the smallest destination that makes `Set` and `Delta` observably
   /// different — see [`with_cells`](Self::with_cells) and
   /// [`with_semantics`](Self::with_semantics) to widen either.
-  #[ must_use ]
-  pub const fn new( config : RingConfig ) -> Self
-  {
-    Self { config, producers : 1, records_per_producer : 1024, cells : 1, semantics : AccumulatorSemantics::Set }
+  #[must_use]
+  pub const fn new(config: RingConfig) -> Self {
+    Self {
+      config,
+      producers: 1,
+      records_per_producer: 1024,
+      cells: 1,
+      semantics: AccumulatorSemantics::Set,
+    }
   }
 
   /// Set how many threads publish concurrently, and the backend that matches.
@@ -232,16 +230,14 @@ impl Workload
   /// # Errors
   ///
   /// [`WorkloadError::ZeroProducers`] for zero.
-  pub fn with_producers( mut self, producers : usize ) -> Result< Self, WorkloadError >
-  {
-    if producers == 0
-    {
-      return Err( WorkloadError::ZeroProducers );
+  pub fn with_producers(mut self, producers: usize) -> Result<Self, WorkloadError> {
+    if producers == 0 {
+      return Err(WorkloadError::ZeroProducers);
     }
 
     self.producers = producers;
-    self.config = self.config.with_producers( producers );
-    Ok( self )
+    self.config = self.config.with_producers(producers);
+    Ok(self)
   }
 
   /// Set how many records each producer publishes.
@@ -249,15 +245,13 @@ impl Workload
   /// # Errors
   ///
   /// [`WorkloadError::ZeroRecords`] for zero.
-  pub fn with_records_per_producer( mut self, records : usize ) -> Result< Self, WorkloadError >
-  {
-    if records == 0
-    {
-      return Err( WorkloadError::ZeroRecords );
+  pub fn with_records_per_producer(mut self, records: usize) -> Result<Self, WorkloadError> {
+    if records == 0 {
+      return Err(WorkloadError::ZeroRecords);
     }
 
     self.records_per_producer = records;
-    Ok( self )
+    Ok(self)
   }
 
   /// Set how many records accumulate before a publication.
@@ -272,15 +266,13 @@ impl Workload
   /// # Errors
   ///
   /// [`WorkloadError::ZeroBatch`] for zero.
-  pub fn with_batch( mut self, batch : usize ) -> Result< Self, WorkloadError >
-  {
-    if batch == 0
-    {
-      return Err( WorkloadError::ZeroBatch );
+  pub fn with_batch(mut self, batch: usize) -> Result<Self, WorkloadError> {
+    if batch == 0 {
+      return Err(WorkloadError::ZeroBatch);
     }
 
-    self.config = self.config.with_batch( batch );
-    Ok( self )
+    self.config = self.config.with_batch(batch);
+    Ok(self)
   }
 
   /// Set how many destination cells drained records fold into.
@@ -294,15 +286,13 @@ impl Workload
   /// # Errors
   ///
   /// [`WorkloadError::ZeroCells`] for zero.
-  pub fn with_cells( mut self, cells : usize ) -> Result< Self, WorkloadError >
-  {
-    if cells == 0
-    {
-      return Err( WorkloadError::ZeroCells );
+  pub fn with_cells(mut self, cells: usize) -> Result<Self, WorkloadError> {
+    if cells == 0 {
+      return Err(WorkloadError::ZeroCells);
     }
 
     self.cells = cells;
-    Ok( self )
+    Ok(self)
   }
 
   /// Set how a repeated write to the same accumulator cell resolves.
@@ -310,45 +300,39 @@ impl Workload
   /// `Set` is what every candidate measured before this axis existed, and
   /// remains the default from [`Workload::new`]. See
   /// [`AccumulatorSemantics`]'s own docs for what each variant means.
-  #[ must_use ]
-  pub const fn with_semantics( mut self, semantics : AccumulatorSemantics ) -> Self
-  {
+  #[must_use]
+  pub const fn with_semantics(mut self, semantics: AccumulatorSemantics) -> Self {
     self.semantics = semantics;
     self
   }
 
   /// The ring configuration every candidate is built from. `Copy`.
-  #[ must_use ]
-  pub const fn config( &self ) -> RingConfig
-  {
+  #[must_use]
+  pub const fn config(&self) -> RingConfig {
     self.config
   }
 
   /// How many threads publish concurrently.
-  #[ must_use ]
-  pub const fn producers( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn producers(&self) -> usize {
     self.producers
   }
 
   /// How many records each producer publishes.
-  #[ must_use ]
-  pub const fn records_per_producer( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn records_per_producer(&self) -> usize {
     self.records_per_producer
   }
 
   /// How many destination cells drained records fold into.
-  #[ must_use ]
-  pub const fn cells( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn cells(&self) -> usize {
     self.cells
   }
 
   /// How a repeated write to the same accumulator cell resolves.
-  #[ must_use ]
-  pub const fn semantics( &self ) -> AccumulatorSemantics
-  {
+  #[must_use]
+  pub const fn semantics(&self) -> AccumulatorSemantics {
     self.semantics
   }
 
@@ -370,23 +354,20 @@ impl Workload
   /// Pitfall: when a validating type already stores a value, storing it a
   /// second time outside that type makes the unvalidated copy the one every
   /// caller reads.
-  #[ must_use ]
-  pub const fn batch( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn batch(&self) -> usize {
     self.config.batch()
   }
 
   /// How many slots the ring under test holds.
-  #[ must_use ]
-  pub fn capacity( &self ) -> usize
-  {
+  #[must_use]
+  pub fn capacity(&self) -> usize {
     self.config.capacity().get()
   }
 
   /// How many records the whole workload offers.
-  #[ must_use ]
-  pub const fn offered( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn offered(&self) -> usize {
     self.producers * self.records_per_producer
   }
 
@@ -395,11 +376,10 @@ impl Workload
   /// Disjoint per producer, so a drained record identifies its writer. Nothing
   /// in this crate asserts on the values yet — they exist so that a future
   /// ordering question can be asked of a recorded run rather than of a new one.
-  #[ must_use ]
-  pub fn records_of( &self, producer : usize ) -> Range< Record >
-  {
-    let start = ( producer * self.records_per_producer ) as Record;
-    start .. start + self.records_per_producer as Record
+  #[must_use]
+  pub fn records_of(&self, producer: usize) -> Range<Record> {
+    let start = (producer * self.records_per_producer) as Record;
+    start..start + self.records_per_producer as Record
   }
 }
 
@@ -413,9 +393,8 @@ impl Workload
 /// doors onto it do not admit the same producer counts and the feature also
 /// requires the candidates be run "under the same producer counts". A single
 /// variant would have had to pick one door and quietly drop the requirement.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum Candidate
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Candidate {
   /// `Mutex< VecDeque< Record > >` — the baseline every other candidate has to
   /// beat to justify its existence. Bounded by the workload's capacity so that
   /// it competes under the same back-pressure as the rings rather than
@@ -436,12 +415,11 @@ pub enum Candidate
   /// producer at all.
   DirectMpsc,
   /// The off-the-shelf concurrent queue, through `ring_factory`'s second door.
-  #[ cfg( feature = "crossbeam" ) ]
+  #[cfg(feature = "crossbeam")]
   OffTheShelf,
 }
 
-impl Candidate
-{
+impl Candidate {
   /// Every candidate, in a fixed order.
   ///
   /// The order is load-bearing, not cosmetic: [`Comparison::fastest`] breaks a
@@ -449,9 +427,8 @@ impl Candidate
   /// (BN50). `the_candidate_list_matches_a_copy_written_outside_the_declaration`
   /// pins this list's contents and order against a copy written in the suite, so
   /// a reorder of either `cfg` arm fails rather than silently changing a verdict.
-  #[ cfg( feature = "crossbeam" ) ]
-  pub const ALL : &'static [ Self ] =
-  &[
+  #[cfg(feature = "crossbeam")]
+  pub const ALL: &'static [Self] = &[
     Self::MutexQueue,
     Self::ContractRing,
     Self::TlsOverRing,
@@ -462,9 +439,8 @@ impl Candidate
 
   /// Every candidate, in a fixed order. The order decides a tie in
   /// [`Comparison::fastest`] — see the crossbeam-gated copy above (BN50).
-  #[ cfg( not( feature = "crossbeam" ) ) ]
-  pub const ALL : &'static [ Self ] =
-  &[
+  #[cfg(not(feature = "crossbeam"))]
+  pub const ALL: &'static [Self] = &[
     Self::MutexQueue,
     Self::ContractRing,
     Self::TlsOverRing,
@@ -473,17 +449,15 @@ impl Candidate
   ];
 
   /// A stable name for reports.
-  #[ must_use ]
-  pub const fn name( self ) -> &'static str
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn name(self) -> &'static str {
+    match self {
       Self::MutexQueue => "mutex_queue",
       Self::ContractRing => "contract_ring",
       Self::TlsOverRing => "tls_over_ring",
       Self::DirectSpsc => "direct_spsc",
       Self::DirectMpsc => "direct_mpsc",
-      #[ cfg( feature = "crossbeam" ) ]
+      #[cfg(feature = "crossbeam")]
       Self::OffTheShelf => "off_the_shelf",
     }
   }
@@ -504,25 +478,21 @@ impl Candidate
   /// | [`DirectSpsc`](Self::DirectSpsc) | 1 | the backend — SPSC is single-producer, and this is the only honest 1 in the table |
   /// | [`DirectMpsc`](Self::DirectMpsc) | none | — |
   /// | `OffTheShelf` | 1 | `ring_handle` again; `ArrayQueue` itself is multi-producer |
-  #[ must_use ]
-  pub const fn producer_ceiling( self ) -> Option< usize >
-  {
-    match self
-    {
+  #[must_use]
+  pub const fn producer_ceiling(self) -> Option<usize> {
+    match self {
       Self::MutexQueue | Self::DirectMpsc => None,
-      Self::ContractRing | Self::TlsOverRing | Self::DirectSpsc => Some( 1 ),
-      #[ cfg( feature = "crossbeam" ) ]
-      Self::OffTheShelf => Some( 1 ),
+      Self::ContractRing | Self::TlsOverRing | Self::DirectSpsc => Some(1),
+      #[cfg(feature = "crossbeam")]
+      Self::OffTheShelf => Some(1),
     }
   }
 
   /// Whether this candidate can be driven by a workload's producer count.
-  #[ must_use ]
-  pub const fn admits( self, producers : usize ) -> bool
-  {
-    match self.producer_ceiling()
-    {
-      Some( ceiling ) => producers <= ceiling,
+  #[must_use]
+  pub const fn admits(self, producers: usize) -> bool {
+    match self.producer_ceiling() {
+      Some(ceiling) => producers <= ceiling,
       None => true,
     }
   }
@@ -540,32 +510,26 @@ impl Candidate
 /// records happened to arrive in — a property `Delta` semantics guarantees by
 /// construction (sum is commutative) and `Set` semantics does not (last write
 /// wins, and "last" depends on scheduling).
-#[ derive( Debug, Clone, PartialEq, Eq ) ]
-pub struct AccumulatorTable
-{
-  cells : Vec< i64 >,
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AccumulatorTable {
+  cells: Vec<i64>,
 }
 
-impl AccumulatorTable
-{
-  fn new( cells : usize ) -> Self
-  {
-    Self { cells : vec![ 0; cells ] }
+impl AccumulatorTable {
+  fn new(cells: usize) -> Self {
+    Self { cells: vec![0; cells] }
   }
 
-  fn apply( &mut self, semantics : AccumulatorSemantics, cell : usize, delta : i64 )
-  {
-    match semantics
-    {
-      AccumulatorSemantics::Set => self.cells[ cell ] = delta,
-      AccumulatorSemantics::Delta => self.cells[ cell ] += delta,
+  fn apply(&mut self, semantics: AccumulatorSemantics, cell: usize, delta: i64) {
+    match semantics {
+      AccumulatorSemantics::Set => self.cells[cell] = delta,
+      AccumulatorSemantics::Delta => self.cells[cell] += delta,
     }
   }
 
   /// The accumulated value in each cell, in cell order.
-  #[ must_use ]
-  pub fn cells( &self ) -> &[ i64 ]
-  {
+  #[must_use]
+  pub fn cells(&self) -> &[i64] {
     &self.cells
   }
 }
@@ -589,19 +553,17 @@ impl AccumulatorTable
 /// every table built by [`run`] passes every drained record through this
 /// check, so a torn or corrupted value is caught here rather than silently
 /// folded into a total that merely looks plausible.
-fn destination_of( workload : &Workload, record : Record ) -> ( usize, i64 )
-{
-  let producer = ( record / workload.records_per_producer() as Record ) as usize;
-  assert!
-  (
+fn destination_of(workload: &Workload, record: Record) -> (usize, i64) {
+  let producer = (record / workload.records_per_producer() as Record) as usize;
+  assert!(
     producer < workload.producers(),
     "record {record} decodes to producer {producer}, outside 0..{} — torn or corrupted write",
     workload.producers(),
   );
 
   let cell = producer % workload.cells();
-  let delta = if producer.is_multiple_of( 2 ) { 1 } else { -1 };
-  ( cell, delta )
+  let delta = if producer.is_multiple_of(2) { 1 } else { -1 };
+  (cell, delta)
 }
 
 // ── Outcome ───────────────────────────────────────────────────────────────
@@ -615,39 +577,34 @@ fn destination_of( workload : &Workload, record : Record ) -> ( usize, i64 )
 /// default `DropNewest` policy the second can exceed the third by two orders of
 /// magnitude, so every derived judgement here — losslessness, drops, fastest —
 /// is computed from `received`.
-#[ derive( Debug ) ]
-pub struct Outcome
-{
-  candidate : Candidate,
-  producers : usize,
-  offered : usize,
-  reported : usize,
-  received : usize,
-  write_nanos : u128,
-  stats : RingStats,
-  table : AccumulatorTable,
+#[derive(Debug)]
+pub struct Outcome {
+  candidate: Candidate,
+  producers: usize,
+  offered: usize,
+  reported: usize,
+  received: usize,
+  write_nanos: u128,
+  stats: RingStats,
+  table: AccumulatorTable,
 }
 
-impl Outcome
-{
+impl Outcome {
   /// Which write path produced this.
-  #[ must_use ]
-  pub const fn candidate( &self ) -> Candidate
-  {
+  #[must_use]
+  pub const fn candidate(&self) -> Candidate {
     self.candidate
   }
 
   /// How many threads published.
-  #[ must_use ]
-  pub const fn producers( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn producers(&self) -> usize {
     self.producers
   }
 
   /// How many records the workload offered.
-  #[ must_use ]
-  pub const fn offered( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn offered(&self) -> usize {
     self.offered
   }
 
@@ -658,9 +615,8 @@ impl Outcome
   /// bound on what landed and nothing more. Published because the gap against
   /// [`received`](Self::received) is itself a measurement — see
   /// [`silently_discarded`](Self::silently_discarded).
-  #[ must_use ]
-  pub const fn reported( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn reported(&self) -> usize {
     self.reported
   }
 
@@ -668,9 +624,8 @@ impl Outcome
   ///
   /// The only count treated as truth. Every judgement this crate makes about a
   /// candidate is computed from it.
-  #[ must_use ]
-  pub const fn received( &self ) -> usize
-  {
+  #[must_use]
+  pub const fn received(&self) -> usize {
     self.received
   }
 
@@ -696,10 +651,9 @@ impl Outcome
   /// language, and no test runs in release to contradict it.
   /// Pitfall: if loudness is load-bearing for an unguarded subtraction, write
   /// the guard — do not inherit it from a profile setting nobody set.
-  #[ must_use ]
-  pub const fn dropped( &self ) -> usize
-  {
-    assert!( self.received <= self.offered, "received exceeded offered" );
+  #[must_use]
+  pub const fn dropped(&self) -> usize {
+    assert!(self.received <= self.offered, "received exceeded offered");
     self.offered - self.received
   }
 
@@ -714,10 +668,9 @@ impl Outcome
   /// If `received` exceeds `reported` — the second half of the ordering
   /// invariant. Unconditional, for the reason given on
   /// [`dropped`](Self::dropped) (BN22).
-  #[ must_use ]
-  pub const fn silently_discarded( &self ) -> usize
-  {
-    assert!( self.received <= self.reported, "received exceeded reported" );
+  #[must_use]
+  pub const fn silently_discarded(&self) -> usize {
+    assert!(self.received <= self.reported, "received exceeded reported");
     self.reported - self.received
   }
 
@@ -725,17 +678,15 @@ impl Outcome
   ///
   /// The drain is not in this figure, and neither is construction. **Never
   /// assert on it** — see this crate's module documentation.
-  #[ must_use ]
-  pub const fn write_nanos( &self ) -> u128
-  {
+  #[must_use]
+  pub const fn write_nanos(&self) -> u128 {
     self.write_nanos
   }
 
   /// Feature 185's counters for this run, written once from totals after the
   /// clock stopped.
-  #[ must_use ]
-  pub const fn stats( &self ) -> &RingStats
-  {
+  #[must_use]
+  pub const fn stats(&self) -> &RingStats {
     &self.stats
   }
 
@@ -744,9 +695,8 @@ impl Outcome
   /// Built once, after the drain, by replaying every received record through
   /// [`Workload::semantics`] — see [`AccumulatorTable`]'s own docs for what
   /// "byte-identical" means when comparing two of these across candidates.
-  #[ must_use ]
-  pub const fn table( &self ) -> &AccumulatorTable
-  {
+  #[must_use]
+  pub const fn table(&self) -> &AccumulatorTable {
     &self.table
   }
 
@@ -756,9 +706,8 @@ impl Outcome
   /// [`received`](Self::received) rather than [`reported`](Self::reported) —
   /// which is the whole point, since a `DropNewest` ring reports success for
   /// every record it is given no matter how small it is.
-  #[ must_use ]
-  pub const fn is_lossless( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn is_lossless(&self) -> bool {
     self.received == self.offered
   }
 
@@ -768,9 +717,8 @@ impl Outcome
   /// design, and the run is still valid. It is the flag that says *how* the
   /// candidate's `dropped` figure was arrived at: `true` means the path handed
   /// its refusals back to the caller, `false` means it absorbed them.
-  #[ must_use ]
-  pub const fn conserved( &self ) -> bool
-  {
+  #[must_use]
+  pub const fn conserved(&self) -> bool {
     self.reported == self.received
   }
 }
@@ -806,59 +754,54 @@ impl Outcome
 /// would break this derive. Fix(BN26): `both_halves_of_the_copy_coupling_are_named`
 /// pins the conjunction so the break lands on a named test rather than on a
 /// derive expansion, and `ring_types::RingError`'s own docs now name this crate.
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
-pub enum RunError
-{
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunError {
   /// The candidate cannot be driven by this many producers.
-  ProducerCeiling
-  {
+  ProducerCeiling {
     /// Which candidate refused.
-    candidate : Candidate,
+    candidate: Candidate,
     /// How many producers the workload asked for.
-    requested : usize,
+    requested: usize,
     /// How many it admits.
-    ceiling : usize,
+    ceiling: usize,
   },
   /// `ring_factory` refused the configuration.
-  Build
-  {
+  Build {
     /// Which candidate was being built.
-    candidate : Candidate,
+    candidate: Candidate,
     /// What `ring_factory` said.
-    error : BuildError,
+    error: BuildError,
   },
   /// `ring_core` refused the configuration, on a path that does not go through
   /// the factory.
-  Ring
-  {
+  Ring {
     /// Which candidate was being built.
-    candidate : Candidate,
+    candidate: Candidate,
     /// What `ring_core` said.
-    error : RingError,
+    error: RingError,
   },
   /// `ring_flush` refused the flush policy.
-  Flush
-  {
+  Flush {
     /// Which candidate was being built.
-    candidate : Candidate,
+    candidate: Candidate,
     /// What `ring_flush` said.
-    error : ConfigError,
+    error: ConfigError,
   },
 }
 
-impl fmt::Display for RunError
-{
-  fn fmt( &self, f : &mut fmt::Formatter< '_ > ) -> fmt::Result
-  {
-    match self
-    {
-      Self::ProducerCeiling { candidate, requested, ceiling } =>
-      {
-        write!( f, "{} admits {ceiling} producer(s), asked for {requested}", candidate.name() )
+impl fmt::Display for RunError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Self::ProducerCeiling {
+        candidate,
+        requested,
+        ceiling,
+      } => {
+        write!(f, "{} admits {ceiling} producer(s), asked for {requested}", candidate.name())
       }
-      Self::Build { candidate, error } => write!( f, "{}: {error}", candidate.name() ),
-      Self::Ring { candidate, error } => write!( f, "{}: {error}", candidate.name() ),
-      Self::Flush { candidate, error } => write!( f, "{}: {error}", candidate.name() ),
+      Self::Build { candidate, error } => write!(f, "{}: {error}", candidate.name()),
+      Self::Ring { candidate, error } => write!(f, "{}: {error}", candidate.name()),
+      Self::Flush { candidate, error } => write!(f, "{}: {error}", candidate.name()),
     }
   }
 }
@@ -875,33 +818,24 @@ impl core::error::Error for RunError {}
 /// workload's producer count — checked before anything is built, so a refusal
 /// costs no allocation. The other three variants relay a dependency's own
 /// refusal of the configuration.
-pub fn run( candidate : Candidate, workload : &Workload ) -> Result< Outcome, RunError >
-{
-  let exceeded = candidate
-    .producer_ceiling()
-    .filter( | ceiling | workload.producers() > *ceiling );
-  if let Some( ceiling ) = exceeded
-  {
-    return Err
-    (
-      RunError::ProducerCeiling
-      {
-        candidate,
-        requested : workload.producers(),
-        ceiling,
-      }
-    );
+pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunError> {
+  let exceeded = candidate.producer_ceiling().filter(|ceiling| workload.producers() > *ceiling);
+  if let Some(ceiling) = exceeded {
+    return Err(RunError::ProducerCeiling {
+      candidate,
+      requested: workload.producers(),
+      ceiling,
+    });
   }
 
-  let ( reported, drained, write_nanos ) = match candidate
-  {
-    Candidate::MutexQueue => run_mutex_queue( workload ),
-    Candidate::ContractRing => run_contract_ring( workload )?,
-    Candidate::TlsOverRing => run_tls_over_ring( workload )?,
-    Candidate::DirectSpsc => run_direct_spsc( workload ),
-    Candidate::DirectMpsc => run_direct_mpsc( workload ),
-    #[ cfg( feature = "crossbeam" ) ]
-    Candidate::OffTheShelf => run_off_the_shelf( workload )?,
+  let (reported, drained, write_nanos) = match candidate {
+    Candidate::MutexQueue => run_mutex_queue(workload),
+    Candidate::ContractRing => run_contract_ring(workload)?,
+    Candidate::TlsOverRing => run_tls_over_ring(workload)?,
+    Candidate::DirectSpsc => run_direct_spsc(workload),
+    Candidate::DirectMpsc => run_direct_mpsc(workload),
+    #[cfg(feature = "crossbeam")]
+    Candidate::OffTheShelf => run_off_the_shelf(workload)?,
   };
   let received = drained.len();
 
@@ -910,11 +844,10 @@ pub fn run( candidate : Candidate, workload : &Workload ) -> Result< Outcome, Ru
   // from `drained`, the same values `received` is a length of, so a table
   // built here can never disagree with the count above about which records
   // it saw.
-  let mut table = AccumulatorTable::new( workload.cells() );
-  for record in &drained
-  {
-    let ( cell, delta ) = destination_of( workload, *record );
-    table.apply( workload.semantics(), cell, delta );
+  let mut table = AccumulatorTable::new(workload.cells());
+  for record in &drained {
+    let (cell, delta) = destination_of(workload, *record);
+    table.apply(workload.semantics(), cell, delta);
   }
 
   let offered = workload.offered();
@@ -940,9 +873,9 @@ pub fn run( candidate : Candidate, workload : &Workload ) -> Result< Outcome, Ru
   // constant, and an assertion on a constant reads exactly like a measurement.
   // Pitfall: to guard a mapping, assert what feeds each counter on a fixture
   // where the candidate expressions disagree — never the derived value alone.
-  stats.record_claim( received as u64 );
-  stats.record_publish( received as u64 );
-  stats.record_consume( received as u64 );
+  stats.record_claim(received as u64);
+  stats.record_publish(received as u64);
+  stats.record_consume(received as u64);
   // Fix(BN53): this feeds `record_drop` from the same `offered - received`
   // subtraction as `Outcome::dropped` (-> BN22), but runs before `Outcome`
   // exists — BN22's guard sits on the two accessor methods that expose the
@@ -956,23 +889,19 @@ pub fn run( candidate : Candidate, workload : &Workload ) -> Result< Outcome, Ru
   // identical subtraction first.
   // Pitfall: guarding a derived accessor does not guard every computation
   // that shares its expression — each call site needs its own assertion.
-  assert!( received <= offered, "received exceeded offered" );
-  stats.record_drop( workload.config().overflow(), ( offered - received ) as u64 );
+  assert!(received <= offered, "received exceeded offered");
+  stats.record_drop(workload.config().overflow(), (offered - received) as u64);
 
-  Ok
-  (
-    Outcome
-    {
-      candidate,
-      producers : workload.producers(),
-      offered,
-      reported,
-      received,
-      write_nanos,
-      stats,
-      table,
-    }
-  )
+  Ok(Outcome {
+    candidate,
+    producers: workload.producers(),
+    offered,
+    reported,
+    received,
+    write_nanos,
+    stats,
+    table,
+  })
 }
 
 /// One producer's share of the mutex candidate: stage locally, take the lock
@@ -981,15 +910,8 @@ pub fn run( candidate : Candidate, workload : &Workload ) -> Result< Outcome, Ru
 /// Amortising the lock over a batch is what makes the baseline a fair one. A
 /// mutex taken per record would lose to anything, and the comparison would
 /// establish nothing that was in doubt.
-fn commit_batch
-(
-  queue : &Mutex< VecDeque< Record > >,
-  staged : &mut Vec< Record >,
-  capacity : usize,
-) -> usize
-{
-  if staged.is_empty()
-  {
+fn commit_batch(queue: &Mutex<VecDeque<Record>>, staged: &mut Vec<Record>, capacity: usize) -> usize {
+  if staged.is_empty() {
     return 0;
   }
 
@@ -1010,12 +932,10 @@ fn commit_batch
   // threads hammering one shared Mutex for the run's whole duration is
   // exactly the shared-lock shape poisoning targets — "it's just a harness"
   // is not a reason to skip the same scrutiny production code gets.
-  let mut guard = queue.lock().unwrap_or_else( std::sync::PoisonError::into_inner );
-  for record in staged.drain( .. )
-  {
-    if guard.len() < capacity
-    {
-      guard.push_back( record );
+  let mut guard = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+  for record in staged.drain(..) {
+    if guard.len() < capacity {
+      guard.push_back(record);
       taken += 1;
     }
   }
@@ -1023,253 +943,215 @@ fn commit_batch
   taken
 }
 
-fn run_mutex_queue( workload : &Workload ) -> ( usize, Vec< Record >, u128 )
-{
+fn run_mutex_queue(workload: &Workload) -> (usize, Vec<Record>, u128) {
   let capacity = workload.capacity();
-  let queue = Mutex::new( VecDeque::< Record >::with_capacity( capacity ) );
-  let reported = AtomicUsize::new( 0 );
+  let queue = Mutex::new(VecDeque::<Record>::with_capacity(capacity));
+  let reported = AtomicUsize::new(0);
 
   let started = Instant::now();
-  std::thread::scope
-  (
-    | scope |
-    {
-      for index in 0 .. workload.producers()
-      {
-        let queue = &queue;
-        let reported = &reported;
-        scope.spawn
-        (
-          move ||
-          {
-            let mut staged = Vec::with_capacity( workload.batch() );
-            let mut taken = 0;
-            for record in workload.records_of( index )
-            {
-              staged.push( record );
-              if staged.len() == workload.batch()
-              {
-                taken += commit_batch( queue, &mut staged, capacity );
-              }
-            }
-            taken += commit_batch( queue, &mut staged, capacity );
-            reported.fetch_add( taken, Ordering::Relaxed );
+  std::thread::scope(|scope| {
+    for index in 0..workload.producers() {
+      let queue = &queue;
+      let reported = &reported;
+      scope.spawn(move || {
+        let mut staged = Vec::with_capacity(workload.batch());
+        let mut taken = 0;
+        for record in workload.records_of(index) {
+          staged.push(record);
+          if staged.len() == workload.batch() {
+            taken += commit_batch(queue, &mut staged, capacity);
           }
-        );
-      }
+        }
+        taken += commit_batch(queue, &mut staged, capacity);
+        reported.fetch_add(taken, Ordering::Relaxed);
+      });
     }
-  );
+  });
   let write_nanos = started.elapsed().as_nanos();
 
-  let drained : Vec< Record > =
-    queue.into_inner().expect( "no producer panics while holding the lock" ).drain( .. ).collect();
-  ( reported.into_inner(), drained, write_nanos )
+  let drained: Vec<Record> = queue
+    .into_inner()
+    .expect("no producer panics while holding the lock")
+    .drain(..)
+    .collect();
+  (reported.into_inner(), drained, write_nanos)
 }
 
-fn run_contract_ring( workload : &Workload ) -> Result< ( usize, Vec< Record >, u128 ), RunError >
-{
-  let mut split = Factory
-    .build::< Record >( workload.config() )
-    .map_err( | error | RunError::Build { candidate : Candidate::ContractRing, error } )?;
+fn run_contract_ring(workload: &Workload) -> Result<(usize, Vec<Record>, u128), RunError> {
+  let mut split = Factory.build::<Record>(workload.config()).map_err(|error| RunError::Build {
+    candidate: Candidate::ContractRing,
+    error,
+  })?;
   let mut ends = split.ends();
-  let ( mut producer, mut consumer ) = ends.split();
+  let (mut producer, mut consumer) = ends.split();
 
   let started = Instant::now();
   let mut reported = 0;
   let mut next = 0;
-  while next < workload.records_per_producer()
-  {
-    let end = usize::min( next + workload.batch(), workload.records_per_producer() );
-    let mut records = next as Record .. end as Record;
-    reported += producer.try_push_batch( &mut records );
+  while next < workload.records_per_producer() {
+    let end = usize::min(next + workload.batch(), workload.records_per_producer());
+    let mut records = next as Record..end as Record;
+    reported += producer.try_push_batch(&mut records);
     next = end;
   }
   let write_nanos = started.elapsed().as_nanos();
 
   let mut sink = Vec::new();
   let mut drained = Vec::new();
-  loop
-  {
+  loop {
     sink.clear();
-    let taken = consumer.try_recv_batch( &mut sink );
-    if taken == 0
-    {
+    let taken = consumer.try_recv_batch(&mut sink);
+    if taken == 0 {
       break;
     }
-    drained.extend_from_slice( &sink );
+    drained.extend_from_slice(&sink);
   }
 
-  Ok( ( reported, drained, write_nanos ) )
+  Ok((reported, drained, write_nanos))
 }
 
-fn run_tls_over_ring( workload : &Workload ) -> Result< ( usize, Vec< Record >, u128 ), RunError >
-{
-  let mut ring : ring_core::Ring< Record > =
-    ring_core::Ring::new( &workload.config() )
-      .map_err( | error | RunError::Ring { candidate : Candidate::TlsOverRing, error } )?;
+fn run_tls_over_ring(workload: &Workload) -> Result<(usize, Vec<Record>, u128), RunError> {
+  let mut ring: ring_core::Ring<Record> = ring_core::Ring::new(&workload.config()).map_err(|error| RunError::Ring {
+    candidate: Candidate::TlsOverRing,
+    error,
+  })?;
   let mut ends = ring.ends();
-  let ( producer, mut consumer ) = ends.split();
+  let (producer, mut consumer) = ends.split();
 
-  let buffer = TlsBuffer::< Record >::with_capacity( workload.batch() );
-  let mut flusher = Flusher::new( buffer, producer, FlushPolicy::OnBatch( workload.batch() ) )
-    .map_err( | error | RunError::Flush { candidate : Candidate::TlsOverRing, error } )?;
+  let buffer = TlsBuffer::<Record>::with_capacity(workload.batch());
+  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBatch(workload.batch())).map_err(|error| RunError::Flush {
+    candidate: Candidate::TlsOverRing,
+    error,
+  })?;
 
   let started = Instant::now();
   let mut reported = 0;
-  for record in workload.records_of( 0 )
-  {
+  for record in workload.records_of(0) {
     // An `append` refusal means a previous flush was `Rejected` and its records
     // are still staged. `ring_flush` documents that a rejection must be
     // retried and that it will not retry on the caller's behalf; not retrying
     // here is deliberate, because a harness that retries measures its own retry
     // loop.
-    if flusher.append( record ).is_err()
-    {
+    if flusher.append(record).is_err() {
       continue;
     }
-    if let FlushOutcome::Flushed { count } = flusher.drive()
-    {
+    if let FlushOutcome::Flushed { count } = flusher.drive() {
       reported += count;
     }
   }
-  if let FlushOutcome::Flushed { count } = flusher.drain_final()
-  {
+  if let FlushOutcome::Flushed { count } = flusher.drain_final() {
     reported += count;
   }
   let write_nanos = started.elapsed().as_nanos();
 
   let mut sink = Vec::new();
   let mut drained = Vec::new();
-  loop
-  {
+  loop {
     sink.clear();
-    let taken = consumer.try_recv_batch( &mut sink );
-    if taken == 0
-    {
+    let taken = consumer.try_recv_batch(&mut sink);
+    if taken == 0 {
       break;
     }
-    drained.extend_from_slice( &sink );
+    drained.extend_from_slice(&sink);
   }
 
-  Ok( ( reported, drained, write_nanos ) )
+  Ok((reported, drained, write_nanos))
 }
 
-fn run_direct_spsc( workload : &Workload ) -> ( usize, Vec< Record >, u128 )
-{
-  let mut ring : ring_spsc::Ring< TypedSlot< Record > > =
-    ring_spsc::Ring::with_config( &workload.config() );
-  let ( mut producer, mut consumer ) = ring.split();
+fn run_direct_spsc(workload: &Workload) -> (usize, Vec<Record>, u128) {
+  let mut ring: ring_spsc::Ring<TypedSlot<Record>> = ring_spsc::Ring::with_config(&workload.config());
+  let (mut producer, mut consumer) = ring.split();
 
   let started = Instant::now();
   let mut reported = 0;
-  for record in workload.records_of( 0 )
-  {
-    if producer.try_push( record ).is_ok()
-    {
+  for record in workload.records_of(0) {
+    if producer.try_push(record).is_ok() {
       reported += 1;
     }
   }
   let write_nanos = started.elapsed().as_nanos();
 
   let mut drained = Vec::new();
-  loop
-  {
+  loop {
     let batch = consumer.drain();
-    if batch.is_empty()
-    {
+    if batch.is_empty() {
       break;
     }
-    drained.extend( batch.iter().filter_map( TypedSlot::get ).copied() );
+    drained.extend(batch.iter().filter_map(TypedSlot::get).copied());
   }
 
-  ( reported, drained, write_nanos )
+  (reported, drained, write_nanos)
 }
 
-fn run_direct_mpsc( workload : &Workload ) -> ( usize, Vec< Record >, u128 )
-{
-  let mut ring : ring_mpsc::Ring< TypedSlot< Record > > =
-    ring_mpsc::Ring::with_config( &workload.config() );
+fn run_direct_mpsc(workload: &Workload) -> (usize, Vec<Record>, u128) {
+  let mut ring: ring_mpsc::Ring<TypedSlot<Record>> = ring_mpsc::Ring::with_config(&workload.config());
   let mut ends = ring.ends();
-  let ( producer, mut consumer ) = ends.split();
-  let reported = AtomicUsize::new( 0 );
+  let (producer, mut consumer) = ends.split();
+  let reported = AtomicUsize::new(0);
 
   let started = Instant::now();
-  std::thread::scope
-  (
-    | scope |
-    {
-      for index in 0 .. workload.producers()
-      {
-        let reported = &reported;
-        scope.spawn
-        (
-          move ||
-          {
-            let mut taken = 0;
-            for record in workload.records_of( index )
-            {
-              if producer.push( record ).is_ok()
-              {
-                taken += 1;
-              }
-            }
-            reported.fetch_add( taken, Ordering::Relaxed );
+  std::thread::scope(|scope| {
+    for index in 0..workload.producers() {
+      let reported = &reported;
+      scope.spawn(move || {
+        let mut taken = 0;
+        for record in workload.records_of(index) {
+          if producer.push(record).is_ok() {
+            taken += 1;
           }
-        );
-      }
+        }
+        reported.fetch_add(taken, Ordering::Relaxed);
+      });
     }
-  );
+  });
   let write_nanos = started.elapsed().as_nanos();
 
   let mut drained = Vec::new();
-  loop
-  {
+  loop {
     let batch = consumer.drain();
-    if batch.is_empty()
-    {
+    if batch.is_empty() {
       break;
     }
-    drained.extend( batch.iter().filter_map( TypedSlot::get ).copied() );
+    drained.extend(batch.iter().filter_map(TypedSlot::get).copied());
   }
 
-  ( reported.into_inner(), drained, write_nanos )
+  (reported.into_inner(), drained, write_nanos)
 }
 
-#[ cfg( feature = "crossbeam" ) ]
-fn run_off_the_shelf( workload : &Workload ) -> Result< ( usize, Vec< Record >, u128 ), RunError >
-{
+#[cfg(feature = "crossbeam")]
+fn run_off_the_shelf(workload: &Workload) -> Result<(usize, Vec<Record>, u128), RunError> {
   let mut split = Factory
-    .build_crossbeam::< Record >( workload.config() )
-    .map_err( | error | RunError::Build { candidate : Candidate::OffTheShelf, error } )?;
+    .build_crossbeam::<Record>(workload.config())
+    .map_err(|error| RunError::Build {
+      candidate: Candidate::OffTheShelf,
+      error,
+    })?;
   let mut ends = split.ends();
-  let ( mut producer, mut consumer ) = ends.split();
+  let (mut producer, mut consumer) = ends.split();
 
   let started = Instant::now();
   let mut reported = 0;
   let mut next = 0;
-  while next < workload.records_per_producer()
-  {
-    let end = usize::min( next + workload.batch(), workload.records_per_producer() );
-    let mut records = next as Record .. end as Record;
-    reported += producer.try_push_batch( &mut records );
+  while next < workload.records_per_producer() {
+    let end = usize::min(next + workload.batch(), workload.records_per_producer());
+    let mut records = next as Record..end as Record;
+    reported += producer.try_push_batch(&mut records);
     next = end;
   }
   let write_nanos = started.elapsed().as_nanos();
 
   let mut sink = Vec::new();
   let mut drained = Vec::new();
-  loop
-  {
+  loop {
     sink.clear();
-    let taken = consumer.try_recv_batch( &mut sink );
-    if taken == 0
-    {
+    let taken = consumer.try_recv_batch(&mut sink);
+    if taken == 0 {
       break;
     }
-    drained.extend_from_slice( &sink );
+    drained.extend_from_slice(&sink);
   }
 
-  Ok( ( reported, drained, write_nanos ) )
+  Ok((reported, drained, write_nanos))
 }
 
 // ── Comparison ────────────────────────────────────────────────────────────
@@ -1280,53 +1162,49 @@ fn run_off_the_shelf( workload : &Workload ) -> Result< ( usize, Vec< Record >, 
 /// excludes is not silently omitted — it appears in
 /// [`refusals`](Self::refusals) with the reason, so a report at four producers
 /// says which paths could not be reached rather than showing a shorter table.
-#[ derive( Debug ) ]
-pub struct Comparison
-{
-  workload : Workload,
-  outcomes : Vec< Outcome >,
-  refusals : Vec< RunError >,
+#[derive(Debug)]
+pub struct Comparison {
+  workload: Workload,
+  outcomes: Vec<Outcome>,
+  refusals: Vec<RunError>,
 }
 
-impl Comparison
-{
+impl Comparison {
   /// Run every candidate in [`Candidate::ALL`], in order.
-  #[ must_use ]
-  pub fn run( workload : Workload ) -> Self
-  {
+  #[must_use]
+  pub fn run(workload: Workload) -> Self {
     let mut outcomes = Vec::new();
     let mut refusals = Vec::new();
 
-    for candidate in Candidate::ALL
-    {
-      match run( *candidate, &workload )
-      {
-        Ok( outcome ) => outcomes.push( outcome ),
-        Err( refusal ) => refusals.push( refusal ),
+    for candidate in Candidate::ALL {
+      match run(*candidate, &workload) {
+        Ok(outcome) => outcomes.push(outcome),
+        Err(refusal) => refusals.push(refusal),
       }
     }
 
-    Self { workload, outcomes, refusals }
+    Self {
+      workload,
+      outcomes,
+      refusals,
+    }
   }
 
   /// The workload every outcome was produced under.
-  #[ must_use ]
-  pub const fn workload( &self ) -> &Workload
-  {
+  #[must_use]
+  pub const fn workload(&self) -> &Workload {
     &self.workload
   }
 
   /// The candidates that ran.
-  #[ must_use ]
-  pub fn outcomes( &self ) -> &[ Outcome ]
-  {
+  #[must_use]
+  pub fn outcomes(&self) -> &[Outcome] {
     &self.outcomes
   }
 
   /// The candidates that did not, and why.
-  #[ must_use ]
-  pub fn refusals( &self ) -> &[ RunError ]
-  {
+  #[must_use]
+  pub fn refusals(&self) -> &[RunError] {
     &self.refusals
   }
 
@@ -1338,20 +1216,18 @@ impl Comparison
   /// some candidates report their drops and others do not, is the one where
   /// reading `reported` instead of `received` would produce a ranking that is
   /// wrong rather than merely imprecise.
-  #[ must_use ]
-  pub fn conserved( &self ) -> bool
-  {
-    self.outcomes.iter().all( Outcome::conserved )
+  #[must_use]
+  pub fn conserved(&self) -> bool {
+    self.outcomes.iter().all(Outcome::conserved)
   }
 
   /// How many records the whole comparison could not account for.
   ///
   /// The sum of every candidate's [`Outcome::silently_discarded`]. Zero under
   /// `OverflowPolicy::Fail`; the size of the trap under `DropNewest`.
-  #[ must_use ]
-  pub fn silently_discarded( &self ) -> usize
-  {
-    self.outcomes.iter().map( Outcome::silently_discarded ).sum()
+  #[must_use]
+  pub fn silently_discarded(&self) -> usize {
+    self.outcomes.iter().map(Outcome::silently_discarded).sum()
   }
 
   /// The fastest candidate **among those that lost nothing**.
@@ -1384,24 +1260,22 @@ impl Comparison
   /// Pitfall: `min_by_key` has a documented tie behaviour and inherits its
   /// meaning from the iteration order — reordering the list changes this
   /// verdict with nothing at the call site to say so.
-  #[ must_use ]
-  pub fn fastest( &self ) -> Option< &Outcome >
-  {
-    self.outcomes
+  #[must_use]
+  pub fn fastest(&self) -> Option<&Outcome> {
+    self
+      .outcomes
       .iter()
-      .filter( | outcome | outcome.is_lossless() )
-      .min_by_key( | outcome | outcome.write_nanos )
+      .filter(|outcome| outcome.is_lossless())
+      .min_by_key(|outcome| outcome.write_nanos)
   }
 
   /// A plain-text table of the run.
-  #[ must_use ]
-  pub fn report( &self ) -> String
-  {
+  #[must_use]
+  pub fn report(&self) -> String {
     use fmt::Write as _;
 
     let mut out = String::new();
-    let _ = writeln!
-    (
+    let _ = writeln!(
       out,
       "{} producer(s) x {} records, batch {}, capacity {}, overflow {:?}",
       self.workload.producers(),
@@ -1410,17 +1284,14 @@ impl Comparison
       self.workload.capacity(),
       self.workload.config().overflow(),
     );
-    let _ = writeln!
-    (
+    let _ = writeln!(
       out,
       "{:<16} {:>9} {:>9} {:>9} {:>8} {:>8} {:>12}",
       "candidate", "offered", "reported", "received", "dropped", "silent", "write ns",
     );
 
-    for outcome in &self.outcomes
-    {
-      let _ = writeln!
-      (
+    for outcome in &self.outcomes {
+      let _ = writeln!(
         out,
         "{:<16} {:>9} {:>9} {:>9} {:>8} {:>8} {:>12}",
         outcome.candidate.name(),
@@ -1433,15 +1304,17 @@ impl Comparison
       );
     }
 
-    for refusal in &self.refusals
-    {
-      let _ = writeln!( out, "refused: {refusal}" );
+    for refusal in &self.refusals {
+      let _ = writeln!(out, "refused: {refusal}");
     }
 
-    match self.fastest()
-    {
-      Some( outcome ) => { let _ = writeln!( out, "fastest lossless: {}", outcome.candidate.name() ); }
-      None => { let _ = writeln!( out, "fastest lossless: none — every candidate dropped records" ); }
+    match self.fastest() {
+      Some(outcome) => {
+        let _ = writeln!(out, "fastest lossless: {}", outcome.candidate.name());
+      }
+      None => {
+        let _ = writeln!(out, "fastest lossless: none — every candidate dropped records");
+      }
     }
 
     out

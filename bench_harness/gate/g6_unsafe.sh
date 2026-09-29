@@ -69,7 +69,7 @@ while read -r c; do
   # declared/justified check entirely — the same "vacuity arriving through the
   # scan" shape the comment above already names for the missing-spaces gap. No
   # crate in the live corpus uses the outer form today (checked across
-  # module/, ring/, spike/), so this was latent rather than exploited.
+  # every crate root), so this was latent rather than exploited.
   # Residual, not fixed here: a combined multi-lint attribute such as
   # `#[allow(dead_code, unsafe_code)]` still would not match — no live crate
   # uses that shape, and the house codestyle above is single-lint-per-attribute.

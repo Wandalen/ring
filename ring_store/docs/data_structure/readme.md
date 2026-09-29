@@ -76,7 +76,7 @@ command grep -m1 -A8 -F '  // The stand-in for "holds no cursor and no ordering 
 # every documentation mention of Default across both crates
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'Default' ring_store/src/lib.rs ring_slot/src/lib.rs \
-  | grep -E '///|//!' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -E '///|//!' | sort
 
 # and the impls that satisfy it
 grep -n 'impl.*Default for' ring_slot/src/lib.rs

@@ -66,7 +66,7 @@ supplies.
 cd "$(git rev-parse --show-toplevel)"
 
 # every crate depending on ring_slot — its own manifest names itself, so drop it
-grep -rln 'ring_slot' ring_*/Cargo.toml | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/Cargo.toml||' \
+grep -rln 'ring_slot' ring_*/Cargo.toml | sed 's|/Cargo.toml||' \
   | grep -v '^ring_slot$' | sort
 
 # the four that stay generic

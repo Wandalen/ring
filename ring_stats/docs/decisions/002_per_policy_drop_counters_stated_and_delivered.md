@@ -26,10 +26,6 @@ lifecycle state — implemented and still marked planned — is
 cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
 # is a parallel ugrep that emits hits in completion order
-echo '  -- what the feature asks for --'
-command grep -m1 -F 'Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.' docs/feature/185_ring_stats.md
-echo '  -- and its first occurrence, in the design record --'
-command grep -m1 -F '12. Stats (claimed, published, dropped, wait_ns)' docs/initial_design_message/958_okay_great_let_work_out/message.md
 echo '  -- what the crate stores --'
 command grep -o '^  [a-z_]* : AtomicU64' ring_stats/src/lib.rs | sed 's/ : AtomicU64//'
 echo '  -- the public methods whose names the feature never mentions --'
@@ -39,10 +35,6 @@ command grep -o '  pub fn \(record_consume\|consumed\|dropped_total\|in_flight\|
 Live output:
 
 ```
-  -- what the feature asks for --
-Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.
-  -- and its first occurrence, in the design record --
-12. Stats (claimed, published, dropped, wait_ns)
   -- what the crate stores --
   claimed
   published
@@ -58,6 +50,18 @@ Per-ring counters for what actually happened: items claimed, items published, it
   pub fn in_flight
   pub fn reset
 ```
+
+> Historical record, not independently reproducible from a standalone checkout
+> (the originating requirement and design record these figures came from —
+> `docs/feature/185_ring_stats.md` and
+> `docs/initial_design_message/958_okay_great_let_work_out/message.md` — are
+> external to this repository and unreachable since extraction): the feature
+> asked for "Per-ring counters for what actually happened: items claimed,
+> items published, items dropped and under which policy, and nanoseconds
+> spent waiting. They are cheap enough to leave on and are the only thing
+> that distinguishes a ring under mild pressure from one that is quietly
+> discarding traffic." Its first occurrence, in the design record, read "12.
+> Stats (claimed, published, dropped, wait_ns)".
 
 ---
 

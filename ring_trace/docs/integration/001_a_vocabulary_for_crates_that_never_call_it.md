@@ -53,8 +53,8 @@ printf '    manifests declaring ring_trace, every root: %s\n' "$n"
 echo '  -- and every mention of it in the workspace source, outside the crate --'
 # a bare root recurses, so `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` covers `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/` and the four
 # named here are complete
-command grep -r 'ring_trace' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_trace/'
-command grep -r 'use ring_trace\|ring_trace::' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_trace/' || echo '    no import anywhere'
+command grep -r 'ring_trace' --include=*.rs . | command grep -v '^ring_trace/'
+command grep -r 'use ring_trace\|ring_trace::' --include=*.rs . | command grep -v '^ring_trace/' || echo '    no import anywhere'
 ```
 
 Live output:

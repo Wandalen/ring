@@ -52,7 +52,7 @@ command grep -m1 -A8 -F '  /// A batch of the requested length cannot be served 
 echo '  -- crates that return it rather than correcting --'
 command grep -rlc 'return Err( RingError::BatchTooLarge' --include=*.rs */src | sed -E 's|/src/lib.rs||'
 echo '  -- the three zeros --'
-command grep -rn 'return Err( RingError::CapacityZero )\|if [a-z_.]* == 0 { 1 }\|\.max( 1 )' --include=*.rs ring_*/src | command grep -v '///\|//!' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/src/lib.rs||;s|/src/capacity.rs||'
+command grep -rn 'return Err( RingError::CapacityZero )\|if [a-z_.]* == 0 { 1 }\|\.max( 1 )' --include=*.rs ring_*/src | command grep -v '///\|//!' | sed 's|/src/lib.rs||;s|/src/capacity.rs||'
 echo '  -- the one cross-field read, and the setter that would make it mutable --'
 command grep -m1 -F '    let capped = if batch > self.capacity.get() { self.capacity.get() } else { batch };' ring_config/src/lib.rs
 command grep -c 'with_capacity' ring_config/src/lib.rs || true

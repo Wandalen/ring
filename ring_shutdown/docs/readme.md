@@ -45,7 +45,7 @@ the settlement. Measured:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 printf 'files in the family holding one: %s\n' "$( command grep -rln 'AtomicBool' ring_*/src | tr '\n' ' ' )"
-printf 'crates among them:               %s\n' "$( command grep -rln 'AtomicBool' ring_*/src | cut -d/ -f2 | sort -u | wc -l )"
+printf 'crates among them:               %s\n' "$( command grep -rln 'AtomicBool' ring_*/src | cut -d/ -f1 | sort -u | wc -l )"
 printf 'what ring_core records instead:  %s\n' "$( command grep -oh '^| .is_closed. |.*settled.*' ring_core/docs/integration/002_*.md | head -1 )"
 ```
 

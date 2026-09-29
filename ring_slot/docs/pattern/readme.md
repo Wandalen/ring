@@ -102,7 +102,7 @@ grep -rn 'dyn Slot\|Box< dyn\|&dyn' ring_*/src/*.rs 2>/dev/null | grep -vE ':[[:
 # three traits describing one slot, across two crates
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn '^pub trait' ring_slot/src/lib.rs ring_event/src/lib.rs \
-  | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | sort
 
 # set's stated justification
 sed -n '/^  \/\/\/ Place `value` in the slot, returning whatever it held before\.$/,/^  \/\/\/ ```$/p;/^  pub fn set( &mut self, value : T ) -> Option< T >$/,/^    self\.0\.replace( value )$/p' ring_slot/src/lib.rs
@@ -114,7 +114,7 @@ grep -n '^pub fn \|^pub enum ' ring_overflow/src/lib.rs
 
 # every set in shipped library code
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
-grep -rn '\.set( ' ring_*/src/*.rs | grep -vE ':[[:space:]]*//' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn '\.set( ' ring_*/src/*.rs | grep -vE ':[[:space:]]*//' | sort
 
 # the one protocol check, and the macro that removes it
 command grep -m1 -B1 -A5 -F '          Ok( mut reserved ) =>' ring_core/src/lib.rs

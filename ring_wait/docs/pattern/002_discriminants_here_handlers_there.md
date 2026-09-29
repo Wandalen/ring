@@ -35,7 +35,7 @@ command grep -r "^pub enum" ring_types/src/*.rs
 # which src files actually name variants in code (not documentation). The
 # printf is guarded by `if` rather than `&&`, so a final iteration with nothing
 # to print leaves the loop's exit status at zero
-for f in $( command grep -rl --include=*.rs "WaitKind::" /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep "/src/" | sort ); do
+for f in $( command grep -rl --include=*.rs "WaitKind::" . | command grep "/src/" | sort ); do
   v=$( command grep -vE "^[[:space:]]*(//|///|//!)" "$f" | command grep -o "WaitKind::[A-Za-z]*" \
        | sort -u | tr '\n' ' ' )
   if [ -n "$v" ]; then printf '%-40s %s\n' "$f" "$v"; fi

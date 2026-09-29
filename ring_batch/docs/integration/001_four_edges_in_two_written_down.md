@@ -146,11 +146,10 @@ echo "  src/lib.rs citing the directory  : $( command grep -rl '008_ring_write_p
 echo "  readme.md citing the flat .md    : $( command grep -l '008_ring_write_path\.md' ring_*/readme.md 2>/dev/null | wc -l ) of 33"
 echo "  readme.md citing the directory   : $( command grep -l '008_ring_write_path/' ring_*/readme.md 2>/dev/null | wc -l ) of 33"
 echo "  and three crates outside the family cite it too:"
-# the family moved to `ring/`, the three outsiders citing it did not all move
-# with it -- `bench_harness` did, `exchange_core` and `smoke_ring_write_path`
-# stayed. So this scan spans both roots, and sorts: brace expansion emits
-# module-first, which is not the alphabetical order the finding is stated in.
-command grep -l '008_ring_write_path/' {module,ring}/*/readme.md 2>/dev/null | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|^ring/||;s|/readme.md||' | command grep -v '^ring_' | LC_ALL=C sort | sed 's/^/    /'
+# `bench_harness`, `exchange_core` and `smoke_ring_write_path` cite it from
+# outside the family, so this scan checks every crate's own readme rather
+# than just the family's.
+command grep -l '008_ring_write_path/' */readme.md 2>/dev/null | sed 's|/readme.md||' | command grep -v '^ring_' | LC_ALL=C sort | sed 's/^/    /'
 ```
 
 Live output:
@@ -183,8 +182,8 @@ directory` reads 0 of 33), each pointing instead to the family overview at
 wrong-path kind this finding tracks: the readmes are not citing a stale form,
 they no longer cite that path at all. The other two outside crates
 changed too — `bench_harness/readme.md` was standardized the same way,
-and `exchange_core` relocated from `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/exchange_core` to
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exchange/exchange_core` (its new readme also omits the citation) —
+and `exchange_core` relocated to a different root entirely
+(its new readme also omits the citation) —
 leaving `smoke_ring_write_path` as the only outside crate the census still
 finds. The `src/lib.rs` half is unaffected: all 33 still cite the directory
 correctly, including `ring_batch`'s own, per the Disposition below.

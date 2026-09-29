@@ -94,7 +94,7 @@ echo '-- the home the deferred figure was sent to --'
 printf '  ring_bench manifest naming ring_debug: %s\n' "$( command grep -c 'ring_debug' ring_bench/Cargo.toml || true )"
 echo '-- and what would falsify the allocation half --'
 printf '  global allocators in ring_*:      %s\n' "$( command grep -rn '#\[ *global_allocator *\]' --include=*.rs ring_*/ | wc -l )"
-printf '  global allocators in /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/spatial/: %s\n' "$( command grep -rn '#\[ *global_allocator *\]' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/spatial/ | wc -l )"
+printf '  global allocators in an unrelated crate root: %s\n' "$( command grep -rn '#\[ *global_allocator *\]' --include=*.rs . | wc -l )"
 ```
 
 Live output:
@@ -136,7 +136,7 @@ Live output:
   ring_bench manifest naming ring_debug: 0
 -- and what would falsify the allocation half --
   global allocators in ring_*:      4
-  global allocators in /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/spatial/: 13
+  global allocators in an unrelated crate root: 13
 ```
 
 ### Non-Functional Requirements

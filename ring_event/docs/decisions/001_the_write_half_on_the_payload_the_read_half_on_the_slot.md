@@ -32,8 +32,8 @@ command grep -m1 -A4 -F '/// A payload that knows how to enter a slot of shape `
 echo '  -- and everything the read half says about sitting on the slot --'
 command grep -m1 -A4 -F '/// A slot that knows what a reader gets back from it.' ring_event/src/lib.rs
 echo '  -- other implementors found: 0 (expected) --'
-command grep -r 'impl.*Fill<\|impl.*Peek for' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_event/src' || true
-printf '    hits: %s\n' "$( command grep -r 'impl.*Fill<\|impl.*Peek for' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_event/src' | wc -l )"
+command grep -r 'impl.*Fill<\|impl.*Peek for' --include=*.rs . | command grep -v '^ring_event/src' || true
+printf '    hits: %s\n' "$( command grep -r 'impl.*Fill<\|impl.*Peek for' --include=*.rs . | command grep -v '^ring_event/src' | wc -l )"
 echo '  -- how the suite covers the payload direction --'
 command grep -m1 -A4 -F 'fn fill_is_implemented_on_the_payload_so_a_new_payload_needs_no_slot_change()' ring_event/tests/event_test.rs
 ```

@@ -63,7 +63,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- every place a bound on T could have been written --'
 command grep -n '^pub struct Registry\|^impl< T' ring_registry/src/lib.rs | sed 's/^/    /'
 echo '  -- who writes a Drop in this family --'
-command grep -rn '^impl.*Drop for' --include=lib.rs ring_*/src/ | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sed 's/^/    /'
+command grep -rn '^impl.*Drop for' --include=lib.rs ring_*/src/ | sed 's/^/    /'
 printf '    impl Drop in ring_registry/src: %s\n' \
   "$( command grep -rc 'impl.*Drop for' ring_registry/src/ | awk -F: '{ s += $2 } END { print s + 0 }' )"
 echo '  -- and the assertion that cannot see a reordering --'

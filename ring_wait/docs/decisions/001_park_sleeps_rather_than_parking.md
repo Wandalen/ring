@@ -150,7 +150,7 @@ grep -B1 -A3 '  Park,' ring_types/src/policy.rs
 # dropped and the result sorted: this scans the whole workspace, so an absolute
 # address stales on an edit in any crate, and the claim is which files name a
 # signalling primitive, never where in one.
-grep -riE 'condvar|futex|unpark|thread::park|notify_one|Waker' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ \
+grep -riE 'condvar|futex|unpark|thread::park|notify_one|Waker' --include=*.rs . \
   | grep -v '/docs/' | LC_ALL=C sort
 ```
 

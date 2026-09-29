@@ -191,11 +191,11 @@ command grep -E 'search\+=|grep -rqE' bench_harness/gate/g3_features.sh \
   | sed -E 's/^(.{0,124}).*/\1/'
 echo '  -- family test trees whose markdown already satisfies that grep --'
 command grep -rlE 'docs/feature/0*[0-9]+_' ring_*/tests --include='*.md' 2>/dev/null \
-  | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||; s|/tests/manual/readme.md||' | tr '\n' ' ' | sed 's/^/    /; s/$/\n/'
+  | sed ' s|/tests/manual/readme.md||' | tr '\n' ' ' | sed 's/^/    /; s/$/\n/'
 printf '    prose files that count as a claiming test: %s\n' \
   "$( command grep -rlE 'docs/feature/0*[0-9]+_' ring_*/tests --include='*.md' 2>/dev/null | wc -l )"
 echo '  -- crates citing feature 176 today --'
-command grep -rlE 'docs/feature/0*176_' ring_*/tests 2>/dev/null | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sed 's/^/    /'
+command grep -rlE 'docs/feature/0*176_' ring_*/tests 2>/dev/null | sed 's/^/    /'
 ```
 
 Live output:

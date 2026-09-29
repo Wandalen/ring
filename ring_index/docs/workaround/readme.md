@@ -49,9 +49,9 @@ than stated in prose.
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- Capacity, and every caller of its third method --'
 command grep -nE '^\s*pub (const )?fn ' ring_types/src/capacity.rs
-command grep -rn '&[^&]*\.mask()' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_types/'
+command grep -rn '&[^&]*\.mask()' --include=*.rs . | command grep -v '^ring_types/'
 echo '  -- every import from ring_index, family-wide --'
-command grep -rn 'use ring_index' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_index/'
+command grep -rn 'use ring_index' --include=*.rs . | command grep -v '^ring_index/'
 echo "  ring_index size: $( wc -l < ring_index/src/lib.rs ) src + $( wc -l < ring_index/tests/index_test.rs ) test lines"
 ```
 

@@ -48,9 +48,9 @@ so the line is unmaintained in both directions with nothing checking it.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- the arithmetic written by hand, and the method that names it --'
-command grep -rn 'Seq( [a-z_.]*\.0 [-+]' --include=*.rs ring_*/src/ | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sed 's/^/    /'
+command grep -rn 'Seq( [a-z_.]*\.0 [-+]' --include=*.rs ring_*/src/ | sed 's/^/    /'
 printf '    crates calling advanced_by or next instead: %s\n' \
-  "$( command grep -rl '\.advanced_by(\|\.next()' --include=*.rs ring_*/src/ 2>/dev/null | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/src/.*||' | sort -u | wc -l )"
+  "$( command grep -rl '\.advanced_by(\|\.next()' --include=*.rs ring_*/src/ 2>/dev/null | sed 's|/src/.*||' | sort -u | wc -l )"
 echo '  -- the dependency two documents name and three sources deny --'
 printf '    readme names: %s   task names: %s   manifest declares: %s   imports: %s\n' \
   "$( command grep -o 'ring_seqno' ring_trace/readme.md | head -1 )" \

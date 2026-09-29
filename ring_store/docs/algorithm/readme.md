@@ -84,7 +84,7 @@ grep -n '^pub fn ' ring_index/src/lib.rs
 # and every use of the crate in family source, doc lines excluded
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'ring_index' ring_*/src/*.rs | grep -v '^ring_index/' \
-  | grep -vE ':[[:space:]]*(///|//!|//)' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -vE ':[[:space:]]*(///|//!|//)' | sort
 
 # the three construction steps
 command grep -m1 -A28 -F '  /// Allocate exactly `capacity` empty slots, once.' ring_store/src/lib.rs

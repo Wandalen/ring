@@ -67,7 +67,7 @@ command grep -m1 -A11 -F '/// A position within a ring'"'"'s storage, always in 
 
 # the only two places the family's executable code names the constructor
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
-grep -rn 'SlotIndex( ' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn 'SlotIndex( ' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sort
 
 # and how this crate builds its own
 printf '  by hand: %s   folded: %s\n' \

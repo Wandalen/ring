@@ -59,9 +59,9 @@ printf '    accessors wrapping the enabled flag: %s   inline checks: %s\n' \
   "$( command grep -c 'if !self.enabled' ring_trace/src/lib.rs || true )"
 echo '  -- the compile-time claims in the family --'
 command grep -rn 'fails to compile' --include=*.rs ring_*/src/ ring_*/tests/ \
-  | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | command grep -o '^[a-z_]*/[a-z]*/[a-z_]*\.rs:[0-9]*' | sed 's/^/    /'
+  | command grep -o '^[a-z_]*/[a-z]*/[a-z_]*\.rs:[0-9]*' | sed 's/^/    /'
 echo '  -- and the wildcard arms that would undo the idiom --'
-command grep -n '_ =>' ring_core/src/lib.rs ring_flush/src/lib.rs | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sed 's/^/    /'
+command grep -n '_ =>' ring_core/src/lib.rs ring_flush/src/lib.rs | sed 's/^/    /'
 printf '    wildcard arms in ring_trace: %s\n' "$( command grep -c '_ =>' ring_trace/src/lib.rs || true )"
 ```
 

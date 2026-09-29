@@ -77,7 +77,7 @@ grep -A4 'pub const fn cursor\|pub const fn barrier' ring_consume/src/lib.rs
 grep 'handshake_test' ring_barrier/src/lib.rs
 
 # every external call into the Consumer
-command grep -r 'consumer\.\|Consumer::' {module,ring}/*/tests/*.rs | command grep -v ring_consume/ | head
+command grep -r 'consumer\.\|Consumer::' */tests/*.rs | command grep -v ring_consume/ | head
 ```
 
 Live output:

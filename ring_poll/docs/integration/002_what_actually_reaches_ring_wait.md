@@ -84,18 +84,18 @@ with another, on a family where the two answers happen to agree.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 printf 'crates in the family:           %s\n' "$( ls -d ring_*/ | wc -l )"
-printf 'manifest names ring_wait:       %s\n' "$( cd ring && for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo "${c%/Cargo.toml}"; done | tr '\n' ' ' )"
-printf 'reach it, normal edges:         %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && printf '%s ' "$n"; done )"
-printf 'reach it without naming it:     %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && ! command grep -q 'ring_wait' "$c/Cargo.toml" && printf '%s ' "$n"; done )"
+printf 'manifest names ring_wait:       %s\n' "$( for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo "${c%/Cargo.toml}"; done | tr '\n' ' ' )"
+printf 'reach it, normal edges:         %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && printf '%s ' "$n"; done )"
+printf 'reach it without naming it:     %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && ! command grep -q 'ring_wait' "$c/Cargo.toml" && printf '%s ' "$n"; done )"
 for n in ring_consume ring_testkit; do
-  for d in $( cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" --depth 1 2>/dev/null | command grep -oE 'ring_[a-z_]+ v' | sed 's/ v//' | tail -n +2 ); do
-    cargo tree --manifest-path ring/Cargo.toml -e normal -p "$d" 2>/dev/null | command grep -q ring_wait && printf '  %-14s reaches it via: %s\n' "$n" "$d"
+  for d in $( cargo tree --manifest-path Cargo.toml -e normal -p "$n" --depth 1 2>/dev/null | command grep -oE 'ring_[a-z_]+ v' | sed 's/ v//' | tail -n +2 ); do
+    cargo tree --manifest-path Cargo.toml -e normal -p "$d" 2>/dev/null | command grep -q ring_wait && printf '  %-14s reaches it via: %s\n' "$n" "$d"
   done
 done
-printf 'reach it, dev edges included:   %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
-printf 'dev-edge-only reacher:          %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); a=$( cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -c ring_wait ); b=$( cargo tree --manifest-path ring/Cargo.toml -p "$n" 2>/dev/null | command grep -c ring_wait ); [ "$a" = 0 ] && [ "$b" != 0 ] && printf '%s ' "$n"; done )"
+printf 'reach it, dev edges included:   %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
+printf 'dev-edge-only reacher:          %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); a=$( cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -c ring_wait ); b=$( cargo tree --manifest-path Cargo.toml -p "$n" 2>/dev/null | command grep -c ring_wait ); [ "$a" = 0 ] && [ "$b" != 0 ] && printf '%s ' "$n"; done )"
 printf '  and its use sites:            %s\n' "$( command grep -rn 'use ring_barrier' ring_publish/tests/*.rs | sed 's|ring_publish/||; s/:  use.*//' | tr '\n' ' ' )"
-printf 'tick-path crates, any depth:    %s\n' "$( for n in ring_poll ring_handle ring_core; do printf '%s=%s ' "$n" "$( cargo tree --manifest-path ring/Cargo.toml -p "$n" 2>/dev/null | command grep -c ring_wait )"; done )"
+printf 'tick-path crates, any depth:    %s\n' "$( for n in ring_poll ring_handle ring_core; do printf '%s=%s ' "$n" "$( cargo tree --manifest-path Cargo.toml -p "$n" 2>/dev/null | command grep -c ring_wait )"; done )"
 printf 'the guard the suite runs:       %s\n' "$( command grep -oE 'contains\( "ring_wait" \)' ring_poll/tests/poll_test.rs )"
 printf 'the tick-path list, as written: %s\n' "$( command grep -oE 'for tick_path in \[.*\]' ring_poll/tests/poll_test.rs | sed 's/for tick_path in //' )"
 printf 'its length vs the family:       %s of %s\n' "$( command grep -oE 'for tick_path in \[.*\]' ring_poll/tests/poll_test.rs | command grep -o '"ring_' | wc -l )" "$( ls -d ring_*/ | wc -l )"

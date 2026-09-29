@@ -109,7 +109,7 @@ from the requested figure, and neither of them can see this measurement.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-grep -r "from_micros( 50 )\|50µs" {module,ring}/*/src/*.rs {module,ring}/*/tests/*.rs
+grep -r "from_micros( 50 )\|50µs" */src/*.rs */tests/*.rs
 ```
 
 Live output:

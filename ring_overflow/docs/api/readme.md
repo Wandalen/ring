@@ -54,7 +54,7 @@ echo '  -- the whole surface, with attributes --'
 # it — the `-B1` line above it is a doc-comment fence, not an attribute
 command grep -n -B1 'pub enum \|pub fn \|pub const ' ring_overflow/src/lib.rs | command grep -v '^--$'
 echo '  -- and every predicate call outside this crate --'
-command grep -rl 'lost_an_item\|accepted_incoming' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | command grep -v '^ring_overflow/' | wc -l
+command grep -rl 'lost_an_item\|accepted_incoming' --include=*.rs . | command grep -v '^ring_overflow/' | wc -l
 ```
 
 ### Findings Recorded Here

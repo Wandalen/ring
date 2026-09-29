@@ -60,21 +60,21 @@ awk '/^\[dev-dependencies\]/{f=1;next} /^\[/{f=0} f' ring_publish/Cargo.toml | g
 # reaches the substrate crates either — they are a repo-root sibling of
 # `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, not nested inside it, so `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` has to be named in its own
 # right
-for m in $( command grep -rl --include=Cargo.toml 'ring_publish' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | sort ); do
+for m in $( command grep -rl --include=Cargo.toml 'ring_publish' . | sort ); do
   awk -v f="$m" '/^\[/{s=$0} /ring_publish/{printf "%s  %s  %s\n", f, s, $0}' "$m"
 done
 
 # tier and dependent count for every crate in the family
 for c in ring_*/; do n=$( basename "$c" )
   t=$( grep -m1 -oE 'Tier [0-9]+' "$c/src/lib.rs" 2>/dev/null )
-  d=$( command grep -rl --include=Cargo.toml "^${n} = " /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ 2>/dev/null | command grep -v "/${n}/" | wc -l )
+  d=$( command grep -rl --include=Cargo.toml "^${n} = " . 2>/dev/null | command grep -v "/${n}/" | wc -l )
   printf "%-16s %-8s dependents=%s\n" "$n" "$t" "$d"
 done
 
 # prose references, which are not edges. Workspace-wide, unlike `integration/001`'s
 # PB2 census, which is deliberately scoped to this family's own `*/src/*.rs`
 # — the two agreed at ten until a crate outside the family cited this one
-command grep -rl --include=*.rs 'ring_publish' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep '/src/' | command grep -v 'ring_publish/' | sort
+command grep -rl --include=*.rs 'ring_publish' . | command grep '/src/' | command grep -v 'ring_publish/' | sort
 
 # the named next adopter, and every decision that could have resolved it
 awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f' ring_core/Cargo.toml | grep -oE '^ring_[a-z_]+'
@@ -87,7 +87,7 @@ done )
 [ -n "$after" ] && echo "$after" || echo '(no ruling after 124 names ring_publish)'
 
 # the constant, declared twice
-command grep -rn --include=*.rs 'const PUBLISH' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep '/src/' | sort
+command grep -rn --include=*.rs 'const PUBLISH' . | command grep '/src/' | sort
 ```
 
 | | Value |

@@ -52,8 +52,8 @@ And `ring_core` fixes `TypedSlot< T >` eight times while never mentioning
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- every edge into this crate, and every code reference outside it --'
-command grep -rn 'ring_event' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_event/'
-command grep -rn 'ring_event' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v '^ring_event/'
+command grep -rn 'ring_event' --include=Cargo.toml . | command grep -v '^ring_event/'
+command grep -rn 'ring_event' --include=*.rs . | command grep -v '^ring_event/'
 echo '  -- what ring_core declares, writes with, and reads with --'
 command grep -n 'ring_' ring_core/Cargo.toml | command grep -v '^2:'
 command grep -rn '\.set( \|TypedSlot::take' --include=*.rs ring_core/src

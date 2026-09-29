@@ -56,7 +56,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- the write side, and who calls each --'
 for m in record_claim record_publish record_consume record_drop record_wait; do
   printf '    %-16s callers outside this crate: %s\n' "$m" \
-    "$( command grep -rn "\.$m(" --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ | command grep -v '^ring_stats/' | wc -l )"
+    "$( command grep -rn "\.$m(" --include=*.rs | command grep -v '^ring_stats/' | wc -l )"
 done
 echo '  -- the read side, by name --'
 command grep -o 'pub fn \(claimed\|published\|consumed\|dropped\|dropped_total\|wait_nanos\|in_flight\)' ring_stats/src/lib.rs

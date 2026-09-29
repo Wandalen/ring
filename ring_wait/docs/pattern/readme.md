@@ -36,12 +36,12 @@ cd "$(git rev-parse --show-toplevel)"
 # are named explicitly and the result sorted: a bare `` glob
 # reaches neither `ring/` nor the `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`-nested crates, and `grep` here is
 # a `ugrep` shim whose unsorted output order is not stable between runs
-command grep -r --include=*.rs "spin_loop" /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep "/src/" | sort
+command grep -r --include=*.rs "spin_loop" . | command grep "/src/" | sort
 
 # instances of the enum shape — which files name every variant in *code*
 for e in WaitKind OverflowPolicy; do
   echo "## $e"
-  for f in $( command grep -rl --include=*.rs "$e::" /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep "/src/" | sort ); do
+  for f in $( command grep -rl --include=*.rs "$e::" . | command grep "/src/" | sort ); do
     v=$( command grep -vE "^[[:space:]]*(//|///|//!)" "$f" | command grep -o "$e::[A-Za-z]*" \
          | sort -u | tr '\n' ' ' )
     # the trailing `true` keeps a final empty `$v` from failing the whole block

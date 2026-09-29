@@ -195,9 +195,9 @@ done
 #
 # Fix(g12_ran_cargo_from_repo_for_crates_repo_may_not_own)
 # Root cause: this ran cargo from $REPO unconditionally, which assumes $REPO is
-#   the workspace that declares the crate named by `-p`. Since the substrate/
-#   relocation there are twelve workspace roots, and 168 of the 241 crates the
-#   families declare are members of one of the eleven others. `-p` selects from
+#   the workspace that declares the crate named by `-p`. This tree can hold
+#   more than one workspace root, and a crate the families declare can be a
+#   member of a sibling root rather than the root workspace. `-p` selects from
 #   the resolve graph rather than the member list, so a non-member reachable as
 #   a path dependency is accepted without complaint and compiled with its
 #   dev-dependencies unresolved — the shape that made g9 report fourteen rustc

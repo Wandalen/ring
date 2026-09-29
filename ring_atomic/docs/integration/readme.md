@@ -44,7 +44,7 @@ echo '  -- in --'
 command grep -E '^ring_|^loom' ring_atomic/Cargo.toml
 command grep -nE '^use ring_' ring_atomic/src/lib.rs
 echo '  -- out --'
-command grep -l '^ring_atomic' ring_*/Cargo.toml | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/Cargo.toml||' | tr '\n' ' '; echo
+command grep -l '^ring_atomic' ring_*/Cargo.toml | sed 's|/Cargo.toml||' | tr '\n' ' '; echo
 echo '  -- and the re-export that widens it --'
 command grep -n 'pub use ring_atomic' */src/lib.rs 
 ```

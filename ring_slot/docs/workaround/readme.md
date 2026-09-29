@@ -93,7 +93,7 @@ awk '/^  NameUnknown,$/{ n1 = NR } n1 && NR >= n1 + 1 && NR <= n1 + 9 { print } 
 # every crate that constructs it — three mean slots, one means bytes
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'RingError::BatchTooLarge' ring_*/src/*.rs | grep -vE ':[[:space:]]*//' \
-  | grep -v '^ring_types/' | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -v '^ring_types/' | sort
 
 # the classification the borrow inherits
 command grep -m1 -B1 -A2 -F '      | Self::CapacityNotPowerOfTwo( _ )' ring_types/src/error.rs

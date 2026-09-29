@@ -7,7 +7,8 @@
 # The gates were once family-specific in their code and are now family-neutral
 # in both code and declaration. What changed and why:
 #
-#   * `ring_crates()` used to glob `module/ring_*`. A glob reports whatever is
+#   * `ring_crates()` used to glob a shared parent directory for anything
+#     prefixed `ring_`. A glob reports whatever is
 #     on disk, so it cannot distinguish "the family is complete" from "the
 #     family does not exist" — and G5 and G6, both conjunctions over a
 #     declared set, read REACHED against a family with zero crates in it.
@@ -31,37 +32,41 @@ DECL_ROOT="$GATE_DIR/declared"
 # Where crates live, and how this harness finds itself.
 #
 # The declarations are located from BASH_SOURCE rather than from a literal
-# under `module/`, because they are a sibling of this file and move with it.
+# under a shared parent directory, because they are a sibling of this file and
+# move with it.
 # A literal did not survive the ring family moving to its own root: every
 # gate then aborted looking for a declaration directory one tree over.
 #
-# Crates sit under three roots — the ring family under `ring/`, the eleven
-# substrate families under `substrate/`, everything else still under `module/`
-# — so a single root cannot address them.
-# `spike/` is deliberately not a crate root here: it was outside the census
-# before the move and adding it would silently widen what G18 and G22 grade,
-# and `strip_crate_root` below relies on spike/ paths staying absolute so that
-# `family_bin_sources` can drop them from G1's join. G11 adds it explicitly,
-# for its own reason. Where a declared name may be *found* is a separate
-# question with a separate answer — see RESOLVE_ROOTS.
+# Crates can sit under more than one root — this repo's own crates under one
+# root, and (in the layout this tooling was originally built for) sibling
+# roots holding other crate families — so a single root cannot address them
+# all.
+# A demo-binaries root is deliberately not a crate root here: it was outside
+# the census before a later crate relocation and adding it would silently
+# widen what G18 and G22 grade, and `strip_crate_root` below relies on paths
+# under it staying absolute so that `family_bin_sources` can drop them from
+# G1's join. G11 adds it explicitly, for its own reason. Where a declared name
+# may be *found* is a separate question with a separate answer — see
+# RESOLVE_ROOTS.
 CRATE_ROOTS=( "$REPO/module" "$REPO/ring" "$REPO/substrate" )
 
 # Where a declared crate name may be found, as opposed to what the census
 # counts. Conflating the two is what made `assert_declared_crates_exist`
 # report a batch of crates as "absent from the tree" while every one of them
-# sat at `spike/<name>/Cargo.toml`: a relocation moved a set of `demo_*` crates
-# out of `module/`, the families still declaring them as members kept their old
-# reference, and `crate_dir` searched the census roots only. Every affected
-# gate invocation aborted on that false verdict without grading anything.
+# sat under the demo-binaries root instead: a relocation moved a set of
+# `demo_*` crates out of their old root, the families still declaring them as
+# members kept their old reference, and `crate_dir` searched the census roots
+# only. Every affected gate invocation aborted on that false verdict without
+# grading anything.
 #
 # Only `crate_dir` reads this. `all_crate_names` and `strip_crate_root` go on
 # reading CRATE_ROOTS, so a name becoming resolvable does not widen the census
-# and does not make a spike/ path relative: a declared spike/ crate now
-# resolves and is still counted by nobody.
+# and does not make a path under that root relative: a declared crate there
+# now resolves and is still counted by nobody.
 RESOLVE_ROOTS=( "${CRATE_ROOTS[@]}" "$REPO/spike" )
 
 # Roots that place a grouping segment between themselves and a crate:
-# `substrate/<family>/<crate>`, where `<family>` organizes the root and is not
+# `<root>/<family>/<crate>`, where `<family>` organizes the root and is not
 # part of the crate's own address. Declared explicitly rather than inferred,
 # because once a root prefix is stripped a nesting root and a flat one are
 # indistinguishable by shape — a family directory's own crate-shaped name reads
@@ -74,18 +79,18 @@ NESTED_ROOTS=( "$REPO/substrate" )
 
 # Every cargo workspace root in the tree, absolute, repo root first.
 #
-# The tree is twelve workspaces, not one — the same fact crate_dir()'s tie-break
+# The tree can be more than one workspace — the same fact crate_dir()'s tie-break
 # below is built on, stated here as something callable rather than as a remark.
-# `$REPO/Cargo.toml` is one workspace, covering `module/`, `ring/`, `spike/` and
-# `division/`; each of the eleven `substrate/<family>/Cargo.toml` is an
-# independent virtual `[workspace]` of its own.
+# `$REPO/Cargo.toml` is one workspace, covering the repo's own top-level crates;
+# a sibling root's own `Cargo.toml` can be an independent virtual `[workspace]`
+# of its own.
 #
 # This matters to anything that asks cargo a question, because `cargo metadata`
 # answers only for the workspace it is run in. A single invocation at `$REPO`
-# reports 91 packages and omits all 168 crates under `substrate/` — not as an
-# error, just as a shorter list. Asking once and reading the answer as "the
-# crates" is therefore asking about a twelfth of the tree; ask once per root and
-# merge.
+# reports only the root workspace's own packages and omits every crate held by
+# a sibling workspace — not as an error, just as a shorter list. Asking once and
+# reading the answer as "the crates" is therefore asking about a fraction of the
+# tree; ask once per root and merge.
 #
 # A `[workspace]` guard, mirroring all_crate_names()'s `[package]` one: nothing
 # requires a directory under `substrate/` to be a workspace, and a family that
@@ -108,10 +113,10 @@ workspace_roots() {
 # match winning.
 #
 # That tie-break is load-bearing, not vacuous: the roots are not one workspace.
-# `module/` and `ring/` are members of the repo-root workspace, while each of the
-# eleven `substrate/<family>/Cargo.toml` is a workspace of its own, so cargo's
-# one-package-name-per-workspace rule does not reach across them — two roots can
-# hold same-named crates and both will build, and cargo will never complain.
+# Some roots are members of the repo-root workspace, while a sibling root's own
+# `Cargo.toml` can be a workspace of its own, so cargo's one-package-name-per-
+# workspace rule does not reach across them — two roots can hold same-named
+# crates and both will build, and cargo will never complain.
 # This function resolves such a pair by RESOLVE_ROOTS order alone, silently: it
 # answers with whichever root comes first, not with the copy the caller meant,
 # and there is no signal that a choice was made at all.
@@ -130,13 +135,13 @@ workspace_roots() {
 # for different reasons.
 #
 # For the nested search, searching from depth 2 puts ordinary source directories
-# in range — `module/frame_spine/src`, `ring/ring_align/tests` — and while none
+# in range — `some_root/example_crate/src`, `ring/ring_align/tests` — and while none
 # of those is spelled like a crate today, nothing enforces that, and a false hit
 # resolves a crate to a directory holding no manifest at all, which every caller
 # downstream reads as the crate existing.
 #
 # For the flat search the failure was live, not hypothetical. `[ -d ]` alone
-# answered with `substrate/<family>` for every family whose directory is spelled
+# answered with `<root>/<family>` for every family whose directory is spelled
 # like one of its own member crates, which several are — so the workspace
 # directory shadowed the crate one level below it and won, being flat. Those
 # resolved to a directory with
@@ -164,17 +169,16 @@ crate_dir() {
 # Absolute path of the cargo workspace that owns a crate; non-zero and silent
 # if the crate resolves to no root, or sits under no `[workspace]` at all.
 #
-# Needed because this tree is twelve workspaces, not one. `$REPO/Cargo.toml`
-# covers `module/`, `ring/`, `spike/` and `division/`; each of the eleven
-# `substrate/<family>/Cargo.toml` is an independent virtual workspace, and
-# `cargo metadata` at `$REPO` does not see a single one of the 168 crates they
-# hold. Any caller that hardcodes `cd "$REPO"` before a `cargo -p <crate>` call
-# therefore works for the four trees in the root workspace and fails for the
-# substrate ones — and it fails in the shape that reads as a defect in the
-# crate: `cargo build -p smoke_lang_stack` at `$REPO` answers "package ID
-# specification did not match any packages", and the same package asked for its
-# bin targets answers with nothing, which is indistinguishable from a crate
-# that genuinely declares none.
+# Needed because this tree can be more than one workspace. `$REPO/Cargo.toml`
+# covers the repo's own top-level crates; a sibling root's own `Cargo.toml` can
+# be an independent virtual workspace, and `cargo metadata` at `$REPO` does not
+# see a single one of the crates it holds. Any caller that hardcodes
+# `cd "$REPO"` before a `cargo -p <crate>` call therefore works for crates in
+# the root workspace and fails for crates in a sibling one — and it fails in
+# the shape that reads as a defect in the crate: `cargo build -p <crate>` at
+# `$REPO` answers "package ID specification did not match any packages", and
+# the same package asked for its bin targets answers with nothing, which is
+# indistinguishable from a crate that genuinely declares none.
 #
 # Walks up from the crate directory rather than pattern-matching the path, so
 # it stays correct for whatever nesting the next relocation introduces. Stops
@@ -203,13 +207,13 @@ crate_workspace_root() {
 # The family's crates grouped by the workspace that owns them, one line per
 # group, crates space-separated after the root:
 #
-#   /abs/path/to/substrate/<family>  crate_one crate_two …
+#   /abs/path/to/<root>/<family>  crate_one crate_two …
 #
 # What this is for: a gate that builds `-p <crate>` arguments must run cargo
 # from a workspace that actually contains those packages. Hardcoding
-# `cd "$REPO"` — as every `-p` call site here did — is legal only for the four
-# trees in the root workspace. Point it at a family living under
-# `substrate/<family>/` and cargo refuses the invocation whole:
+# `cd "$REPO"` — as every `-p` call site here did — is legal only for crates
+# in the root workspace. Point it at a family living under a sibling root's
+# own `<root>/<family>/` and cargo refuses the invocation whole:
 #
 #   error: cannot specify features for packages outside of workspace
 #
@@ -318,8 +322,8 @@ cargo_over_workspaces() {
 # resolves — flat (2 levels under a root), family-nested (3) and
 # nested one level deeper still (4) — confirmed the only depths present in the tree.
 #
-# A manifest is only a crate's if it declares a `[package]`. Every
-# `substrate/<family>/Cargo.toml` is a virtual `[workspace]` manifest holding
+# A manifest is only a crate's if it declares a `[package]`. Every sibling
+# root's own `<root>/<family>/Cargo.toml` is a virtual `[workspace]` manifest holding
 # no package at all, and it sits at exactly the depth a flat crate's own
 # manifest does, so counting manifests alone would enter every family
 # directory name into the census as a crate that does not exist. G18 would
@@ -334,7 +338,7 @@ all_crate_names() {
 # Strip whichever crate root prefixes each path on stdin, leaving `<crate>/…`.
 #
 # Declarations name a crate and a path inside it, never the root that crate
-# currently sits under: `<crate>/tests/some_test.rs`, not `module/<crate>/…`.
+# currently sits under: `<crate>/tests/some_test.rs`, not `<root>/<crate>/…`.
 # That is deliberate. It is the property that lets a
 # family move between roots without invalidating every declaration naming it —
 # which is precisely what the ring family's move did to every path literal that
@@ -352,35 +356,36 @@ all_crate_names() {
 # reduces to the same `<crate>/…` a declaration actually names.
 #
 # NESTED_ROOTS is consumed first, and deliberately so: its rules take the root
-# prefix and the family segment off together. Were the plain-root loop to run
-# first, `$REPO/substrate/<family>/<crate>/…` would reduce to
-# `<family>/<crate>/…`, which the trailing `(substrate|division)` rule no
-# longer matches — the literal `substrate/` it keys on is exactly what the root
-# rule just removed. Every substrate path would then carry a family segment no
-# declaration names, and every join keyed on that spelling would match nothing.
+# prefix and the grouping segment off together. Were the plain-root loop to run
+# first, a nested root's own `<root>/<group>/<crate>/…` would reduce to
+# `<group>/<crate>/…`, which the trailing grouping rule no longer matches — the
+# literal root segment it keys on is exactly what the root rule just removed.
+# Every such path would then carry a group segment no declaration names, and
+# every join keyed on that spelling would match nothing.
 #
-# The trailing rule stays for `division/`, which is a grouping segment *inside*
-# the `module/` root rather than a root of its own, and for input that arrives
-# already repo-relative — strip_crate_root is also fed tool output, not only
-# absolute filesystem paths.
+# The trailing rule also covers a grouping segment that sits *inside* a plain
+# root rather than being a root of its own, and for input that arrives already
+# repo-relative — strip_crate_root is also fed tool output, not only absolute
+# filesystem paths.
 #
-# This function does not know about `$REPO/spike`, so it leaves a spike/ path
-# absolute. That was once described here as deliberate — family_bin_sources()
+# This function does not know about a demo-binaries root, so it leaves a path
+# under one absolute. That was once described here as deliberate — family_bin_sources()
 # dropped whatever this left absolute, and the note claimed that was how paths
 # outside every crate root got excluded from G1's join. It had stopped being
-# true: the demo-crate relocation moved 19 `demo_*` crates from module/ into spike/, turning that
-# "exclusion" into blindness to every binary they own. G1 then held those
-# binaries to a coverage bar no test can reach, and never budget-checked them —
-# `demo_spatial_fixed/src/main.rs` is 1816 lines against a 12-line shim budget.
+# true: a later crate relocation moved a batch of `demo_*` crates into that
+# root, turning that "exclusion" into blindness to every binary they own. G1
+# then held those binaries to a coverage bar no test can reach, and never
+# budget-checked them — one relocated demo's own main.rs ran well over a
+# thousand lines against a 12-line shim budget.
 # family_bin_sources() now builds its key from cargo's own manifest_path and
 # calls nothing here, so no part of G1 depends on this behavior any more.
 #
 # Whether the remaining callers want it is a separate, open question, not an
 # endorsement: g10_pinned_math.sh normalizes its hits through this function and
 # classifies them against an allowlist keyed on the stripped spelling, so adding
-# a spike/ rule would move that key space under it. G10 has its own, already-
-# filed spike/ blindness upstream of this (its source list, not its key), so the
-# two want deciding together rather than one patched blind.
+# a rule for that root would move that key space under it. G10 has its own,
+# already-filed blindness to that root upstream of this (its source list, not
+# its key), so the two want deciding together rather than one patched blind.
 strip_crate_root() {
   local root expr=''
   for root in "${NESTED_ROOTS[@]}"; do expr="$expr s#^$root/[^/]+/##;"; done
@@ -481,9 +486,9 @@ family_smoke() {
 # crate/package name, Cargo does not restrict `.rs` source file names to a
 # safe charset — `#[path = "weird name.rs"]` is legal — so this is not
 # structurally ruled out the way a crate-name-keyed lookup would be. No live
-# trigger: confirmed empirically that all 983 `.rs` files under every
-# `src/`/`tests/` directory in `module/` and `ring/` are free of whitespace
-# and glob metacharacters.
+# trigger: confirmed empirically that every `.rs` file under every
+# `src/`/`tests/` directory in this repository's own crate roots is free of
+# whitespace and glob metacharacters.
 crate_rs_listing() {
   ( cd "$1" && find src tests -name '*.rs' -type f 2>/dev/null | sort | xargs -r sha256sum )
 }
@@ -498,19 +503,16 @@ crate_rs_listing() {
 # is not the rule. G1 drops binary entry points from its coverage denominator
 # and bounds how much may live in one, and both halves used to spell "binary
 # entry point" as the literal path `src/main.rs`. A `[[bin]]` may declare any
-# `path`: one crate elsewhere in this repository's own history declared a
-# second one at `src/bin/wasm_probe.rs`, which was therefore neither dropped
-# nor bounded — measured directly, ten coverable lines, reported `0/10`,
-# sitting permanently in a denominator whose threshold is 100% and which no
-# test suite can move.
+# `path`: a crate declaring a second one at a non-conventional path would
+# therefore be neither dropped nor bounded, sitting permanently in a
+# denominator whose threshold is 100% and which no test suite can move.
 #
 # Asked of every workspace rather than of one, for a reason this function is
-# its own best illustration of. It used to run `cargo metadata` once at
-# `$REPO`, which answers for the root workspace's own trees and for nothing
-# under `substrate/` (workspace_roots()). The crate the paragraph above is
-# about lived under a `substrate/<family>/` root, so the fix written for it
-# had gone blind to it, and its second binary was once again neither dropped
-# nor bounded.
+# its own best illustration of. Running `cargo metadata` once at `$REPO`
+# answers for the root workspace's own trees and for nothing under a sibling
+# workspace root (workspace_roots()). A crate living under such a root would
+# go unseen by a fix that only widened `src/main.rs` handling, and its second
+# binary would again go neither dropped nor bounded.
 #
 # The empty-output contract is what hid it. A family of pure libraries declaring
 # no binary and a family cargo was never asked about produce the identical
@@ -526,7 +528,7 @@ family_bin_sources() {
   # A root that cannot be read at all is fatal, and deliberately so: that is the
   # "could not be told which files are binaries" case the header names, and it
   # has to stay distinguishable from the family that legitimately has none.
-  # Asking eleven roots and silently accepting that one of them answered nothing
+  # Asking every root and silently accepting that one of them answered nothing
   # would rebuild the exact blindness this loop replaced.
   while IFS= read -r root; do
     meta="$( cd "$root" && cargo metadata --no-deps --format-version 1 2>/dev/null )" || return 1
@@ -535,8 +537,8 @@ family_bin_sources() {
     # Keyed `<crate>/<path-within-crate>`, computed from the package's own
     # manifest directory rather than by stripping a list of known roots. That
     # spelling is what g1_coverage.sh's per_file join uses, and deriving it from
-    # cargo's own answer makes it survive a relocation: a crate moving between
-    # module/, ring/, substrate/ or spike/ changes its manifest_path and its
+    # cargo's own answer makes it survive a relocation: a crate moving from
+    # one crate root to another changes its manifest_path and its
     # src_path together, and the segment between them — the key — does not move.
     emitted="$( printf '%s' "$meta" | python3 -c '
 import json, os, sys

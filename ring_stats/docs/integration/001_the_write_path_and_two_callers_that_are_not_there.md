@@ -28,11 +28,11 @@ cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
 # is a parallel ugrep that emits hits in completion order
 echo '  -- who declares ring_stats --'
-for f in */Cargo.toml; do if command grep -q '^ring_stats' "$f"; then echo "    ${f#ring/}"; fi; done
+for f in */Cargo.toml; do if command grep -q '^ring_stats' "$f"; then echo "    ${f}"; fi; done
 echo '  -- every production call of a recorder --'
-command grep -r 'stats\.record_' --include=*.rs */src/ | command grep -v '//!' | sed 's|ring/||'
+command grep -r 'stats\.record_' --include=*.rs */src/ | command grep -v '//!'
 echo '  -- who imports the one that counts --'
-command grep -r 'use ring_overflow::' --include=*.rs */src/ */tests/ | sed 's|ring/||'
+command grep -r 'use ring_overflow::' --include=*.rs */src/ */tests/
 echo '  -- what ring_core reaches for at the full-ring branch --'
 command grep -m1 -B2 -A4 -F '      Err( record ) => match would_resolve( self.overflow )' ring_core/src/lib.rs
 echo '  -- and what the crate now says about that, up front --'
@@ -133,9 +133,8 @@ in what it measures, which is the point — the fix is that
 
 ### ST18 — `reset` Names a Caller in a Crate That Does Not Depend on This One
 
-`RingStats::reset`'s doc comment says: "Used by `ring_shutdown`'s reset, so a
-recycled ring does not carry the previous world's numbers, per
-`docs/feature/184_close_reset_and_drain_all.md`."
+`RingStats::reset`'s doc comment says it is named for `ring_shutdown`'s reset,
+so a recycled ring would not carry the previous world's numbers.
 
 `ring_shutdown`'s manifest declares four dependencies — `ring_cursor`, `ring_wait`,
 `ring_core`, `ring_types` — and `ring_stats` is not among them. Zero lines of that

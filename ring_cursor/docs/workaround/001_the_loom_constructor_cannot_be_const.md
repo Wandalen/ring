@@ -64,7 +64,7 @@ only by reference.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 command grep -r 'cfg( *loom *)' --include=*.rs \
-  {module,ring}/*/src/ {module,ring}/*/tests/ \
+  */src/ */tests/ \
   | sed -E 's/:/: /' | LC_ALL=C sort
 ```
 
@@ -148,7 +148,7 @@ census beside it is not:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 command grep -rl 'cfg( *loom *)' --include=*.rs \
-  {module,ring}/*/src/ {module,ring}/*/tests/ | LC_ALL=C sort
+  */src/ */tests/ | LC_ALL=C sort
 ```
 
 Live output:

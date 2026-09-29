@@ -61,7 +61,7 @@ command grep -n 'pub trait\|^impl' ring_event/src/lib.rs
 echo '  -- the three free functions and the methods under them --'
 awk '/^pub fn publish_into< S, P >\( slot : &mut S, payload : P \) -> Result< \(\), RingError >$/{ n1 = NR } n1 && NR >= n1 && NR <= n1 + 5 { print } /^\/\/\/ let slot = BytesSlot::< 4 >::empty\(\);$/{ n2 = NR } n2 && NR >= n2 + 3 && NR <= n2 + 8 { print } /^pub fn recycle< S >\( slot : &mut S \)$/{ n3 = NR } n3 && NR >= n3 && NR <= n3 + 5 { print }' ring_event/src/lib.rs | command grep 'pub fn\|  [a-z]*\.'
 echo '  -- implementors of either trait outside the crate --'
-command grep -rn 'impl.*Fill<\|impl.*Peek for' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -vc '^ring_event/src' || true
+command grep -rn 'impl.*Fill<\|impl.*Peek for' --include=*.rs . | command grep -vc '^ring_event/src' || true
 echo '  -- what the family calls the third operation, and what it calls publish --'
 command grep -rn 'pub fn recycle\|pub fn reset\|fn clear( &mut self )\|pub fn clear' --include=*.rs ring_*/src | sed 's/.*fn //; s/[(<].*//' | sort | uniq -c | sort -rn
 command grep -rn 'pub fn publish( ' --include=*.rs ring_*/src

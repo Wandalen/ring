@@ -29,7 +29,7 @@ command grep 'pub fn record_[a-z]*(' ring_stats/src/lib.rs
 echo '  -- every call of each, outside this crate --'
 for m in record_claim record_publish record_consume record_drop record_wait; do
   printf '    %-16s %s\n' "$m" \
-    "$( command grep -rn "\.$m(" --include=*.rs . | command grep -v '^ring_stats/' | sed 's|ring/||' | tr '\n' ' ' )"
+    "$( command grep -rn "\.$m(" --include=*.rs . | command grep -v '^ring_stats/' | tr '\n' ' ' )"
 done
 echo '  -- what the crate says the fourth counter is for --'
 command grep -m1 -A9 -F '  /// Record nanoseconds spent waiting for space or data.' ring_stats/src/lib.rs

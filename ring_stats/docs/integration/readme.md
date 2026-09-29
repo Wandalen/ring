@@ -56,7 +56,7 @@ command grep -rn 'stats\.record_' --include=*.rs */src/
 echo '  -- who imports the counting half --'
 command grep -rn 'use ring_overflow::' --include=*.rs */src/ */tests/ | command grep -v '///' 
 echo '  -- who calls reset, and what its doc says --'
-command grep -rn '\.reset()' --include=*.rs ring_*/ | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||'
+command grep -rn '\.reset()' --include=*.rs ring_*/
 command grep -c 'ring_stats' ring_shutdown/Cargo.toml || true
 ```
 

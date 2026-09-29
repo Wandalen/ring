@@ -64,7 +64,7 @@ grep -n '\.set(\|\.write(\|\.take(' ring_store/src/lib.rs | grep -vE ':[[:space:
 
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'Slot::clear\|slot\.clear()\|Slot::is_empty' ring_*/src/*.rs \
-  | grep -v '^ring_slot/' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -v '^ring_slot/' | sort
 
 # every signature and field naming a ring_types type
 grep -n 'SlotIndex\|Seq\|Capacity' ring_store/src/lib.rs | grep -E 'pub (const )?fn |^[0-9]+:  (slots|capacity) :' | grep -vE ':[[:space:]]*(///|//!|//)'

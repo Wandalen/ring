@@ -46,7 +46,7 @@ grep "pub const GATING" ring_cursor/src/lib.rs
 grep "load( GATING )" ring_cursor/src/lib.rs
 
 # every site spelling the sleep length — three reason about it, three collide
-command grep -r "from_micros( 50 )\|50µs" {module,ring}/*/src/*.rs {module,ring}/*/tests/*.rs 
+command grep -r "from_micros( 50 )\|50µs" */src/*.rs */tests/*.rs 
 ```
 
 Live output:

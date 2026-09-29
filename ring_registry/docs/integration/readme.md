@@ -63,7 +63,7 @@ command grep -n -B 1 'NameTaken,\|NameUnknown,' ring_types/src/error.rs | sed 's
 echo '  -- and how far the replacement error reaches --'
 printf '    ring_registry on the declared export surface: %s\n' \
   "$( command grep -c '^ring_registry$' bench_harness/gate/declared/ring/export_surface.txt || true )"
-printf '    pub use of RegistryError anywhere in /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/:  %s\n' \
+printf '    pub use of RegistryError anywhere in the tree:  %s\n' \
   "$( command grep -rc 'pub use.*RegistryError' --include=*.rs */ | awk -F: '{ s += $2 } END { print s + 0 }' )"
 ```
 

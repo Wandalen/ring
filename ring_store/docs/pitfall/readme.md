@@ -58,7 +58,7 @@ cd "$(git rev-parse --show-toplevel)"
 awk '/^  \/\/\/ Always false — a `Capacity` cannot be zero, so a buffer always has slots\.$/{ n1 = NR } n1 && NR >= n1 && NR <= n1 + 5 { print } /^  \/\/\/ assert!\( !buffer\.is_empty\(\) \);$/{ n2 = NR } n2 && NR >= n2 + 2 && NR <= n2 + 6 { print }' ring_store/src/lib.rs
 
 # every is_empty in the family — sorted: grep -r has no stable multi-file order
-grep -rn 'pub \(const \)\?fn is_empty' ring_*/src/*.rs | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn 'pub \(const \)\?fn is_empty' ring_*/src/*.rs | sort
 
 # the naming inversion where both types are in scope
 grep -n 'let mut buffer = TlsBuffer\|let mut ring : Buffer\|buffer\.is_empty()' ring_tls/tests/tls_test.rs | head -8

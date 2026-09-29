@@ -57,8 +57,10 @@ the state it needs is per-thread — which it is, because this crate does not pr
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-echo '  -- the one stated requirement --'
-command grep -m1 -F 'Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.' docs/feature/185_ring_stats.md
+# the one stated requirement lived in docs/feature/185_ring_stats.md — a
+# pre-implementation design corpus external to this repository, unreachable
+# since extraction; the quote it once produced is preserved as a historical
+# note in non_functional_requirement/001.md
 echo '  -- what the crate does to check it --'
 printf '    benches/ present: %s   Instant/Duration in the suite: %s\n' \
   "$( test -d ring_stats/benches && echo yes || echo no )" \

@@ -23,12 +23,19 @@ counter distorting the thing it measures is
 
 ## The Requirement, and What Checks It
 
+> The requirement itself, as `docs/feature/185_ring_stats.md` stated it —
+> historical record, not independently reproducible from a standalone
+> checkout (that pre-implementation design corpus is external to this
+> repository and unreachable since extraction): "Per-ring counters for what
+> actually happened: items claimed, items published, items dropped and under
+> which policy, and nanoseconds spent waiting. They are cheap enough to leave
+> on and are the only thing that distinguishes a ring under mild pressure from
+> one that is quietly discarding traffic."
+
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
 # is a parallel ugrep that emits hits in completion order
-echo '  -- the requirement, as feature 185 states it --'
-command grep -m1 -F 'Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.' docs/feature/185_ring_stats.md
 echo '  -- every cost statement in the crate source --'
 command grep 'cheap\|cost\|free\|overhead\|fence\|hot path' ring_stats/src/lib.rs
 echo '  -- and what measures any of it --'
@@ -40,8 +47,6 @@ printf '    benches/ present: %s   Instant/Duration in the suite: %s\n' \
 Live output:
 
 ```
-  -- the requirement, as feature 185 states it --
-Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.
   -- every cost statement in the crate source --
 //! `docs/feature/185_ring_stats.md` asks for counters cheap enough to leave on
 //! synchronisation point, so ordering them would buy nothing. The fence-cost

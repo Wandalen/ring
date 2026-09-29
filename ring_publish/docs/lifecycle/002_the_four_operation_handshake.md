@@ -57,7 +57,7 @@ cd "$(git rev-parse --show-toplevel)"
 # all four roots named explicitly: `ring/` holds this crate and both its
 # numbered-clause siblings, and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` is a repo-root sibling of `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`
 # rather than nested inside it, so neither is reachable from a bare `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`
-grep -r 'Clause' --include='*.rs' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | LC_ALL=C sort
+grep -r 'Clause' --include='*.rs' . | LC_ALL=C sort
 ```
 
 Live output:

@@ -98,7 +98,7 @@ awk '/^  \/\/\/ Return the slot to its empty state\.$/{ n1 = NR } n1 && NR >= n1
 # every place the family clears a slot, both generic over the trait
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'Slot::clear\|slot\.clear()' ring_*/src/*.rs \
-  | grep -v '^ring_slot/' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -v '^ring_slot/' | sort
 ```
 
 The counterexample fixtures, the `secret` residue, and the `Debug` output all

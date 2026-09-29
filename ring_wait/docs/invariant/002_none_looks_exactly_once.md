@@ -149,7 +149,7 @@ The family runs `loom` broadly. This crate's entire test file opts out.
 cd "$(git rev-parse --show-toplevel)"
 command grep -m1 -A6 -F '// Ordinary tests, compiled out under `--cfg loom`. That cfg swaps' ring_wait/tests/wait_test.rs
 # crates whose tests are loom-aware, and whether this one has a loom-only module
-grep -rl 'loom' --include=*.rs {module,ring}/*/tests/ | wc -l
+grep -rl 'loom' --include=*.rs */tests/ | wc -l
 grep -c 'cfg( loom )' ring_wait/tests/wait_test.rs || echo '0 — no loom-gated module'
 ```
 

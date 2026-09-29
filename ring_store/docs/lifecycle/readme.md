@@ -52,10 +52,10 @@ lap later, or at ring teardown, whichever comes first.
 cd "$(git rev-parse --show-toplevel)"
 
 # the family's Drop impls — sorted: grep -r has no stable multi-file order
-grep -rn '^impl.*Drop for' ring_*/src/*.rs | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn '^impl.*Drop for' ring_*/src/*.rs | sort
 
 # the operation that would empty a slot on read, and its whole call census
-grep -rn '\.take(' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn '\.take(' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sort
 
 # the one written statement of the consumer-does-not-clear rule
 command grep -m1 -A6 -F '    let Ok( mut reservation ) = self.claim() else { return Err( record ) };' ring_spsc/src/lib.rs
@@ -68,7 +68,7 @@ grep -ci 'buffer' ring_shutdown/src/lib.rs || true
 
 # every caller of the sweep
 grep -rn 'buffer\.clear()\|Buffer::clear' ring_*/src/*.rs ring_*/tests/*.rs 2>/dev/null \
-  | grep -vE ':[[:space:]]*(///|//!|//)' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -vE ':[[:space:]]*(///|//!|//)' | sort
 ```
 
 The drop counts and the `BytesSlot` residue come from a release probe; both are

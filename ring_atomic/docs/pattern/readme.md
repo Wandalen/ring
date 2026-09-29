@@ -60,7 +60,7 @@ echo '  -- pattern one: the claim, and the atomics standing outside it --'
 command grep -m1 -A3 -F '//! the orderings are: this crate is the one place in 33 crates where an atomic' ring_atomic/src/lib.rs
 command grep -rnE 'Atomic[A-Za-z0-9]+::new' --include=lib.rs ring_*/src/ \
   | command grep -v 'ring_atomic/\|AtomicSeq::new' | command grep -vE ':[0-9]+: *//' \
-  | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/src/lib.rs||'
+  | sed 's|/src/lib.rs||'
 echo '  -- pattern two: delegation, not reimplementation --'
 command grep -m1 -A26 -F 'impl SeqCell for CountingSeq' ring_atomic/src/lib.rs | command grep -E 'fn |self\.cell'
 echo '  -- and the single test the downstream counting assertions rest on --'

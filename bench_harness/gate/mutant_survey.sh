@@ -41,12 +41,11 @@
 # WHY --in-place, WHICH IS OTHERWISE THE WRONG CHOICE
 #
 # `cargo mutants` normally copies the tree to a scratch directory and mutates
-# the copy, which is strictly safer. That is unavailable here: several `spike/`
-# crates declare `path = "../../../cgtools/..."`, which escapes the workspace
-# root. Relocate the tree and that path resolves against the new parent —
-# `/tmp/cgtools/...`, which does not exist — so the baseline build fails before
-# a single mutant is tested. Any tree-relocating tool hits this, not just this
-# one.
+# the copy, which is strictly safer. That is unavailable in general: a path
+# dependency that escapes the workspace root breaks under relocation —
+# relocate the tree and that path resolves against the new parent instead,
+# which need not exist there, so the baseline build fails before a single
+# mutant is tested. Any tree-relocating tool hits this, not just this one.
 #
 # So the survey mutates the real tree, and pays for it with the same discipline
 # G12 uses: hash every target before, restore-check after, and treat a tree
@@ -236,16 +235,16 @@ fi
 # now one of the things it is sourced for.
 . "$SELF_DIR/common.sh"
 
-# Which root a crate lives under is not fixed. A literal `module/` here did
-# not merely mislabel an error message: it made this script unrunnable for
-# all 33 ring crates after they moved to `ring/`, dying on its first line of
-# real work with `no crate at module/ring_seqno`. That is the same population
-# G13 reports as never surveyed — the gate names this script as the remedy,
-# and the remedy could not run.
+# Which root a crate lives under is not fixed. A literal old-root prefix here
+# did not merely mislabel an error message: it made this script unrunnable for
+# all 33 ring crates after they moved to their current root, dying on its
+# first line of real work with `no crate at <old-root>/ring_seqno`. That is
+# the same population G13 reports as never surveyed — the gate names this
+# script as the remedy, and the remedy could not run.
 #
 # CRATE_REL carries the answer down to the foreign-result check below rather
-# than letting it widen to accept both roots. A result prefixed
-# `module/ring_seqno/` must still read as foreign, because it would mean the
+# than letting it widen to accept both roots. A result prefixed by the
+# old root must still read as foreign, because it would mean the
 # survey mutated a tree this crate no longer occupies.
 CRATE_DIR="$( crate_dir "$CRATE" )" \
   || { echo "no crate named $CRATE under module/ or ring/" >&2; exit 2; }
@@ -279,8 +278,8 @@ WS_ROOT="$( crate_workspace_root "$CRATE" 2>/dev/null )" || WS_ROOT=""
 WS_REL="${WS_ROOT#"$REPO"}"; WS_REL="${WS_REL#/}"; [ -n "$WS_REL" ] || WS_REL="<repo root>"
 
 # CRATE_REL carries the answer down to the foreign-result check below rather
-# than letting it widen to accept both roots. A result prefixed
-# `module/ring_seqno/` must still read as foreign, because it would mean the
+# than letting it widen to accept both roots. A result prefixed by the
+# old root must still read as foreign, because it would mean the
 # survey mutated a tree this crate no longer occupies.
 #
 # Relative to WS_ROOT rather than to `$REPO`, because that is the form
@@ -469,8 +468,8 @@ count_lines()
 }
 
 # The survey's own non-vacuity check, and the reason `survey_status` is captured
-# at all. If the baseline build dies — the `cgtools` path escape above is one way
-# it can — `cargo mutants` writes no `missed.txt`, so `$missed` comes back empty
+# at all. If the baseline build dies — the escaping-path-dependency risk above is
+# one way it can — `cargo mutants` writes no `missed.txt`, so `$missed` comes back empty
 # and every line below reads it as "nothing survived". A survey that never ran
 # would report the cleanest possible result.
 #

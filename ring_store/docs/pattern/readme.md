@@ -52,11 +52,11 @@ all.
 cd "$(git rev-parse --show-toplevel)"
 
 # who depends on the fold — sorted: a glob is not expanded in a stable order
-grep -ln 'ring_index' ring_*/Cargo.toml | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/Cargo.toml||' | sort
+grep -ln 'ring_index' ring_*/Cargo.toml | sed 's|/Cargo.toml||' | sort
 
 # every call site of it
 grep -rn '[^_a-zA-Z]of( ' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' \
-  | grep -vE '::of\(|fn of\(' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  | grep -vE '::of\(|fn of\(' | sort
 
 # the composition point, and the route that takes capacity as a parameter
 command grep -m1 -A13 -F '  /// assert_eq!( buffer.get( SlotIndex( 2 ) ).get(), Some( &1 ) );' ring_store/src/lib.rs | tail -n 12

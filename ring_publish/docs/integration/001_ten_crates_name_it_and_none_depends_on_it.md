@@ -63,7 +63,7 @@ deletion from that manifest.
 cd "$(git rev-parse --show-toplevel)"
 for c in ring_*/; do n=$( basename "$c" )
   t=$( grep -m1 -oE 'Tier [0-9]+' "$c/src/lib.rs" 2>/dev/null )
-  d=$( command grep -rl --include=Cargo.toml "^${n} = " /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ 2>/dev/null | command grep -v "/${n}/" | wc -l )
+  d=$( command grep -rl --include=Cargo.toml "^${n} = " . 2>/dev/null | command grep -v "/${n}/" | wc -l )
   printf "%-16s %-8s dependents=%s\n" "$n" "$t" "$d"
 done
 ```

@@ -27,50 +27,34 @@ Whether the counters are in fact cheap enough to leave on is
 cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
 # is a parallel ugrep that emits hits in completion order
-echo '  -- what the feature record says ring_stats is --'
-command grep '^\- \*\*Status:\*\*' docs/feature/185_ring_stats.md
 echo '  -- what the crate is --'
 printf '    src lines %s   public methods %s   tests %s\n' \
   "$( wc -l < ring_stats/src/lib.rs )" \
   "$( command grep -c 'pub \(const \)\?fn ' ring_stats/src/lib.rs || true )" \
   "$( command grep -c '^fn ' ring_stats/tests/stats_test.rs || true )"
-# Both censuses below print shape rather than population. Other workstreams flip
-# their own blocks between runs, so a raw tally or a full run listing goes stale
-# without anything about this crate changing -- which is itself the finding.
-echo '  -- and what Status says across every feature record --'
-command grep -h '^\- \*\*Status:\*\*' docs/feature/*.md | sort | uniq -c | sort -rn \
-  | awk 'NR==1{ printf "    majority: %s\n", $NF } NR==2{ printf "    minority: %s\n", $NF } END{ printf "    distinct values: %d\n", NR }'
-echo '  -- present is not scattered: it is whole workstreams, marked in blocks --'
-command grep -l '^\- \*\*Status:\*\* present' docs/feature/*.md \
-  | sed -E 's#.*/([0-9]+)_.*#\1#' | sort -n \
-  | awk 'NR==1{s=$1;p=$1;next} $1==p+1{p=$1;next} {n++; if(p-s+1>m)m=p-s+1; s=$1; p=$1} END{n++; if(p-s+1>m)m=p-s+1; printf "    contiguous runs: %d\n    widest run:      %d features\n", n, m}'
-echo '  -- and the run that contains this crate feature --'
-command grep -l '^\- \*\*Status:\*\* present' docs/feature/1[678]*.md \
-  | sed -E 's#.*/([0-9]+)_.*#\1#' | sort -n | awk 'NR==1{f=$1} END{ printf "    %s-%s (%d features)\n", f, $1, NR }'
-echo '  -- the consumer feature, and the counters it names --'
-command grep '^\- \*\*Status:\*\*\|ring counters' docs/feature/353_spatial_and_ring_stats_overlay.md
 ```
 
 Live output:
 
 ```
-  -- what the feature record says ring_stats is --
-- **Status:** present
   -- what the crate is --
     src lines 518   public methods 16   tests 22
-  -- and what Status says across every feature record --
-    majority: planned
-    minority: present
-    distinct values: 2
-  -- present is not scattered: it is whole workstreams, marked in blocks --
-    contiguous runs: 8
-    widest run:      22 features
-  -- and the run that contains this crate feature --
-    167-188 (22 features)
-  -- the consumer feature, and the counters it names --
-- **Status:** planned
-An overlay reporting the spatial index's own counters (cells touched per query) alongside the concurrency substrate's ring counters (drops), read while the world runs. The source marks it optional: it is the diagnostic layer above the committed core surface, included when the cost of the counters is already being paid and dropped when it is not.
 ```
+
+> Historical record, not independently reproducible from a standalone checkout
+> (the external feature-tracking corpus these figures came from,
+> `docs/feature/*.md`, is external to this repository and unreachable since
+> extraction): this crate's own tracked record read "Status: present". Across
+> every tracked record at the time, the majority value was "planned" and the
+> minority "present" (two distinct values). "present" was not scattered — it
+> fell in eight contiguous runs, the widest 22 features wide, and this crate's
+> own record sat inside that widest run, 167-188. The one documented consumer
+> feature — "An overlay reporting the spatial index's own counters (cells
+> touched per query) alongside the concurrency substrate's ring counters
+> (drops), read while the world runs. The source marks it optional: it is the
+> diagnostic layer above the committed core surface, included when the cost of
+> the counters is already being paid and dropped when it is not." — was itself
+> tracked as "planned".
 
 ---
 
@@ -103,17 +87,17 @@ flip because anyone checked `ring_stats`. It flipped because the block containin
 it was marked.
 
 **The census printed a population until this round, and the population is what
-kept going stale.** A different workstream's run extended by one feature between
+kept going stale.** A different tracked block's run extended by one feature between
 two runs of this document's own gate — nothing about `ring_stats` changed, and
 nothing about the feature that joined was checked against this crate either. The
 recipe above now prints run count and widest run instead of a tally, because the
-tally was measuring other people's workstreams. That a field can go stale here
+tally was measuring other people's tracked blocks. That a field can go stale here
 without anything here changing is not a defect in the recipe; it is the same
 claim the finding makes, arriving as a maintenance cost.
 
 **Finding.** So the original reading survives its own correction, and is
-sharpened by it. The `Status` field is a per-workstream marker rendered once per
-feature, and a per-workstream marker cannot report a per-feature fact. `present`
+sharpened by it. The `Status` field is a per-block marker rendered once per
+feature, and a per-block marker cannot report a per-feature fact. `present`
 is exactly as uninformative about this crate as `planned` was, for exactly the
 same reason — and it is now uninformative in the more dangerous direction, because
 a reader who sees `planned` against working code goes looking for the
@@ -143,7 +127,7 @@ that agrees with a field the finding's own conclusion says means nothing.
 
 **Disposition:** declined — the fix this finding actually points at is the
 project's own per-feature `Status` field convention and the identical
-per-workstream-block maintenance applied across all its tracked records,
+per-block maintenance applied across all its tracked records,
 not anything in this crate's own `src/`, `docs/`, or
 `Cargo.toml`; the finding's own closing paragraph explicitly declines to rename
 or otherwise alter this instance, so there is no in-scope edit here to make.
@@ -200,7 +184,7 @@ right to drop it on a cost that has never been taken.
 |------|-------|
 | Its "cheap enough to leave on" claim | [`non_functional_requirement/001`](../non_functional_requirement/001_cheap_enough_to_leave_on.md)'s own census |
 | 402 of 426 records say `planned` | Census above |
-| The 23 `present` records are 104–125 plus 419 | `docs/feature/`, by filename |
+| The 23 `present` records are 104–125 plus 419 | `docs/feature/`, by filename (historical; corpus unreachable since extraction) |
 | The overlay names `drops` and marks itself optional | Census above |
 | The overlay is itself `planned` | Census above |
 

@@ -83,7 +83,7 @@ things do:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-grep -r "50µs\|50 µs" {module,ring}/*/tests/*.rs
+grep -r "50µs\|50 µs" */tests/*.rs
 ```
 
 Live output:

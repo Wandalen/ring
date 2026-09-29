@@ -47,8 +47,8 @@ relies on most.
 cd "$(git rev-parse --show-toplevel)"
 echo "  types declared here: $( command grep -cE '^\s*(pub )?(struct|enum) ' ring_index/src/lib.rs )"
 command grep -n '^use ' ring_index/src/lib.rs
-echo "  SlotIndex constructions family-wide, excluding doctests and ring_types/src: $( command grep -rn 'SlotIndex( ' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v 'ring_types/src' | command grep -vc ':[0-9]*: *///' )"
-echo "  of which in a src/ file: $( command grep -rn 'SlotIndex( ' --include=*.rs /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/ | command grep -v 'ring_types/src' | command grep -v ':[0-9]*: *///' | command grep -c '/src/' )"
+echo "  SlotIndex constructions family-wide, excluding doctests and ring_types/src: $( command grep -rn 'SlotIndex( ' --include=*.rs . | command grep -v 'ring_types/src' | command grep -vc ':[0-9]*: *///' )"
+echo "  of which in a src/ file: $( command grep -rn 'SlotIndex( ' --include=*.rs . | command grep -v 'ring_types/src' | command grep -v ':[0-9]*: *///' | command grep -c '/src/' )"
 ```
 
 ### Findings Recorded Here

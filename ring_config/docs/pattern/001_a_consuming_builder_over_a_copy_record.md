@@ -43,7 +43,7 @@ echo '  -- every method in this family that takes `mut self`, with its receivers
 # line number stops being true the next time anything above it is edited.
 for f in $( command grep -rl 'fn [a-z_]*( mut self' --include=*.rs */src 2>/dev/null | LC_ALL=C sort )
 do
-  awk -v path="${f#/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/}" '
+  awk -v path="$f" '
     FNR == NR {
       if ( $0 ~ /^#\[ derive/ ) { pending = $0 }
       else if ( $0 ~ /^pub struct / ) { name = $3; sub( /[^A-Za-z0-9_].*/, "", name ); drv[ name ] = pending; pending = "" }

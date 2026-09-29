@@ -55,9 +55,7 @@
 #      and the statement ends at the message's own `)`, not the literal's. A
 #      custom failure message is the ordinary, encouraged way to write an
 #      assertion, which made this the gate's largest blind spot in practice:
-#      `cluster_macro/tests/macro_test.rs:177,226`,
-#      `cluster_physics/tests/physics_test.rs:341` and
-#      `visibility_cull/tests/cull_test.rs:424-425` each carried a
+#      three separate test files each carried a
 #      recorded-literal assertion in exactly this shape, invisible to the gate
 #      before this change. Bounded the same way Change 1 bounded the trailing
 #      shape: the quote is required, not optional, so an ordinary two-argument

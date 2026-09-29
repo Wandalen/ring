@@ -62,12 +62,12 @@ Roster size, and how often it changes:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-printf 'roster size, manifest scan:  %s\n' "$( cd ring && for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo x; done | wc -l )"
-printf 'roster size, normal closure: %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
+printf 'roster size, manifest scan:  %s\n' "$( for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo x; done | wc -l )"
+printf 'roster size, normal closure: %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
 printf 'the threshold proposed here: %s\n' "$( command grep -oE 'at [0-9]+ or more, generate it' ring_poll/docs/decisions/001_should_the_roster_be_generated.md | command grep -oE '[0-9]+' )"
 printf 'build scripts in the family: %s\n' "$( ls ring_*/build.rs 2>/dev/null | wc -l )"
 printf 'cargo-metadata call sites:   %s\n' "$( command grep -rl 'cargo_metadata\|cargo metadata' ring_*/src ring_*/tests 2>/dev/null | wc -l )"
-printf 'the owner named here:        %s\n' "$( command grep -oE 'S8 owns it because .ring_[a-z]+' ring_poll/docs/decisions/001_should_the_roster_be_generated.md | command grep -oE 'ring_[a-z]+' )"
+printf 'the owner named here:        %s\n' "$( command grep -oE 'ring_[a-z]+. owns it because' ring_poll/docs/decisions/001_should_the_roster_be_generated.md | command grep -oE 'ring_[a-z]+' )"
 printf 'and its size today:          %s src lines\n' "$( wc -l < ring_bench/src/lib.rs )"
 printf 'family rank by src size:     %s\n' "$( wc -l ring_*/src/lib.rs | sort -rn | command grep -v ' total$' | command grep -n 'ring_bench' | cut -d: -f1 )"
 printf 'the crate above it:          %s\n' "$( wc -l ring_*/src/lib.rs | sort -rn | command grep -v total | sed -n '1p' | awk '{print $2}' | cut -d/ -f1 )"

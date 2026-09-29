@@ -57,14 +57,14 @@ cd "$(git rev-parse --show-toplevel)"
 
 # who names it, and in which manifest section
 # sorted: the crate list is sorted first, so the awk output follows it
-for c in $( ls -d ring_*/ | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/||' | sort ); do
+for c in $( ls -d ring_*/ | sed 's|/||' | sort ); do
   awk -v c="$c" '/^\[dependencies\]/{s="dependencies"} /^\[dev-dependencies\]/{s="dev-dependencies"} /ring_store =/{printf "  %-10s %s\n", c, s}' ring/$c/Cargo.toml
 done
 
 # where each of them imports the type
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn 'use ring_store::' ring_event/tests/*.rs ring_tls/tests/*.rs \
-  ring_mpsc/src/lib.rs ring_spsc/src/lib.rs | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+  ring_mpsc/src/lib.rs ring_spsc/src/lib.rs | sort
 
 # how much of the surface the two real consumers reach
 for m in new clear all_empty capacity len is_empty get get_mut at at_mut iter iter_mut; do
@@ -74,7 +74,7 @@ done
 # the workspace denial, and the only two crates that opt out
 grep -n 'unsafe-code' Cargo.toml
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
-grep -rn 'allow( unsafe_code )' ring_*/src/lib.rs | sed 's|^/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | sort
+grep -rn 'allow( unsafe_code )' ring_*/src/lib.rs | sort
 
 # every unsafe block in the family, and the four that dereference the cell
 printf '  total: %s  direct: %s  via slot/slot_mut: %s\n' \

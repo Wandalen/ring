@@ -92,7 +92,7 @@ field_names() {
 # already names for a different pair of duplicate parsers. Root cause:
 # g22's fix was never carried over to this file's own copy of the same
 # check. Pitfall: zero live trigger — measured directly, not assumed: no
-# crate under module/, ring/, substrate/ or spike/ has zero matches under
+# crate under any crate root has zero matches under
 # the old pattern and more than zero under g22's qualifier-aware one, so
 # widening it changes no classification for any tracked module today.
 module_reading() {
@@ -154,22 +154,22 @@ verdict_table() {
   #   plain (persistent) variable costs nothing and stays validly bound for
   #   any later EXIT, matching how `$VERDICTS` itself is already scoped.
   trap 'rm -f -- "$log" "$VERDICTS"' EXIT
-  # Fix(g19_green_column_measured_one_workspace_of_twelve)
+  # Fix(g19_green_column_measured_one_workspace_only)
   # Root cause: this ran `cargo nextest run --workspace` exactly once, at
   #   `$REPO`. `--workspace` means "every member of the workspace I am
-  #   standing in", and $REPO's member list is 91 packages. The substrate/
-  #   relocation left eleven further workspace roots — each its own
-  #   `[workspace]` with its own members, 259 packages across all twelve — and
-  #   none of their crates were built, run, or emitted a nextest status line.
-  #   158 of the 205 modules the corpus declares live in that invisible set.
+  #   standing in", and that leaves out every crate belonging to a sibling
+  #   workspace root instead — each its own `[workspace]` with its own
+  #   members — so none of their crates were built, run, or emitted a
+  #   nextest status line. A large share of the modules the corpus declares
+  #   live in that invisible set.
   # Pitfall: the under-reach is silent, and both of the shapes it produces
   #   read as a plausible measurement rather than as an error. A workstream
   #   whose modules all live outside $REPO contributes no crate to
   #   `$VERDICTS`, so `ran` stays 0 and the row computes `⬜` — indis-
   #   tinguishable from a genuinely untested workstream. A workstream split
   #   across roots contributes only its $REPO crates, so `ran` is 1 and the
-  #   row computes a truthful-looking `✅N` over a truncated N. Six work-
-  #   streams sat in the first state and five in the second; no inspection of
+  #   row computes a truthful-looking `✅N` over a truncated N. Several work-
+  #   streams sat in the first state and several in the second; no inspection of
   #   the gate's own output separates either from a correct reading. Fixed by
   #   fanning out over workspace_roots() — the same enumeration
   #   cargo_over_workspaces() builds its per-family groups from — appending

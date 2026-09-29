@@ -57,7 +57,7 @@ printf 'each declares an owner:       %s\n' "$( command grep -hc '^- \*\*Owner:\
 printf 'each names its measurement:   %s\n' "$( command grep -lc '^### What Would Settle It' [0-9][0-9][0-9]_*.md | wc -l )"
 printf 'crates outside holding Guarded: %s\n' "$( cd ../../..; command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u | command grep -vc ring_shutdown || true )"
 printf 'crates outside binding Stopped: %s\n' "$( cd ../../..; command grep -rl '= .*\.close()' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u | command grep -v ring_shutdown | tr '\n' ' ' )"
-printf 'files outside citing either:   %s\n' "$( cd ../../../..; command grep -rl 'should_into_inner_exist\|should_a_stopped_token_be_unique' --include=*.md . | command grep -vc ring_shutdown || true )"
+printf 'files outside citing either:   %s\n' "$( cd ../../..; command grep -rl 'should_into_inner_exist\|should_a_stopped_token_be_unique' --include=*.md . | command grep -vc ring_shutdown || true )"
 ```
 
 Live output:

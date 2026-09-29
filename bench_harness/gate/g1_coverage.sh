@@ -88,9 +88,9 @@ mkdir -p "$lcov_root"
 # cargo honours: with `--all-features` it refuses the whole invocation outright
 # — `error: cannot specify features for packages outside of workspace` — and
 # that refusal is a property of the selection, not of each package, so one root
-# member in the list is enough to mask it for the rest. The eleven families
-# split across twelve workspaces, six of them naming no root member at all, and
-# this gate graded every one of those six on a command that compiled nothing.
+# member in the list is enough to mask it for the rest. Families can split
+# across several workspaces, some of them naming no root member at all, and
+# this gate graded every one of those on a command that compiled nothing.
 # See common.sh's family_workspace_groups() for the grouping.
 #
 # Worse here than in G2, and worth naming: tarpaulin swallows cargo's message
@@ -326,11 +326,11 @@ per_file="$( awk 'NR == FNR { drop[ $0 ] = 1; next } !( $1 in drop )' \
 #
 #   * An `else` whose path no test takes — the whole block reads zero, nothing
 #     inside it is positive, no discount, and the gate fails on the `else` and
-#     the body alike. Measured 2026-08-31: `exact_decimal/src/lib.rs` lines 237,
+#     the body alike. Measured 2026-08-31: one crate's `src/lib.rs` lines 237,
 #     238 and 240 all read zero together.
 #   * A site where tarpaulin instruments the `else` correctly — the line already
 #     reads positive, so there is nothing to discount. Measured in the same run:
-#     all four `let … else` in `smoke_lang_stack/src/lib.rs`, whose `else` lines
+#     all four `let … else` in another crate's `src/lib.rs`, whose `else` lines
 #     are hit normally. Which sites land which way is not settled here; the
 #     discount does not depend on knowing.
 #

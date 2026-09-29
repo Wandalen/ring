@@ -37,9 +37,9 @@ assert_declared_crates_exist
 # `g12_mutation.sh`'s `g12_block_markers_matched_by_prefix_not_equality` —
 # open and close boundaries both need "is this the one heading," and a
 # prefix test answers a different question. Pitfall: zero live trigger —
-# measured directly, not assumed: every one of the 158 "## Run Record"-
-# shaped headings across every live `tests/manual/readme.md` in module/,
-# ring/, substrate/ and spike/ is exactly hash-run-space-"Run Record" with
+# measured directly, not assumed: every "## Run Record"-
+# shaped heading across every live `tests/manual/readme.md` under any crate
+# root is exactly hash-run-space-"Run Record" with
 # nothing trailing (no extra words, no trailing whitespace, no CR), so
 # anchoring the pattern changes which lines it matches for zero files today.
 run_record_section() {

@@ -29,7 +29,7 @@ echo '  -- the whole layout, seven counters and no repr --'
 command grep -m1 -A10 -F '#[ derive( Debug, Default ) ]' ring_stats/src/lib.rs
 echo '  -- the crate that exists for exactly this, and who depends on it --'
 command grep -m1 -A5 -F '//! `docs/feature/169_padded_cursor.md` states the problem this crate exists to' ring_align/src/lib.rs
-for f in */Cargo.toml; do if command grep -q '^ring_align' "$f"; then echo "    declares ring_align: ${f#ring/}"; fi; done
+for f in */Cargo.toml; do if command grep -q '^ring_align' "$f"; then echo "    declares ring_align: ${f}"; fi; done
 ```
 
 Live output:

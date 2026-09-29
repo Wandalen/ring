@@ -61,7 +61,7 @@ printf '    public methods returning a guard: %s   callbacks runnable under the 
   "$( command grep -c 'pub fn [a-z_]*(.*MutexGuard' ring_trace/src/lib.rs || true )" \
   "$( command grep -c 'FnOnce\|FnMut\|impl Fn' ring_trace/src/lib.rs || true )"
 command grep -rn '\.lock()' --include=*.rs ring_*/src/ ring_*/tests/ \
-  | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | command grep -o '^[a-z_]*/[a-z]*/[a-z_]*\.rs:[0-9]*' | sed 's/^/    /'
+  | command grep -o '^[a-z_]*/[a-z]*/[a-z_]*\.rs:[0-9]*' | sed 's/^/    /'
 ```
 
 ### Findings Recorded Here

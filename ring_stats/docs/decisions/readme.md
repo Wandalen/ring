@@ -53,10 +53,12 @@ echo '  -- the two recorded decisions --'
 command grep -m1 -A8 -F '//! The counters are relaxed atomics: a stats read is a diagnostic, never a' ring_stats/src/lib.rs
 echo '  -- the first, applied without exception --'
 command grep -o 'Ordering::[A-Za-z]*' ring_stats/src/lib.rs | sort | uniq -c
-echo '  -- the second, and what the feature asked for --'
-command grep -m1 -F 'Per-ring counters for what actually happened: items claimed, items published, items dropped and under which policy, and nanoseconds spent waiting. They are cheap enough to leave on and are the only thing that distinguishes a ring under mild pressure from one that is quietly discarding traffic.' docs/feature/185_ring_stats.md
-echo '  -- and the methods it never named --'
+echo '  -- and the methods the requirement never named --'
 command grep -o '  pub fn \(record_consume\|consumed\|dropped_total\|in_flight\|reset\)' ring_stats/src/lib.rs
+# what the feature asked for, in the second decision's own recipe, lived in
+# docs/feature/185_ring_stats.md — external to this repository and
+# unreachable since extraction; the quote it once produced is preserved as a
+# historical note in decisions/002.md
 ```
 
 ### Findings Recorded Here

@@ -46,7 +46,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- the cell: birth, the writes, the absent end --'
 command grep -m1  -A3 -F '  /// crate should be pinned to.' ring_atomic/src/lib.rs | tail -n 1
 command grep -rnE '\.store\( ' --include=lib.rs ring_consume/src/ ring_spsc/src/ ring_mpsc/src/ \
-  | command grep -vE ':[0-9]+: *//' | command grep -v 'stamp(' | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||;s|/src/lib.rs||'
+  | command grep -vE ':[0-9]+: *//' | command grep -v 'stamp(' | sed 's|/src/lib.rs||'
 command grep -rc 'impl Drop for AtomicSeq\|impl Drop for CountingSeq' ring_atomic/src/lib.rs || true
 echo '  -- the crate: where its task sits, and what its Scope says --'
 find ring_atomic/task -name '*.md' | sort

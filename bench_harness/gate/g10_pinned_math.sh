@@ -130,20 +130,21 @@ mapfile -t allowed < <( decl_lines "$decl" | sort -u )
 # this tree has never had a single uniform one (see common.sh's crate_dir(),
 # which spans the same range):
 #
-#   flat   `<root>/<crate>/…`                     — module/, ring/, spike/
-#   one    `substrate/<family>/<crate>/…`         — all 168 substrate crates
-#   two    `module/division/<NNN_name>/<crate>/…` — the division crates
+#   flat   `<root>/<crate>/…`                — an ungrouped root
+#   one    `<root>/<family>/<crate>/…`       — a family-grouped root
+#   two    `<root>/<group>/<name>/<crate>/…` — a doubly-grouped root
 #
 # A root that has no crates at a given depth contributes zero matches from that
 # set under nullglob, not a phantom literal path.
 #
-# The middle depth was missing until it was measured: `substrate/` used to sit
-# under `module/` as `module/substrate/<NNN_name>/<crate>/`, which the two-deep
-# set matched, and when it was promoted to a repository root it lost exactly one
-# level and stopped matching anything at all. Every one of its 742 sources went
-# unread while the two surviving sets kept the aggregate non-empty, so neither
-# the total-emptiness check below nor the deeper-than-reach net after it could
-# notice — hence the per-root assertion rather than one across all roots.
+# The middle depth was missing until it was measured: one grouped root used to
+# sit nested one level deeper under another root, which the two-deep set
+# matched, and when it was promoted to a repository root of its own it lost
+# exactly one level and stopped matching anything at all. Every one of its
+# sources went unread while the two surviving sets kept the aggregate
+# non-empty, so neither the total-emptiness check below nor the deeper-than-
+# reach net after it could notice — hence the per-root assertion rather than
+# one across all roots.
 shopt -s nullglob
 SRC=()
 for _root in "${CRATE_ROOTS[@]}"; do
@@ -217,7 +218,7 @@ LOG_WITH_BASE='\.log\([[:space:]]*[^)[:space:]]'
 # on, so it was invisible to this detector until now — the same class of gap
 # `sin_cos` closed above, arriving from the opposite direction (a real call
 # shape the pattern never covered, not a loose pattern matching too much). A
-# repository-wide sweep (module/, ring/, spike/, every Cargo.toml) found zero
+# repository-wide sweep (every root, every Cargo.toml) found zero
 # existing calls of this form and zero `libm`/`num-traits` dependency
 # anywhere, so this closes a blind spot rather than a live leak. Unlike the
 # bare `.log(` collision above, `f32::`/`f64::`/`libm::` as a path qualifier
@@ -281,9 +282,9 @@ fi
 # Non-vacuity, detector B: the math library resolved from the manifest that
 # declares it rather than a path written here, so a moved checkout follows
 # instead of the control quietly going stale.
-manifest="$( crate_dir orbital_types )/Cargo.toml"
+manifest="$( crate_dir pinned_math_facade )/Cargo.toml"
 [ -f "$manifest" ] || fail "no manifest at ${manifest#"$REPO"/} to resolve the math library from, so detector B cannot check its own premise"
-cg_rel="$( sed -nE 's/^[[:space:]]*ndarray_cg[[:space:]]*=.*path[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$manifest" | head -1 )"
+cg_rel="$( sed -nE 's/^[[:space:]]*math_backend[[:space:]]*=.*path[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' "$manifest" | head -1 )"
 [ -n "$cg_rel" ] || fail "${manifest#"$REPO"/} declares no path dependency on the math library, so detector B has nothing to check its premise against"
 CG="$( cd "$( dirname "$manifest" )/$cg_rel" 2>/dev/null && pwd )"
 [ -n "${CG:-}" ] && [ -d "$CG/src" ] || fail "the math library path '$cg_rel' declared by ${manifest#"$REPO"/} does not resolve to a source tree, so detector B's premise is unchecked"

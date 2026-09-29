@@ -76,11 +76,11 @@ Both counts, and the delta, are already computable. There is no missing evidence
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-printf 'option A set, size %s: ' "$( cd ring && for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo x; done | wc -l )"
-( cd ring && for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo "${c%/Cargo.toml}"; done | tr '\n' ' ' ); echo
-printf 'option B set, size %s: ' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
-for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && printf '%s ' "$n"; done; echo
-printf 'with dev edges included:  %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
+printf 'option A set, size %s: ' "$( for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo x; done | wc -l )"
+( for c in ring_*/Cargo.toml; do command grep -q 'ring_wait' "$c" && echo "${c%/Cargo.toml}"; done | tr '\n' ' ' ); echo
+printf 'option B set, size %s: ' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
+for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q 'ring_wait' && printf '%s ' "$n"; done; echo
+printf 'with dev edges included:  %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -p "$n" 2>/dev/null | command grep -q 'ring_wait' && echo x; done | wc -l )"
 printf 'files naming the const:   %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | wc -l )"
 printf 'the declaration:          %s\n' "$( command grep -rl 'pub const PARKING_CRATES' */src 2>/dev/null | tr '\n' ' ' )"
 printf 'code references:          %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | while read -r f; do command grep -qE '^ *(use [^/]*|for [a-z]+ in |[a-z]+, )PARKING_CRATES' "$f" && echo "$f"; done | tr '\n' ' ' )"

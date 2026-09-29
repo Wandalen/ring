@@ -5,15 +5,15 @@
 #
 # Every family crate has missing_docs enforced, so a clean build is the first
 # half — but by two mechanisms rather than one, and the difference is the
-# reason the RUSTFLAGS below is load-bearing rather than decoration. Of the 226
-# library crates the eleven declaring families name, fifty-nine carry
-# `#![deny(missing_docs)]` in their own crate root, and the other hundred and
-# sixty-seven carry `[lints] workspace = true`, inheriting `missing_docs =
-# "warn"` from their workspace root. Warn, not deny: for that majority the lint
+# reason the RUSTFLAGS below is load-bearing rather than decoration. Of the
+# library crates the declaring families name, some carry
+# `#![deny(missing_docs)]` in their own crate root, and the rest carry
+# `[lints] workspace = true`, inheriting `missing_docs =
+# "warn"` from their workspace root. Warn, not deny: for that latter group the lint
 # only fails a build because this gate passes `RUSTFLAGS=-D warnings`, and
-# dropping that flag as redundant would silently downgrade three quarters of
+# dropping that flag as redundant would silently downgrade a large part of
 # the tree to a warning nobody reads while this gate kept reporting REACHED.
-# (Measured, not assumed: `cargo check -p spatial_bounds -v` shows
+# (Measured, not assumed: `cargo check -p <crate> -v` shows
 # `--warn=missing_docs` on the rustc command line for a crate whose lib.rs
 # never mentions the lint.)
 #
@@ -45,7 +45,7 @@ while read -r c; do
   # assumed from the conventional filename: a `[lib]` section may relocate the
   # library, and a crate with neither a declared path nor `src/lib.rs` has no
   # library for a doctest to live in. Differentially tested against `cargo
-  # metadata` over all 259 packages in the tree — no disagreement — which is
+  # metadata` over every package in the tree — no disagreement — which is
   # what makes reading the manifest directly preferable to a second
   # metadata walk beside the one family_bin_sources() already performs.
   libsrc="$( awk '
@@ -143,9 +143,9 @@ fi
 #   * Reach. In a selection mixing lib-bearing crates with bin-only ones, cargo
 #     silently drops the bin-only members: `cargo test --doc` is a lib-only
 #     operation, and a selection containing at least one library gets no warning
-#     about the rest. Measured on lang: one `Doc-tests` header for `lang_common`,
-#     none for the `smoke_lang_*` binary beside it, exit 0 — while the pass line
-#     counted both. (A selection of nothing but bin-only crates does refuse, with
+#     about the rest. Measured on one family: one `Doc-tests` header for its
+#     library crate, none for the smoke-test binary beside it, exit 0 — while
+#     the pass line counted both. (A selection of nothing but bin-only crates does refuse, with
 #     `error: no library targets found in packages: …` and exit 101, so this is
 #     specific to mixed selections and invisible everywhere else.)
 #
@@ -159,7 +159,7 @@ fi
 #     doctests and exits 0, and the pass line then reported every crate as
 #     documenting its public items "with examples that run": a conjunction over
 #     an empty set, which is the shape G9's own header names. Measured across
-#     several declaring families: eleven `Doc-tests` headers, every one
+#     several declaring families: multiple `Doc-tests` headers, every one
 #     `running 0 tests`, exit 0. More than one declaring family was in this
 #     state.
 #

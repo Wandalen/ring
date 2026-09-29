@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# G18 — every crate under module/ is claimed by exactly one gate family, or
-# exempted with a written reason.
+# G18 — every crate in this repository is claimed by exactly one gate family,
+# or exempted with a written reason.
 #
 # The gate the other seventeen cannot be: each of those grades the crates its
 # family declares, and is silent about a crate no family declares at all. A

@@ -11,8 +11,20 @@ _crate=""
 _dry_run=0
 for _arg in "$@"; do
   case "$_arg" in
-    filter::*) _filter="${_arg#filter::}" ;;
-    crate::*)  _crate="${_arg#crate::}" ;;
+    filter::*)
+      _filter="${_arg#filter::}"
+      if [[ -z "$_filter" ]]; then
+        echo "verb/test_only: filter::<substr> cannot be empty" >&2
+        exit 2
+      fi
+      ;;
+    crate::*)
+      _crate="${_arg#crate::}"
+      if [[ -z "$_crate" ]]; then
+        echo "verb/test_only: crate::<name> cannot be empty" >&2
+        exit 2
+      fi
+      ;;
     dry::1)    _dry_run=1 ;;
     *)
       echo "verb/test_only: unrecognized parameter '$_arg' — expected filter::<substr>, crate::<name>, or dry::1" >&2

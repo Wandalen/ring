@@ -13,9 +13,22 @@ _gates=()
 _dry_run=0
 for _arg in "$@"; do
   case "$_arg" in
-    family::*) _family="${_arg#family::}" ;;
+    family::*)
+      _family="${_arg#family::}"
+      if [[ -z "$_family" ]]; then
+        echo "verb/gate: family::<name> cannot be empty" >&2
+        exit 2
+      fi
+      ;;
     stage::*)  _stage="${_arg#stage::}" ;;
-    gate::*)   _gates+=( "${_arg#gate::}" ) ;;
+    gate::*)
+      _g="${_arg#gate::}"
+      if [[ -z "$_g" ]]; then
+        echo "verb/gate: gate::<name> cannot be empty" >&2
+        exit 2
+      fi
+      _gates+=( "$_g" )
+      ;;
     dry::1)    _dry_run=1 ;;
     *)
       echo "verb/gate: unrecognized parameter '$_arg' — expected family::<name>, gate::<name>, stage::<name>, or dry::1" >&2

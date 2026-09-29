@@ -3,6 +3,11 @@
 #@ tags: verb, verbs
 set -euo pipefail
 
+if (( $# > 0 )); then
+  echo "verb/verbs: unrecognized parameter '$1' — this verb takes no parameters" >&2
+  exit 2
+fi
+
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 for f in *; do

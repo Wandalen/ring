@@ -13,22 +13,22 @@ note: required because it appears within the type `PhantomData<Cell<()>>`
 note: required because it appears within the type `ring_spsc::Producer<'_, ring_slot::TypedSlot<u32>>`
   --> $WORKSPACE/ring_spsc/src/lib.rs
    |
-   | pub struct Producer< 'a, S >
+   | pub struct Producer<'a, S> {
    |            ^^^^^^^^
 note: required because it appears within the type `ring_core::ProducerInner<'_, u32>`
   --> $WORKSPACE/ring_core/src/lib.rs
    |
-   | enum ProducerInner< 'a, T >
+   | enum ProducerInner<'a, T> {
    |      ^^^^^^^^^^^^^
 note: required because it appears within the type `ring_core::Producer<'_, u32>`
   --> $WORKSPACE/ring_core/src/lib.rs
    |
-   | pub struct Producer< 'a, T >
+   | pub struct Producer<'a, T> {
    |            ^^^^^^^^
 note: required because it appears within the type `ring_handle::Producer<'_, u32>`
   --> src/lib.rs
    |
-   | pub struct Producer< 'a, T >
+   | pub struct Producer<'a, T> {
    |            ^^^^^^^^
    = note: required for `&ring_handle::Producer<'_, u32>` to implement `Send`
 note: required because it's used within this closure

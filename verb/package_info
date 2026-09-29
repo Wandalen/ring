@@ -5,6 +5,11 @@
 #@ tags: verb, package_info
 set -euo pipefail
 
+if (( $# > 0 )); then
+  echo "verb/package_info: unrecognized parameter '$1' — this verb takes no parameters" >&2
+  exit 2
+fi
+
 _root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _ws_toml="$_root/Cargo.toml"
 

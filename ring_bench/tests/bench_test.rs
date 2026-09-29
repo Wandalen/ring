@@ -1001,8 +1001,8 @@ fn both_ordering_subtractions_are_guarded_unconditionally() {
   let source = include_str!("../src/lib.rs");
 
   for guard in [
-    "assert!( self.received <= self.offered, \"received exceeded offered\" );",
-    "assert!( self.received <= self.reported, \"received exceeded reported\" );",
+    "assert!(self.received <= self.offered, \"received exceeded offered\");",
+    "assert!(self.received <= self.reported, \"received exceeded reported\");",
   ] {
     assert!(source.contains(guard), "src/lib.rs no longer contains {guard}");
   }
@@ -1066,8 +1066,8 @@ fn both_ordering_subtractions_are_guarded_unconditionally() {
 fn the_record_drop_input_is_guarded_before_the_subtraction_runs() {
   let source = include_str!("../src/lib.rs");
 
-  let guard = "assert!( received <= offered, \"received exceeded offered\" );";
-  let call = "stats.record_drop( workload.config().overflow(), ( offered - received ) as u64 );";
+  let guard = "assert!(received <= offered, \"received exceeded offered\");";
+  let call = "stats.record_drop(workload.config().overflow(), (offered - received) as u64);";
 
   let guard_pos = source
     .find(guard)

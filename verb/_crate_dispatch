@@ -6,6 +6,10 @@
 #@ tags: verb, internal
 set -euo pipefail
 
+if (( $# < 2 )); then
+  echo "verb/_crate_dispatch: requires <verb> <crate> as its first two arguments — never invoke directly, use a crate's own verb/test, verb/test_only, verb/lint, or verb/build" >&2
+  exit 2
+fi
 _verb="$1"; _crate="$2"; shift 2
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -21,6 +25,10 @@ for _arg in "$@"; do
         exit 2
       fi
       _filter="${_arg#filter::}"
+      if [[ -z "$_filter" ]]; then
+        echo "verb/$_verb: filter::<substr> cannot be empty" >&2
+        exit 2
+      fi
       ;;
     *)
       if [[ "$_verb" == "test_only" ]]; then

@@ -29,11 +29,12 @@ fi
 STEPS_1=( 'RUSTFLAGS="-D warnings" cargo nextest run --all-features' )
 STEPS_2=( "${STEPS_1[@]}" 'RUSTDOCFLAGS="-D warnings" cargo test --doc --all-features' )
 STEPS_3=( "${STEPS_2[@]}" 'cargo clippy --all-targets --all-features -- -D warnings' )
-STEPS_4=( "${STEPS_3[@]}" 'cargo +nightly udeps --all-targets --all-features' '( [ -f Cargo.lock ] && cargo +nightly audit || echo "no Cargo.lock — skipping audit" )' )
+STEPS_4=( "${STEPS_3[@]}" 'cargo +nightly udeps --all-targets --all-features' '( if [ -f Cargo.lock ]; then cargo +nightly audit; else echo "no Cargo.lock — skipping audit"; fi )' )
 # CLAUDE.md's own Level 5 inserts `will .test dry:0` here — a self-check specific to the `will`
 # tool, which has no equivalent in this repo. Substituted with this family's own maximal check:
-# the full corpus/quality gate suite (G1-G21, see bench_harness/gate/readme.md).
-STEPS_5=( "${STEPS_4[@]}" '( cd bench_harness && bash gate/run_all.sh --family ring )' )
+# the full corpus/quality gate suite (G1-G21, see bench_harness/gate/readme.md), via verb/gate
+# itself rather than re-deriving its invocation here.
+STEPS_5=( "${STEPS_4[@]}" './verb/gate' )
 
 case "$_level" in
   1) STEPS=( "${STEPS_1[@]}" ) ;;

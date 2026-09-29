@@ -9,7 +9,13 @@ _crate=""
 _dry_run=0
 for _arg in "$@"; do
   case "$_arg" in
-    crate::*) _crate="${_arg#crate::}" ;;
+    crate::*)
+      _crate="${_arg#crate::}"
+      if [[ -z "$_crate" ]]; then
+        echo "verb/lint: crate::<name> cannot be empty" >&2
+        exit 2
+      fi
+      ;;
     dry::1)   _dry_run=1 ;;
     *)
       echo "verb/lint: unrecognized parameter '$_arg' — expected crate::<name> or dry::1" >&2

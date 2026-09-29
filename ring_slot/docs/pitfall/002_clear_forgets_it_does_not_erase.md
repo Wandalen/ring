@@ -143,7 +143,7 @@ cd "$(git rev-parse --show-toplevel)"
 # every place the family clears a ring_slot slot
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 command grep -r 'Slot::clear\|slot\.clear()' ring_*/src/*.rs \
-  | command grep -v '^ring_slot/' | sed 's|ring/||' | LC_ALL=C sort
+  | command grep -v '^ring_slot/' | LC_ALL=C sort
 ```
 
 Live output:

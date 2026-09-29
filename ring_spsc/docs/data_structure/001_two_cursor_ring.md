@@ -176,7 +176,7 @@ separation this instance requires, and already has a test for it.
 | File | Relationship |
 |------|--------------|
 | `tests/spsc_test.rs` | `one_producer_and_one_consumer_exchange_one_hundred_thousand_items` drives every operation in the table |
-| `tests/spsc_test.rs` | `a_new_ring_is_empty_and_fully_free` asserts `Ring::on_distinct_lines()` — feature 169's assertion, checked at this crate's composition rather than only at [`ring_cursor`](../../../ring_cursor/readme.md). The method is re-exposed on `Ring` precisely so a test at this level can make it |
+| `tests/spsc_test.rs` | `a_new_ring_is_empty_and_fully_free` asserts `Ring::on_distinct_lines()` — the padding assertion, checked at this crate's composition rather than only at [`ring_cursor`](../../../ring_cursor/readme.md). The method is re-exposed on `Ring` precisely so a test at this level can make it |
 
 ### SP9 — The Cursors Come From `ring_cursor` as a Pair, Not as Two Fields
 

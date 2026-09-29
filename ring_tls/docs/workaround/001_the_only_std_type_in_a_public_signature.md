@@ -57,7 +57,7 @@ which is what made this a workaround rather than a decision — a decision would
 have had a rationale. TL51's disposition below applied exactly this signature.
 
 `ring_batch` already returned `impl Iterator< Item = Seq > + use< >` from
-`BatchClaim::sequences`, in this same workstream, so the idiom was present in a
+`BatchClaim::sequences`, in this same family, so the idiom was present in a
 crate this one depends on before this crate adopted it too.
 
 ### Sources

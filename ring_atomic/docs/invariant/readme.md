@@ -48,7 +48,7 @@ command grep -nE '# Panics|# Safety|# Errors' ring_atomic/src/lib.rs
 command grep -m1 -A1 -F '  /// The sequence actually found, when it was not `current` — the multi-producer' ring_atomic/src/lib.rs
 echo '  -- and the word the family builds its gates on --'
 command grep -rc 'monoton' ring_atomic/src/lib.rs
-command grep -rl 'monoton' --include=lib.rs --include=id.rs */src/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/src/.*||' | sort -u | tr '\n' ' '; echo
+command grep -rl 'monoton' --include=lib.rs --include=id.rs */src/ | sed -E 's|/src/.*||' | sort -u | tr '\n' ' '; echo
 ```
 
 ### Findings Recorded Here

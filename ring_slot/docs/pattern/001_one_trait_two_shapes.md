@@ -79,7 +79,7 @@ Every consumer is generic over one type parameter instead:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
-grep -E '^pub struct (Buffer|Ring)<' ring_store/src/lib.rs ring_mpsc/src/lib.rs ring_spsc/src/lib.rs | sed 's|^ring/||' | sort
+grep -E '^pub struct (Buffer|Ring)<' ring_store/src/lib.rs ring_mpsc/src/lib.rs ring_spsc/src/lib.rs | sort
 ```
 
 Live output:
@@ -122,7 +122,7 @@ The missing half exists, one crate away:
 cd "$(git rev-parse --show-toplevel)"
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
 grep -rn '^pub trait' ring_slot/src/lib.rs ring_event/src/lib.rs \
-  | sed 's|^ring/||' | sort | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
+  | sort | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 ```
 
 Live output:

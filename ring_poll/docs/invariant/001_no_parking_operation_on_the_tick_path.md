@@ -88,12 +88,12 @@ counter-example is one line: `Budget::new( 1_000_000 )`. See
 cd "$(git rev-parse --show-toplevel)"
 printf 'the set, as declared in src:  %s\n' "$( command grep 'pub const PARKING_CRATES' ring_poll/src/lib.rs | command grep -oE 'ring_[a-z_]+' | tr '\n' ' ' )"
 printf 'the same names, typed here:   %s copies in prose\n' "$( command grep -o 'ring_barrier, ring_shutdown, ring_[w]ait' ring_poll/docs/invariant/001_no_parking_operation_on_the_tick_path.md | wc -l )"
-printf 'crates that reach ring_wait:  %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path ring/Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q ring_wait && echo x; done | wc -l )"
-printf 'WaitKind is owned by:         %s\n' "$( command grep -rl 'pub enum WaitKind' */src/ 2>/dev/null | cut -d/ -f2 | tr '\n' ' ' )"
+printf 'crates that reach ring_wait:  %s\n' "$( for c in ring_*/; do n=$( basename "$c" ); cargo tree --manifest-path Cargo.toml -e normal -p "$n" 2>/dev/null | command grep -q ring_wait && echo x; done | wc -l )"
+printf 'WaitKind is owned by:         %s\n' "$( command grep -rl 'pub enum WaitKind' */src/ 2>/dev/null | cut -d/ -f1 | tr '\n' ' ' )"
 printf 'its variants:                 %s\n' "$( awk '/pub enum WaitKind/{f=1} f&&/^\}/{exit} f' ring_types/src/policy.rs | command grep -oE '^  [A-Z][a-zA-Z]*' | tr -d ' ' | tr '\n' ' ' )"
-printf 'ring_types, in this closure:  %s\n' "$( cargo tree --manifest-path ring/Cargo.toml -p ring_poll -e normal 2>/dev/null | command grep -c 'ring_types v' || true )"
-printf 'ring_wait, in this closure:   %s\n' "$( cargo tree --manifest-path ring/Cargo.toml -p ring_poll 2>/dev/null | command grep -c 'ring_wait v' || true )"
-printf 'crates whose API takes a kind: %s\n' "$( for n in ring_barrier ring_shutdown ring_wait; do command grep -qE 'pub fn .*kind : WaitKind|kind : WaitKind' ring/$n/src/lib.rs && printf '%s ' "$n"; done )"
+printf 'ring_types, in this closure:  %s\n' "$( cargo tree --manifest-path Cargo.toml -p ring_poll -e normal 2>/dev/null | command grep -c 'ring_types v' || true )"
+printf 'ring_wait, in this closure:   %s\n' "$( cargo tree --manifest-path Cargo.toml -p ring_poll 2>/dev/null | command grep -c 'ring_wait v' || true )"
+printf 'crates whose API takes a kind: %s\n' "$( for n in ring_barrier ring_shutdown ring_wait; do command grep -qE 'pub fn .*kind : WaitKind|kind : WaitKind' $n/src/lib.rs && printf '%s ' "$n"; done )"
 printf 'this crate naming WaitKind:   %s\n' "$( command grep -c 'WaitKind' ring_poll/src/lib.rs || true )"
 ```
 

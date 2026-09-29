@@ -55,9 +55,9 @@ command grep -c 'pub const fn is_' ring_config/src/lib.rs || true
 echo '  -- must_use attributes immediately above a consuming setter --'
 command grep -B 1 'pub const fn with_' ring_config/src/lib.rs | command grep -c 'must_use' || true
 echo '  -- files anywhere in the workspace declaring a consuming builder --'
-command grep -rl 'fn [a-z_]*( mut self' --include=*.rs */src | sort | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rl 'fn [a-z_]*( mut self' --include=*.rs */src | sort 
 echo '  -- every field of type RingConfig or OverflowPolicy in the family --'
-command grep -rn '^  [a-z_]* : \(RingConfig\|OverflowPolicy\),' --include=*.rs */src | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn '^  [a-z_]* : \(RingConfig\|OverflowPolicy\),' --include=*.rs */src 
 ```
 
 ### Findings Recorded Here

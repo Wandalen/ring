@@ -50,7 +50,7 @@ cd "$(git rev-parse --show-toplevel)"
 # is a parallel ugrep that emits hits in completion order
 echo '  -- the trait, and what bounds it in 33 crates --'
 command grep -m1 -A1 -F 'pub trait SeqCell' ring_atomic/src/lib.rs
-command grep -rn ': SeqCell' --include=*.rs */ | command grep -v 'ring_atomic/' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn ': SeqCell' --include=*.rs */ | command grep -v 'ring_atomic/' 
 echo '  -- must_use, spent here and one crate down --'
 printf '    ring_atomic : %-3s  ring_types : %s\n' \
   "$( command grep -c 'must_use' ring_atomic/src/lib.rs || true )" \

@@ -67,7 +67,7 @@ printf '    fetch_add %-4s load %-4s store %-4s pub fn %s\n' \
 echo '  -- the four that compose --'
 command grep '^  pub fn dropped_total\|^  pub fn in_flight\|^  pub fn snapshot\|^  pub fn reset' ring_stats/src/lib.rs
 echo '  -- and who calls the one that subtracts, doc comments excluded --'
-command grep -rn '[^_]in_flight()' --include=*.rs */src/ */tests/ | command grep -v '///' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn '[^_]in_flight()' --include=*.rs */src/ */tests/ | command grep -v '///' 
 ```
 
 ### Findings Recorded Here

@@ -64,14 +64,14 @@ command grep -n 'pub fn new(\|pub const fn with_' ring_config/src/lib.rs | sed -
 echo '  -- the rationale, stated once, at the wrong end --'
 command grep -m1 -A2 -F '  /// A count of `0` is clamped to `1`: a ring nothing can publish into has no' ring_config/src/lib.rs
 echo '  -- the error four other crates raise for the same predicate --'
-command grep -rn 'return Err( RingError::BatchTooLarge' --include=*.rs */src | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
+command grep -rn 'return Err( RingError::BatchTooLarge' --include=*.rs */src  | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 echo '  -- every construction site outside this crate, and how many are doc comments --'
 command grep -rn 'RingConfig::new(' --include=*.rs */src | command grep -vc '^ring_config/' || true
 command grep -rn 'RingConfig::new(' --include=*.rs */src | command grep -v '^ring_config/' | command grep -c '/// \|//! ' || true
 echo '  -- and the ones that are not, which is where the Result is really discharged --'
-command grep -rn 'RingConfig::new(' --include=*.rs */src | command grep -v '^ring_config/' | command grep -v '/// \|//! ' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
+command grep -rn 'RingConfig::new(' --include=*.rs */src | command grep -v '^ring_config/' | command grep -v '/// \|//! '  | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 echo '  -- who reads RingConfig::batch, the field RC16 was written about --'
-command grep -rn '\.batch()' --include=*.rs */src | command grep -v '^ring_config/' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
+command grep -rn '\.batch()' --include=*.rs */src | command grep -v '^ring_config/'  | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 ```
 
 Live output:

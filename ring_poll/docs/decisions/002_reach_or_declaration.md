@@ -85,7 +85,7 @@ printf 'files naming the const:   %s\n' "$( command grep -rl 'PARKING_CRATES' */
 printf 'the declaration:          %s\n' "$( command grep -rl 'pub const PARKING_CRATES' */src 2>/dev/null | tr '\n' ' ' )"
 printf 'code references:          %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | while read -r f; do command grep -qE '^ *(use [^/]*|for [a-z]+ in |[a-z]+, )PARKING_CRATES' "$f" && echo "$f"; done | tr '\n' ' ' )"
 printf 'prose-only references:    %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | while read -r f; do command grep -qE '^ *(use [^/]*|for [a-z]+ in |[a-z]+, |pub const )PARKING_CRATES' "$f" || echo "$f"; done | tr '\n' ' ' )"
-printf 'crates compiling against: %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | while read -r f; do command grep -qE '^ *(use [^/]*|for [a-z]+ in |[a-z]+, |pub const )PARKING_CRATES' "$f" && echo "$f"; done | cut -d/ -f2 | sort -u | tr '\n' ' ' )"
+printf 'crates compiling against: %s\n' "$( command grep -rl 'PARKING_CRATES' */src */tests 2>/dev/null | while read -r f; do command grep -qE '^ *(use [^/]*|for [a-z]+ in |[a-z]+, |pub const )PARKING_CRATES' "$f" && echo "$f"; done | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 printf 'subprocess calls in suite: %s\n' "$( command grep -c 'Command::new' ring_poll/tests/poll_test.rs || true )"
 ```
 

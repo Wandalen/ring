@@ -31,6 +31,6 @@ printf 'rows in the table below:  '; grep -coE '^\| SP[0-9]+ ' readme.md
 | ID | Subject | Tier | Finding |
 |----|---------|------|---------|
 | SP18 | `Cargo.toml` | n/a — observation | The three absent ones — `ring_atomic`, `ring_claim`, `ring_gating` — are exactly the crates single-producer makes unnecessary. |
-| SP19 | the module documentation | n/a — drift | `docs/workstream/008_ring_write_path.md` does not exist; the workstream lives at `008_ring_write_path/readme.md`. |
+| SP19 | the module documentation | n/a — drift (historical; source corpus unreachable since extraction) | `docs/workstream/008_ring_write_path.md` did not exist there; the workstream lived at `008_ring_write_path/readme.md`. |
 | SP20 | `adoption` | n/a — observation | The instance argues this crate is internal; the count that supports it is five code references from `ring_core` and two from `ring_bench`. |
 | SP21 | `ring_core` | n/a — observation | All five references are storage or handle variants in `ring_core`'s backend enums, never a call. |

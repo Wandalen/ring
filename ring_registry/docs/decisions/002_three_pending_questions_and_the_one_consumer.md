@@ -39,10 +39,10 @@ command grep -m1 -A2 -F 'dump compared between runs, say. The cheaper answer wou
 echo '  -- and the correction Pending 3 now states --'
 command grep -n '^is the faster of the two on' "$d" | sed 's/^/    /' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 echo '  -- the only consumer, and every registry method it calls --'
-# excludes ring/Cargo.toml itself: that workspace manifest lists every
+# excludes ./Cargo.toml itself: that workspace manifest lists every
 # crate as a member path (including ring_registry), which is not the same
 # claim as a manifest declaring ring_registry as a dependency
-command grep -rln 'ring_registry' --include=Cargo.toml . | command grep -v '^ring/Cargo.toml$' | sed 's|ring/||' | command grep -v '^ring_registry/' | sed 's/^/    manifest: /' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
+command grep -rln 'ring_registry' --include=Cargo.toml . | command grep -v '^\./Cargo\.toml$' | sed 's|^\./||' | command grep -v '^ring_registry/' | sed 's/^/    manifest: /' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 command grep -rhon 'registry\.[a-z_]*(' ring_factory/src ring_factory/tests | sort -t: -k2 -u | sed 's/^/    /' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'
 echo '  -- what that consumer does with the unordered iteration --'
 command grep -n -e 'registry.names()' -e 'names.sort_unstable' -e 'assert_eq!( names' ring_factory/tests/factory_test.rs | sed 's/^/    /' | sed -E 's/^([[:space:]]*)([^[:space:]:]*:)?[0-9]+[:-]/\1\2/'

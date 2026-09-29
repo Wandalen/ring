@@ -134,8 +134,8 @@ what the ends must guarantee *and now enforces the pairing itself* — `split`'s
 `&mut self` is the enforcement, and it needs nothing from above. What the
 crates above add is the rest: choosing between backends, rejecting a
 multi-producer config, and waking a parked counterpart. That is the same
-inversion the ring's own construction has, and it is what ruling 4's five-crate
-export surface costs and buys.
+inversion the ring's own construction has, and it is what the five-crate
+export surface above costs and buys.
 
 ### Cleanup Requirements
 

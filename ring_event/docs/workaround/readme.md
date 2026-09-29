@@ -61,7 +61,7 @@ echo '  -- direct writes with a plain literal, then with a slice --'
 command grep -rn '\.write( b"' --include=*.rs */ | wc -l
 command grep -rn '\.write( &[a-z_]*\[ *\.\. *\]\|\.write( &b"' --include=*.rs */ | wc -l
 echo '  -- and every byte fill that goes through this crate --'
-command grep -rn 'publish_into( *&mut [a-z_]*, *&\[\|publish_into( *&mut [a-z_]*, *&b"' --include=*.rs */ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'publish_into( *&mut [a-z_]*, *&\[\|publish_into( *&mut [a-z_]*, *&b"' --include=*.rs */ 
 echo '  -- the three dependency statements, and how they disagree --'
 command grep -m1 -F 'Depends on [`ring_types`](../ring_types/readme.md), [`ring_slot`](../ring_slot/readme.md), [`ring_seqno`](../ring_seqno/readme.md).' ring_event/readme.md
 command grep -m1 -F '**Depends on:** `ring_types`, `ring_slot`, `ring_seqno`' ring_event/task/unverified/115_implement_ring_event.md

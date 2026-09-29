@@ -49,7 +49,7 @@ command grep -n '^//! ## ' ring_atomic/src/lib.rs
 echo '  -- the ordering choices the crate makes for itself --'
 command grep -cE 'Ordering::(Relaxed|Acquire|Release|AcqRel|SeqCst)' ring_atomic/src/lib.rs
 echo '  -- and the crates the trait decision was made for --'
-command grep -rl 'CountingSeq' --include=*.rs */ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/.*||' | sort -u
+command grep -rl 'CountingSeq' --include=*.rs */ | sed -E 's|/.*||' | sort -u
 ```
 
 ### Findings Recorded Here

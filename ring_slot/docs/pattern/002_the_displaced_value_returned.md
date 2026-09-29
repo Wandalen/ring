@@ -167,7 +167,7 @@ Every `set` in shipped library code across the family:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # sorted: grep is shimmed to a parallel ugrep here, so hits arrive in completion order
-command grep -r '\.set( ' ring_*/src/*.rs | command grep -vE ':[[:space:]]*//' | sed 's|^ring/||' | LC_ALL=C sort
+command grep -r '\.set( ' ring_*/src/*.rs | command grep -vE ':[[:space:]]*//' | LC_ALL=C sort
 ```
 
 Live output:

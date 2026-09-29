@@ -52,7 +52,7 @@ command grep -m1 -A7 -F 'pub const fn would_resolve( policy : OverflowPolicy ) -
 echo '  -- the statement between them --'
 command grep -n 'record_drop' ring_overflow/src/lib.rs
 echo '  -- and every production consumer --'
-command grep -rn 'use ring_overflow' --include=*.rs */src/ | command grep -v '^ring_overflow/' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'use ring_overflow' --include=*.rs */src/ | command grep -v '^ring_overflow/' 
 ```
 
 ### Findings Recorded Here

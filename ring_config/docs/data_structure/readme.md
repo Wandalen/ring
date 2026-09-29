@@ -53,11 +53,11 @@ convention a reader meets depends on which crate they arrived through.
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- the record as declared, and the types it is built from --'
 command grep -m1 -A8 -F '#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]' ring_config/src/lib.rs
-command grep -n 'derive\|pub struct Capacity\|pub enum WaitKind\|pub enum OverflowPolicy' ring_types/src/capacity.rs ring_types/src/policy.rs | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -n 'derive\|pub struct Capacity\|pub enum WaitKind\|pub enum OverflowPolicy' ring_types/src/capacity.rs ring_types/src/policy.rs 
 echo '  -- every signature and field naming a RingConfig outside this crate --'
-command grep -rn ': *&\?RingConfig' --include=*.rs */src | command grep -v '^ring_config/' | command grep -v '//\|use ring_config' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn ': *&\?RingConfig' --include=*.rs */src | command grep -v '^ring_config/' | command grep -v '//\|use ring_config' 
 echo '  -- how many by-reference signatures each crate carries --'
-command grep -rc ': *&RingConfig' --include=*.rs */src 2>/dev/null | command grep -v ':0$' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rc ': *&RingConfig' --include=*.rs */src 2>/dev/null | command grep -v ':0$' 
 ```
 
 ### Findings Recorded Here

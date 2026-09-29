@@ -248,19 +248,12 @@ argument the module documentation makes in full
 
 ### SP19 — The Crate Head Cites a Path That Is a Directory
 
-```sh
-cd "$(git rev-parse --show-toplevel)"/module
-cd ../docs/workstream
-printf 'as a file:       '; [ -f 008_ring_write_path.md ] && echo yes || echo no
-printf 'as a directory:  '; [ -d 008_ring_write_path ] && echo yes || echo no
-```
-
-Live output:
-
-```
-as a file:       no
-as a directory:  yes
-```
+> Historical record, not independently reproducible from a standalone checkout
+> (the design corpus this probed, `docs/workstream/`, is external to this
+> repository and unreachable since extraction): checking whether
+> `008_ring_write_path.md` existed as a file and `008_ring_write_path` existed
+> as a directory under that corpus's `docs/workstream/` returned "as a file:
+> no" / "as a directory: yes".
 
 One character — a `.md` where a `/readme.md` was meant. The same line appeared at
 the head of every crate in the family, so this was one defect in thirty-three
@@ -269,5 +262,5 @@ files rather than thirty-three defects.
 Not fixed here: it is a family-wide source correction, and this crate's docs are
 not the place to make thirty-three of them. It has since been made under
 `ring_cursor`'s CU48, which carries the applied disposition for all 33 crates;
-the two output lines above still read the same way because they measure the
+the quoted result above still reads the same way because it measures the
 workstream path's own shape, which did not change — only the citations to it did.

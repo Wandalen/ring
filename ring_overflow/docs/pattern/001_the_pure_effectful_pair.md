@@ -25,11 +25,11 @@ cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
 # is a parallel ugrep that emits hits in completion order
 echo '  -- every would_* function under the crate tree --'
-command grep -r 'fn would_' --include=*.rs */src/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -r 'fn would_' --include=*.rs */src/ 
 echo '  -- the four prefixes a second crate might reach for instead --'
 for p in peek try dry preview; do printf '     %-8s %s\n' "$p" "$( command grep -rc "fn ${p}_" --include=*.rs */src/ | awk -F: '{ n += $2 } END{ print n+0 }' )"; done
 echo '  -- crates under the crate tree declaring at least one pub const fn --'
-command grep -rl 'pub const fn ' --include=*.rs */src/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/src/.*||' | sort -u | wc -l
+command grep -rl 'pub const fn ' --include=*.rs */src/ | sed -E 's|/src/.*||' | sort -u | wc -l
 echo '  -- how many this crate declares, of four functions --'
 command grep -c 'pub const fn ' ring_overflow/src/lib.rs || true
 echo '  -- and the doc line naming the pattern --'

@@ -30,7 +30,7 @@ command grep -A 2 'pub const fn is_multi_producer\|pub const fn is_tick_safe' ri
 echo '  -- and the claim the first one makes about how many there are --'
 command grep -m1 -A2 -F '  /// A derived reading, and the one a factory branches on:' ring_config/src/lib.rs
 echo '  -- every non-doctest call to either, in src/ or tests/, anywhere --'
-command grep -r 'is_multi_producer()\|is_tick_safe()' --include=*.rs */src */tests | command grep -v '^ring_config/src' | command grep -v '///\|//!' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -r 'is_multi_producer()\|is_tick_safe()' --include=*.rs */src */tests | command grep -v '^ring_config/src' | command grep -v '///\|//!' 
 echo '  -- what is_tick_safe delegates to --'
 command grep -A 7 'pub const fn is_non_blocking' ring_types/src/policy.rs
 ```

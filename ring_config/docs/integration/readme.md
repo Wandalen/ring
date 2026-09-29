@@ -54,7 +54,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- every crate declaring ring_config, and the section it declares it in --'
 for c in ring_*/Cargo.toml; do awk -v n="$( basename "$( dirname "$c" )" )" '/^\[/ { s = $0 } /^ring_config/ { printf "  %-13s %s\n", n, s }' "$c"; done
 echo '  -- every crate naming RingConfig in a src/ signature or field --'
-command grep -rn ': *&\?RingConfig' --include=*.rs */src | command grep -v '//\|use ring_config' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/([a-z_]*)/.*#  \2#' | sort -u
+command grep -rn ': *&\?RingConfig' --include=*.rs */src | command grep -v '//\|use ring_config' | sed -E 's#^([a-z_]*)/.*#  \1#' | sort -u
 echo '  -- everything ring_factory re-exports --'
 command grep -n 'pub use' ring_factory/src/lib.rs
 echo '  -- and the two family manifests declaring an edge with no use behind it --'

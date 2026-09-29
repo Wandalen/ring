@@ -24,10 +24,10 @@ curve itself is
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- the one dependent, and what it takes --'
-command grep -rl '^ring_batch = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##; s|/Cargo.toml||' | tr '\n' ' '; echo
+command grep -rl '^ring_batch = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's|/Cargo.toml||' | tr '\n' ' '; echo
 command grep 'use ring_batch' ring_tls/src/lib.rs
 echo '  -- and who depends on it --'
-command grep -rl '^ring_tls = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##; s|/Cargo.toml||' | sort | tr '\n' ' '; echo
+command grep -rl '^ring_tls = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's|/Cargo.toml||' | sort | tr '\n' ' '; echo
 echo '  -- the feature this crate is built for, and its hard problems --'
 command grep -m1 'Status' docs/feature/177_batch_claim_and_batch_drain.md
 command grep -m1 'Status' docs/hard_problem/118_merging_thread_local_writes_into_one_stream.md

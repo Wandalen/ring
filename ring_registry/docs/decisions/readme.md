@@ -197,7 +197,7 @@ command grep -n '^### Closed\|^### Pending' "$d" | cut -c1-88 | sed 's/^/    /'
 echo '  -- what each open entry names as the evidence that would settle it --'
 command grep -n '^\*\*What would settle it' "$d" | cut -c1-88 | sed 's/^/    /'
 echo '  -- the only consumer that could supply it --'
-command grep -rln 'ring_registry' --include=Cargo.toml */ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' |
+command grep -rln 'ring_registry' --include=Cargo.toml */  |
   command grep -v '^ring_registry/' | sed 's/^/    manifest: /'
 echo '  -- and the answer it has already given --'
 command grep -n 'registry.names()\|names.sort_unstable\|assert_eq!( names' \

@@ -28,7 +28,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- one fallible constructor, four infallible setters --'
 command grep 'pub fn new(\|pub const fn with_' ring_config/src/lib.rs
 echo '  -- every construction site outside this crate, in src/, by crate --'
-command grep -rc 'RingConfig::new(' --include=*.rs */src | command grep -v ':0$\|^ring_config/' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rc 'RingConfig::new(' --include=*.rs */src | command grep -v ':0$\|^ring_config/' 
 echo '  -- how many of those lines sit inside a doc comment --'
 command grep -r 'RingConfig::new(' --include=*.rs */src | command grep -v '^ring_config/' | command grep -c '/// \|//! ' || true
 echo '  -- and how each construction expression discharges the Result --'

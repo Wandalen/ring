@@ -70,7 +70,7 @@ printf 'cargo-metadata call sites:   %s\n' "$( command grep -rl 'cargo_metadata\
 printf 'the owner named here:        %s\n' "$( command grep -oE 'S8 owns it because .ring_[a-z]+' ring_poll/docs/decisions/001_should_the_roster_be_generated.md | command grep -oE 'ring_[a-z]+' )"
 printf 'and its size today:          %s src lines\n' "$( wc -l < ring_bench/src/lib.rs )"
 printf 'family rank by src size:     %s\n' "$( wc -l ring_*/src/lib.rs | sort -rn | command grep -v ' total$' | command grep -n 'ring_bench' | cut -d: -f1 )"
-printf 'the crate above it:          %s\n' "$( wc -l ring_*/src/lib.rs | sort -rn | command grep -v total | sed -n '1p' | tr -s ' ' | cut -d/ -f2 )"
+printf 'the crate above it:          %s\n' "$( wc -l ring_*/src/lib.rs | sort -rn | command grep -v total | sed -n '1p' | awk '{print $2}' | cut -d/ -f1 )"
 ```
 
 Live output:

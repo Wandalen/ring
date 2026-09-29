@@ -12,7 +12,7 @@
 | ID | Name | Purpose | Status |
 |----|------|---------|--------|
 | 001 | [Register Before First Append](001_register_before_first_append.md) | The ordering rule that closes the silent-loss window a lazily-initialized thread-local opens | 🔄 |
-| 002 | [Staging Then Merge](002_staging_then_merge.md) | How this crate composes with a ring into the two-stage write path that message 528 ranks first — and why it is not a ring competitor | 🔄 |
+| 002 | [Staging Then Merge](002_staging_then_merge.md) | How this crate composes with a ring into the two-stage write path — the composition this crate's staging exists to feed — and why it is not a ring competitor | 🔄 |
 
 
 

@@ -100,15 +100,15 @@ feature-flagged.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-printf 'manifests declaring loom:      %s\n' "$( command grep -l '^loom = ' ring_*/Cargo.toml | sed 's|ring/||; s|/Cargo.toml||' | tr '\n' ' ' )"
-printf 'crates branching in src/:      %s\n' "$( command grep -lE '#\[ cfg\( ?(not\( )?loom' ring_*/src/*.rs 2>/dev/null | sed 's|ring/||; s|/src/.*||' | sort -u | tr '\n' ' ' )"
-printf 'files that run under the cfg:  %s\n' "$( command grep -l '^#!\[ cfg( loom ) \]' ring_*/tests/*.rs 2>/dev/null | sed 's|ring/||' | tr '\n' ' ' )"
-printf 'crates gating a test file off: %s\n' "$( command grep -l '^#!\[ cfg( not( loom ) ) \]' ring_*/tests/*.rs 2>/dev/null | sed 's|ring/||; s|/tests/.*||' | sort -u | wc -l )"
+printf 'manifests declaring loom:      %s\n' "$( command grep -l '^loom = ' ring_*/Cargo.toml | sed 's|/Cargo.toml||' | tr '\n' ' ' )"
+printf 'crates branching in src/:      %s\n' "$( command grep -lE '#\[ cfg\( ?(not\( )?loom' ring_*/src/*.rs 2>/dev/null | sed 's|/src/.*||' | sort -u | tr '\n' ' ' )"
+printf 'files that run under the cfg:  %s\n' "$( command grep -l '^#!\[ cfg( loom ) \]' ring_*/tests/*.rs 2>/dev/null | tr '\n' ' ' )"
+printf 'crates gating a test file off: %s\n' "$( command grep -l '^#!\[ cfg( not( loom ) ) \]' ring_*/tests/*.rs 2>/dev/null | sed 's|/tests/.*||' | sort -u | wc -l )"
 printf 'cfg attributes in this src/:   %s\n' "$( command grep -cE '^ *#!?\[ cfg' ring_testkit/src/lib.rs || true )"
 printf 'this crate gates whole files:  %s\n' "$( command grep -hm1 '^#!\[ cfg' ring_testkit/tests/*.rs | tr '\n' ' ' )"
 printf 'the manifest entry:            %s\n' "$( command grep -A1 "cfg(loom)" ring_testkit/Cargo.toml | tr '\n' ' ' )"
 printf 'the root manifest comment:     %s\n' "$( command grep -m1 'read the cfg' Cargo.toml )"
-printf 'src files naming loom:: :      %s\n' "$( command grep -c 'loom::' ring_*/src/*.rs 2>/dev/null | command grep -v ':0$' | sed 's|ring/||' | tr '\n' ' ' )"
+printf 'src files naming loom:: :      %s\n' "$( command grep -c 'loom::' ring_*/src/*.rs 2>/dev/null | command grep -v ':0$' | tr '\n' ' ' )"
 ```
 
 Live output:

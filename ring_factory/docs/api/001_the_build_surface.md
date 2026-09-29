@@ -285,7 +285,7 @@ echo '  -- manifests naming any of the five, outside ring_* --'
 command grep -rl 'ring_factory\|ring_handle\|ring_tls\|ring_flush\|ring_types' \
   --include=Cargo.toml . 2>/dev/null | command grep -vE '/ring_|\.claude/worktrees' | sed 's|^\./||' | command grep -v '^ring/Cargo.toml$'
 echo '  -- and inside it --'
-command grep -rl 'ring_factory = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/Cargo.toml||' | sort
+command grep -rl 'ring_factory = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's|/Cargo.toml||' | sort
 ```
 
 Live output:

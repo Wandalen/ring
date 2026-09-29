@@ -44,7 +44,7 @@ echo '  -- every crossbeam feature declaration in the tree --'
 # anchored on the declaration, not on `[features]` with a fixed window: both
 # stanzas carry several comment lines before the entry, so an `-A3` window after
 # the header prints comments and reports the feature as declared nowhere
-command grep -r --exclude-dir=-target_gate --exclude-dir=target '^crossbeam = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -r --exclude-dir=-target_gate --exclude-dir=target '^crossbeam = ' --include=Cargo.toml /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ . /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ 
 echo '  -- and the one declaration it gates --'
 command grep -A1 'cfg( feature = "crossbeam" )' ring_factory/src/lib.rs
 ```

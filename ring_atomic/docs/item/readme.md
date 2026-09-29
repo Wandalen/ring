@@ -58,8 +58,8 @@ echo '  -- constructors among them, then every contract clause in the file --'
 command grep -cE 'pub (const )?fn new|fn default' ring_atomic/src/lib.rs
 command grep -nE '# Panics|# Safety|# Errors' ring_atomic/src/lib.rs
 echo '  -- the two substitution shapes --'
-command grep -rcE '\b[A-Z] *: *SeqCell' --include=lib.rs */src/ | command grep -v ':0' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/src/lib.rs||'
-command grep -rcE '^ +[a-z_]+ *: *PaddedCursor,' --include=lib.rs */src/ | command grep -v ':0' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/src/lib.rs||'
+command grep -rcE '\b[A-Z] *: *SeqCell' --include=lib.rs */src/ | command grep -v ':0' | sed -E 's|/src/lib.rs||'
+command grep -rcE '^ +[a-z_]+ *: *PaddedCursor,' --include=lib.rs */src/ | command grep -v ':0' | sed -E 's|/src/lib.rs||'
 ```
 
 ### Findings Recorded Here

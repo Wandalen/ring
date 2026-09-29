@@ -48,7 +48,7 @@ policy breaks both `match` sites — not in the reading.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- every would_* under the crate tree --'
-command grep -rn 'fn would_' --include=*.rs */src/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'fn would_' --include=*.rs */src/ 
 echo '  -- and the argument the module comment makes --'
 command grep -m1 -A1 -F '//! kept the item. [`Resolution`] below is the type that makes the alternative' ring_overflow/src/lib.rs
 ```

@@ -177,5 +177,5 @@ registration, and the orphan-list mitigation this instance specifies have no
 built counterpart; the crate's actual lifecycle is a plain owned value with a
 derived `Drop`. One of the nineteen pre-implementation instances
 `../decisions/001_the_corpus_specifies_an_api_the_crate_did_not_build.md`
-catalogs, whose rewrite-vs-supersede-vs-relocate resolution is workstream
-008's to make.
+catalogs, whose rewrite-vs-supersede-vs-relocate resolution remains an open
+follow-up.

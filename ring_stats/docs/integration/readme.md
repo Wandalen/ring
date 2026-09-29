@@ -52,9 +52,9 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- who declares ring_stats --'
 for f in */Cargo.toml ; do if command grep -q '^ring_stats' "$f"; then echo "    $( basename "$( dirname "$f" )" )/Cargo.toml"; fi; done
 echo '  -- every production call of a recorder --'
-command grep -rn 'stats\.record_' --include=*.rs */src/ | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'stats\.record_' --include=*.rs */src/ 
 echo '  -- who imports the counting half --'
-command grep -rn 'use ring_overflow::' --include=*.rs */src/ */tests/ | command grep -v '///' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'use ring_overflow::' --include=*.rs */src/ */tests/ | command grep -v '///' 
 echo '  -- who calls reset, and what its doc says --'
 command grep -rn '\.reset()' --include=*.rs ring_*/ | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||'
 command grep -c 'ring_stats' ring_shutdown/Cargo.toml || true

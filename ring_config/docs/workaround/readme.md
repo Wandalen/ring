@@ -69,10 +69,10 @@ command grep 'pub fn ' ring_config/src/lib.rs || true
 echo '  -- the three things in its body a const fn cannot do --'
 command grep 'Capacity::new( slots )?\|WaitKind::default()\|OverflowPolicy::default()' ring_config/src/lib.rs
 echo '  -- every const fn returning a Result under the crate tree --'
-command grep -r 'pub const fn [a-z_]*(.*) -> Result' --include=*.rs */src | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -r 'pub const fn [a-z_]*(.*) -> Result' --include=*.rs */src 
 echo '  -- the lint table entry, and how many crates escalate it by hand --'
 command grep 'missing_docs' Cargo.toml   # anchored: the members list above it grows
-command grep -rl 'deny( missing_docs' --include=*.rs */src | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' | cut -d/ -f1 | sort -u | wc -l
+command grep -rl 'deny( missing_docs' --include=*.rs */src  | cut -d/ -f1 | sort -u | wc -l
 ls -d */ | wc -l
 ```
 

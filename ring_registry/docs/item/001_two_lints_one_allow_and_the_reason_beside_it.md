@@ -34,8 +34,8 @@ echo '  -- and every allow in the thirty-three crates --'
 command grep -r '#\[ allow' --include=*.rs ring_*/src/ ring_*/tests/ 2>/dev/null | sed 's|ring/||' | sed 's/^/    /'
 echo '  -- how much of this crate is prose --'
 for c in ring_registry ring_handle ring_trace ring_core; do
-  d=$( command grep -c '^ *///\|^//!' ring/$c/src/lib.rs || true )
-  t=$( wc -l < ring/$c/src/lib.rs )
+  d=$( command grep -c '^ *///\|^//!' $c/src/lib.rs || true )
+  t=$( wc -l < $c/src/lib.rs )
   printf '    %-14s %3s doc lines of %3s   %s%%\n' "$c" "$d" "$t" "$(( d * 100 / t ))"
 done
 ```

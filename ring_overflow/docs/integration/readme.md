@@ -45,7 +45,7 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- both dependencies out --'
 sed -n '/^\[dependencies\]/,/^\[/p' ring_overflow/Cargo.toml | command grep '^ring_'
 echo '  -- every crate that declares this one --'
-for f in */Cargo.toml ; do command grep -l '^ring_overflow' "$f"; done 2>/dev/null | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##;s|/Cargo.toml||'
+for f in */Cargo.toml ; do command grep -l '^ring_overflow' "$f"; done 2>/dev/null | sed -E 's|/Cargo.toml||'
 echo '  -- and the whole of its use --'
 command grep -n 'ring_overflow\|would_resolve\|Resolution' ring_core/src/lib.rs
 ```

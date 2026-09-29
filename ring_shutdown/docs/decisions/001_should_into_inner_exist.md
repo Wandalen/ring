@@ -60,8 +60,8 @@ crate's own call sites do.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-GUARDED_CRATES=$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f2 | sort -u )
-for c in $GUARDED_CRATES; do command grep -r 'into_inner' ring/$c/src ring/$c/tests --include='*.rs' 2>/dev/null; done | sed 's/:/: /' | sort
+GUARDED_CRATES=$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u )
+for c in $GUARDED_CRATES; do command grep -r 'into_inner' $c/src $c/tests --include='*.rs' 2>/dev/null; done | sed 's/:/: /' | sort
 ```
 
 Live output:
@@ -95,14 +95,14 @@ decision.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 printf 'lines that command returns:    %s\n' "$( command grep -rn 'into_inner' ring_*/src ring_*/tests --include='*.rs' | wc -l )"
-printf 'types declaring into_inner:    %s\n' "$( command grep -rln 'fn into_inner' ring_*/src --include='*.rs' | cut -d/ -f2 | sort -u | tr '\n' ' ' )"
-printf 'crates the matches come from:  %s\n' "$( command grep -rl 'into_inner' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f2 | sort -u | tr '\n' ' ' )"
+printf 'types declaring into_inner:    %s\n' "$( command grep -rln 'fn into_inner' ring_*/src --include='*.rs' | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
+printf 'crates the matches come from:  %s\n' "$( command grep -rl 'into_inner' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 printf 'matches inside this crate:     %s\n' "$( command grep -rn 'into_inner' ring_shutdown/src ring_shutdown/tests --include='*.rs' | wc -l )"
 printf 'of those, the declaration:     %s\n' "$( command grep -rc 'pub fn into_inner' ring_shutdown/src/lib.rs )"
 printf 'one is a doc-comment mention:  %s\n' "$( command grep -rn 'into_inner' ring_shutdown/src ring_shutdown/tests --include='*.rs' | command grep -c '/// ' || true )"
 printf 'so call sites of the subject:  %s\n' "$( command grep -rn 'into_inner' ring_shutdown/src ring_shutdown/tests --include='*.rs' | command grep -v 'pub fn into_inner' | command grep -cv '/// ' || true )"
 printf 'the bullet that removes it:    %s\n' "$( awk '/^### Regenerate/{exit} {print}' ring_shutdown/docs/decisions/001_should_into_inner_exist.md | command grep -m1 -o 'Zero non-test call sites' )"
-printf 'crates that hold a Guarded:    %s\n' "$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f2 | sort -u | tr '\n' ' ' )"
+printf 'crates that hold a Guarded:    %s\n' "$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 printf 'the owner crate exists:        %s\n' "$( ls -d ring_factory 2>/dev/null | wc -l )"
 printf 'and hands out a Guarded:       %s\n' "$( command grep -c 'Guarded' ring_factory/src/lib.rs 2>/dev/null || true )"
 # excludes .claude/worktrees/ copies and hyphen-prefixed scratch/backup dirs
@@ -198,9 +198,9 @@ Now prints: `guarded crates: ring_shutdown`
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-GUARDED_CRATES=$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f2 | sort -u )
+GUARDED_CRATES=$( command grep -rl 'Guarded' ring_*/src ring_*/tests --include='*.rs' | cut -d/ -f1 | sort -u )
 printf 'guarded crates: %s\n' "$GUARDED_CRATES"
-for c in $GUARDED_CRATES; do command grep -rl 'into_inner' ring/$c/src ring/$c/tests --include='*.rs' 2>/dev/null; done | wc -l
+for c in $GUARDED_CRATES; do command grep -rl 'into_inner' $c/src $c/tests --include='*.rs' 2>/dev/null; done | wc -l
 ```
 
 Live output:

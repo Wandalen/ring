@@ -153,7 +153,7 @@ reachable on every run rather than letting the claim go stale again.
 | File | Relationship |
 |------|--------------|
 | `tests/spsc_test.rs` | `src/lib.rs`'s `compile_fail` blocks — non-`Clone`, non-`Sync`, and no second `split` while the first pair lives. In the library rather than here, because rustdoc collects doc tests from the library target only |
-| `tests/spsc_test.rs` | `one_producer_and_one_consumer_exchange_one_hundred_thousand_items` and `both_ends_are_send_and_neither_is_sync` — feature 179's positive half, and the bound it rests on stated as a trait bound rather than inferred from a passing run |
+| `tests/spsc_test.rs` | `one_producer_and_one_consumer_exchange_one_hundred_thousand_items` and `both_ends_are_send_and_neither_is_sync` — this invariant's positive half, and the bound it rests on stated as a trait bound rather than inferred from a passing run |
 | `tests/spsc_test.rs` | `exhaustive::free_capacity_degrades_safely_even_when_a_precondition_violation_reaches_d2` — the negative half this page's own text used to understate: exhaustive `loom` proof that violating this invariant reaches D2 through nothing but this crate's own API, and that `free_capacity` degrades safely once it does |
 
 ### SP22 — The Cardinality Invariant Is Enforced by `&mut` and by Compile-Fail Tests

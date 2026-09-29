@@ -59,7 +59,7 @@ command grep -c 'pub fn \|pub const fn ' ring_config/src/lib.rs || true
 command grep -c 'pub const fn ' ring_config/src/lib.rs || true
 command grep -c 'must_use' ring_config/src/lib.rs || true
 echo '  -- every RingConfig accessor call in src/ outside this crate --'
-command grep -rn 'config\.\(capacity\|wait\|overflow\|producers\|batch\|is_multi_producer\|is_tick_safe\)()' --include=*.rs */src | command grep -v '^ring_config/' | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -rn 'config\.\(capacity\|wait\|overflow\|producers\|batch\|is_multi_producer\|is_tick_safe\)()' --include=*.rs */src | command grep -v '^ring_config/' 
 echo '  -- and the measured half of the same result --'
 command grep -m1 -B1 -A5 -F '/// The criterion'"'"'s real extent: **two of five fields**, and each of the other' ring_factory/tests/factory_test.rs
 ```

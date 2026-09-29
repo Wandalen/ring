@@ -77,7 +77,7 @@ echo '  -- crates escalating it to deny by hand, split by family --'
 # fails a `^orbital_` match — so the family reports zero rather than nineteen,
 # with no error anywhere to say a column moved.
 esc=$( command grep -rl 'deny( missing_docs' --include=*.rs */src 2>/dev/null \
-  | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##' | cut -d/ -f1 | sort -u )
+   | cut -d/ -f1 | sort -u )
 printf '    escalating, total:  %s\n' "$( printf '%s\n' "$esc" | wc -l )"
 printf '    of those, ring_*:   %s\n' "$( printf '%s\n' "$esc" | command grep -c '^ring_' )"
 printf '    of those, orbital_*:%s\n' "$( printf '%s\n' "$esc" | command grep -c '^orbital_' )"

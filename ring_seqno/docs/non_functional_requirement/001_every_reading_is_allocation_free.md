@@ -27,7 +27,7 @@ command grep -E 'Vec|String|Box|to_vec|collect|format!|vec!' ring_seqno/src/lib.
 # ring_cursor and is the subject of § The Allocation That Was One Tier Up
 echo '  -- nor anywhere else on the gating read path --'
 for c in ring_cursor ring_barrier ring_claim ring_consume; do
-  printf '    %-14s %s\n' "$c" "$( command grep -E 'Vec|String|Box|to_vec|collect|format!|vec!' ring/$c/src/lib.rs | command grep -cvE '^[[:space:]]*(///|//!|//)' || true )"
+  printf '    %-14s %s\n' "$c" "$( command grep -E 'Vec|String|Box|to_vec|collect|format!|vec!' $c/src/lib.rs | command grep -cvE '^[[:space:]]*(///|//!|//)' || true )"
 done
 # control — the one crate on this path that does still own a heap buffer, so a
 # zero above is a measurement and not a broken pattern

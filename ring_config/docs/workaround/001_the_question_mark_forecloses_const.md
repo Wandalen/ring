@@ -36,7 +36,7 @@ command grep -m1 -A10 -F '    Ok' ring_config/src/lib.rs
 echo '  -- the same familys fallible constructor, which is const --'
 command grep -m1 -A11 -F '  pub const fn new( slots : usize ) -> Result< Self, RingError >' ring_types/src/capacity.rs
 echo '  -- every const fn returning a Result anywhere in the crate tree --'
-command grep -r 'pub const fn [a-z_]*(.*) -> Result' --include=*.rs */src | sed -E 's#^(/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/[^/]+|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/[^/]+|module|ring|spike)/##'
+command grep -r 'pub const fn [a-z_]*(.*) -> Result' --include=*.rs */src 
 echo '  -- and what the suite pins the two defaults to --'
 command grep -m1 -A1 -F '  assert_eq!( cfg.wait(), WaitKind::Spin );' ring_config/tests/config_test.rs
 ```

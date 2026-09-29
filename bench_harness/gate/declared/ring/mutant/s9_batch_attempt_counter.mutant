@@ -1,0 +1,28 @@
+# `push_batch_within`'s attempt counter, stuck at zero.
+#
+# `attempt *= 1` never advances from its initial zero, so the budget bound never
+# fires and the loop is held together entirely by its `moved == 0` break. That
+# break does fire — which is why this survived a suite that watches only the
+# published count — but it fires one attempt later than the budget would have,
+# and by S7's reasoning that attempt costs a record.
+#
+# Worth stating plainly: with the break removed as well, this mutation is an
+# infinite loop. It reads as a survivor rather than a hang only because the
+# break masks it, which is the same masking that made the budget look untested.
+
+id: S9
+crate: ring_poll
+file: src/lib.rs
+round: 2026-08-30
+round-failures: 1
+detector: push_batch_within_eats_one_record_per_attempt
+
+--- from
+      break;
+    }
+    attempt += 1;
+--- to
+      break;
+    }
+    attempt *= 1;   // PROBE ONLY — G12, was `+=`
+--- end

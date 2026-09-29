@@ -1,0 +1,33 @@
+# `vanished` subtracting the term it should be adding.
+#
+# `accepted - ( received + in_ring )` and `accepted - ( received - in_ring )`
+# are the same arithmetic wherever `in_ring_at_end` is zero, and it was zero in
+# all four tests that read `vanished()`. The one test that ends with records
+# still in the ring — three of them — never called the method.
+#
+# This is B5 in its original form: a test relating two quantities must run where
+# they can differ. Here the two facts existed in the same suite and never met in
+# the same fixture. The fix moved the assertion rather than the fixture: the
+# test whose name says nothing was discarded now asks the method that measures
+# discarding.
+#
+# Under the mutation that expression underflows rather than merely miscounting,
+# so the detector fails on a panic. That is incidental — the defect is the term,
+# not the panic.
+
+id: S12
+crate: ring_testkit
+file: src/lib.rs
+round: 2026-08-30
+round-failures: 1
+detector: closing_leaves_published_records_where_they_are
+
+--- from
+  pub fn vanished( &self ) -> usize
+  {
+    self.accepted.saturating_sub( self.received.len() + self.in_ring_at_end )
+--- to
+  pub fn vanished( &self ) -> usize
+  {
+    self.accepted.saturating_sub( self.received.len() - self.in_ring_at_end )   // PROBE ONLY — G12, was `+`
+--- end

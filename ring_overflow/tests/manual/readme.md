@@ -1,0 +1,80 @@
+# ring_overflow — manual testing plan
+
+`tests/overflow_test.rs` asserts the three policies resolve correctly. This plan
+covers the claim that no test can make on its own: that there is **no fourth
+outcome**, and that the absence is load-bearing rather than incidental.
+
+Feature 174's acceptance criterion is negative — "exactly three discriminants,
+no overwrite variant" — and a negative is exactly what a passing test suite is
+worst at guaranteeing. A test listing three variants keeps passing after someone
+adds a fourth.
+
+Run from the workspace root.
+
+## M1 — the resolution has exactly three variants
+
+```bash
+grep -nE -A 12 "pub enum Resolution" ring_overflow/src/lib.rs
+```
+
+**Expected:** three variants, each documented with what happened to the *data* —
+not merely whether the call succeeded. No `Overwrite`, no `Replace`, no
+catch-all.
+
+## M2 — a fourth variant would break the build, not slip through
+
+The exhaustive `match` in `would_resolve` and in the test's `name` helper is what
+actually enforces the criterion. Confirm neither has a wildcard arm.
+
+```bash
+grep -nE -A 8 "pub const fn would_resolve" ring_overflow/src/lib.rs
+grep -n "_ =>" ring_overflow/src/lib.rs ring_overflow/tests/overflow_test.rs
+```
+
+**Expected:** the first shows three arms and no `_`. The second finds nothing —
+a wildcard anywhere would let a fourth variant compile silently, which is the
+whole failure mode this criterion exists to prevent.
+
+## M3 — the enum is not `#[non_exhaustive]`
+
+A `#[non_exhaustive]` enum forces downstream wildcards, which would defeat M2
+for every consumer even though this crate itself stays clean.
+
+```bash
+grep -n -B 3 "pub enum Resolution" ring_overflow/src/lib.rs
+```
+
+**Expected:** no `#[ non_exhaustive ]`. (Contrast `RingError` in `ring_types`,
+which *is* non-exhaustive on purpose — new error kinds are expected; new
+overflow outcomes are not.)
+
+## M4 — the accounting claim holds for every policy
+
+The crate claims exactly one counter moves per `resolve` call, "whichever branch
+is taken". A refusal that skipped its counter would make a saturated `Fail` ring
+read as idle.
+
+```bash
+cd ring_overflow && cargo test --test overflow_test exactly_one_counter_moves_per_call -- --nocapture
+```
+
+**Expected:** passes. Then read it — the assertion is `dropped_total() == 1` for
+*every* policy including `Fail`, not just the two lossy ones.
+
+## M5 — the doc examples are the API's first reader
+
+```bash
+cd ring_overflow && cargo test --doc
+```
+
+**Expected:** every example passes and reads as an explanation on its own.
+
+## Run Record
+
+| Date | Check | Result | Note |
+| ---- | ----- | ------ | ---- |
+| 2026-08-28 | M1 | ✅ | Exactly three variants — `DroppedIncoming`, `EvictedOldest`, `Refused` — each documented by what happened to the data. No overwrite variant. |
+| 2026-08-28 | M2 | ✅ | `would_resolve` has three arms, no `_`. No `_ =>` anywhere in the crate source or its test — a fourth variant is a compile error in both places. |
+| 2026-08-28 | M3 | ✅ | Derives are `Debug, Clone, Copy, PartialEq, Eq, Hash`; no `#[ non_exhaustive ]`, so downstream matches stay exhaustive too. |
+| 2026-08-28 | M4 | ✅ | Passes. The loop runs `OverflowPolicy::ALL`, asserting `dropped( policy ) == 1` and `dropped_total() == 1` for each — `Fail` included. |
+| 2026-08-28 | M5 | ✅ | 5 doc tests pass. |

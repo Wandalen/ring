@@ -1,0 +1,17 @@
+[package]
+name = "ring_store"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Power-of-two slot storage array"
+publish = true
+
+[dependencies]
+ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_slot = { path = "../ring_slot", version = "0.1.0" }
+ring_index = { path = "../ring_index", version = "0.1.0" }
+
+[lints]
+workspace = true

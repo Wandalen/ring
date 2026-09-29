@@ -1,0 +1,22 @@
+# The alignment canary, across two allocations rather than one struct.
+#
+# `Producer::on_distinct_lines` is the only one of the three that computes the
+# comparison itself, because its two cursors are not fields of a shared parent:
+# one lives in the ring's gating set, the other in the claimer. Its own doc says
+# so, and says why it checks at all — a sibling change that dropped the padding
+# would cost this crate a contended line on its hottest path and break nothing
+# that compiles.
+#
+# Separate allocations do not weaken the conclusion. Both are `PaddedCursor`,
+# both are 64-byte aligned, and two distinct addresses that are each a multiple
+# of 64 differ by at least 64 wherever they were allocated. The method is
+# unconditionally true, and unkillable while `align_of::< PaddedCursor >()` is
+# what its own crate asserts it to be.
+#
+# See accepted/readme.md, "The alignment canaries".
+#
+# NOT accepted, and deliberately absent: this crate's `Consumer::is_empty` and
+# `Ring::committed`, both real one-polarity defects found in the same sweep and
+# both now held by `mutant/S4` and `mutant/S11`.
+
+ring/ring_mpsc/src/lib.rs:862:5: replace Producer<'a, S>::on_distinct_lines -> bool with true

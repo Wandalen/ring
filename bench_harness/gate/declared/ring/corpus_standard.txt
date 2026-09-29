@@ -1,0 +1,71 @@
+# The doc-corpus standard G14-G17 grade the ring family against.
+#
+# Declared here rather than hard-coded in the gates for the same reason crate
+# membership moved out of a glob: a threshold living in the script that
+# checks it cannot be changed without editing the checker, so the standard and
+# the instrument are one artifact and neither can contradict the other visibly.
+# Editing `min_findings` below from 52 to 53 must flip every currently-closed
+# crate to NOT REACHED. If it does not, a gate is reading its own constant.
+#
+# Format: `key value`, one per line, comments and blanks stripped by decl_lines.
+
+# ---- the thirteen doc definitions every crate carries ----------------------
+#
+# `definition/` is deliberately absent from this list and present in the tree:
+# it holds the Module Index, which is apparatus describing the other thirteen
+# rather than a fourteenth dimension of design. G14 requires all thirteen plus
+# `definition/`, which is why the count it reports is 13 and the directory count
+# it accepts is 14.
+
+definition algorithm
+definition api
+definition data_structure
+definition decisions
+definition integration
+definition invariant
+definition item
+definition lifecycle
+definition non_functional_requirement
+definition pattern
+definition pitfall
+definition type
+definition workaround
+
+# ---- minimum counts, per crate ---------------------------------------------
+#
+# Floors, not targets. `ring_types` carries 65 instances against a floor of 26
+# and five closed crates carry 53-56 findings against a floor of 52; a gate that
+# treated these as equalities would report the most complete crates in the family
+# as violations.
+
+min_definitions 13
+min_instances 26
+min_findings 52
+
+# ---- the closed tier vocabulary --------------------------------------------
+#
+# Reachable tiers are bolded in the source, record tiers are not, and the
+# bolding is load-bearing: it is how a reader scanning a findings table
+# distinguishes something that can still be acted on from something recorded
+# for the archive. A hybrid — `n/a — latent hazard` — says both at once and is
+# what G17 exists to refuse. Four are live in `ring_publish`'s Module Index.
+#
+# This list was taken from the corpus rather than composed for it: all thirteen
+# strings below appear in the family's 632 declared findings rows, and nothing
+# else does. A tier declared here that nothing uses would be a bar this family
+# never set; a tier used that is not declared here fails 20 crates for the
+# instrument's mistake rather than the corpus'.
+
+tier **latent hazard**
+tier **misleading doc**
+tier **measured cost**
+tier **wrong doc**
+tier n/a — observation
+tier n/a — doc gap
+tier n/a — coverage
+tier n/a — unenforced
+tier n/a — duplication
+tier n/a — unadopted
+tier n/a — inconsistency
+tier n/a — drift
+tier n/a — diagnostics

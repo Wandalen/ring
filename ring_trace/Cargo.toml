@@ -1,0 +1,15 @@
+[package]
+name = "ring_trace"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Optional sequence-operation trace log"
+publish = false
+
+[dependencies]
+ring_types = { path = "../ring_types" }
+
+[lints]
+workspace = true

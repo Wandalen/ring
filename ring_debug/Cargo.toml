@@ -1,0 +1,29 @@
+[package]
+name = "ring_debug"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Runtime invariant checks over a live ring"
+publish = false
+
+[dependencies]
+ring_core = { path = "../ring_core" }
+ring_cursor = { path = "../ring_cursor" }
+# Beyond the two edges the initial design assigned this crate, and both are
+# forced rather than convenient — see docs/integration/001.
+#   ring_types  — `Seq` and `Capacity` appear in every public signature here.
+#   ring_atomic — `PaddedCursor`'s `load`/`store` are `SeqCell` trait methods,
+#                 so reading a cursor at all needs the trait in scope. Reading
+#                 the derived values instead is what this crate exists because
+#                 you cannot do (docs/pitfall/001).
+ring_types = { path = "../ring_types" }
+ring_atomic = { path = "../ring_atomic" }
+
+[dev-dependencies]
+# `check_ends` takes a split ring's two ends, and building one needs a config.
+ring_config = { path = "../ring_config" }
+
+[lints]
+workspace = true

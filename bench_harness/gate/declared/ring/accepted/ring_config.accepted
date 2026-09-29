@@ -1,0 +1,14 @@
+# A boundary comparison whose two branches agree on the boundary.
+#
+#     let capped = if batch > self.capacity.get() { self.capacity.get() } else { batch };
+#
+# `>` becoming `>=` changes behaviour only where `batch == capacity`, and there
+# the two branches return the same value: the `then` arm yields `capacity`, the
+# `else` arm yields `batch`, and they are equal. Every other input takes the
+# same branch under both operators.
+#
+# So the usual off-by-one test — exercise the boundary, both sides of it — is
+# already present and cannot fail. This is an equivalent mutant, and unusually,
+# one where the mutated operator is arguably the clearer way to write it.
+
+ring/ring_config/src/lib.rs:142:27: replace > with >= in RingConfig::with_batch

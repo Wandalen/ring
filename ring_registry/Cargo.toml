@@ -1,0 +1,26 @@
+[package]
+name = "ring_registry"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Named ring registry"
+publish = true
+
+# Initial design message 960 assigned three edges: ring_handle, ring_core,
+# ring_types. The implementation needs one. A registry stores `Split< T >` and
+# never looks inside it — `T` is opaque here, so `ring_types`' vocabulary never
+# appears, and `ring_core::Ring` is only ever seen wrapped. Both moved to
+# dev-dependencies (where building a ring to register is exactly what a test
+# does) rather than kept as unused declarations; `ring_types` is dropped
+# outright. See docs/integration/001.
+[dependencies]
+ring_handle = { path = "../ring_handle", version = "0.1.0" }
+
+[dev-dependencies]
+ring_config = { path = "../ring_config", version = "0.1.0" }
+ring_core = { path = "../ring_core", version = "0.1.0" }
+
+[lints]
+workspace = true

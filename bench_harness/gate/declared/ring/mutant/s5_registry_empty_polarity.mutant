@@ -1,0 +1,30 @@
+# ring_registry's emptiness predicate, asserted at one polarity only.
+#
+# Found by the family sweep of 2026-08-30. Six crates carried this same defect
+# and it is recorded once per crate, because a declaration in one crate cannot
+# protect another. The shared reasoning — and why the sixth crate is in
+# ../accepted/ instead — is in readme.md under "The one-polarity rule".
+#
+# Before the fix every `is_empty()` assertion in this crate expected the same
+# answer, so a body that returned that answer unconditionally satisfied all of
+# them. The detector below now asserts the other polarity at the point where
+# the crate already had the opposite state in hand — which also makes the test
+# prove the thing its own name claims, rather than passing on a container that
+# was never filled.
+
+id: S5
+crate: ring_registry
+file: src/lib.rs
+round: 2026-08-30
+round-failures: 1
+detector: removing_a_name_frees_it_for_reuse
+
+--- from
+  pub fn is_empty( &self ) -> bool
+  {
+    self.rings.is_empty()
+--- to
+  pub fn is_empty( &self ) -> bool
+  {
+    true   // PROBE ONLY — G12, was `self.rings.is_empty()`
+--- end

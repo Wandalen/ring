@@ -1,0 +1,37 @@
+[package]
+name = "ring_factory"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Ring Factory is a lock-free write path that lets many concurrent producer threads submit work to a single ordered consumer without contending on a shared lock, eliminating the lock-convoy jitter that would erode a tight latency budget under load. Its claim, publish, and commit protocol is designed as a reusable foundation for latency-critical, strictly-ordered systems such as order-matching engines, where many concurrent order submissions must funnel into one deterministic, low-latency decision stream."
+publish = true
+
+[features]
+# Forwards to `ring_core`'s optional crossbeam backend, which gates
+# `Factory::build_crossbeam`. Feature 187 is a build-time opt-in, so the door to
+# it is a separate function rather than a `RingConfig` field — see the crate
+# docs, "The refusal that carries a route".
+crossbeam = [ "ring_core/crossbeam" ]
+
+[dependencies]
+ring_config = { path = "../ring_config", version = "0.1.0" }
+ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_registry = { path = "../ring_registry", version = "0.1.0" }
+# Message 960 did not assign these two, and both are needed to write the
+# signature: `ring_handle` owns `Split`, which is `build`'s return type, and
+# `ring_types` owns `RingError`, which `BuildError::Unsupported` carries.
+# `ring_handle` was reachable only transitively through `ring_registry`, which
+# is not enough to name a type. Recorded as requirement 1 of
+# `docs/integration/001` — a manifest bug, not a decision.
+ring_handle = { path = "../ring_handle", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
+# Message 960 also assigned `ring_stats` and `ring_tls`; both are removed.
+# `RingConfig` has no field that would configure staging or counters, so there
+# was nothing for a build to do with either, and inventing surface to justify a
+# manifest line is backwards. Closes `docs/decisions` Pending 7 by the second of
+# its two branches. Restore them alongside the config fields, not before.
+
+[lints]
+workspace = true

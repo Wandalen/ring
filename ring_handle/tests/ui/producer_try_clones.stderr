@@ -1,0 +1,5 @@
+error[E0599]: no method named `try_clone` found for struct `ring_handle::Producer<'a, T>` in the current scope
+  --> tests/ui/producer_try_clones.rs:34:26
+   |
+34 |   let _second = producer.try_clone();
+   |                          ^^^^^^^^^ method not found in `ring_handle::Producer<'_, u32>`

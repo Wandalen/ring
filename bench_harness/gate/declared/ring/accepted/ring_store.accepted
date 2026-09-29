@@ -1,0 +1,18 @@
+# `is_empty` returning `false` unconditionally, which it already does.
+#
+# `Buffer::new` is the only constructor, and it sizes its slots to
+# `capacity.get()`. `Capacity` is a newtype whose only `Self( .. )` sits past a
+# rejection of zero, so every `Capacity` is at least one and every `Buffer` has
+# at least one slot. `is_empty` therefore returns `false` for every value of the
+# type that can exist, and a mutant returning `false` returns the same answer.
+#
+# This is an equivalent mutant rather than a blind spot: no test can kill it,
+# because no test can build the input that would separate it from the original.
+# The crate already knew — the test covering this line is named
+# `a_buffer_is_never_empty_because_a_capacity_is_never_zero`.
+#
+# Five sibling crates carried a *real* one-polarity defect on their own
+# `is_empty` in the same sweep and are held by `mutant/S2` through `S6`. That
+# this one looks identical and is not is the reason both directories exist.
+
+ring/ring_store/src/lib.rs:190:5: replace Buffer<S>::is_empty -> bool with false

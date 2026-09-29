@@ -1,0 +1,18 @@
+[package]
+name = "ring_cursor"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Producer and consumer sequence cursors, cache-line separated"
+publish = true
+
+[dependencies]
+ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_seqno = { path = "../ring_seqno", version = "0.1.0" }
+ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
+ring_align = { path = "../ring_align", version = "0.1.0" }
+
+[lints]
+workspace = true

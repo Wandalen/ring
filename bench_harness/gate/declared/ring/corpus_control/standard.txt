@@ -1,0 +1,34 @@
+# The standard the control fixtures are graded against.
+#
+# Same shape as corpus_standard.txt with the floors lowered, because a fixture
+# built to the family's own 13/26/52 would be a fifth complete crate to
+# maintain, and every one of its 52 findings would be a finding about nothing.
+# The tier vocabulary is copied verbatim rather than reduced: G17's whole
+# assertion is membership of that set, so a shortened set would let a fixture
+# pass for a reason the family's crates never could.
+#
+# Each fixture is otherwise complete against this standard and carries exactly
+# one seeded defect. That is the isolation the control exists for — a single
+# fixture broken four ways proves that something fires, never that each gate's
+# own detector fires.
+
+definition algorithm
+definition invariant
+
+min_definitions 2
+min_instances 4
+min_findings 4
+
+tier **latent hazard**
+tier **misleading doc**
+tier **measured cost**
+tier **wrong doc**
+tier n/a — observation
+tier n/a — doc gap
+tier n/a — coverage
+tier n/a — unenforced
+tier n/a — duplication
+tier n/a — unadopted
+tier n/a — inconsistency
+tier n/a — drift
+tier n/a — diagnostics

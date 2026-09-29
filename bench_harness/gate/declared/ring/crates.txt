@@ -1,0 +1,42 @@
+# Ring family membership — the 33 crates the ring family built.
+#
+# Was a `find module -name 'ring_*'` glob until a later pass replaced it with
+# this list. A glob cannot fail: it reports whatever is on disk, so a gate run
+# against a crate that does not exist reads REACHED rather than NOT REACHED,
+# which is exactly the vacuous pass that replacement was measured against.
+# An explicit list can be checked against the tree, and common.sh's
+# `assert_declared_crates_exist` does check it.
+
+ring_align
+ring_atomic
+ring_barrier
+ring_batch
+ring_bench
+ring_claim
+ring_config
+ring_consume
+ring_core
+ring_cursor
+ring_debug
+ring_event
+ring_factory
+ring_flush
+ring_gating
+ring_handle
+ring_index
+ring_mpsc
+ring_overflow
+ring_poll
+ring_publish
+ring_registry
+ring_seqno
+ring_shutdown
+ring_slot
+ring_spsc
+ring_stats
+ring_store
+ring_testkit
+ring_tls
+ring_trace
+ring_types
+ring_wait

@@ -1,0 +1,8 @@
+# The family a bare `run_all.sh` grades. One name, matching a directory
+# alongside this file.
+#
+# Override per run with `--family <name>` or the GATE_FAMILY environment
+# variable; neither is needed here, since `ring` is the only family this
+# repository declares.
+
+ring

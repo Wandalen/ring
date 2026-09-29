@@ -1,0 +1,49 @@
+[package]
+name = "ring_bench"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Comparative write-path measurements — mutex, ring, and thread-local staging"
+publish = false
+
+[features]
+# Forwards to `ring_factory`'s crossbeam door, which gates the off-the-shelf
+# candidate. Feature 186 names that candidate; feature 187 makes it optional.
+# The comparison therefore has five candidates by default and six with this on,
+# which `Candidate::ALL` reflects rather than hides.
+crossbeam = [ "ring_factory/crossbeam" ]
+
+[dependencies]
+ring_factory = { path = "../ring_factory" }
+ring_tls = { path = "../ring_tls" }
+ring_flush = { path = "../ring_flush" }
+ring_stats = { path = "../ring_stats" }
+ring_spsc = { path = "../ring_spsc" }
+ring_mpsc = { path = "../ring_mpsc" }
+# Message 960 did not assign these three. Each is needed to write a signature,
+# which is the same reason `ring_factory` had to add two — see that crate's
+# `docs/integration/001`. Third occurrence in the family, and the first where
+# the missing name is on the export Contract's own argument list:
+#
+#   ring_core  — `ring_flush::Flusher::new` takes a `ring_core::Producer` and
+#                `ring_flush` re-exports neither it nor a way to build one, so
+#                the staging candidate cannot be constructed without this line.
+#                Recorded as this crate's `docs/integration/001` requirement 1;
+#                it is a Contract defect, not a preference.
+#   ring_slot  — `ring_spsc::Ring< S >` and `ring_mpsc::Ring< S >` are generic
+#                over `Slot`, and `TypedSlot< T >` is the only implementor this
+#                benchmark exercises (the other, `BytesSlot< N >`, round-trips
+#                through no path measured here — see ring_event's own
+#                non_functional_requirement/001 § EV34). The two direct
+#                candidates cannot name their own ring type without it.
+#   ring_types — `RingStats::record_drop` takes an `OverflowPolicy`, so the
+#                per-run counters feature 185 supplies cannot be recorded
+#                without naming the policy vocabulary.
+ring_core = { path = "../ring_core" }
+ring_slot = { path = "../ring_slot" }
+ring_types = { path = "../ring_types" }
+
+[lints]
+workspace = true

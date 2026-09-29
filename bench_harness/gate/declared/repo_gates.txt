@@ -1,0 +1,36 @@
+# The family-independent gates — the ones `--every` runs once for the whole
+# repository, before any family block.
+#
+# Why this file exists at all. `run_all.sh --every` already refuses to hardcode
+# the *family* list, and says why in its own words: a written-down list "would
+# reintroduce exactly the omission this mode exists to prevent ... and a family
+# added tomorrow would be missing from the total without anything saying so".
+# That argument was then not applied to the family-independent gates themselves,
+# which sat hardcoded two lines below it. G18 and G19 were the whole set when it
+# was written, so the list and the code agreed and nothing pointed at the gap.
+#
+# G22 is the third, and adding it is what surfaced the gap: a repository-wide
+# gate can be written, committed, and never run, and the `--every` total would
+# still print as though it had covered everything. The count comes from this
+# file now, so a gate declared here and missing its script fails loudly, and a
+# gate added here is in the total the same run.
+#
+# `common.sh` already states the principle for the family case — "Which gates
+# apply is itself declared" — and this file is that sentence applied one level
+# up, to the gates no family can declare.
+#
+# Membership rule: a gate belongs here when its reading spans families and
+# therefore cannot live in any single `<family>/gates.txt`. It is not a
+# catch-all for gates that are merely important.
+
+# Coverage across families — every crate claimed exactly once, or exempted.
+g18
+
+# The Overview Table, which spans every family this repository could ever
+# declare and maps onto no single one of them.
+g19
+
+# Exemption expiry — G18 counts exemptions, this one checks they are still
+# earned. Family-independent for the same reason G18 is: it grades the shared
+# `exempt.txt`, which belongs to no family.
+g22

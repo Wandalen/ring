@@ -1,0 +1,40 @@
+# B5 — the `reported`-vs-`received` counter mapping, which `ring_bench`'s own
+# pitfall/003 calls the crate's most expensive lesson.
+#
+# The original defect fed workload totals through the slot-lifecycle counters,
+# so 240 refused records read as 240 leaked slots on a 16-slot ring.
+#
+# This is the mutant the whole gate exists for. When the round first reinstated
+# it, **every test passed** — the crate had 100% line coverage over 298 lines
+# and zero defence against its own headline defect. Two reasons, both
+# instructive: the test named after the job runs a candidate whose `reported`
+# and `received` are equal, so the mapping is invisible to it; and the one test
+# using the candidate where they differ asserted on `Outcome`'s fields rather
+# than on `outcome.stats()`. Both mutated lines executed in both tests. Neither
+# test looked at the number they produced.
+#
+# `a_dropnewest_ring_reports_successes_it_did_not_keep` was then given the four
+# counter assertions and `in_flight()` on `ContractRing`, and the re-probe went
+# red with exactly one failure. That fix is what this mutant now guards: it is
+# the only entry here whose green result was ever the true one, which is
+# precisely why leaving it to a human habit was this family's own closing
+# constraint.
+
+id: B5
+crate: ring_bench
+file: src/lib.rs
+round: 2026-08-28
+round-failures: 1
+detector: a_dropnewest_ring_reports_successes_it_did_not_keep
+
+--- from
+  stats.record_claim( received as u64 );
+  stats.record_publish( received as u64 );
+  stats.record_consume( received as u64 );
+  stats.record_drop( workload.config().overflow(), ( offered - received ) as u64 );
+--- to
+  stats.record_claim( reported as u64 );      // PROBE ONLY — G12, was `received`
+  stats.record_publish( reported as u64 );
+  stats.record_consume( reported as u64 );
+  stats.record_drop( workload.config().overflow(), ( offered - reported ) as u64 );
+--- end

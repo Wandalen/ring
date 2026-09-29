@@ -1,0 +1,36 @@
+target/
+Cargo.lock
+dist/
+.claude/
+-*
+*.log
+
+# Out-of-tree build directories. `target/` above is a trailing-slash pattern,
+# so it matches that exact name and nothing else — a run that isolates itself
+# with `CARGO_TARGET_DIR=target-gate` (gate runs do, to keep a concurrent
+# cargo from corrupting the coverage report) lands 5 GB of build artefacts in
+# a directory no rule here covered.
+target-*/
+
+# Python bytecode from the gate tooling under `bench_harness/gate/`.
+__pycache__/
+
+# Coverage and profiling artefacts. Most land under `target/` and are already
+# covered above, but the LLVM instrumentation cargo links into build scripts
+# writes `build_rs_cov.profraw` into the invocation cwd — the repository root —
+# where nothing else catches it. The rest are listed because the tool that
+# emits them is chosen per run (tarpaulin, llvm-cov, grcov, gcov) and each
+# picks a different extension for the same throwaway data.
+*.profraw
+*.profdata
+*.gcda
+*.gcno
+lcov.info
+cobertura.xml
+tarpaulin-report.*
+
+# Editor and OS droppings.
+*.swp
+*.swo
+*~
+.DS_Store

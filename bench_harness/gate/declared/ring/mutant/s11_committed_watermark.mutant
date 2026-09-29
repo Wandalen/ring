@@ -1,0 +1,28 @@
+# `committed` returning the default instead of reading the cursor.
+#
+# Every assertion on `committed()` in the crate — one test and two doctests —
+# expected `Seq::ZERO`, so a method that returned the default and never touched
+# the consumer cursor satisfied all three. `Consumer::position()`, the same
+# cursor by another name, was asserted once and also only at zero.
+#
+# This is the one-polarity rule (readme.md) applied to a quantity rather than a
+# predicate: a watermark asserted only where it has not moved is indistinguish-
+# able from one that cannot move. The detector now brackets a drain — zero
+# before, `Seq( 1 )` after — so the assertion straddles the change.
+
+id: S11
+crate: ring_mpsc
+file: src/lib.rs
+round: 2026-08-30
+round-failures: 1
+detector: a_second_drain_sees_what_was_published_after_the_first
+
+--- from
+  pub fn committed( &self ) -> Seq
+  {
+    self.consumer_cursor().load( GATING )
+--- to
+  pub fn committed( &self ) -> Seq
+  {
+    Default::default()   // PROBE ONLY — G12, was `self.consumer_cursor().load( GATING )`
+--- end

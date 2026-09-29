@@ -1,0 +1,15 @@
+[package]
+name = "ring_slot"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Slot payload views — typed and raw bytes"
+publish = true
+
+[dependencies]
+ring_types = { path = "../ring_types", version = "0.1.0" }
+
+[lints]
+workspace = true

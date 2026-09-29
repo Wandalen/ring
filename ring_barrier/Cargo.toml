@@ -1,0 +1,23 @@
+[package]
+name = "ring_barrier"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Consumer barrier over the minimum of dependent cursors"
+publish = true
+
+[dependencies]
+ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
+ring_wait = { path = "../ring_wait", version = "0.1.0" }
+
+# Tests only. Three of them assert the relationship between this crate's answers
+# and `ring_gating`'s over one set of cursors — see the test file's own header on
+# why a stand-in would assert nothing. The library itself never names it.
+[dev-dependencies]
+ring_gating = { path = "../ring_gating", version = "0.1.0" }
+
+[lints]
+workspace = true

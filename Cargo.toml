@@ -1,0 +1,71 @@
+[workspace]
+resolver = "3"
+
+members = [
+  # Family-neutral validation machinery: it depends on no ring_* crate, so its
+  # stage gates run against an empty workspace. ring_bench (tier 12) grades
+  # write paths; this grades the family. Also grades other families in the
+  # tree (see gate/declared/) — a shared-infrastructure crate that lives here
+  # rather than at the repository root, kept alongside the family it was
+  # built to grade first.
+  "bench_harness",
+
+  # The 33-crate ring_* forest, in dependency order: every crate's
+  # dependencies appear above it, so the forest is acyclic by inspection.
+  # ring_mpsc and ring_tls were mpsc_ring and bump_log before the family
+  # adopted one prefix.
+  "ring_types",
+  "ring_seqno",
+  "ring_index",
+  "ring_align",
+  "ring_atomic",
+  "ring_config",
+  "ring_slot",
+  "ring_cursor",
+  "ring_store",
+  "ring_wait",
+  "ring_gating",
+  "ring_barrier",
+  "ring_claim",
+  "ring_publish",
+  "ring_consume",
+  "ring_overflow",
+  "ring_batch",
+  "ring_event",
+  "ring_spsc",
+  "ring_mpsc",
+  "ring_core",
+  "ring_handle",
+  "ring_tls",
+  "ring_flush",
+  "ring_stats",
+  "ring_shutdown",
+  "ring_poll",
+  "ring_registry",
+  "ring_factory",
+  "ring_trace",
+  "ring_debug",
+  "ring_testkit",
+  "ring_bench",
+]
+
+[workspace.package]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/Wandalen/ring"
+
+[workspace.lints.rust]
+rust_2018_idioms = { level = "warn", priority = -1 }
+future_incompatible = { level = "warn", priority = -1 }
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unsafe-code = "deny"
+# `loom` is set by RUSTFLAGS, not by any feature, so rustc has no other way to
+# learn it is a real cfg. Declared once here rather than per crate: the lints
+# table is inherited workspace-wide, and a crate cannot both inherit it and add
+# its own. Only ring_atomic, ring_cursor and ring_publish read the cfg — see
+# ring_atomic's module documentation on the seam.
+unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
+
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"

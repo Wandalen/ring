@@ -1,0 +1,34 @@
+# `free_capacity` answering zero forever, and passing.
+#
+# `ring_core`'s own module table calls this "one signature over two contracts":
+# binding at SPSC, advisory at MPSC and crossbeam. The suite tested the advisory
+# reading against every backend and the binding reading against none, and a
+# constant zero satisfies the advisory reading completely — understating is
+# permitted, and zero is the largest understatement available.
+#
+# The test's other assertion looked stronger than it was. `assert_eq!( claimed
+# == 0, producer.is_full() )` compares two readings that move together, because
+# `is_full` is *defined* as `free_capacity() == 0`: mutate the one and both
+# sides of the comparison change with it. A test can only catch a mutation it
+# straddles, and this one sat entirely on one side.
+#
+# The detector now asserts exactness at SPSC, where the contract is binding.
+# Exactness is the only form of this assertion a constant cannot pass.
+
+id: S10
+crate: ring_core
+file: src/lib.rs
+round: 2026-08-30
+round-failures: 1
+detector: free_capacity_never_overstates_the_room_available
+
+--- from
+  pub fn free_capacity( &self ) -> usize
+  {
+    match &self.inner
+--- to
+  pub fn free_capacity( &self ) -> usize
+  {
+    if true { return 0; }   // PROBE ONLY — G12, was the match below
+    match &self.inner
+--- end

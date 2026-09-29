@@ -1,0 +1,14 @@
+# The alignment canary, which reads `true` while the contract it watches holds.
+#
+# `CursorPair::on_distinct_lines` compares the addresses of its two
+# `PaddedCursor` fields. `PaddedCursor` has `size_of == 64` and `align_of == 64`,
+# so two of them in one struct sit at distinct multiples of 64 and are always at
+# least a line apart. The method returns `true` for every pair that can exist.
+#
+# Killing the mutant would need two cursors closer than 64 bytes, which cannot
+# be built while the alignment holds — and the alignment is asserted directly,
+# here and in `ring_align`, by tests that swept clean. See accepted/readme.md,
+# "The alignment canaries", for why leaving these three unkillable is the point
+# rather than a concession.
+
+ring/ring_cursor/src/lib.rs:440:5: replace CursorPair::on_distinct_lines -> bool with true

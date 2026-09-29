@@ -1,0 +1,39 @@
+# F1 — the `at_barrier` guard, without which `OnBarrier` fires on every drive.
+#
+# The failure `ring_flush` exists to make visible is a policy that quietly
+# starts firing when it should not. Twenty-four passing tests is also an
+# accurate description of twenty-four tests that could never fail; the only way
+# to tell those apart is to commit the violation.
+#
+# The round predicted two failures and got four. The extras say what the real
+# detector is, and it is not the test named after the job: every one of them
+# contains an assertion that some drive returns `NotTriggered`. That shape
+# catches this, and it turns up incidentally in tests written for other reasons.
+#
+# The count below is 6 rather than the round's own 4, and the discrepancy is not
+# erosion in either direction — it is the round's number being wrong. Its output
+# reads "16/23 tests run", which is nextest stopping early on failures by
+# default, so 4 was however many had run when it gave up rather than how many
+# catch this. Re-measured 2026-08-29 with `--no-fail-fast`: **6**. The round's
+# conclusion survives its arithmetic — the detector really is the not-firing
+# assertion — and there are two more tests holding this line than it knew.
+# G12 runs `--no-fail-fast` for exactly this reason.
+#
+# It also corrected the crate's own module documentation, which had claimed this
+# was the failure "no positive test can see". The distinction that matters is
+# not positive versus negative tests — it is assertions about firing versus
+# assertions about *not* firing. A suite made entirely of "after
+# `drive_at_barrier`, `Flushed`" would miss it; four of ours do not, by accident.
+
+id: F1
+crate: ring_flush
+file: src/lib.rs
+round: 2026-08-28
+round-failures: 6
+detector: on_barrier_never_fires_without_an_announcement
+
+--- from
+      FlushPolicy::OnBarrier if at_barrier => Some( FlushCause::Barrier ),
+--- to
+      FlushPolicy::OnBarrier => Some( FlushCause::Barrier ),  // PROBE ONLY — G12
+--- end

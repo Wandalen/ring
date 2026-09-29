@@ -1,0 +1,26 @@
+# Stage scope — which crates and features each stage's reached-test covers.
+#
+# Transcribed from this family's own staged plan, whose reached-test column
+# reads "G1–G6 over the N crates" for every stage.
+# Without this file the gates only grade the whole family, so a stage verdict
+# would have to wait for the Final Goal — which is the opposite of what staged
+# validation is for.
+#
+# Format, whitespace-separated:  <stage> <crates,comma-separated> <features,comma-separated>
+#
+# S9 is the Final Goal and deliberately absent: it is the unscoped run, which is
+# what `run_all.sh` with no argument already does. Adding it here as "all 33 /
+# all 22" would create a second place for that list to drift from reality.
+#
+# M0 and M1 are also absent — neither is graded by G1–G6 over a crate set. M0's
+# reached-test is that all six gates report NOT REACHED, and M1's is a corpus
+# count.
+
+S1 ring_types,ring_seqno,ring_index,ring_align,ring_config,ring_overflow,ring_stats,ring_slot 167,174,180,182,185
+S2 ring_store,ring_atomic,ring_batch,ring_event,ring_tls,ring_trace 168,175,177,182
+S3 ring_cursor 169
+S4 ring_wait,ring_publish,ring_gating,ring_barrier,ring_claim,ring_consume 170,172,173,178
+S5 ring_spsc,ring_mpsc,ring_core 171,172,187
+S6 ring_handle,ring_flush,ring_shutdown,ring_poll,ring_debug 176,179,183,184
+S7 ring_registry,ring_testkit,ring_factory 180,181,188
+S8 ring_bench 186

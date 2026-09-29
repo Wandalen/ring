@@ -1,0 +1,17 @@
+# Ring family export surface — the only ring_* crates a consumer outside
+# ring/ring_* may name as a dependency.
+#
+# This five-crate Contract set holds that features 171 (SPSC), 172 (MPSC) and
+# 181 (registry) are reached *through* this surface rather than by importing
+# ring_spsc, ring_mpsc or ring_registry directly: ring_factory constructs them
+# and hands back ring_handle values.
+#
+# The other 28 crates are internal to the family and freely refactorable.
+# Widening this file widens the family's contract — do not add a name without
+# a ruling that says so.
+
+ring_factory
+ring_handle
+ring_tls
+ring_flush
+ring_types

@@ -1,0 +1,28 @@
+# `Tick::push_batch`'s loss arithmetic, divided instead of subtracted.
+#
+# `offered - moved` is exactly what a batch attempt destroyed: the record
+# `try_push_batch` pulled from the iterator before it knew there was no room.
+# Every existing caller of `push_batch` happened to move at least one record,
+# so `offered / moved` (integer division) came out equal to `offered - moved`
+# by coincidence in each of them — the two operators diverge only once `moved`
+# drops to zero, which nothing exercised.
+#
+# A ring that is already full before `push_batch` is called moves nothing on
+# its one attempt and still eats the record that attempt pulled: `offered` is
+# 1, `moved` is 0. Subtraction reports the correct loss of 1. Division panics
+# on the zero divisor before it can report anything.
+
+id: S13
+crate: ring_poll
+file: src/lib.rs
+round: 2026-09-05
+round-failures: 1
+detector: a_tick_records_a_fully_refused_batch_as_lost_not_moved
+
+--- from
+    self.moved += moved;
+    self.lost += offered - moved;
+--- to
+    self.moved += moved;
+    self.lost += offered / moved;   // PROBE ONLY — G12, was `offered - moved`
+--- end

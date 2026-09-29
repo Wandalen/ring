@@ -5,9 +5,15 @@ do-protocol verb scripts for the `ring` repository — one Cargo workspace, 34 m
 (twelve independent workspaces, fanned out via `each_workspace`), every verb here
 reaches the whole family directly — no fan-out step exists or is needed.
 
-This is the repo root's `verb/`, and the only one in the tree — no per-crate `verb/`
-exists yet (34 crates × N verbs is real duplication weight; deferred until the
-shared-implementation question is settled). Every invocation below is root-level.
+This is the repo root's `verb/`. Every one of the 34 crates also has its own `verb/`
+(`test`, `test_only`, `lint`, `build` — see e.g. [`../ring_spsc/verb/readme.md`](../ring_spsc/verb/readme.md)),
+for iterating on one crate without touching the other 33. Those are thin wrappers —
+every crate's `verb/test` is a 4-line file that `exec`s this directory's own
+`_crate_dispatch` with its own crate name baked in, so the actual logic (argument
+parsing, the cargo invocation shape) lives in exactly one place regardless of how
+many crates call into it. `_crate_dispatch` is not itself a verb — it takes a verb
+name and a crate name as its first two positional args and has no meaning invoked
+on its own, which is why `verbs` (below) skips anything starting with `_`.
 
 **Parameter convention:** every parameter is `key::val` (`level::3`, `crate::ring_spsc`,
 `dry::1`) — never `--flag val`. Every verb rejects an unrecognized parameter loudly
@@ -22,6 +28,7 @@ No `verb.rulebook.md` exists in this repo to govern these, same as `codename_spa
 | `test_only` | Filtered nextest run — `filter::<substring>`, `crate::<name>`. Ordinary verification during development |
 | `lint` | Clippy, warnings as errors. `crate::<name>` narrows to one package |
 | `build` | Compile the workspace. `crate::<name>` narrows to one package |
+| `fmt` | Apply this repo's adopted rustfmt style workspace-wide (`+nightly`, `rustfmt.toml`). `check::1` verifies without writing |
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first — incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh` — the family's own G1-G21 corpus/quality suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
 | `bench` | Run `ring_bench`'s comparison example — the family's benchmark harness |
@@ -29,6 +36,7 @@ No `verb.rulebook.md` exists in this repo to govern these, same as `codename_spa
 | `verify` | Full pre-push gate — alias for `test level::5` |
 | `verbs` | List all verbs with their purpose line |
 | `package_info` | Family manifest info as flat JSON — no single crate here is "the" package (34 peer members), so this describes the family the workspace root declares |
+| `_crate_dispatch` | Shared implementation behind every per-crate `verb/{test,test_only,lint,build}` wrapper. Not a verb — takes a verb name and crate name as its first two args, never invoked directly |
 
 ### Why `test` is leveled and the monorepo's `test` is not
 

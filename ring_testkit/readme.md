@@ -42,6 +42,7 @@ is the caller's, built however they like and passed to `run`. That split is why
 
 | Step | Effect |
 |---|---|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `Push` / `PushMany` | Mint a record and publish it through the shutdown guard |
 | `Recv` / `RecvMany` | Take from the consumer end |
 | `Stage` / `StageMany` | Mint into the `TlsBuffer` instead of the ring |

@@ -43,6 +43,7 @@ see a slot, and the guarantee that it sees nothing earlier. The corpus under
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | 13 doc definitions, 26 instances, 46 findings — see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root — the crate's whole public surface |
 | `tests/` | `publish_test.rs`, the handshake's `handshake_test.rs`, and the manual plan under `manual/` |

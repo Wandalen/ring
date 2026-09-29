@@ -25,6 +25,7 @@ severity in [`docs/definition/readme.md`](docs/definition/readme.md).
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | The design corpus — 13 definitions, 26 instances, 56 findings; see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root — the crate's whole public surface |
 | `tests/` | `index_test.rs` and the manual plan under `manual/` |

@@ -32,6 +32,7 @@ they cost.
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | 13 doc definitions, 26 instances, 24 findings — see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root — the crate's whole public surface |
 | `tests/` | `wait_test.rs` and the manual plan under `manual/` |

@@ -30,6 +30,7 @@ assert!( registry.get_mut( "telemetry" ).is_none() );
 
 | Operation | Effect |
 |---|---|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `register` | Takes ownership, or refuses and hands the ring back |
 | `get_mut` | Lends the ring; the registry keeps owning it |
 | `remove` | Gives ownership to the caller, freeing the name |

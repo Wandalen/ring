@@ -40,6 +40,7 @@ cargo test --doc -p ring_shutdown     # 8 doc tests
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | 13 doc instances across 10 definitions — see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | The flag, the `Stopped` token, the guarded producer, and the two close-aware waits |
 | `tests/shutdown_test.rs` | This crate's reached-test and 15 tests across the surface |

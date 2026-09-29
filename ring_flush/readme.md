@@ -51,6 +51,7 @@ The third is the one that loses data when neglected.
 
 | Question the docs left open | Settled as |
 |---|---|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | The flush log's compilation boundary | An opt-in `FlushLog` the driver owns — no cargo feature and no `cfg`, so the acceptance criterion holds under default features and a release build that never opts in allocates nothing |
 | How a record reaches the buffer | `Flusher::append`, absent from both API instances — without it a buffer moved into `Flusher::new` is unreachable |
 | `ConfigError::AlreadyBound` | Not built. `new` takes the buffer **by value**, so ownership enforces one-policy-per-buffer and no runtime check is reachable |

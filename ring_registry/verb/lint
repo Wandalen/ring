@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+#@ purpose: ring_registry-scoped lint. Thin wrapper — see verb/readme.md at the workspace root.
+#@ tags: verb, lint
+exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/verb/_crate_dispatch" lint ring_registry "$@"

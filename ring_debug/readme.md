@@ -62,6 +62,7 @@ all**. Pinned as a test, not left as a caveat:
 
 | Question | Answer |
 |---|---|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | Is this belt-and-braces? | No — the failure mode is silent and lands on `may_claim` |
 | Should `ring_seqno` be made defensive instead? | No — a branch on the family's hottest read, for a state a correct program never reaches |
 | One entry point or two? | Two — D3 costs the caller a baseline that D1 and D2 do not |

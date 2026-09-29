@@ -17,6 +17,7 @@ version of that list is short enough to read at once:
 
 | Added | What it prevents |
 |---|---|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | The ring is taken **by value** | Splitting the same ring twice, which `Ring::ends`'s borrow permits |
 | `try_clone` is **withheld** | A second producer — refused at compile time here, at runtime one crate down |
 | A drain iterator bounded at call time | A full drain that never terminates under a live producer |

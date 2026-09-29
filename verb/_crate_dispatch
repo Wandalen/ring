@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+#@ purpose: Shared implementation behind every per-crate verb/<name> wrapper. One
+#@          script, so the 34 crates' wrappers can never drift out of sync with each
+#@          other. Not a verb itself — never invoke directly; run a crate's own
+#@          verb/test / verb/test_only / verb/lint / verb/build instead.
+#@ tags: verb, internal
+set -euo pipefail
+
+_verb="$1"; _crate="$2"; shift 2
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+_dry_run=0
+_filter=""
+for _arg in "$@"; do
+  case "$_arg" in
+    dry::1) _dry_run=1 ;;
+    filter::*)
+      if [[ "$_verb" != "test_only" ]]; then
+        echo "verb/$_verb: unrecognized parameter '$_arg' — filter:: only applies to test_only" >&2
+        exit 2
+      fi
+      _filter="${_arg#filter::}"
+      ;;
+    *)
+      if [[ "$_verb" == "test_only" ]]; then
+        echo "verb/$_verb: unrecognized parameter '$_arg' — expected filter::<substr> or dry::1" >&2
+      else
+        echo "verb/$_verb: unrecognized parameter '$_arg' — expected dry::1" >&2
+      fi
+      exit 2
+      ;;
+  esac
+done
+
+case "$_verb" in
+  test)
+    STEPS=(
+      "RUSTFLAGS=\"-D warnings\" cargo nextest run -p $_crate --all-features"
+      "RUSTDOCFLAGS=\"-D warnings\" cargo test --doc -p $_crate --all-features"
+      "cargo clippy -p $_crate --all-targets --all-features -- -D warnings"
+    )
+    if (( _dry_run )); then
+      printf '%s\n' "${STEPS[@]}"
+      exit 0
+    fi
+    for step in "${STEPS[@]}"; do
+      eval "$step"
+    done
+    ;;
+  test_only)
+    _cmd=( cargo nextest run -p "$_crate" --all-features )
+    [[ -n "$_filter" ]] && _cmd+=( "$_filter" )
+    if (( _dry_run )); then
+      printf '%s\n' "${_cmd[*]}"
+      exit 0
+    fi
+    exec "${_cmd[@]}"
+    ;;
+  lint)
+    _cmd=( cargo clippy -p "$_crate" --all-targets --all-features -- -D warnings )
+    if (( _dry_run )); then
+      printf '%s\n' "${_cmd[*]}"
+      exit 0
+    fi
+    exec "${_cmd[@]}"
+    ;;
+  build)
+    _cmd=( cargo build -p "$_crate" --all-features )
+    if (( _dry_run )); then
+      printf '%s\n' "${_cmd[*]}"
+      exit 0
+    fi
+    exec "${_cmd[@]}"
+    ;;
+  *)
+    echo "verb/_crate_dispatch: unknown verb '$_verb'" >&2
+    exit 2
+    ;;
+esac

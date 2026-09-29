@@ -16,5 +16,6 @@ Implemented, delivering the configuration surface of features 172, 180 and 183. 
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | Scope, related crates, and open trade-offs — see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root — the crate's whole public surface |

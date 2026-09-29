@@ -24,6 +24,7 @@ indexed and ranked by severity in
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | The design corpus — 13 definitions, 26 instances, 52 findings; see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root — the crate's whole public surface |
 | `tests/` | `slot_test.rs` and the manual plan under `manual/` |

@@ -53,6 +53,7 @@ cargo nextest run -p ring_core --features crossbeam # 23 tests, three
 
 | File | Responsibility |
 |------|-----------------|
+| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
 | `docs/` | 19 doc instances across 12 definitions — see [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | The `Ring`, its three backends, and the ends/producer/consumer handles |
 | `tests/core_test.rs` | The crossbeam backend's reached-test and 21 tests across every backend the build offers |

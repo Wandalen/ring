@@ -79,7 +79,7 @@ grep -c 'TypedSlot' ring_core/src/lib.rs
 # BytesSlot's reach, shipped code against total
 for f in $( grep -rl 'BytesSlot' ring_*/src/*.rs ring_*/tests/*.rs 2>/dev/null \
   | grep -v '^ring_slot/' | sort ); do
-  printf '%-38s total %2d   shipped code %d\n' "${f#/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/}" \
+  printf '%-38s total %2d   shipped code %d\n' "${f#}" \
     "$( grep -c 'BytesSlot' "$f" )" \
     "$( grep -vE '^[[:space:]]*//' "$f" | grep -c 'BytesSlot' )"
 done

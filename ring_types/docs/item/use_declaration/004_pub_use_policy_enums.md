@@ -56,7 +56,6 @@ consumers, not seventeen:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-cd ring
 comm -12 \
   <(command grep -rln '\bWaitKind\b'       ring_*/src --include='*.rs' | sed 's|/src.*||' | sort -u) \
   <(command grep -rln '\bOverflowPolicy\b' ring_*/src --include='*.rs' | sed 's|/src.*||' | sort -u) \

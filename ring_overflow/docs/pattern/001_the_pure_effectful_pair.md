@@ -7,7 +7,7 @@ computes and records, one that only computes — and how often the rest of the
 codebase uses it.
 
 **Responsibility:** The pattern's shape here, its naming convention, and its
-frequency across `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`.
+frequency across `any crate root`.
 
 **In Scope:** `ring_overflow/src/lib.rs:192`, `:210`, `:229`.
 
@@ -56,9 +56,9 @@ ring_overflow/src/lib.rs:pub const fn would_resolve( policy : OverflowPolicy ) -
 
 ---
 
-### OV41 — The `would_` Prefix Appears Once Under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` and Is Never Explained as a Convention
+### OV41 — The `would_` Prefix Appears Once Under `any crate root` and Is Never Explained as a Convention
 
-`would_resolve` is the only function anywhere under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` whose name begins
+`would_resolve` is the only function anywhere under `any crate root` whose name begins
 `would_`. `const` purity itself is ordinary here — the census above counts dozens
 of crates declaring at least one `pub const fn` — while pairing a `const`
 computation with a recording twin under a `would_`/bare naming split is not. That
@@ -72,7 +72,7 @@ callers deciding what a policy *would* do".
 What is absent is any statement that it *is* a convention. A second crate needing
 the same split has no precedent to follow and no rulebook entry to find, so it will
 reach for `peek_`, `dry_`, or `preview_` with equal justification — the census
-above finds **zero** of all three under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, so none of them carries a
+above finds **zero** of all three under `any crate root`, so none of them carries a
 precedent either. The fourth candidate is worse than absent: `try_` is already
 spoken for, **72** times over, and it means *fallible attempt* rather than
 *hypothetical result* — so the one prefix a maintainer is most likely to reach
@@ -153,7 +153,7 @@ holds no`
 
 | Fact | Where |
 |------|-------|
-| The only `would_` under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` | Census above |
+| The only `would_` under `any crate root` | Census above |
 | `would_resolve`'s stated purpose | `ring_overflow/src/lib.rs:210-212` |
 | The recording half | `ring_overflow/src/lib.rs:192`, `:199` |
 | The consumer that declares no `ring_stats` | `ring_core/Cargo.toml` |

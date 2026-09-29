@@ -84,7 +84,7 @@ cd "$(git rev-parse --show-toplevel)"
 for t in Seq SlotIndex; do
   printf '%-12s %s\n' "$t" \
     "$( command grep -rlE "\b$t\b" ring_*/src | command grep -v '^ring_types/' \
-         | cut -d/ -f2 | sort -u | tr '\n' ' ' )"
+         | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 done
 ```
 

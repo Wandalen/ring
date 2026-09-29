@@ -94,7 +94,7 @@ printf 'crates depending on ring_tls:      %s\n' "$( command grep -l 'ring_tls *
 printf 'of those, also on ring_core:       %s\n' "$( for m in $( command grep -l 'ring_tls *=' ring_*/Cargo.toml ) ; do command grep -q 'ring_core *=' "$m" && echo x ; done | wc -l )"
 # Note: the two commands above are scoped to ring_*/Cargo.toml only. Workspace-wide
 # (module + ring + spike), ring_tls has a fourth dependent outside this glob:
-# /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path, which also depends on ring_core.
+# smoke_ring_write_path, which also depends on ring_core.
 printf 'the bound flush_into needs:        %s\n' "$( command grep -rn 'pub trait SeqCell' ring_*/src/lib.rs )"
 printf 'impls of it in the family:         %s\n' "$( command grep -rhc 'impl SeqCell for' ring_*/src/lib.rs | paste -sd+ | bc )"
 printf 'ring_core dependencies:            %s\n' "$( command grep -oE '^ring_[a-z_]+' ring_core/Cargo.toml | sort -u | tr '\n' ' ' )"
@@ -148,7 +148,7 @@ and its own test suite.
 
 The population that could adopt it is small and fully accounted for.
 `ring_tls` has exactly four dependents workspace-wide — `ring_bench`, `ring_flush`,
-`ring_testkit`, and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path` — and **all four** also depend on
+`ring_testkit`, and `smoke_ring_write_path` — and **all four** also depend on
 `ring_core`. Every crate in the family that holds a `TlsBuffer` also holds a `Ring`,
 and not one of them has found a way to put the two together through the operation
 that exists for precisely that join.

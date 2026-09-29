@@ -248,7 +248,7 @@ mapfile -t members < <( family_members )
 ```
 
 Zero occurrences. The exemption is `grep -qx` against the family's declared
-membership list, and the script's header explains the choice: a `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/<prefix>_*`
+membership list, and the script's header explains the choice: a `<prefix>_*`
 path test would class a family's own demo binary as an external consumer and
 "demand its whole dependency list be exported."
 

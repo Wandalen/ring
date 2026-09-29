@@ -298,7 +298,7 @@ ring_tls
 ring_flush
 ring_types
   -- manifests naming any of the five, outside ring_* --
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/Cargo.toml
+smoke_ring_write_path/Cargo.toml
   -- and inside it --
 ring_bench
 smoke_ring_write_path
@@ -329,13 +329,13 @@ which lists members rather than depending on anything. The only crate that
 depends on `ring_factory` is `ring_bench`, which is inside the family and
 therefore refactorable alongside it." Both undercounted, and the recipe's own
 output — two blocks, both quoted above — had already said so: the second block
-named `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/Cargo.toml` beside the workspace manifest,
+named `smoke_ring_write_path/Cargo.toml` beside the workspace manifest,
 and the third named `smoke_ring_write_path` beside `ring_bench`. Its manifest
 (checked directly) declares ordinary path dependencies on all five
 export-surface crates, not a passing mention of one. So "unexercised… a
 consumer that does not exist yet" and "would today break exactly one crate" are
 both wrong in their strong form: a breaking change would touch `ring_bench` and
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path` at minimum. Whether `smoke_ring_write_path`'s own
+`smoke_ring_write_path` at minimum. Whether `smoke_ring_write_path`'s own
 tests would catch such a break is a separate question this pass did not verify.
 
 ### FC6 — The Re-export Rule Is Derivable, Correct, and Stated Nowhere

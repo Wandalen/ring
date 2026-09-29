@@ -91,7 +91,7 @@ awk '/^  \/\/\/ assert_eq!\( BytesSlot::< 8 >::empty\(\)\.capacity\(\), 8 \);$/{
 
 # path-form uses, by crate and directory
 grep -rn 'TypedSlot::\(get\|take\)' ring_*/src/*.rs ring_*/tests/*.rs 2>/dev/null \
-  | sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/\([a-z_]*\)/\([a-z]*\)/.*|\1/\2|' | sort | uniq -c
+  | sed 's|\([a-z_]*\)/\([a-z]*\)/.*|\1/\2|' | sort | uniq -c
 
 # the split, stated twice in the crate that pays for it
 command grep -m1 -A3 -F '  /// **This is the only way to move a record out of a batch**, because taking a' ring_spsc/src/lib.rs

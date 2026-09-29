@@ -33,7 +33,7 @@ echo '  -- the instruction it bottoms out in --'
 command grep -m1 -F '    counter.fetch_add( n, Ordering::Relaxed );' ring_stats/src/lib.rs
 echo '  -- which half the one production caller takes --'
 command grep 'ring_overflow::\|would_resolve( self' ring_core/src/lib.rs
-echo '  -- benches/ directories under /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/, across 33 crates --'
+echo '  -- benches/ directories under , across 33 crates --'
 ls -d */benches 2>/dev/null | wc -l
 ```
 
@@ -47,7 +47,7 @@ Live output:
   -- which half the one production caller takes --
 use ring_overflow::{ would_resolve, Resolution };
       Err( record ) => match would_resolve( self.overflow )
-  -- benches/ directories under /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/, across 33 crates --
+  -- benches/ directories under , across 33 crates --
 0
 ```
 
@@ -55,7 +55,7 @@ use ring_overflow::{ would_resolve, Resolution };
 
 ## The Measurement
 
-No crate under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` carries a `benches/` directory, so this number was taken
+No crate under `any crate root` carries a `benches/` directory, so this number was taken
 outside the tree, with a throwaway binary linking `ring_overflow`, `ring_stats`
 and `ring_types` by path at `--release`. Its loop, so the number can be
 reconstructed without it:
@@ -149,7 +149,7 @@ all target the same `AtomicU64` for their policy. A relaxed `fetch_add` under th
 contention is not 4 ns.
 
 **Finding.** So the measurement that would inform a design decision is the one this
-probe cannot take, and no crate under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` has a `benches/` directory — the
+probe cannot take, and no crate under `any crate root` has a `benches/` directory — the
 census returns zero across all 33, including `ring_bench`, whose name promises
 otherwise and which never mentions `ring_overflow`.
 
@@ -182,7 +182,7 @@ there is exactly one call site and it is not that.
 | The one differing statement | `ring_overflow/src/lib.rs:199` |
 | The relaxed read-modify-write it reaches | `ring_stats/src/lib.rs:293` |
 | The consumer's import and call, both of the pure half | `ring_core/src/lib.rs:80`, `:411` |
-| Zero `benches/` directories under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` | Census above |
+| Zero `benches/` directories under `any crate root` | Census above |
 | 7.00x / 7.02x across two paired runs | Measurement above |
 
 ### Tests

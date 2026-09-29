@@ -37,10 +37,10 @@ command grep -rn --include=*.rs 'ring_debug' */src/ | command grep -v '^ring_deb
 **Result (2026-08-28):** as predicted — empty.
 
 **Re-verified (2026-09-27) — no longer empty, and the root set had also drifted.**
-The recipe above is widened from the original `*/src/`-only form to the
-family's full five-root set (`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/`, `ring/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/`,
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`) and switched to `command grep`, per the same convention applied
-family-wide. Re-run at either scope, it now finds two lines:
+The recipe above is widened from the original `*/src/`-only form to cover every
+crate root this repository's history defined — five in total — and switched to
+`command grep`, per the same convention applied family-wide. Re-run at either
+scope, it now finds two lines:
 `ring_spsc/src/lib.rs:556-557`, a doc comment citing
 `ring_debug/docs/invariant/002` and `ring_debug/docs/pattern/001` by path. This
 is a documentation cross-reference, not a `use` or a call — C1 (still one

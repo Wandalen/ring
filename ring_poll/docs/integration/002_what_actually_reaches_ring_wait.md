@@ -30,7 +30,7 @@ reachable in a normal build, which is the closure a consumer links against.
 
 ### Why The Scan Cannot See Them
 
-The guard in `tests/poll_test.rs` walks `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, reads each `Cargo.toml`, and
+The guard in `tests/poll_test.rs` walks `any crate root`, reads each `Cargo.toml`, and
 keeps the crates whose file text `contains( "ring_wait" )`. That is a test on
 the *string* `ring_wait` appearing in one file.
 

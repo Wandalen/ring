@@ -59,7 +59,7 @@ other 32 depend on, rather than four crates they each depend on separately
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 printf 'instances:        '; ls ring_types/docs/item/| wc -l
-printf 'rows in table:    '; command grep -c '^| [0-9][0-9][0-9] |' ring_types/docs/item//home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/readme.md
+printf 'rows in table:    '; command grep -c '^| [0-9][0-9][0-9] |' ring_types/docs/item/readme.md
 printf 'mod decls in lib: '; command grep -h '^mod ' ring_types/src/lib.rs | wc -l
 printf 'pub mod decls:    '; command grep -h '^pub mod ' ring_types/src/lib.rs | wc -l
 ```

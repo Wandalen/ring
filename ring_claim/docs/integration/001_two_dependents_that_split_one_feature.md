@@ -186,7 +186,7 @@ ring_index/src/lib.rs
 ring_mpsc/src/lib.rs
 ring_publish/src/lib.rs
 ring_spsc/src/lib.rs
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_orbital_rail/src/beat_s11.rs
+demo_orbital_rail/src/beat_s11.rs
 ```
 
 | Crate | Where | What it says |

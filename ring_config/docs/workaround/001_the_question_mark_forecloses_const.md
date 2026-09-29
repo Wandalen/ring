@@ -12,7 +12,7 @@ would be traded away.
 
 **In Scope:** `ring_config/src/lib.rs:65-77`;
 `ring_types/src/capacity.rs:40-51`;
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exact/exact_decimal/src/lib.rs`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exact/exact_qty/src/lib.rs`;
+`exact_decimal/src/lib.rs`, `exact_qty/src/lib.rs`;
 `ring_config/tests/config_test.rs:41-42`.
 
 **Out of Scope:** The `const` surface as a whole is
@@ -298,17 +298,17 @@ route to changing it costs a coupling the suite cannot watch.
 
 ### RC50 — The Technique Is Now Routine Elsewhere, Undocumented at Every Site
 
-A census over every `src/` file under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` finds thirteen `pub const fn`s
+A census over every `src/` file under `any crate root` finds thirteen `pub const fn`s
 returning a `Result`. One is `ring_types::Capacity::new` — the function
 `RingConfig::new` calls on line `:71`. The other twelve are in `exact_decimal`
 and `exact_qty`, two crates with no dependency edge to this family in either
 direction.
 
-**Correction (2026-09-28):** "under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`" is stale. The recipe above already
-searches five roots — `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/`, `ring/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` and
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` — and labels itself accordingly; none of the thirteen hits are
-under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` itself. `ring_types::Capacity::new` is under `ring/`, and the
-other twelve are under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exact/`. The count and the split — one in
+**Correction (2026-09-28):** "under `any crate root`" is stale. The recipe above already
+searches every crate root this repository's original layout defined, and labels
+itself accordingly; none of the thirteen hits are under the one root that
+sentence meant. `ring_types::Capacity::new` is under `ring/`, and the
+other twelve are under a different crate root. The count and the split — one in
 `ring_types`, twelve in `exact_decimal`/`exact_qty` — are unchanged; only this
 sentence's root name is corrected to match the recipe it describes.
 
@@ -368,7 +368,7 @@ forgotten and imitated as a convention.
 | The constructor's body and its three blockers | `ring_config/src/lib.rs:65-77` |
 | `Capacity::new` written with `return Err` | `ring_types/src/capacity.rs:40-51` |
 | Thirteen `const fn`s returning `Result` under the crate tree, twelve outside the family | Census above |
-| No rationale for the form at any of the thirteen | `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exact/exact_decimal/src/lib.rs`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/exact/exact_qty/src/lib.rs` — no `///` or `//!` line mentions it |
+| No rationale for the form at any of the thirteen | `exact_decimal/src/lib.rs`, `exact_qty/src/lib.rs` — no `///` or `//!` line mentions it |
 | The test pinning the two default variants | `ring_config/tests/config_test.rs:41-42` |
 | E0658 for `?`, E0015 for `::default()`, and a `const` item proving the match form | Probes above |
 

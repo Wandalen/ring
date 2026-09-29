@@ -56,7 +56,7 @@ printf 'deletion conditions in src:   %s\n' "$( cd ../..; command grep -rc 'elet
 printf 'crates filing the same shape: %s\n' "$( cd ../../..; command grep -rl 'llvm-cov' ring_*/docs/workaround --include='*.md' | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 printf 'crates still using bare loop: %s\n' "$( cd ../../..; command grep -rlE '^\s*loop\s*$' ring_*/src --include='*.rs' | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
 printf 'compile-fail harnesses nearby: %s\n' "$( cd ../../..; { command grep -rl '```compile_fail' ring_*/src --include='*.rs'; command grep -rl 'trybuild' ring_*/Cargo.toml; } | cut -d/ -f1 | sort -u | tr '\n' ' ' )"
-printf 'and what already runs them:   %s\n' "$( cd ../../../..; command grep -o 'cargo test --doc --all-features' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test | head -1 )"
+printf 'and what already runs them:   %s\n' "$( cd ../../../..; command grep -o 'cargo test --doc --all-features' verb/test | head -1 )"
 ```
 
 Live output:

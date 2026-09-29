@@ -106,7 +106,7 @@ buffer that weakens the epoch discipline fails regardless of its numbers.
 
 | File | Relationship |
 |------|--------------|
-| `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` benchmark harness (to create) | The criterion harness whose reports are this requirement's evidence |
+| `the spike root` benchmark harness (to create) | The criterion harness whose reports are this requirement's evidence |
 
 ### TL41 — The Adoption Gate Was Met by a Crate the Requirement Was Not Written For
 

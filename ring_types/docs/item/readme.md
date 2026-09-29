@@ -25,7 +25,7 @@
 
 | ID | Name | Kind | Defined In | Status |
 |----|------|------|-----------|--------|
-| — | [/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/](/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/) | Module (#1) | `lib.rs` | 🔄 |
+| — | []() | Module (#1) | `lib.rs` | 🔄 |
 | — | [use_declaration/](use_declaration/) | Use Declaration (#3) | `lib.rs`, `capacity.rs`, `error.rs` | 🔄 |
 | — | [struct/](struct/) | Struct (#6) | `capacity.rs`, `id.rs` | 🔄 |
 | — | [enum/](enum/) | Enum (#7) | `error.rs`, `policy.rs` | 🔄 |

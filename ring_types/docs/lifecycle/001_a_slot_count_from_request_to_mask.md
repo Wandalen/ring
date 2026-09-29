@@ -75,7 +75,7 @@ destructor and releases nothing — it is a `usize` behind a newtype.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 command grep -rlE '\bCapacity\b' ring_*/src | command grep -v '^ring_types/' \
-  | cut -d/ -f2 | sort -u | tr '\n' ' '
+  | cut -d/ -f1 | sort -u | tr '\n' ' '
 ```
 
 Live output:

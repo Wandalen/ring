@@ -33,7 +33,7 @@ inhabitants that break it.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 command grep -rlE '\bCapacity\b' ring_*/src | command grep -v '^ring_types/' \
-  | cut -d/ -f2 | sort -u | wc -l
+  | cut -d/ -f1 | sort -u | wc -l
 command grep -rn 'is_power_of_two' ring_*/src | command grep -vc '^ring_types/'
 ```
 

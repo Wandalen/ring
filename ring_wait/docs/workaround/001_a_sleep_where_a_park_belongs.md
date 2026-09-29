@@ -89,7 +89,7 @@ grep -r "50µs\|50 µs" */tests/*.rs
 Live output:
 
 ```
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/input_timeline/tests/timeline_test.rs:    "event 1 is stamped 50µs, before its predecessor at 100µs",
+input_timeline/tests/timeline_test.rs:    "event 1 is stamped 50µs, before its predecessor at 100µs",
 ring_handle/tests/handle_test.rs:    "10 000 empty drains took {elapsed:?}; a 50µs park each would be ~500ms"
 ring_poll/tests/poll_test.rs:/// The arithmetic is the assertion. `ring_wait`'s `Park` variant sleeps 50µs
 ```
@@ -118,11 +118,11 @@ grep -r "from_micros" */tests/*.rs
 Live output:
 
 ```
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
+demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
+demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
 ```
 
-Both lines are one `demo_live_capture` test (relocated to `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` by the
+Both lines are one `demo_live_capture` test (relocated to `the spike root` by the
 demo-crate relocation) sleeping twice to advance a clock — the same duration by coincidence,
 reached through no code of this crate's. So
 changing `50` to `500` would leave both comments stale, both tests passing, and

@@ -20,11 +20,10 @@ a measured benchmark.*
 The concurrency write-path family: 33 `ring_*` mechanism crates plus
 `bench_harness`, its family-neutral stage-gate and workload oracle. All 34
 are for-keeps, non-demo crates, and together they form this repository's own
-Cargo workspace ([`Cargo.toml`](Cargo.toml)). The family moved twice: out of
-`codename_space_sandbox/module/` into its own top-level `ring/` directory
-within that monorepo on 2026-09-07, so its internal dependency graph was no
-longer nested inside an unrelated crate set, then out of that monorepo
-entirely into this standalone repository on 2026-09-29.
+Cargo workspace ([`Cargo.toml`](Cargo.toml)). The family was extracted into
+this standalone repository on 2026-09-29, after an earlier internal
+reorganization had already consolidated it into a single top-level directory
+so its dependency graph was no longer nested inside an unrelated crate set.
 
 ## Architecture
 
@@ -85,10 +84,6 @@ as a feature-gated interim backend, so consumers are not blocked on the
 in-house rings earning the operating history `ring_bench` exists to produce —
 the full reasoning, its costs, and its exact removal condition are recorded in
 [`ring_core/docs/workaround/001_crossbeam_queue_as_interim_backend.md`](ring_core/docs/workaround/001_crossbeam_queue_as_interim_backend.md).
-
-For the fuller build-vs-buy narrative — why open source was evaluated first,
-what was adopted permanently, and how 2-3 off-the-shelf competitors compare —
-see the [`codename_space_sandbox` FAQ](https://github.com/Wandalen/codename_space_sandbox/blob/master/faq.md).
 
 ## Crates
 

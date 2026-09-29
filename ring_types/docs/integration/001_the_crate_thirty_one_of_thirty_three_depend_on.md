@@ -90,7 +90,7 @@ integration point with its own consumer set:
 cd "$(git rev-parse --show-toplevel)"
 for t in RingError Seq Capacity OverflowPolicy WaitKind SlotIndex; do
   n=$( command grep -rlE "\b$t\b" ring_*/src 2>/dev/null \
-       | command grep -v '^ring_types/' | cut -d/ -f2 | sort -u | wc -l )
+       | command grep -v '^ring_types/' | cut -d/ -f1 | sort -u | wc -l )
   printf '%-16s %s\n' "$t" "$n"
 done
 ```

@@ -274,7 +274,7 @@ Live output:
 
 ```
   -- what the confinement half scans: manifests outside the family --
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/Cargo.toml
+smoke_ring_write_path/Cargo.toml
   -- the two halves, in the gate itself --
 [ ${#allowed[@]} -gt 0 ] || fail "declared export surface is empty"
   [ "${n:-0}" -gt 0 ] || hollow+=( "$c" )
@@ -303,17 +303,17 @@ first consumer, and there is not one yet
 **Correction (2026-09-28):** "One file, and it is the workspace root manifest
 listing members rather than depending on anything" undercounted, for the same
 reason as api/001 FC5 — the recipe's own output, quoted above, already named a
-second file, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/Cargo.toml`. The workspace root
+second file, `smoke_ring_write_path/Cargo.toml`. The workspace root
 manifest's member list has since moved to `ring/Cargo.toml`, itself a
 family-internal workspace file rather than an outside one, so it is now
 excluded from this census the same way every individual family crate's
-manifest already was — leaving `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/Cargo.toml` as the
+manifest already was — leaving `smoke_ring_write_path/Cargo.toml` as the
 one file this half actually scans. Unlike the root manifest, it declares
 ordinary path dependencies on family crates (`ring_config`, `ring_core`,
 `ring_types`, `ring_tls`, `ring_flush`, `ring_factory`, `ring_handle` — checked
 directly), so "lists members rather than depending on anything" described the
 wrong file. → api/001 FC5's "there is not one yet" is corrected there for the
-same reason: `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path` is an existing outside-family
+same reason: `smoke_ring_write_path` is an existing outside-family
 consumer, not a hypothetical future one.
 
 ### FC20 — Eight Empty `Error` Impls, Five Wrapping Variants, and No Chain Longer Than One

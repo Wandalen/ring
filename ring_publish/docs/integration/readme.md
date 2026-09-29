@@ -54,12 +54,9 @@ cd "$(git rev-parse --show-toplevel)"
 awk '/^\[dependencies\]/{f=1;next} /^\[/{f=0} f' ring_publish/Cargo.toml | grep -oE '^ring_[a-z_]+'
 awk '/^\[dev-dependencies\]/{f=1;next} /^\[/{f=0} f' ring_publish/Cargo.toml | grep -oE '^ring_[a-z_]+'
 
-# in: every manifest naming this crate, with the section it appears in. All four
-# roots are named explicitly throughout this block: a `` glob reaches
-# neither `ring/` nor the substrate crates, and a bare `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` root no longer
-# reaches the substrate crates either — they are a repo-root sibling of
-# `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, not nested inside it, so `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` has to be named in its own
-# right
+# in: every manifest naming this crate, with the section it appears in. Searching
+# from the repository root reaches every crate regardless of which top-level
+# directory it lives under, so no per-root list is needed
 for m in $( command grep -rl --include=Cargo.toml 'ring_publish' . | sort ); do
   awk -v f="$m" '/^\[/{s=$0} /ring_publish/{printf "%s  %s  %s\n", f, s, $0}' "$m"
 done

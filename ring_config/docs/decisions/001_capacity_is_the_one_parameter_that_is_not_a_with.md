@@ -144,7 +144,7 @@ the doctests or through `smoke_ring_write_path`.
 | The rationale, stated at `with_producers` | `ring_config/src/lib.rs:112-114` |
 | 35 mentions across twelve crates, 33 of them in doc comments | Census above |
 | 32 construction expressions in doc comments, all `.unwrap()` | Census above |
-| The two constructions outside a doc comment, both `.map_err( … )?` | `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/src/lane.rs:195`, `:265-267` |
+| The two constructions outside a doc comment, both `.map_err( … )?` | `smoke_ring_write_path/src/lane.rs:195`, `:265-267` |
 
 ### Tests
 

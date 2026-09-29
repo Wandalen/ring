@@ -54,12 +54,12 @@ someone correctly prefers `Option` to `Result`.
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- every allow in the thirty-three crates, and which carry a reason --'
 command grep -rn '#\[ allow' --include=*.rs ring_*/src/ ring_*/tests/ 2>/dev/null |
-  sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | cut -c1-96 | sed 's/^/    /'
+  sed 's|||' | cut -c1-96 | sed 's/^/    /'
 echo '  -- the four attributes this crate wrote --'
 command grep -n '#\[ must_use \]' ring_registry/src/lib.rs | sed 's/^/    /'
 echo '  -- every pub fn in the family handing ownership out through Option --'
 command grep -rn 'pub fn [a-z_]*( *&mut self.*) *-> *Option< [A-Z]' --include=lib.rs ring_*/src/ |
-  sed 's|/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/||' | cut -c1-88 | sed 's/^/    /'
+  sed 's|||' | cut -c1-88 | sed 's/^/    /'
 echo '  -- and the two attribute forms across the family --'
 printf '    must_use attributes: %s   expect attributes: %s\n' \
   "$( command grep -rc '#\[ must_use' --include=lib.rs ring_*/src/ | awk -F: '{ s += $2 } END { print s + 0 }' )" \

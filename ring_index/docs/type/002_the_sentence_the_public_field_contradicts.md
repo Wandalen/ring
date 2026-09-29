@@ -11,7 +11,7 @@ family except one — the body of this crate's `of` function.
 what its declaration enforces, measured across all 33 crates.
 
 **In Scope:** `ring_types/src/id.rs:88-99`; every `SlotIndex( .. )` in
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`.
+`any crate root`.
 
 **Out of Scope:** the opacity split across the three types is
 [`type/001`](001_three_types_borrowed_none_owned.md). The one-owner rule for the

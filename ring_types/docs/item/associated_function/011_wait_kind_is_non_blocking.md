@@ -101,7 +101,7 @@ almost the same name.** Its test at `wait_test.rs:103` is
 `exactly_one_discriminant_is_non_blocking`; `ring_types`' is
 `exactly_one_wait_kind_is_non_blocking`. Two crates, one property, tested
 independently on both sides of the discriminant/handler boundary — which is what
-decision 121 § 5's split is supposed to produce
+the discriminant/handler split is supposed to produce
 (→ [`../../pattern/001`](../../pattern/001_discriminants_here_handlers_elsewhere.md)).
 
 ## Crate Usage

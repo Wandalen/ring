@@ -177,7 +177,7 @@ lines between the two structs: 424
 
 `Script::steps()` and `Script::stage_limit()` are `#[ must_use ]` public
 accessors over two private fields. Across every `.rs` file in `ring/`,
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` they are called **four** times, all four inside
+`any crate root` and `the spike root` they are called **four** times, all four inside
 `a_script_reports_what_it_was_built_from` and
 `an_empty_script_produces_an_empty_outcome`, which exist to assert exactly that
 the accessors return what the builder was given.

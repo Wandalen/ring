@@ -30,7 +30,7 @@ What each gate asks:
 
 | Gate | Asks | Reached when |
 |---|---|---|
-| G1 | Is every line covered? | tarpaulin reports `n/n` for every file under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/<crate>/src/` |
+| G1 | Is every line covered? | tarpaulin reports `n/n` for every file under `<crate>/src/` |
 | G2 | Does every crate export and document something real? | ≥1 `pub` item, zero `missing_docs`, no prose still calling itself a skeleton |
 | G3 | Is every feature claimed? | each of the 22 features cited by name in some crate's `tests/` |
 | G4 | Was it run by hand? | every crate has `tests/manual/readme.md` with a `## Run Record` and an ISO date |

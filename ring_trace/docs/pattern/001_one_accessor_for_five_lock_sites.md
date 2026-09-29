@@ -24,6 +24,11 @@ compile-time pattern is
 
 ## The Accessor and What It Replaced
 
+The plan quoted below, `docs/plan/008_ring_write_path_staged.md`, was reachable
+only through the pre-extraction monorepo's `docs/` symlink and no longer exists
+in a standalone `ring` checkout — that one line of the recipe cannot be re-run.
+The Live output is kept as the historical record of what it said.
+
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim
@@ -103,7 +108,7 @@ precaution taken in advance. A maintainer weighing whether to inline the accesso
 back into two call sites for readability meets the precaution and not the history.
 
 **Finding.** Recorded as a good pattern whose evidence sits one document away, in
-a plan whose S1 notes a reader of this crate has no reason to open. Two clauses
+an external plan a reader of this crate has no reason to open. Two clauses
 close it: that the five sites did in fact disagree, in four different ways, and
 that inlining this accessor reintroduces the same failure mode. That converts a
 stated intention into a stated constraint, which is what stops a future

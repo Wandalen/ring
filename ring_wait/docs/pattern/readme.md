@@ -32,9 +32,10 @@ interesting divergence shows up.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 
-# instances of the loop shape — every bounded retry with a pause hint. The roots
-# are named explicitly and the result sorted: a bare `` glob
-# reaches neither `ring/` nor the `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`-nested crates, and `grep` here is
+# instances of the loop shape — every bounded retry with a pause hint. Searching
+# from the repository root reaches every crate uniformly, which a glob rooted at
+# just one crate root would not — it would miss crates that live under a
+# different root entirely — and the result is sorted because `grep` here is
 # a `ugrep` shim whose unsorted output order is not stable between runs
 command grep -r --include=*.rs "spin_loop" . | command grep "/src/" | sort
 
@@ -64,7 +65,7 @@ ring_wait/src/lib.rs:        core::hint::spin_loop();
 ring_config/src/lib.rs              WaitKind::default 
 ring_wait/src/lib.rs                WaitKind::None WaitKind::Park WaitKind::Spin WaitKind::Yield 
 ## OverflowPolicy
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/src/lane.rs OverflowPolicy::default 
+smoke_ring_write_path/src/lane.rs OverflowPolicy::default 
 ring_config/src/lib.rs              OverflowPolicy::default 
 ring_core/src/lib.rs                OverflowPolicy::DropOldest 
 ring_overflow/src/lib.rs            OverflowPolicy::DropNewest OverflowPolicy::DropOldest OverflowPolicy::Fail 

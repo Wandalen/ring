@@ -295,7 +295,7 @@ printf 'ordinary body gate:  '; grep -m1 -n 'cfg( not( loom ) )' tests/mpsc_test
 printf 'exhaustive gate:     '; grep -m1 -n 'cfg( loom )' tests/mpsc_test.rs
 printf 'loom dep gate:       '; grep -n "cfg(loom)" Cargo.toml
 printf 'verb/test sets it:   '
-grep -c 'cfg loom' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test 2>/dev/null || echo 0
+grep -c 'cfg loom' verb/test 2>/dev/null || echo 0
 ```
 
 Live output:

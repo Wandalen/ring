@@ -55,20 +55,20 @@ against.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # all four roots named explicitly: `ring/` holds this crate and both its
-# numbered-clause siblings, and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` is a repo-root sibling of `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`
-# rather than nested inside it, so neither is reachable from a bare `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`
+# numbered-clause siblings, and `the substrate root` is a repo-root sibling of `any crate root`
+# rather than nested inside it, so neither is reachable from a bare `any crate root`
 grep -r 'Clause' --include='*.rs' . | LC_ALL=C sort
 ```
 
 Live output:
 
 ```
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 1: the driven arm must deliver exactly the staged batch, in order. Dropping one record
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 2: exactly one flush. Two entries would mean the batch moved in pieces — the records
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 3: the driven flush must leave nothing behind. `judge_flush` already read the count the
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 4 is T75 itself: a control arm that never called `drive` must see nothing. A record
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 5: the records the control arm did not deliver must still be staged. Without it a
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/smoke_ring_write_path/tests/judge_test.rs:/// Clause 6, and the field that replaced `ArmReport::drive_called`: an arm that never drove cannot
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 1: the driven arm must deliver exactly the staged batch, in order. Dropping one record
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 2: exactly one flush. Two entries would mean the batch moved in pieces — the records
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 3: the driven flush must leave nothing behind. `judge_flush` already read the count the
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 4 is T75 itself: a control arm that never called `drive` must see nothing. A record
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 5: the records the control arm did not deliver must still be staged. Without it a
+smoke_ring_write_path/tests/judge_test.rs:/// Clause 6, and the field that replaced `ArmReport::drive_called`: an arm that never drove cannot
 ring_publish/tests/handshake_test.rs:          // Clause 1, made observable: `available` offered this slot, so the
 ring_publish/tests/handshake_test.rs:          // Clause 3: commit takes exactly what was offered, and lands there.
 ring_publish/tests/handshake_test.rs:      // Clause 2, deterministically now that the producer is done: what was
@@ -77,43 +77,43 @@ ring_registry/tests/registry_test.rs://! | Clause | Test |
 ring_testkit/tests/testkit_test.rs:/// **Clause 1 — a scripted sequence reproduces identical outcomes every run.**
 ring_testkit/tests/testkit_test.rs:/// **Clause 1, the part a single re-run cannot show.** Ten runs, all equal.
 ring_testkit/tests/testkit_test.rs:/// **Clause 2 — the fixture decides something a count cannot.**
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_asteroids/tests/judge_test.rs:/// Clause order: all three real-arm clauses before any control-arm clause, and the split before
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_orbit_ship/tests/judge_test.rs:/// Clause order: envelope, then spread, then control arm. All three wrong reports the envelope —
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_spatial_wrap/src/lane.rs:/// Clauses 1 and 2 alone were the whole reached-test until a probe ran them against deliberately
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_spatial_wrap/src/lane.rs:/// So the pair could not distinguish a correct wrap from returning nothing at all. Clause 3 grades
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_spatial_wrap/tests/lane_test.rs:/// and one folding the x and z axes into each other. Clause 3 — agreement with an independently
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_c.rs:  // Clause 1 — the crate's own module doc still says it is unimplemented.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_c.rs:  // Clause 2 — the crate publishes at least one item, by band E's own producer.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_c.rs:  // Clause 3 — every populated mapped definition has a matching test surface.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_c.rs:  // Clause 4a — no spec still marks itself pending.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_c.rs:  // Clause 4b — every declared case id is cited by a test.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs://! | Lane says | Clauses satisfy the cell | Band D reports | Why |
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:fn nonempty( found : &[ Clause ], key : &str ) -> Option< String >
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:fn unmet( requirement : &Requirement, found : &[ Clause ], tag : &str ) -> Option< String >
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/band_d.rs:use crate::lane_line::{ Clause, LaneLine, clause_number, clause_value, clauses, parse_lane_line };
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/lane_line.rs:    found.push( Clause { key : key.to_string(), value : value.to_string() } );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/lane_line.rs:pub fn clause_number( found : &[ Clause ], key : &str ) -> Option< u64 >
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/lane_line.rs:pub fn clause_value< 'a >( found : &'a [ Clause ], key : &str ) -> Option< &'a str >
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/lane_line.rs:pub fn clauses( line : &str ) -> Vec< Clause >
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/src/lane_line.rs:pub struct Clause
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 1: while the crate's own module doc says it is unimplemented, that sentence is the
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 2's other half: no `src/` at all is a different condition from a `src/` that publishes
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 2, and the reason clause 1 is not enough on its own: deleting the skeleton sentence is a
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 3's exemptions, in the corpus's own practice: a pitfall is a warning and a feature is a
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 3's other boundary: a definition directory holding only its own index is scaffolding, not
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 3's surface reader must not count a hyphen-prefixed scratch file as a real mirror. Such
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 3: a populated doc definition with no test surface is the corpus describing behaviour
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 4a: a spec marked pending is the corpus itself saying the case is unimplemented. Nothing
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 4b's prefix guard, live rather than in the unit self-test. Without it a crate declaring
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 4b's prefix guard, the boundary its sibling above does not cover: a shorter id must not
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 4b's source reader must not count a hyphen-prefixed scratch probe as a real citation. A
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/band_c_test.rs:/// Clause 4b, the half a status glyph cannot cover: a case can be declared, marked done, and cited
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/lane_line_test.rs:  assert_eq!( found, vec![ Clause { key : "detail".to_string(), value : "a=b".to_string() } ] );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/lane_line_test.rs:/// Clauses are read out of a real lane line, and the prose around them is not mistaken for one.
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/ws001_gate/tests/lane_line_test.rs:use ws001_gate::lane_line::{ self, Clause, clause_number, clause_value, clauses, parse_lane_line };
+demo_asteroids/tests/judge_test.rs:/// Clause order: all three real-arm clauses before any control-arm clause, and the split before
+demo_orbit_ship/tests/judge_test.rs:/// Clause order: envelope, then spread, then control arm. All three wrong reports the envelope —
+demo_spatial_wrap/src/lane.rs:/// Clauses 1 and 2 alone were the whole reached-test until a probe ran them against deliberately
+demo_spatial_wrap/src/lane.rs:/// So the pair could not distinguish a correct wrap from returning nothing at all. Clause 3 grades
+demo_spatial_wrap/tests/lane_test.rs:/// and one folding the x and z axes into each other. Clause 3 — agreement with an independently
+ws001_gate/src/band_c.rs:  // Clause 1 — the crate's own module doc still says it is unimplemented.
+ws001_gate/src/band_c.rs:  // Clause 2 — the crate publishes at least one item, by band E's own producer.
+ws001_gate/src/band_c.rs:  // Clause 3 — every populated mapped definition has a matching test surface.
+ws001_gate/src/band_c.rs:  // Clause 4a — no spec still marks itself pending.
+ws001_gate/src/band_c.rs:  // Clause 4b — every declared case id is cited by a test.
+ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
+ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
+ws001_gate/src/band_d.rs:    /// Clause key, as the lane prints it.
+ws001_gate/src/band_d.rs://! | Lane says | Clauses satisfy the cell | Band D reports | Why |
+ws001_gate/src/band_d.rs:fn nonempty( found : &[ Clause ], key : &str ) -> Option< String >
+ws001_gate/src/band_d.rs:fn unmet( requirement : &Requirement, found : &[ Clause ], tag : &str ) -> Option< String >
+ws001_gate/src/band_d.rs:use crate::lane_line::{ Clause, LaneLine, clause_number, clause_value, clauses, parse_lane_line };
+ws001_gate/src/lane_line.rs:    found.push( Clause { key : key.to_string(), value : value.to_string() } );
+ws001_gate/src/lane_line.rs:pub fn clause_number( found : &[ Clause ], key : &str ) -> Option< u64 >
+ws001_gate/src/lane_line.rs:pub fn clause_value< 'a >( found : &'a [ Clause ], key : &str ) -> Option< &'a str >
+ws001_gate/src/lane_line.rs:pub fn clauses( line : &str ) -> Vec< Clause >
+ws001_gate/src/lane_line.rs:pub struct Clause
+ws001_gate/tests/band_c_test.rs:/// Clause 1: while the crate's own module doc says it is unimplemented, that sentence is the
+ws001_gate/tests/band_c_test.rs:/// Clause 2's other half: no `src/` at all is a different condition from a `src/` that publishes
+ws001_gate/tests/band_c_test.rs:/// Clause 2, and the reason clause 1 is not enough on its own: deleting the skeleton sentence is a
+ws001_gate/tests/band_c_test.rs:/// Clause 3's exemptions, in the corpus's own practice: a pitfall is a warning and a feature is a
+ws001_gate/tests/band_c_test.rs:/// Clause 3's other boundary: a definition directory holding only its own index is scaffolding, not
+ws001_gate/tests/band_c_test.rs:/// Clause 3's surface reader must not count a hyphen-prefixed scratch file as a real mirror. Such
+ws001_gate/tests/band_c_test.rs:/// Clause 3: a populated doc definition with no test surface is the corpus describing behaviour
+ws001_gate/tests/band_c_test.rs:/// Clause 4a: a spec marked pending is the corpus itself saying the case is unimplemented. Nothing
+ws001_gate/tests/band_c_test.rs:/// Clause 4b's prefix guard, live rather than in the unit self-test. Without it a crate declaring
+ws001_gate/tests/band_c_test.rs:/// Clause 4b's prefix guard, the boundary its sibling above does not cover: a shorter id must not
+ws001_gate/tests/band_c_test.rs:/// Clause 4b's source reader must not count a hyphen-prefixed scratch probe as a real citation. A
+ws001_gate/tests/band_c_test.rs:/// Clause 4b, the half a status glyph cannot cover: a case can be declared, marked done, and cited
+ws001_gate/tests/lane_line_test.rs:  assert_eq!( found, vec![ Clause { key : "detail".to_string(), value : "a=b".to_string() } ] );
+ws001_gate/tests/lane_line_test.rs:/// Clauses are read out of a real lane line, and the prose around them is not mistaken for one.
+ws001_gate/tests/lane_line_test.rs:use ws001_gate::lane_line::{ self, Clause, clause_number, clause_value, clauses, parse_lane_line };
 ```
 
 `ws001_gate` (added to the corpus after this doc was written) has grown since: the `Clause` type

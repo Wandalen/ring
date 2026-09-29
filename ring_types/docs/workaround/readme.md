@@ -8,7 +8,7 @@ cost it imposes and the condition under which it can be deleted.
 - **Purpose**: Record every external constraint this crate compensates for, so each one carries a stated cost and a checkable deletion condition rather than becoming permanent by default.
 - **Responsibility**: Document this crate's workarounds, and keep each one's Removal trigger falsifiable at a toolchain or dependency bump.
 - **In Scope**: Constraints originating outside this repository. For a crate with an empty `[dependencies]` table that means one source only — **the Rust language and standard library itself**.
-- **Out of Scope**: This crate's own design decisions, which are not workarounds however unusual they look (→ [`decisions/`](../decisions/readme.md)); constraints compensated in shared tooling (→ [`docs/workaround/`](../../../../docs/workaround/readme.md) at the repository root).
+- **Out of Scope**: This crate's own design decisions, which are not workarounds however unusual they look (→ [`decisions/`](../decisions/readme.md)); constraints compensated in shared tooling outside this crate (none apply here — see Workarounds below).
 
 ### Overview Table
 
@@ -69,8 +69,8 @@ Live output:
 Exits 1.
 
 **The last two rows are the judgement calls**, and both went the same way: a
-language limitation that costs nothing is not a workaround, because OD077's
-Quality Checklist rules out a costless one. `Seq::ZERO` compensates for a `const`
+language limitation that costs nothing is not a workaround, because this doc
+definition's own Quality Checklist rules out a costless one. `Seq::ZERO` compensates for a `const`
 limitation and the compensation is *better* than what it replaces — more
 readable at every call site. Filing that as debt would attach a deletion
 condition to something nobody should delete.
@@ -85,7 +85,7 @@ condition to something nobody should delete.
 
 | File | Relationship |
 |------|-----------------|
-| [`../../../../docs/workaround/readme.md`](../../../../docs/workaround/readme.md) | Repo-wide workarounds; none reach this crate, which has no rendering, wasm, or dev-server path |
+| *(none)* | No repo-wide workaround catalog is reachable from a standalone `ring` checkout; regardless, this crate has no rendering, wasm, or dev-server path for one to compensate |
 
 
 ### Regenerate

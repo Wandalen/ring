@@ -30,7 +30,7 @@ workspace lints table could centralise, not about the ring family — and that
 made it the one recipe in this crate's corpus that moved whenever an unrelated
 crate was added anywhere in the workspace. It moved three times before the
 recipe was rewritten to stop printing the denominator at all: the tree held 117
-crates at the first census, all of them under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, and has more than
+crates at the first census, all of them under `any crate root`, and has more than
 doubled since — spreading across five roots in the process.
 
 So the denominator is deliberately absent from the output below. A count that
@@ -47,7 +47,7 @@ actually held: 33 of 33, at every census. The non-ring share is what moved, 22 �
 because they are two different facts and only one of them is stable.
 
 Then the failure inverted. Four relocations moved most of the workspace out from
-under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, and a recipe rooted at `` went on printing a number
+under `any crate root`, and a recipe still rooted there went on printing a number
 without printing an error: the escalating total it recorded fell to 57, and reads
 37 today, while the prose above it still said sixty. The usual reading — prose
 goes stale, the recorded output is fresh — had it backwards here. The prose was
@@ -72,7 +72,7 @@ echo '  -- crates escalating it to deny by hand, split by family --'
 # split three ways rather than two: the ring share is the one that has held at
 # 33 of 33 across every census, and the growth is all in the second family
 # the crate name is taken by stripping a named root prefix, never by cutting a
-# fixed field.  A positional `cut -d/ -f2` reads `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/orbital/orbital_soi`
+# fixed field.  A positional `cut -d/ -f2` reads `orbital_soi`
 # as the family `orbital`, collapsing nineteen crates into one token that then
 # fails a `^orbital_` match — so the family reports zero rather than nineteen,
 # with no error anywhere to say a column moved.
@@ -87,11 +87,11 @@ echo '  -- and does every crate in the workspace inherit the table? --'
 # adds a crate anywhere in the workspace, so quoting it would make this document
 # stale by unrelated work; what the finding rests on is that the answer is "all",
 # and that the escalating count does not move when the denominator does.
-# the same glob list is written out three times on purpose.  Pairing an `ls` of
-# `` with a recursive `grep -r ` does not compare
-# like with like: the recursive side descends into `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/` and counts
-# crates the `ls` side cannot see, so the two disagree by construction and the
-# check reports a failure of its own making.
+# the same glob list is written out three times on purpose.  Pairing a shallow
+# `ls` glob with a recursive `grep -r` would not compare like with like: the
+# recursive side would descend into nested crates the shallow glob can't see,
+# so the two would disagree by construction and the check would report a
+# failure of its own making.
 n=$(   ls                                 */Cargo.toml 2>/dev/null | wc -l )
 own=$( command grep -l '^\[workspace\]'   */Cargo.toml 2>/dev/null | wc -l )
 i=$(   command grep -l 'workspace = true' */Cargo.toml 2>/dev/null | wc -l )
@@ -130,17 +130,16 @@ second, so the deny is in force for every crate, including every one that does
 not escalate on its own.
 
 *The recording below is left exactly as captured on 2026-08-31, not re-run. Its
-one quoted crate path predates the relocations — `rhi_vulkan` now sits at
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/render/rhi_vulkan` — and the absolute prefix is an artifact of the
-machine it ran on rather than part of the finding. What it establishes is the
-exit status, which depends on neither.*
+one quoted crate path predates a later relocation, and the absolute prefix is
+an artifact of the machine it ran on rather than part of the finding. What it
+establishes is the exit status, which depends on neither.*
 
 ```
 RUSTFLAGS=-Dmissing_docs cargo check --workspace --all-features
 ```
 
 ```
-    Checking rhi_vulkan v0.1.0 (/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox//home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/rhi_vulkan)
+    Checking rhi_vulkan v0.1.0 (rhi_vulkan)
     Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 02s
 ──── exit 0 · pid 1104119 · 2026-08-31 · 01:55:05 · elapsed 63s ────────────────
 ```

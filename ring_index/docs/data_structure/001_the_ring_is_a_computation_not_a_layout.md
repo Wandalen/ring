@@ -10,7 +10,7 @@ only as this crate's fold, recomputed at every access and stored nowhere.
 any struct's layout.
 
 **In Scope:** `ring_store/src/lib.rs:59-63`; every field of type
-`SlotIndex` in `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` — of which there are none.
+`SlotIndex` in `any crate root` — of which there are none.
 
 **Out of Scope:** the one collection this crate builds is
 [`data_structure/002`](002_the_one_collection_the_crate_builds.md). The fold's

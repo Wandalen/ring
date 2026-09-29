@@ -124,8 +124,8 @@ prints: `A derived reading, and the one a factory branches on: a single-producer
 
 ### RC28 — `is_tick_safe` Is Called Only by the Test That Tests It
 
-The census covers every `src/` and `tests/` directory under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, `ring/`,
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/` — the whole crate tree, not one family.
+The census covers every `src/` and `tests/` directory under `any crate root`, `ring/`,
+`the spike root` and `the substrate root` — the whole crate tree, not one family.
 `is_multi_producer` is called from production once — the backend selection in
 `ring_core/src/lib.rs`, the `match config.is_multi_producer()` line printed
 above — and asserted from two other crates' suites, twice in

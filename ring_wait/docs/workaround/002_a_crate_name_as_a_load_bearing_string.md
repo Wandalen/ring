@@ -289,7 +289,7 @@ cd "$(git rev-parse --show-toplevel)"
 # the doc comment wraps, so join it into one line before matching anything in it
 DOC=$( awk '/pub const PARKING_CRATES/{ exit } /^\/\/\//{ sub( /^\/\/\/ ?/, "" ); printf "%s ", $0 }' ring_poll/src/lib.rs )
 printf 'the array, as declared:  %s\n' "$( command grep -m1 -oE 'pub const PARKING_CRATES.*$' ring_poll/src/lib.rs )"
-printf 'the crate that holds it: %s\n' "$( command grep -rl 'pub const PARKING_CRATES' ring_*/src/lib.rs | cut -d/ -f2 | tr '\n' ' ' )"
+printf 'the crate that holds it: %s\n' "$( command grep -rl 'pub const PARKING_CRATES' ring_*/src/lib.rs | cut -d/ -f1 | tr '\n' ' ' )"
 printf 'the test that enforces:  %s\n' "$( printf '%s' "$DOC" | command grep -m1 -oE 'the_tick_path_cannot_reach_a_parking_operation' )"
 printf 'what that test reads:    %s\n' "$( printf '%s' "$DOC" | command grep -m1 -oE 'reads the manifests off disk and compares them against this array' )"
 printf 'and what fails on drift: %s\n' "$( printf '%s' "$DOC" | command grep -m1 -oE 'without being listed here fails the suite' )"

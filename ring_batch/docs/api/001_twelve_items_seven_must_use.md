@@ -83,7 +83,7 @@ to notice, so a bare call statement is well-formed code:
    Compiling ring_index v0.1.0 (/home/user1/pro/lib/yrd_gamedev/substrate/ring/ring_index)
    Compiling ring_atomic v0.1.0 (/home/user1/pro/lib/yrd_gamedev/substrate/ring/ring_atomic)
    Compiling ring_batch v0.1.0 (/home/user1/pro/lib/yrd_gamedev/substrate/ring/ring_batch)
-   Compiling batch_probe v0.0.0 (/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/-batch_probe)
+   Compiling batch_probe v0.0.0 (-batch_probe)
     Finished `release` profile [optimized] target(s) in 0.50s
   two claims taken and both ranges thrown away
   cursor is now at 16, so sequences 0..16 are owned by nobody

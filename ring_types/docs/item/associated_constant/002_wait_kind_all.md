@@ -66,7 +66,7 @@ Test-only references: `ring_types` — `tests/types_test.rs:139`,
 | Crate | Via File | Purpose | Refs |
 |-------|----------|---------|-----:|
 | `ring_types` | `src/policy.rs` | Defining crate | — |
-| `ring_wait` | `tests/wait_test.rs` | Sweeps every variant through the handler — the other half of decision 121 § 5's split | 7 |
+| `ring_wait` | `tests/wait_test.rs` | Sweeps every variant through the handler — the other half of the discriminant/handler split | 7 |
 | `ring_config` | `tests/config_test.rs` | Sweeps every variant through `is_tick_safe` | 1 |
 
 ```sh

@@ -91,8 +91,8 @@ printf 'blocks across those:           %s\n' "$( command grep -rhc '```compile_f
 printf 'why ring_mpsc chose them:      %s\n' "$( awk '/^### Regenerate/{ exit } { print }' ring_mpsc/src/lib.rs | tr '\n' ' ' | sed 's/  */ /g' | command grep -o 'rustdoc collects doc tests from the library target only' )"
 printf 'family crates with trybuild:   %s\n' "$( command grep -rl 'trybuild' ring_*/Cargo.toml | cut -d/ -f1 | tr '\n' ' ' )"
 printf 'expected-error files it keeps: %s\n' "$( ls ring_handle/tests/ui/*.stderr 2>/dev/null | wc -l )"
-printf 'what /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test already runs:   %s\n' "$( command grep -o 'cargo test --doc --all-features' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test | head -1 )"
-printf 'under which flags:             %s\n' "$( command grep -o 'RUSTDOCFLAGS="-D warnings" cargo test --doc' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test | head -1 )"
+printf 'what verb/test already runs:   %s\n' "$( command grep -o 'cargo test --doc --all-features' verb/test | head -1 )"
+printf 'under which flags:             %s\n' "$( command grep -o 'RUSTDOCFLAGS="-D warnings" cargo test --doc' verb/test | head -1 )"
 ```
 
 Live output:

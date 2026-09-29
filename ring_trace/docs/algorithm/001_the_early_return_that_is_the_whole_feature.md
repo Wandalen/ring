@@ -218,8 +218,8 @@ reads it exactly that way — nineteen tests, every one an assertion about `len`
 The crate's own documentation is where the cost claim enters. The module doc
 argues for the `Mutex` on the grounds that the disabled path is already free, the
 test file's header says a trace that recorded anything when switched off "would
-put a lock and an allocation on the path being measured", and the `len` doc calls
-zero-forever "the second half of feature 185's `ring_trace` clause". So the
+put a lock and an allocation on the path being measured", and the `len` doc ties
+zero-forever to the second half of the crate's own acceptance clause. So the
 crate volunteers a performance argument the criterion never asked for, and it is
 the volunteered argument that the measurement contradicts — not the criterion,
 which is met exactly.

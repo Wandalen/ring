@@ -13,7 +13,7 @@ workspace, the import census across every `.rs` file, the mapping from
 three prose mentions.
 
 **In Scope:** `ring_trace/src/lib.rs:59-82`; every `Cargo.toml` and
-`.rs` file under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, `ring/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`;
+`.rs` file under `any crate root`, `ring/`, `the spike root` and `the substrate root`;
 `ring_bench/tests/bench_test.rs:1441`, `ring_bench/src/lib.rs:1007`
 and `ring_debug/tests/debug_test.rs:6`.
 
@@ -41,18 +41,16 @@ for op in claim publish consume commit drop; do
 done
 echo '  -- who declares this crate at all --'
 n=0
-# every crate root spelled out: crates sit one level under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`, `ring/`
-# and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/`, two under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/` and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`, so a lone
-# `` glob sees a fraction of the tree and silently reports zero for
-# the rest of it
+# every crate is a top-level directory here, so a bare `*/` glob already reaches
+# all of them in a single pass — nothing is missed by depth
 for c in */ ; do
   k=$( command grep -c '^ring_trace *=' "$c"Cargo.toml 2>/dev/null || true )
   n=$(( n + k ))
 done
 printf '    manifests declaring ring_trace, every root: %s\n' "$n"
 echo '  -- and every mention of it in the workspace source, outside the crate --'
-# a bare root recurses, so `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` covers `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/` and the four
-# named here are complete
+# `grep -r` with no path argument already recurses from the repository root, so
+# one search covers every crate in a single pass — no per-root list is needed
 command grep -r 'ring_trace' --include=*.rs . | command grep -v '^ring_trace/'
 command grep -r 'use ring_trace\|ring_trace::' --include=*.rs . | command grep -v '^ring_trace/' || echo '    no import anywhere'
 ```
@@ -96,9 +94,9 @@ Three of those names are crate names — `ring_claim`, `ring_publish`,
 `ring_cursor` and `ring_overflow`, which likewise do not.
 
 Zero manifests anywhere in the workspace declare `ring_trace`, as a dependency
-or a dev-dependency — the census walks all four crate roots, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` (with
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/` under it), `ring/`, `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/` and `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/`, not the
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`-and-`ring/` pair the family occupied when this was first measured.
+or a dev-dependency — the census walks all four crate roots, `any crate root` (with
+`any crate root` under it), `ring/`, `the spike root` and `the substrate root`, not the
+`any crate root`-and-`ring/` pair the family occupied when this was first measured.
 That is a stricter isolation than the corpus has found before:
 `ring_event`, the other crate in this family with no consumers, is at least
 declared once under `[dev-dependencies]`. This crate is declared nowhere at all,

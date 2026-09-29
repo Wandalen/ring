@@ -58,11 +58,11 @@ pub const GATING : Ordering = Ordering::Acquire;
     ring_seqno::pending( self.producer.load( GATING ), self.consumer.load( GATING ) )
     ring_seqno::may_claim( self.producer.load( GATING ), self.consumer.load( GATING ), self.capacity )
 ring_wait/src/lib.rs:      std::thread::sleep( std::time::Duration::from_micros( 50 ) );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/input_timeline/tests/timeline_test.rs:    "event 1 is stamped 50µs, before its predecessor at 100µs",
+input_timeline/tests/timeline_test.rs:    "event 1 is stamped 50µs, before its predecessor at 100µs",
 ring_handle/tests/handle_test.rs:    "10 000 empty drains took {elapsed:?}; a 50µs park each would be ~500ms"
 ring_poll/tests/poll_test.rs:/// The arithmetic is the assertion. `ring_wait`'s `Park` variant sleeps 50µs
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
+demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
+demo_live_capture/tests/capture_test.rs:  std::thread::sleep( Duration::from_micros( 50 ) );
 ```
 
 | | Count |

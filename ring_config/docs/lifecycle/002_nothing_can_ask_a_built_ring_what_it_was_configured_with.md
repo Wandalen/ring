@@ -62,7 +62,7 @@ ring_config/src/lib.rs:  pub const fn wait( &self ) -> WaitKind
 ring_config/src/lib.rs:  pub const fn producers( &self ) -> usize
 ring_config/src/lib.rs:  pub const fn batch( &self ) -> usize
   -- and every comparison of two configurations outside this crate, in src/ or tests/ --
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/spike/demo_window_present/src/grade.rs:  if tally.presented == 0 && tally.skipped == 0 && tally.reconfigured == 0
+demo_window_present/src/grade.rs:  if tally.presented == 0 && tally.skipped == 0 && tally.reconfigured == 0
 ```
 
 ---

@@ -25,6 +25,13 @@ the criterion is met is
 
 ## Three Citations of One Sentence
 
+Recorded before the `ring/` extraction, when `docs/feature/` and `docs/decision/`
+resolved through the monorepo's `docs/` symlink. From a standalone `ring`
+checkout those two paths no longer exist: the `docs/feature/185_ring_stats.md`
+reads and the `docs/decision/121_...` read below cannot be regenerated. The Live
+output is kept as the historical record; the criterion's real, in-repo address
+is `bench_harness/docs/acceptance/001_feature_reached_tests.md` (see Sources).
+
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 # `command grep` bypasses the shell shim to the ordered GNU binary; the shim

@@ -49,7 +49,7 @@ allocator is the standard way to turn "allocates nothing" into a test that fails
 when it stops being true, and `ring_debug` has none. Four crates in this same
 family already do — `ring_barrier`, `ring_claim`, `ring_consume` and
 `ring_cursor` each carry one in `tests/allocation_test.rs` — and
-`` carries thirteen across
+the repository as a whole carries thirteen across
 seven crates. The technique is not
 merely available in this repository, it is already in use next door, which makes
 its absence here a gap rather than a missing capability.
@@ -89,7 +89,7 @@ echo '-- the Run Record date --'
 awk '/^## Run Record/{ f = 1 } f && NF { print "  " $0 }' $D/tests/manual/readme.md | head -6 | cut -c1-140
 echo '-- guards for C1 and C2 elsewhere in this crate docs (excluding this file) --'
 command grep -r 'grep' $D/docs --include=*.md | command grep -v "$SELF" | sed 's|^ring_debug/docs/||' | command grep 'Cargo.toml' | command grep 'ring_debug' | cut -c1-120 | sed 's/^/  C1: /'
-command grep -r "/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/\\*/src" $D/docs --include=*.md | command grep -v "$SELF" | sed 's|^ring_debug/docs/||' | command grep 'ring_debug' | cut -c1-130 | sed 's/^/  C2: /'
+command grep -r "\\*/src" $D/docs --include=*.md | command grep -v "$SELF" | sed 's|^ring_debug/docs/||' | command grep 'ring_debug' | cut -c1-130 | sed 's/^/  C2: /'
 echo '-- the home the deferred figure was sent to --'
 printf '  ring_bench manifest naming ring_debug: %s\n' "$( command grep -c 'ring_debug' ring_bench/Cargo.toml || true )"
 echo '-- and what would falsify the allocation half --'
@@ -121,7 +121,7 @@ Live output:
   | M3 | Nothing runs implicitly | ✅ no match |
 -- guards for C1 and C2 elsewhere in this crate docs (excluding this file) --
   C1: non_functional_requirement/001_absent_unless_called.md:| C1 | No family crate depends on `ring_debug` | `command grep -r
-  C1: non_functional_requirement/001_absent_unless_called.md:command grep -rln 'ring_debug' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/divisio
+  C1: non_functional_requirement/001_absent_unless_called.md:command grep -rln 'ring_debug' divisio
   C1: workaround/002_one_cast_between_two_newtypes_that_disagree.md:  "$( command grep -rl 'ring_debug' --include=*.rs --inclu
   C1: integration/001_reaching_the_cursors_of_a_live_ring.md:  "$( command grep -c 'features' ring_debug/Cargo.toml || tr
   C1: integration/002_the_edges_that_were_never_drawn.md:sed -n '/^\[dependencies\]/,/^\[/p' ring_debug/Cargo.toml | comm
@@ -131,7 +131,7 @@ Live output:
   C1: integration/002_the_edges_that_were_never_drawn.md:printf '  ring_debug naming ring_testkit: %s\n' "$( command grep -c '
   C1: decisions/001_four_edges_not_two.md:sed -n '/^\[dependencies\]/,/^\[/p' ring_debug/Cargo.toml | command grep -E '^r
   C2: non_functional_requirement/001_absent_unless_called.md:| C2 | No family `src/` mentions `ring_debug` | `command grep -rn --include
-  C2: non_functional_requirement/001_absent_unless_called.md:command grep -rn --include=*.rs 'ring_debug' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/division/
+  C2: non_functional_requirement/001_absent_unless_called.md:command grep -rn --include=*.rs 'ring_debug' division/
 -- the home the deferred figure was sent to --
   ring_bench manifest naming ring_debug: 0
 -- and what would falsify the allocation half --

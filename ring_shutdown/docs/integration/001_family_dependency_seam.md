@@ -66,7 +66,7 @@ printf 'features this crate declares:  %s\n' "$( awk '/^\[features\]/{f=1;next} 
 printf 'non-family, --all-features:    %s\n' "$( cargo tree -p ring_shutdown -e normal --all-features 2>/dev/null | command grep -cv 'ring_' )"
 printf 'where the externals do enter:  %s\n' "$( cargo tree -p ring_core -e normal --all-features 2>/dev/null | command grep -v 'ring_' | command grep -oE '[a-z-]+ v[0-9.]+' | sort -u | tr '\n' ' ' )"
 printf 'the feature that admits them:  %s\n' "$( command grep -o 'crossbeam = .*' ring_core/Cargo.toml )"
-printf 'what the crate is tested with: %s\n' "$( command grep -o 'cargo nextest run --all-features' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/verb/test | head -1 )"
+printf 'what the crate is tested with: %s\n' "$( command grep -o 'cargo nextest run --all-features' verb/test | head -1 )"
 ```
 
 Live output:

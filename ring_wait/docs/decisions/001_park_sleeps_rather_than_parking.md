@@ -166,8 +166,8 @@ ring_handle/tests/handle_test.rs:  [ "thread::sleep", "yield_now", "::park", "pa
 ring_wait/src/lib.rs:      // Sleeping rather than `thread::park` on purpose. Parking requires the
 ring_wait/src/lib.rs:      // publisher to hold the waiter's handle and unpark it, which is a
 ring_wait/src/lib.rs:      // relationship here, and the sleep length is what a real unpark would
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/render/rhi_vulkan/src/buffer.rs:    let mut cx = std::task::Context::from_waker( waker );
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/render/rhi_vulkan/src/buffer.rs:    let waker = std::task::Waker::noop();
+rhi_vulkan/src/buffer.rs:    let mut cx = std::task::Context::from_waker( waker );
+rhi_vulkan/src/buffer.rs:    let waker = std::task::Waker::noop();
 ```
 
 `ring_types::WaitKind::Park` documented the variant as *"Block until a publisher

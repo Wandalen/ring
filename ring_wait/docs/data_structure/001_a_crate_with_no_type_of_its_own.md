@@ -183,7 +183,7 @@ cd "$(git rev-parse --show-toplevel)"
 # crates whose source names the enum
 grep -rl 'WaitKind' --include=*.rs */src/ | sed 's#ring/##;s#/src.*##' | sort -u
 echo '--- crates whose manifest takes the dependency ---'
-grep -rl 'ring_wait' --include=Cargo.toml . | command grep -v '^ring/Cargo.toml$' | sed 's#ring/##;s#/Cargo.toml##' | sort
+grep -rl 'ring_wait' --include=Cargo.toml . | command grep -v '^Cargo.toml$' | sed 's#ring/##;s#/Cargo.toml##' | sort
 ```
 
 Live output:

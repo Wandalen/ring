@@ -71,7 +71,7 @@ command grep -r 'cfg( *loom *)' --include=*.rs \
 Live output:
 
 ```
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ws_verify/src/probe.rs: /// `--all-features` is not optional: two silent gates (`cfg(loom)` and the
+ws_verify/src/probe.rs: /// `--all-features` is not optional: two silent gates (`cfg(loom)` and the
 ring_atomic/src/lib.rs:   #[ cfg( loom ) ]
 ring_atomic/src/lib.rs:   #[ cfg( loom ) ]
 ring_atomic/src/lib.rs: #[ cfg( loom ) ]
@@ -154,7 +154,7 @@ command grep -rl 'cfg( *loom *)' --include=*.rs \
 Live output:
 
 ```
-/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/ws_verify/src/probe.rs
+ws_verify/src/probe.rs
 ring_atomic/src/lib.rs
 ring_cursor/src/lib.rs
 ring_mpsc/tests/mpsc_test.rs

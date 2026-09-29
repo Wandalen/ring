@@ -122,7 +122,7 @@ assert_eq!(
 
 It does not assert what the predicate returns. It asserts that the handler's
 behaviour and the predicate's claim agree — so a drift in either direction fails,
-in the crate that owns the behaviour, which is exactly what decision 121 § 5's
+in the crate that owns the behaviour, which is exactly what the
 discriminant/handler split is for
 (→ [`../../pattern/001`](../../pattern/001_discriminants_here_handlers_elsewhere.md)).
 

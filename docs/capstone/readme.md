@@ -25,9 +25,9 @@ the same spirit: a gate that can fail, not a claim that sounds true.
 **Two things to know before anyone opens an editor:**
 
 1. `git log` here has exactly **one commit** (`f0eb4c1`, "initial commit").
-   The crate family was extracted out of a larger monorepo
-   (`codename_space_sandbox`) as a fresh squashed snapshot — there's no
-   history to `git blame` past that commit.
+   The crate family was extracted out of a larger private monorepo as a
+   fresh squashed snapshot — there's no history to `git blame` past that
+   commit.
 2. As of 2026-09-29 (the day of extraction), the working tree still had a
    large post-extraction fixup sitting uncommitted. That's very likely
    resolved by the time you read this — just run `git status`/`git log`

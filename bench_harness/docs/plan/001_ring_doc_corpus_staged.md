@@ -598,7 +598,7 @@ narrates the number in prose; `ring_poll`'s regenerate block prints it as
 context. Both went stale the moment the count moved 19 → 21. Two further blocks
 broke for reasons worth separating from staleness: `ring_gating` controlled its
 "no `#[ inline ]` in the family" claim against a raw count over
-`` — a workspace-wide number any concurrent session moves, and
+the whole repository — a workspace-wide number any concurrent session moves, and
 already disagreeing with its own prose by two before this round touched it — now
 stated as a relation, per the S5 rule the same recipe cites two lines below for
 its profile check. `ring_consume` ran `cargo tree` without redirecting stderr,
@@ -664,7 +664,7 @@ contract end to end rather than describe it.
 **The Regression Gate found more than the stage did, for the second round
 running — and this time the cause was outside this plan entirely.** Fourteen
 recipes across eleven already-closed crates went stale, none of them from an
-edit to those crates. `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` grew from 170 to 190 crates while S5 was being
+edit to those crates. `any crate root` grew from 170 to 190 crates while S5 was being
 written, by sessions with no connection to the ring family, and three distinct
 mechanisms turned that growth into false documentation:
 
@@ -679,7 +679,7 @@ because the distinction it forces into the recipe is the one the finding was
 always making.
 
 **One document could not be stabilised and had to be redesigned instead.**
-`ring_config/docs/workaround/002` printed how many crates exist under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/`,
+`ring_config/docs/workaround/002` printed how many crates exist under `any crate root`,
 so every crate any session added anywhere in the workspace made it stale — it
 drifted twice inside a single gate round, 189 during the run and 190 minutes
 later. Patching the number was a losing race. The recipe now prints no moving
@@ -735,7 +735,7 @@ recorded and the same fix:
 
 | Crate | What moved | Ruling |
 |---|---|---|
-| `ring_overflow` | Crates under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` declaring a `pub const fn`, 59 → 60 | Prose stopped restating the cardinal; the census keeps it |
+| `ring_overflow` | Crates under `any crate root` declaring a `pub const fn`, 59 → 60 | Prose stopped restating the cardinal; the census keeps it |
 | `ring_stats`, `ring_batch` | `docs/feature/*.md` `Status:` tally, 367/58 → 366/59, twice, in different crates | Both recipes now print the invariant — which value dominates, how many contiguous runs, the widest — never the population |
 
 `ring_stats` is the sharper of the two, because the volatile measurement *is* the
@@ -752,7 +752,7 @@ it also sharpened the finding.
 **Two defects the gates cannot see were found by hand while repairing ones they
 can.** `ring_overflow`'s OV41 asserted that a census "finds none of" `peek_`,
 `try_`, `dry_` or `preview_` — while greping for none of them. Three are indeed
-absent; `try_` occurs 72 times under `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/module/` meaning *fallible attempt*, so the
+absent; `try_` occurs 72 times under `any crate root` meaning *fallible attempt*, so the
 one prefix a maintainer is likeliest to reach for is the one that would say the
 wrong thing, and the finding is better for saying so. Separately,
 `ring_stats`'s Severity census listed ST31 under `n/a — drift` while both of its

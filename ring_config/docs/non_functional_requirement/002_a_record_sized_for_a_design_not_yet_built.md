@@ -11,7 +11,7 @@ argument, the state of the consumer crate, and the one stated payoff that is
 still missing.
 
 **In Scope:** `ring_config/src/lib.rs:7-17`;
-`/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/lang/lang_channel/src/lib.rs`.
+`lang_channel/src/lib.rs`.
 
 **Out of Scope:** The non-functional properties the crate actually has are
 [`non_functional_requirement/001`](001_a_record_that_allocates_nothing_and_is_read_once.md).
@@ -29,8 +29,8 @@ cd "$(git rev-parse --show-toplevel)"
 echo '  -- the consumer this crate says it is sized for --'
 command grep -m1 -A2 -F '//! set of legal configurations enumerable instead of "whatever someone wrote a' ring_config/src/lib.rs
 echo '  -- lines in that consumer crate, then mentions of the record inside it --'
-command grep -c '' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/lang/lang_channel/src/lib.rs
-command grep -c 'RingConfig' /home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/lang/lang_channel/src/lib.rs || true
+command grep -c '' lang_channel/src/lib.rs
+command grep -c 'RingConfig' lang_channel/src/lib.rs || true
 ```
 
 Live output:
@@ -121,7 +121,7 @@ note that reading a built ring's configuration back out is still only partial.
 | Fact | Where |
 |------|-------|
 | The module comment's two reasons, and its "eventually" | `ring_config/src/lib.rs:7-17` |
-| `lang_channel` at forty-one lines, naming the record zero times | `/home/user1/pro/lib/yrd_gamedev/codename_space_sandbox/substrate/lang/lang_channel/src/lib.rs` |
+| `lang_channel` at forty-one lines, naming the record zero times | `lang_channel/src/lib.rs` |
 | The three readings a built ring exposes | `ring_core/src/lib.rs:214`, `:227`, `:244` |
 
 ### Tests

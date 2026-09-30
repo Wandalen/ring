@@ -288,6 +288,13 @@ future_incompatible = { level = "warn", priority = -1 }
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unsafe-code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unreachable_pub = "warn"
+meta_variable_misuse = "warn"
+redundant_lifetimes = "warn"
+unit_bindings = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
 # `loom` is set by RUSTFLAGS, not by any feature, so rustc has no other way to
 # learn it is a real cfg. Declared once here rather than per crate: the lints
 # table is inherited workspace-wide, and a crate cannot both inherit it and add
@@ -296,7 +303,40 @@ unsafe-code = "deny"
 unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
 
 [workspace.lints.clippy]
+# Unsafe: one operation per block, each with its own `// SAFETY:`.
 undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+cast_ptr_alignment = "warn"
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+mem_forget = "warn"
+# Concurrency: locks are what this family exists to avoid; refcount bumps stay visible.
+mutex_atomic = "warn"
+mutex_integer = "warn"
+rc_mutex = "warn"
+clone_on_ref_ptr = "warn"
+# Determinism: hash iteration order would leak into the delivery order.
+iter_over_hash_type = "warn"
+# Sequence and index arithmetic.
+cast_sign_loss = "warn"
+precedence_bits = "warn"
+# Hygiene.
+dbg_macro = "warn"
+exit = "warn"
+infinite_loop = "warn"
+large_stack_frames = "warn"
+todo = "warn"
+unimplemented = "warn"
+unused_result_ok = "warn"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
+private_intra_doc_links = "deny"
+bare_urls = "warn"
+missing_crate_level_docs = "warn"
+unescaped_backticks = "warn"
 0
 allocation_test.rs
 consume_test.rs

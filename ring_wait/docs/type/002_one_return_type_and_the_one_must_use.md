@@ -255,11 +255,38 @@ Live output:
 
 ```
 [workspace.lints.clippy]
+# Unsafe: one operation per block, each with its own `// SAFETY:`.
 undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+cast_ptr_alignment = "warn"
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+mem_forget = "warn"
+# Concurrency: locks are what this family exists to avoid; refcount bumps stay visible.
+mutex_atomic = "warn"
+mutex_integer = "warn"
+rc_mutex = "warn"
+clone_on_ref_ptr = "warn"
+# Determinism: hash iteration order would leak into the delivery order.
+iter_over_hash_type = "warn"
+# Sequence and index arithmetic.
+cast_sign_loss = "warn"
+precedence_bits = "warn"
+# Hygiene.
+dbg_macro = "warn"
+exit = "warn"
+infinite_loop = "warn"
+large_stack_frames = "warn"
+todo = "warn"
+unimplemented = "warn"
+unused_result_ok = "warn"
+
+[workspace.lints.rustdoc]
 ```
 
-`[workspace.lints.clippy]` contains exactly one entry —
-`undocumented_unsafe_blocks = "deny"`. No `must_use_candidate`, no
+The workspace lint tables name neither `must_use_candidate` nor
 `unused_results`. The gap is invisible to `cargo clippy` and to every test.
 
 Two annotations, both one line, would close it: `#[ must_use ]` on `pause`, and
@@ -361,7 +388,7 @@ distinct closures the family writes, which is three in `src/` and one per test.
 | File | Relationship |
 |------|--------------|
 | `ring_types/src/error.rs:43,42-80,146-159` | `#[ non_exhaustive ]`, the nine variants, and `is_transient`'s set |
-| `Cargo.toml` § `[workspace.lints.clippy]` | The one lint enabled, and the two that are not |
+| `Cargo.toml` § `[workspace.lints.clippy]` | The lints enabled, and the two that are not |
 
 ### Tests
 

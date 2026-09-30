@@ -164,21 +164,47 @@ close it, neither taken:
 | Add `#[ must_use ]` to `check` | Redundant, and clippy's `double_must_use` lint objects |
 | Note the exception in `check`'s doc | One line, no lint interaction |
 
-Neither is done today, and nothing forces the choice: the workspace's whole
-clippy table is one line, and `double_must_use` is not it.
+Neither is done today, and nothing forces the choice: the workspace's clippy
+table does not name `double_must_use`.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 sed -n '/\[workspace.lints.clippy\]/,/^\[[a-z]/p' Cargo.toml
-# [workspace.lints.clippy]
-# undocumented_unsafe_blocks = "deny"
 ```
 
 Live output:
 
 ```
 [workspace.lints.clippy]
+# Unsafe: one operation per block, each with its own `// SAFETY:`.
 undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+cast_ptr_alignment = "warn"
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+mem_forget = "warn"
+# Concurrency: locks are what this family exists to avoid; refcount bumps stay visible.
+mutex_atomic = "warn"
+mutex_integer = "warn"
+rc_mutex = "warn"
+clone_on_ref_ptr = "warn"
+# Determinism: hash iteration order would leak into the delivery order.
+iter_over_hash_type = "warn"
+# Sequence and index arithmetic.
+cast_sign_loss = "warn"
+precedence_bits = "warn"
+# Hygiene.
+dbg_macro = "warn"
+exit = "warn"
+infinite_loop = "warn"
+large_stack_frames = "warn"
+todo = "warn"
+unimplemented = "warn"
+unused_result_ok = "warn"
+
+[workspace.lints.rustdoc]
 ```
 
 So the redundant-attribute option would cost nothing today and would start
@@ -306,7 +332,7 @@ that has the gap explains why it is not one.
 |------|--------------|
 | `ring_gating/src/lib.rs:92-324` | All eleven methods |
 | `ring_gating/src/lib.rs:141-145` | `cursor` — the shared borrow that permits stores |
-| `Cargo.toml` § `[workspace.lints.clippy]` | One line, `undocumented_unsafe_blocks` — `double_must_use` unenforced |
+| `Cargo.toml` § `[workspace.lints.clippy]` | Names individual lints — `double_must_use` unenforced |
 | rust-lang/rust#143874 | `Deref` const-stability, which blocks two of the four candidates |
 
 ### Tests

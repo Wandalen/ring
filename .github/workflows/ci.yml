@@ -1,0 +1,65 @@
+# Fast verification — every push and PR.
+#
+# Mirrors `verb/test` levels 1-3 (nextest, doctests, clippy) plus
+# `cargo doc` and the repo's own nightly-rustfmt check (`verb/fmt check::1`).
+# Slow jobs (full gate suite, loom) live in `gates.yml` / `loom.yml` and run
+# on `master` + nightly instead of blocking every push.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: build + nextest + doctests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: build workspace
+        run: cargo build --workspace --all-features
+      - name: nextest (verb/test level 1)
+        run: cargo nextest run --workspace --all-features
+      - name: doctests (verb/test level 2)
+        run: RUSTDOCFLAGS="-D warnings" cargo test --doc --workspace --all-features
+
+  clippy:
+    name: clippy -D warnings
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (verb/lint)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  doc:
+    name: cargo doc --no-deps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: rustdoc, warnings denied
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --all-features
+
+  fmt:
+    name: nightly rustfmt --check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - name: fmt check (verb/fmt check::1)
+        run: cargo +nightly fmt --all -- --check

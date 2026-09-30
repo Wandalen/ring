@@ -1,0 +1,32 @@
+# Loom interleaving models — slow, separate job.
+#
+# `RUSTFLAGS="--cfg loom"` swaps `ring_atomic`'s cells for loom's checked
+# equivalents, so the same test binaries exhaustively explore interleavings
+# instead of sampling them. Kept out of `ci.yml` because it is an order of
+# magnitude slower than the sampled run and would block every quick push.
+#
+# Schedule: `master` pushes + nightly + manual dispatch — never on every PR.
+
+name: Loom
+
+on:
+  push:
+    branches: [master]
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  loom:
+    name: cargo test --cfg loom
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: loom models (see ring_spsc / ring_mpsc / ring_publish readmes)
+        run: RUSTFLAGS="--cfg loom" cargo test --workspace --all-features

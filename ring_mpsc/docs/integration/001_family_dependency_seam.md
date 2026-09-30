@@ -229,7 +229,7 @@ runs in four would still report green against a genuinely broken publish.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_mpsc
-grep -c 'path = "\.\./ring_' Cargo.toml
+grep -cE '^ring_[a-z_]+ = \{ workspace = true' Cargo.toml
 grep -cE '^[a-z-]+ = \{ version' Cargo.toml
 # The command above can legitimately exit nonzero -- a count of zero, a diff
 # that differs -- and the sweep that keeps this output current skips any block

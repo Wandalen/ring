@@ -1,6 +1,6 @@
 [package]
 name = "ring_handle"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -17,12 +17,12 @@ default = []
 crossbeam = [ "ring_core/crossbeam" ]
 
 [dependencies]
-ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_core = { workspace = true }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config" }
-ring_types = { path = "../ring_types" }
-trybuild = "1.0"
+ring_config = { workspace = true }
+ring_types = { workspace = true }
+trybuild = { workspace = true }
 
 [lints]
 workspace = true

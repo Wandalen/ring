@@ -1,6 +1,6 @@
 [package]
 name = "ring_index"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,7 +9,7 @@ description = "Sequence-to-slot index mapping for power-of-two capacities"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ring_atomic"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,12 +9,12 @@ description = "Atomic sequence helpers with explicit memory orderings"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_types = { workspace = true }
 
 # Only under `RUSTFLAGS="--cfg loom"`. An ordinary build never sees it, never
 # resolves it, and never compiles it — see the module documentation on the seam.
 [target.'cfg(loom)'.dependencies]
-loom = "0.7"
+loom = { workspace = true }
 
 [lints]
 workspace = true

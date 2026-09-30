@@ -141,7 +141,7 @@ add edges *into* this crate when it lands, never out of it.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_core
-printf 'path deps:   '; grep -c 'path = "\.\./ring_' Cargo.toml
+printf 'path deps:   '; grep -cE '^ring_[a-z_]+ = \{ workspace = true' Cargo.toml
 printf 'use lines:   '; grep -cE '^use ' src/lib.rs
 echo '--- reached by full path ---'
 grep -oE 'ring_(mpsc|spsc|slot|overflow|config|types)::' src/lib.rs | sort | uniq -c

@@ -1,6 +1,6 @@
 [package]
 name = "ring_poll"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,11 +9,11 @@ description = "Non-blocking progress helpers"
 publish = true
 
 [dependencies]
-ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_core = { workspace = true }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config" }
-ring_types = { path = "../ring_types" }
+ring_config = { workspace = true }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

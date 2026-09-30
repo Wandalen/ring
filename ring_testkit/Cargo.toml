@@ -1,6 +1,6 @@
 [package]
 name = "ring_testkit"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,20 +9,20 @@ description = "Determinism-test fixtures driving scripted claim and drain sequen
 publish = false
 
 [dependencies]
-ring_core = { path = "../ring_core" }
-ring_tls = { path = "../ring_tls" }
-ring_shutdown = { path = "../ring_shutdown" }
+ring_core = { workspace = true }
+ring_tls = { workspace = true }
+ring_shutdown = { workspace = true }
 
 # `ring_config` is not one of message 960's declared edges, and is a
 # dev-dependency rather than an added one: `Script::run` takes a ring the caller
 # already built, so the config type appears in no signature here. Only the tests
 # and doc examples need to build a ring to drive.
 [dev-dependencies]
-ring_config = { path = "../ring_config" }
+ring_config = { workspace = true }
 # `RingConfig::with_overflow` takes an `OverflowPolicy`, which `ring_config`
 # does not re-export — so a test that varies the policy has to name the crate
 # the vocabulary lives in.
-ring_types = { path = "../ring_types" }
+ring_types = { workspace = true }
 
 # The exhaustive half of feature 188. Only under `RUSTFLAGS="--cfg loom"`; an
 # ordinary build never sees it. The model lives in `tests/`, not `src/`, so the
@@ -31,7 +31,7 @@ ring_types = { path = "../ring_types" }
 # the exhaustive file, it does not compile it — a break there still leaves
 # `verb/test` fully green (docs/workaround/002 TK54).
 [target.'cfg(loom)'.dev-dependencies]
-loom = "0.7"
+loom = { workspace = true }
 
 [lints]
 workspace = true

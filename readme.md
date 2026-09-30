@@ -13,7 +13,9 @@ unsafe forbidden by default, and nothing gets adopted without first winning
 a measured benchmark.*
 
 ![Rust](https://img.shields.io/badge/rust-2024_edition-orange)
+![Unsafe](https://img.shields.io/badge/unsafe-forbidden-brightgreen)
 ![Crates](https://img.shields.io/badge/crates-34-blue)
+![Concurrency](https://img.shields.io/badge/concurrency-loom--checked-blueviolet)
 [![CI](https://github.com/Wandalen/ring/actions/workflows/ci.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/ci.yml)
 [![Gates](https://github.com/Wandalen/ring/actions/workflows/gates.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/gates.yml)
 [![Loom](https://github.com/Wandalen/ring/actions/workflows/loom.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/loom.yml)

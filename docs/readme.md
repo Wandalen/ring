@@ -8,3 +8,4 @@ etc.), which documents that crate's own public contract and internals, or
 | Directory | Responsibility |
 |-----------|-----------------|
 | [`capstone/`](capstone/readme.md) | Rust bootcamp capstone assignment — production-readiness topics, one file per crate |
+| [`backlog.md`](backlog.md) | Known problems and the plan to fix them, one PR per item |

@@ -147,6 +147,13 @@ future_incompatible = { level = "warn", priority = -1 }
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unsafe-code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+unreachable_pub = "warn"
+meta_variable_misuse = "warn"
+redundant_lifetimes = "warn"
+unit_bindings = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
 # `loom` is set by RUSTFLAGS, not by any feature, so rustc has no other way to
 # learn it is a real cfg. Declared once here rather than per crate: the lints
 # table is inherited workspace-wide, and a crate cannot both inherit it and add

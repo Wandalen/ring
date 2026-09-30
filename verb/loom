@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+#@ purpose: Run every loom model under RUSTFLAGS="--cfg loom". Models are found, not listed:
+#@          any tests/*.rs with a `loom::model(` call. crate::<name> narrows to one package.
+#@          Builds into target-loom/ so the cfg flip does not invalidate the normal build.
+#@ tags: verb, loom
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+_crate=""
+_dry_run=0
+for _arg in "$@"; do
+  case "$_arg" in
+    crate::*)
+      _crate="${_arg#crate::}"
+      if [[ -z "$_crate" ]]; then
+        echo "verb/loom: crate::<name> cannot be empty" >&2
+        exit 2
+      fi
+      ;;
+    dry::1) _dry_run=1 ;;
+    *)
+      echo "verb/loom: unrecognized parameter '$_arg' — expected crate::<name> or dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+mapfile -t _files < <( grep -lE '^\s*loom::model\(' ./*/tests/*.rs | sort )
+_steps=()
+for _f in "${_files[@]}"; do
+  _pkg="$( cut -d/ -f2 <<<"$_f" )"
+  [[ -n "$_crate" && "$_pkg" != "$_crate" ]] && continue
+  _steps+=( "RUSTFLAGS=\"--cfg loom\" CARGO_TARGET_DIR=target-loom cargo test -p $_pkg --test $( basename "$_f" .rs )" )
+done
+
+# An empty run would pass having checked nothing.
+if (( ${#_steps[@]} == 0 )); then
+  echo "verb/loom: no loom model found${_crate:+ in $_crate}" >&2
+  exit 1
+fi
+
+if (( _dry_run )); then
+  printf '%s\n' "${_steps[@]}"
+  exit 0
+fi
+
+for _step in "${_steps[@]}"; do
+  eval "$_step"
+done

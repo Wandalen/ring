@@ -100,10 +100,10 @@ Live output:
 
 ```
 -- inbound edges --
-  ring_core = { path = "../ring_core" }
-  ring_cursor = { path = "../ring_cursor" }
-  ring_types = { path = "../ring_types" }
-  ring_atomic = { path = "../ring_atomic" }
+  ring_core = { workspace = true }
+  ring_cursor = { workspace = true }
+  ring_types = { workspace = true }
+  ring_atomic = { workspace = true }
 -- outbound: manifests outside this crate naming it, in any section --
   0
 -- the eight crates the argument names: prerequisite taken, this edge taken --

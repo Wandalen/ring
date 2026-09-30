@@ -32,6 +32,7 @@ No `verb.rulebook.md` exists in this repo to govern these, same as `codename_spa
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first — incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh` — the family's own G1-G21 corpus/quality suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
 | `bench` | Run `ring_bench`'s comparison example — the family's benchmark harness |
+| `publish_check` | Dry-run `cargo publish` for every publishable crate, building each from its package. `crate::<name>` narrows |
 | `clean` | Remove `target/` and gate scratch logs |
 | `verify` | Full pre-push gate — alias for `test level::5` |
 | `verbs` | List all verbs with their purpose line |

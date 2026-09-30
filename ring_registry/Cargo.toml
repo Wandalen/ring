@@ -1,6 +1,6 @@
 [package]
 name = "ring_registry"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -16,11 +16,11 @@ publish = true
 # does) rather than kept as unused declarations; `ring_types` is dropped
 # outright. See docs/integration/001.
 [dependencies]
-ring_handle = { path = "../ring_handle", version = "0.1.0" }
+ring_handle = { workspace = true }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config" }
-ring_core = { path = "../ring_core" }
+ring_config = { workspace = true }
+ring_core = { workspace = true }
 
 [lints]
 workspace = true

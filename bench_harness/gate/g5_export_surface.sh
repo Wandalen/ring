@@ -95,10 +95,18 @@ while read -r manifest; do
   # what leaves the family, not what moves inside it.
   owner="$( basename "$( dirname "$manifest" )" )"
   printf '%s\n' "${members[@]}" | grep -qx -- "$owner" && continue
+  # Fix(g5_workspace_dependencies_read_as_edges): a `[workspace.dependencies]`
+  # table names every family crate a member may inherit, and the scan read each
+  # row as the root manifest depending on it — 24 violations the moment the
+  # workspace centralized its dependencies. Root cause: a key-based match
+  # cannot tell a declaration of availability from a dependency edge. The edge
+  # is still seen where it is made: a consumer inheriting one writes
+  # `ring_x = { workspace = true }` under its own dependency table.
   while read -r dep; do
     [ -n "$dep" ] || continue
     printf '%s\n' "${allowed[@]}" | grep -qx -- "$dep" || violations+=( "${manifest#"$REPO"/}: $dep" )
-  done < <( grep -oE "^[[:space:]]*(${member_re})[[:space:]]*=" "$manifest" | tr -d ' =' | sort -u )
+  done < <( awk '/^\[/ { skip = ( $0 == "[workspace.dependencies]" ) } !skip' "$manifest" \
+              | grep -oE "^[[:space:]]*(${member_re})[[:space:]]*=" | tr -d ' =' | sort -u )
   # Hyphen-prefixed directories are temporary by convention and gitignored, so a
   # manifest inside one is scratch work rather than project content. Scanning
   # them makes the gate report a violation for a throwaway crate — observed at

@@ -23,7 +23,7 @@ round-failures: 5
 detector: a_path_that_dropped_records_is_not_eligible_to_be_fastest
 
 --- from
-      .filter( | outcome | outcome.is_lossless() )
+            .filter(|outcome| outcome.is_lossless())
 --- to
-      // .filter( | outcome | outcome.is_lossless() )   // PROBE ONLY — G12
+            // .filter(|outcome| outcome.is_lossless()) // PROBE ONLY — G12
 --- end

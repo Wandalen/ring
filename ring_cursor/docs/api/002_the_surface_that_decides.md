@@ -47,20 +47,20 @@ command grep -r 'cursors\.\(producer\|consumer\)()\.load(' --include=*.rs ring_s
 Live output:
 
 ```
-ring_spsc/src/lib.rs:       .field( "consumed", &self.cursors.consumer().load( GATING ) )
-ring_spsc/src/lib.rs:       .field( "produced", &self.cursors.producer().load( GATING ) )
-ring_spsc/src/lib.rs:     let consumed = self.ring.cursors.consumer().load( GATING );
-ring_spsc/src/lib.rs:     let consumed = self.ring.cursors.consumer().load( OWN );
-ring_spsc/src/lib.rs:     let produced = self.ring.cursors.producer().load( GATING );
-ring_spsc/src/lib.rs:     let produced = self.ring.cursors.producer().load( GATING );
-ring_spsc/src/lib.rs:     let produced = self.ring.cursors.producer().load( GATING );
-ring_spsc/src/lib.rs:     let produced = self.ring.cursors.producer().load( OWN );
-ring_spsc/src/lib.rs:     let seq = self.ring.cursors.producer().load( OWN );
-ring_spsc/src/lib.rs:     let start = self.ring.cursors.consumer().load( OWN );
-ring_spsc/src/lib.rs:     let start = self.ring.cursors.consumer().load( OWN );
-ring_spsc/src/lib.rs:     self.ring.cursors.consumer().load( OWN )
-ring_spsc/src/lib.rs:     self.ring.cursors.consumer().load( OWN ) == self.ring.cursors.producer().load( GATING )
-ring_spsc/src/lib.rs:     self.ring.cursors.producer().load( OWN )
+ring_spsc/src/lib.rs:             .field("consumed", &self.cursors.consumer().load(GATING))
+ring_spsc/src/lib.rs:             .field("produced", &self.cursors.producer().load(GATING))
+ring_spsc/src/lib.rs:         let consumed = self.ring.cursors.consumer().load(GATING);
+ring_spsc/src/lib.rs:         let consumed = self.ring.cursors.consumer().load(OWN);
+ring_spsc/src/lib.rs:         let produced = self.ring.cursors.producer().load(GATING);
+ring_spsc/src/lib.rs:         let produced = self.ring.cursors.producer().load(GATING);
+ring_spsc/src/lib.rs:         let produced = self.ring.cursors.producer().load(GATING);
+ring_spsc/src/lib.rs:         let produced = self.ring.cursors.producer().load(OWN);
+ring_spsc/src/lib.rs:         let seq = self.ring.cursors.producer().load(OWN);
+ring_spsc/src/lib.rs:         let start = self.ring.cursors.consumer().load(OWN);
+ring_spsc/src/lib.rs:         let start = self.ring.cursors.consumer().load(OWN);
+ring_spsc/src/lib.rs:         self.ring.cursors.consumer().load(OWN)
+ring_spsc/src/lib.rs:         self.ring.cursors.consumer().load(OWN) == self.ring.cursors.producer().load(GATING)
+ring_spsc/src/lib.rs:         self.ring.cursors.producer().load(OWN)
 ```
 
 ```rust
@@ -132,10 +132,10 @@ command grep -m1 -A3 -F '  /// `GATING` is fixed only for the pair'"'"'s own thr
 Live output:
 
 ```
-  /// `GATING` is fixed only for the pair's own three readings
-  /// (`free_slots`, `pending`, `may_claim`) — this accessor hands back the
-  /// raw cursor itself, whose `SeqCell` impl forwards whatever ordering the
-  /// caller names. The pair decides for the questions it answers, not for
+    /// `GATING` is fixed only for the pair's own three readings
+    /// (`free_slots`, `pending`, `may_claim`) — this accessor hands back the
+    /// raw cursor itself, whose `SeqCell` impl forwards whatever ordering the
+    /// caller names. The pair decides for the questions it answers, not for
 ```
 
 **Disposition:** applied — `producer()`'s and `consumer()`'s doc comments

@@ -151,12 +151,12 @@ command grep -A5 -F '/// Safe only because no caller-supplied code ever runs whi
 Live output:
 
 ```
-  /// Safe only because no caller-supplied code ever runs while this guard is
-  /// held: every method below creates and drops it inside a few plain
-  /// statements, so the poisoning this recovers from cannot actually occur.
-  /// A future method that hands out the guard itself, or takes a callback to
-  /// invoke under the lock, would change that and needs its own reachability
-  /// argument before it can rely on the same recovery. See `pitfall/002` TR43.
+    /// Safe only because no caller-supplied code ever runs while this guard is
+    /// held: every method below creates and drops it inside a few plain
+    /// statements, so the poisoning this recovers from cannot actually occur.
+    /// A future method that hands out the guard itself, or takes a callback to
+    /// invoke under the lock, would change that and needs its own reachability
+    /// argument before it can rely on the same recovery. See `pitfall/002` TR43.
 ```
 
 **Disposition:** applied — added exactly the clause this finding names to

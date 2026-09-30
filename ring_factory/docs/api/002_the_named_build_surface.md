@@ -221,7 +221,7 @@ explicitly classifies as internal and freely refactorable:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- Registry public API --'
-command grep -E '^  pub (const )?fn ' ring_registry/src/lib.rs | sed 's/(.*//'
+command grep -E '^    pub (const )?fn ' ring_registry/src/lib.rs | sed 's/(.*//'
 echo '  -- which of them this crate own tests must call --'
 command grep -oE 'registry\.[a-z_]+\(' ring_factory/tests/factory_test.rs | sort -u
 printf '  ring_registry on the export surface: %s\n' \
@@ -232,14 +232,14 @@ Live output:
 
 ```
   -- Registry public API --
-  pub fn new
-  pub fn register
-  pub fn get_mut
-  pub fn remove
-  pub fn contains
-  pub fn len
-  pub fn is_empty
-  pub fn names
+    pub fn new
+    pub fn register
+    pub fn get_mut
+    pub fn remove
+    pub fn contains
+    pub fn len
+    pub fn is_empty
+    pub fn names
   -- which of them this crate own tests must call --
 registry.contains(
 registry.get_mut(

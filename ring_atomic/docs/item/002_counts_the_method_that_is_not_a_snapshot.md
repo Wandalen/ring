@@ -252,13 +252,13 @@ command grep -m1 -A6 -F '/// Return every count to zero, leaving the sequence it
 Live output:
 
 ```
-  /// Return every count to zero, leaving the sequence itself untouched.
-  ///
-  /// Four independent `Relaxed` stores, not one atomic reset — safe to read
-  /// as complete only while nothing else is touching the cell. For a test
-  /// that sets up a state through the cell and then wants to count only what
-  /// the operation under test does; confirming the sequence survived costs a
-  /// count of its own, since the confirming read is itself counted.
+    /// Return every count to zero, leaving the sequence itself untouched.
+    ///
+    /// Four independent `Relaxed` stores, not one atomic reset — safe to read
+    /// as complete only while nothing else is touching the cell. For a test
+    /// that sets up a state through the cell and then wants to count only what
+    /// the operation under test does; confirming the sequence survived costs a
+    /// count of its own, since the confirming read is itself counted.
 ```
 
 **Disposition:** applied — `counts`'s contract in `src/lib.rs` now opens with

@@ -53,9 +53,9 @@ grep ' as u64\| as usize' ring_seqno/src/lib.rs
 Live output:
 
 ```
-  earlier.distance_to( later ) / capacity.get() as u64
-  consumer.distance_to( producer ) < capacity.get() as u64
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+    earlier.distance_to(later) / capacity.get() as u64
+    consumer.distance_to(producer) < capacity.get() as u64
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
 ```
 
 **This was once an asymmetry; it no longer is.** Two of the three moved the

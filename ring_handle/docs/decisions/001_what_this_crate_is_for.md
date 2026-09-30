@@ -88,9 +88,9 @@ Live output:
     ring_factory/src/lib.rs://! cannot be written.** `ring_handle::Split::ends` borrows `&mut self` and
     ring_factory/src/lib.rs:use ring_handle::Split;
   -- crates whose source mentions try_clone at all --
-    ring_bench
-    ring_core
-    ring_handle
+ring_bench
+ring_core
+ring_handle
   -- call sites outside ring_core: 0
 ```
 

@@ -44,15 +44,15 @@ Live output:
 
 ```
 == .frontier
-  ring_barrier/src/lib.rs               2
-  ring_consume/src/lib.rs               1
+  ring_barrier/src/lib.rs                    2
+  ring_consume/src/lib.rs                    1
 == .available
-  ring_barrier/src/lib.rs               1
-  ring_consume/src/lib.rs               3
-  ring_core/src/lib.rs                  2
-  ring_mpsc/src/lib.rs                  1
+  ring_barrier/src/lib.rs                    1
+  ring_consume/src/lib.rs                    3
+  ring_core/src/lib.rs                       2
+  ring_mpsc/src/lib.rs                       1
 == .admits
-  ring_barrier/src/lib.rs               1
+  ring_barrier/src/lib.rs                    1
 ```
 
 | Method | Library callers | Which |

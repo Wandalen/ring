@@ -300,13 +300,13 @@ command grep -A6 -F 'That guarantee is not free' ring_factory/src/lib.rs
 Live output:
 
 ```
-  /// exposes nothing. **That guarantee is not free: a full `Split<S>` is
-  /// constructed, moved into the registry, moved back out, and dropped before
-  /// the much smaller [`BuildError`] reaches the caller** — building first is a
-  /// correctness choice, since registration is the only operation that can
-  /// decide the name atomically, and a check-then-build order could be
-  /// invalidated by another thread between the two calls.
-  ///
+    /// exposes nothing. **That guarantee is not free: a full `Split<S>` is
+    /// constructed, moved into the registry, moved back out, and dropped before
+    /// the much smaller [`BuildError`] reaches the caller** — building first is a
+    /// correctness choice, since registration is the only operation that can
+    /// decide the name atomically, and a check-then-build order could be
+    /// invalidated by another thread between the two calls.
+    ///
 ```
 
 **Disposition:** applied — `build_named`'s doc comment in

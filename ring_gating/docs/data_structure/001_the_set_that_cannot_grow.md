@@ -18,7 +18,7 @@ grep -E '&mut self|fn push|resize|insert|remove' ring_gating/src/lib.rs
 Live output:
 
 ```
-    cursors.resize_with( consumers, PaddedCursor::default );
+        cursors.resize_with(consumers, PaddedCursor::default);
 ```
 
 One hit, and it is inside `new`:

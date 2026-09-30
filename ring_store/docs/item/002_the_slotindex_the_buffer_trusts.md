@@ -51,8 +51,8 @@ grep 'index\.get()\|index\.0' ring_store/src/lib.rs
 Live output:
 
 ```
-    &self.slots[ index.get() ]
-    &mut self.slots[ index.get() ]
+        &self.slots[index.get()]
+        &mut self.slots[index.get()]
 ```
 
 **Finding.** `SlotIndex( pub usize )` exposes its field, and this crate declines
@@ -87,13 +87,13 @@ command grep -m1 -A6 -F '  /// One stamp per slot, holding the sequence whose pa
 Live output:
 
 ```
-  /// One stamp per slot, holding the sequence whose payload currently occupies
-  /// it. Unpadded on purpose: [`PaddedCursor`] would make this array 64 times
-  /// the size of the payload array for a small `S`, to prevent a false-sharing
-  /// contention that does not arise — two producers writing adjacent stamps are
-  /// two producers that claimed adjacent sequences, which is a handful of
-  /// stores on one line rather than a contended loop.
-  stamps : Box< [ AtomicSeq ] >,
+    /// One stamp per slot, holding the sequence whose payload currently occupies
+    /// it. Unpadded on purpose: [`PaddedCursor`] would make this array 64 times
+    /// the size of the payload array for a small `S`, to prevent a false-sharing
+    /// contention that does not arise — two producers writing adjacent stamps are
+    /// two producers that claimed adjacent sequences, which is a handful of
+    /// stores on one line rather than a contended loop.
+    stamps: Box<[AtomicSeq]>,
 ```
 
 A second array, the same length as the slots, holding exactly the mapping the

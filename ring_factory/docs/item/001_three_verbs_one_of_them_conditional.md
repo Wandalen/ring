@@ -135,9 +135,9 @@ Live output:
 ```
 //! [`BuildError::Unsupported`], never re-decided here: duplicating the
 //! [`BuildError::NameTaken`] is the one refusal this crate owns outright.
-    let ring = Ring::new( &cfg ).map_err( BuildError::Unsupported )?;
-      Err( ( RegistryError::NameTaken { .. }, _refused ) ) => Err( BuildError::NameTaken ),
-    let ring = Ring::new_crossbeam( &cfg ).map_err( BuildError::Unsupported )?;
+        let ring = Ring::new(&cfg).map_err(BuildError::Unsupported)?;
+            Err((RegistryError::NameTaken { .. }, _refused)) => Err(BuildError::NameTaken),
+        let ring = Ring::new_crossbeam(&cfg).map_err(BuildError::Unsupported)?;
 ```
 
 The consequence is a sequencing guarantee stated in the doc comment and nowhere

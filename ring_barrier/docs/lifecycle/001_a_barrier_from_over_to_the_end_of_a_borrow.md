@@ -158,10 +158,9 @@ Live output:
 
 ```
 (no destruction step of any kind)
-pub struct Consumer< 'a >
-{
-  cursor : &'a PaddedCursor,
-  barrier : Barrier< 'a >,
+pub struct Consumer<'a> {
+    cursor: &'a PaddedCursor,
+    barrier: Barrier<'a>,
 }
 ```
 

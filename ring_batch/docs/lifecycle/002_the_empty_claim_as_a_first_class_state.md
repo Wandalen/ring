@@ -105,12 +105,12 @@ command grep -m1 -A5 -F '  /// Flushing an empty buffer is legal and claims noth
 Live output:
 
 ```
-  /// Flushing an empty buffer is legal and claims nothing — a zero-length
-  /// `fetch_add` still costs one atomic, which is why a caller in a hot loop
-  /// should check [`TlsBuffer::is_empty`] first. This function does not check
-  /// on the caller's behalf: a silent skip would make the operation count
-  /// depend on the data, and the whole point of the counting shim is that it
-  /// does not.
+    /// Flushing an empty buffer is legal and claims nothing — a zero-length
+    /// `fetch_add` still costs one atomic, which is why a caller in a hot loop
+    /// should check [`TlsBuffer::is_empty`] first. This function does not check
+    /// on the caller's behalf: a silent skip would make the operation count
+    /// depend on the data, and the whole point of the counting shim is that it
+    /// does not.
 ```
 
 The reasoning is sound and the warning is explicit. What neither says is what the

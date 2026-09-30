@@ -32,8 +32,8 @@ ring_types/src/capacity.rs:use crate::RingError;
 ring_types/src/error.rs:use core::fmt;
 ring_types/src/lib.rs:pub use capacity::Capacity;
 ring_types/src/lib.rs:pub use error::RingError;
-ring_types/src/lib.rs:pub use id::{ Seq, SlotIndex };
-ring_types/src/lib.rs:pub use policy::{ OverflowPolicy, WaitKind };
+ring_types/src/lib.rs:pub use id::{Seq, SlotIndex};
+ring_types/src/lib.rs:pub use policy::{OverflowPolicy, WaitKind};
 ```
 
 returns exactly these six. Four are `pub use` in `lib.rs` and constitute the

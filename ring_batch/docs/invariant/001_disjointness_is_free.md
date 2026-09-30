@@ -140,7 +140,7 @@ command grep 'blind to this crate' ring_batch/tests/batch_test.rs
 Live output:
 
 ```
-  // fetch_add's own atomicity, but blind to this crate's actual race: a
+    // fetch_add's own atomicity, but blind to this crate's actual race: a
 ```
 
 **Disposition:** applied — the test's own comment no longer opens with "The

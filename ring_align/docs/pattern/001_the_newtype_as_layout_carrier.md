@@ -121,7 +121,7 @@ Live output:
 
 ```
 ring_align/src/lib.rs://! No `unsafe` is needed for any of it — `#[ repr( align( 64 ) ) ]` is a safe
-ring_align/src/lib.rs:#[ repr( align( 64 ) ) ]
+ring_align/src/lib.rs:#[repr(align(64))]
 ring_cursor/src/lib.rs://! `#[ repr( align( 64 ) ) ]` happens to round the size up too, so both hold —
 ```
 

@@ -158,29 +158,29 @@ command grep -r "distance_to" --include=*.rs ring_*/src/ | grep -v ring_types | 
 Live output:
 
 ```
-  /// How many publications separate this sequence from a later one, or `0`
-  /// when `later` is not actually later.
-  ///
-  /// Saturating rather than signed: the caller that needs the direction has
-  /// already compared the two, and every caller that does not wants a count.
-  ///
-  /// ```
-  /// use ring_types::Seq;
-  /// assert_eq!( Seq( 4 ).distance_to( Seq( 10 ) ), 6 );
-  /// assert_eq!( Seq( 10 ).distance_to( Seq( 4 ) ), 0 );
-  /// ```
-ring_barrier/src/lib.rs:    self.frontier().map_or( 0, | frontier | from.distance_to( frontier ) )
-ring_mpsc/src/lib.rs:    from.distance_to( end ) as usize
-ring_mpsc/src/lib.rs:    Batch { ring : self.ring, start, len : start.distance_to( end ) as usize }
-ring_seqno/src/lib.rs:  earlier.distance_to( later ) / capacity.get() as u64
-ring_seqno/src/lib.rs:  consumer.distance_to( producer ) < capacity.get() as u64
-ring_seqno/src/lib.rs:  let in_flight = consumer.distance_to( producer );
-ring_seqno/src/lib.rs:  consumer.distance_to( producer )
-ring_spsc/src/lib.rs:  /// cannot itself underflow (`Seq::distance_to` is `saturating_sub`), but if
-ring_spsc/src/lib.rs:    consumed.distance_to( produced )
-ring_spsc/src/lib.rs:    consumed.distance_to( produced ) as usize
-ring_spsc/src/lib.rs:    Batch { ring : self.ring, start, len : start.distance_to( produced ) as usize }
-ring_spsc/src/lib.rs:    Batch { ring : self.ring, start, len : max.min( start.distance_to( produced ) as usize ) }
+    /// How many publications separate this sequence from a later one, or `0`
+    /// when `later` is not actually later.
+    ///
+    /// Saturating rather than signed: the caller that needs the direction has
+    /// already compared the two, and every caller that does not wants a count.
+    ///
+    /// ```
+    /// use ring_types::Seq;
+    /// assert_eq!(Seq(4).distance_to(Seq(10)), 6);
+    /// assert_eq!(Seq(10).distance_to(Seq(4)), 0);
+    /// ```
+ring_barrier/src/lib.rs:        self.frontier().map_or(0, |frontier| from.distance_to(frontier))
+ring_mpsc/src/lib.rs:        from.distance_to(end) as usize
+ring_mpsc/src/lib.rs:        Batch { ring: self.ring, start, len: start.distance_to(end) as usize }
+ring_seqno/src/lib.rs:    earlier.distance_to(later) / capacity.get() as u64
+ring_seqno/src/lib.rs:    consumer.distance_to(producer) < capacity.get() as u64
+ring_seqno/src/lib.rs:    let in_flight = consumer.distance_to(producer);
+ring_seqno/src/lib.rs:    consumer.distance_to(producer)
+ring_spsc/src/lib.rs:    /// cannot itself underflow (`Seq::distance_to` is `saturating_sub`), but if
+ring_spsc/src/lib.rs:        consumed.distance_to(produced)
+ring_spsc/src/lib.rs:        consumed.distance_to(produced) as usize
+ring_spsc/src/lib.rs:        Batch { ring: self.ring, start, len: start.distance_to(produced) as usize }
+ring_spsc/src/lib.rs:        Batch { ring: self.ring, start, len: max.min(start.distance_to(produced) as usize) }
 ```
 
 ### BR36 — A Consumer Past Its Barrier Is Indistinguishable From One Exactly At It

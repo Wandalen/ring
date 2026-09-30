@@ -46,26 +46,26 @@ grep 'GatingSet::new' ring_claim/tests/claim_test.rs
 Live output:
 
 ```
-  let consumers = GatingSet::new( cap( 64 ), 1 );
-  let consumers = GatingSet::new( cap( CAPACITY ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 8 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 8 ), 1 );
-  let consumers = GatingSet::new( cap( 8 ), 2 );
-  let consumers = GatingSet::new( cap( 8 ), 1 );
-  let consumers = GatingSet::new( cap( 16_384 ), 0 );
-  let consumers = GatingSet::new( cap( 16_384 ), 0 );
-  let consumers = GatingSet::new( cap( 16_384 ), 0 );
-  let consumers = GatingSet::new( cap( 8_192 ), 0 );
-  let consumers = GatingSet::new( cap( CAPACITY ), 1 );
-  let consumers = GatingSet::new( cap( 4 ), 1 );
-  let consumers = GatingSet::new( cap( 8 ), 1 );
+    let consumers = GatingSet::new(cap(64), 1);
+    let consumers = GatingSet::new(cap(CAPACITY), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(8), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(8), 1);
+    let consumers = GatingSet::new(cap(8), 2);
+    let consumers = GatingSet::new(cap(8), 1);
+    let consumers = GatingSet::new(cap(16_384), 0);
+    let consumers = GatingSet::new(cap(16_384), 0);
+    let consumers = GatingSet::new(cap(16_384), 0);
+    let consumers = GatingSet::new(cap(8_192), 0);
+    let consumers = GatingSet::new(cap(CAPACITY), 1);
+    let consumers = GatingSet::new(cap(4), 1);
+    let consumers = GatingSet::new(cap(8), 1);
 ```
 
 | Test | Capacity | Consumers | Gate active |

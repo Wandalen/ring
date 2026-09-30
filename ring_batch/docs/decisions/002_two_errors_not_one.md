@@ -127,16 +127,16 @@ command grep -m1 -A9 -F '  /// Claim as many of `max` sequences as are available
 Live output:
 
 ```
-  /// Claim as many of `max` sequences as are available, down to one.
-  ///
-  /// For a batching producer that would rather write four items now than wait
-  /// for room for eight.
-  ///
-  /// # Errors
-  ///
-  /// [`RingError::Full`] when not even one slot is free. Never
-  /// `BatchTooLarge` — a `max` wider than the ring is not an error here, it is
-  /// simply more than will be granted.
+    /// Claim as many of `max` sequences as are available, down to one.
+    ///
+    /// For a batching producer that would rather write four items now than wait
+    /// for room for eight.
+    ///
+    /// # Errors
+    ///
+    /// [`RingError::Full`] when not even one slot is free. Never
+    /// `BatchTooLarge` — a `max` wider than the ring is not an error here, it is
+    /// simply more than will be granted.
 ```
 
 **Finding.** `claim_up_to` is the answer to "how much could I have had", asked

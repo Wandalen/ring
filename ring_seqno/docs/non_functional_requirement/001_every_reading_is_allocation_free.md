@@ -83,7 +83,7 @@ Live output:
 
 ```
 (no matches — nothing outside core)
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 ```
 
 The first command prints nothing; the second shows the file's only crate-level
@@ -108,11 +108,11 @@ rm -f /tmp/-nostd_control.rs
 Live output:
 
 ```
-ring_overflow/src/lib.rs:#![ no_std ]
+ring_overflow/src/lib.rs:#![no_std]
 ring_overflow/src/lib.rs:// `no_std` here is an assertion, not a convenience. This crate, `ring_stats`,
 ring_overflow/src/lib.rs:// property is only worth anything transitively: a `no_std` crate depending on a
-ring_stats/src/lib.rs:#![ no_std ]
-ring_types/src/lib.rs:#![ no_std ]
+ring_stats/src/lib.rs:#![no_std]
+ring_types/src/lib.rs:#![no_std]
 #![ no_std ]
 ```
 

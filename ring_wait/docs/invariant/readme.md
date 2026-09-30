@@ -33,8 +33,8 @@ grep -vE "^[[:space:]]*//" ring_wait/src/lib.rs | grep -E "WaitKind::None"
 Live output:
 
 ```
-    WaitKind::Park | WaitKind::None => None,
-    WaitKind::None => false,
+        WaitKind::Park | WaitKind::None => None,
+        WaitKind::None => false,
 ```
 
 | | Structural (001) | Behavioural (002) |

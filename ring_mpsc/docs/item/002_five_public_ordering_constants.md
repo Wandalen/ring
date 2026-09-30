@@ -62,7 +62,7 @@ state the invariant in checkable form.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_mpsc
-grep -c 'assert_eq!( ring_mpsc::' src/lib.rs
+grep -c 'assert_eq!(ring_mpsc::' src/lib.rs
 ```
 
 Live output:

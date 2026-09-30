@@ -159,7 +159,7 @@ unused_macro_rules = "warn"
 # table is inherited workspace-wide, and a crate cannot both inherit it and add
 # its own. Only ring_atomic, ring_cursor and ring_publish read the cfg — see
 # ring_atomic's module documentation on the seam.
-unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
 
 [workspace.lints.clippy]
 ```

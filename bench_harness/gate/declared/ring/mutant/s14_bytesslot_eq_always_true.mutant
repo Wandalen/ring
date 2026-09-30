@@ -21,11 +21,9 @@ round-failures: 1
 detector: slots_with_different_payloads_are_not_equal
 
 --- from
-  fn eq( &self, other : &Self ) -> bool
-  {
-    self.read() == other.read()
+    fn eq(&self, other: &Self) -> bool {
+        self.read() == other.read()
 --- to
-  fn eq( &self, other : &Self ) -> bool
-  {
-    true   // PROBE ONLY — G12, was `self.read() == other.read()`
+    fn eq(&self, other: &Self) -> bool {
+        true // PROBE ONLY — G12, was `self.read() == other.read()`
 --- end

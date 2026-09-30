@@ -91,17 +91,17 @@ grep -rE '^\s*(pub )?const [A-Z_]+ *: *(core::sync::atomic::)?Ordering' */src/*.
 Live output:
 
 ```
-ring_claim/src/lib.rs:const CLAIM_SUCCESS : core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
-ring_consume/src/lib.rs:const COMMIT : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
-ring_cursor/src/lib.rs:pub const GATING : Ordering = Ordering::Acquire;
-ring_debug/src/lib.rs:const OBSERVE : Ordering = Ordering::Acquire;
-ring_mpsc/src/lib.rs:pub const PUBLISH : Ordering = Ordering::Release;
-ring_mpsc/src/lib.rs:pub const OBSERVE : Ordering = Ordering::Acquire;
-ring_mpsc/src/lib.rs:pub const COMMIT : Ordering = Ordering::Release;
-ring_mpsc/src/lib.rs:pub const OWN : Ordering = Ordering::Relaxed;
-ring_publish/src/lib.rs:const PUBLISH : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
-ring_spsc/src/lib.rs:pub const OWN : Ordering = Ordering::Relaxed;
-ring_spsc/src/lib.rs:pub const HANDOFF : Ordering = Ordering::Release;
+ring_claim/src/lib.rs:const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
+ring_consume/src/lib.rs:const COMMIT: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+ring_cursor/src/lib.rs:pub const GATING: Ordering = Ordering::Acquire;
+ring_debug/src/lib.rs:const OBSERVE: Ordering = Ordering::Acquire;
+ring_mpsc/src/lib.rs:pub const PUBLISH: Ordering = Ordering::Release;
+ring_mpsc/src/lib.rs:pub const OBSERVE: Ordering = Ordering::Acquire;
+ring_mpsc/src/lib.rs:pub const COMMIT: Ordering = Ordering::Release;
+ring_mpsc/src/lib.rs:pub const OWN: Ordering = Ordering::Relaxed;
+ring_publish/src/lib.rs:const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+ring_spsc/src/lib.rs:pub const OWN: Ordering = Ordering::Relaxed;
+ring_spsc/src/lib.rs:pub const HANDOFF: Ordering = Ordering::Release;
 ```
 
 Eleven named ordering constants exist family-wide, in seven crates:

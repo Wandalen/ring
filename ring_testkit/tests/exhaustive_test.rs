@@ -48,8 +48,8 @@ const WRITTEN: usize = 0xABC;
 /// Constructed inside the model closure, never outside it: the cursors are
 /// loom atomics under this cfg and panic if touched with no model running.
 fn ends() -> (ring_core::Producer<'static, u32>, ring_core::Consumer<'static, u32>) {
-  let config = RingConfig::new(CAPACITY).expect("a power of two");
-  leak_ends(Ring::new(&config).expect("the default policy is accepted"))
+    let config = RingConfig::new(CAPACITY).expect("a power of two");
+    leak_ends(Ring::new(&config).expect("the default policy is accepted"))
 }
 
 /// **The reached-test.** No interleaving delivers a record that was never
@@ -60,30 +60,30 @@ fn ends() -> (ring_core::Producer<'static, u32>, ring_core::Consumer<'static, u3
 /// would multiply executions without adding an observation.
 #[test]
 fn no_interleaving_delivers_a_record_that_was_not_published() {
-  loom::model(|| {
-    let (mut producer, mut consumer) = ends();
+    loom::model(|| {
+        let (mut producer, mut consumer) = ends();
 
-    let producing = loom::thread::spawn(move || {
-      producer.try_push(0).expect("an empty ring admits one");
+        let producing = loom::thread::spawn(move || {
+            producer.try_push(0).expect("an empty ring admits one");
+        });
+
+        let draining = loom::thread::spawn(move || {
+            let mut received = Vec::new();
+            if let Some(record) = consumer.try_recv() {
+                received.push(record);
+            }
+
+            assert!(received.len() <= 1, "drained {} past the only push ever made", received.len());
+            assert_eq!(
+                audit_received(&received, 1),
+                Ok(()),
+                "a drain saw records that could not have been published: {received:?}",
+            );
+        });
+
+        producing.join().expect("the producer thread");
+        draining.join().expect("the drain thread");
     });
-
-    let draining = loom::thread::spawn(move || {
-      let mut received = Vec::new();
-      if let Some(record) = consumer.try_recv() {
-        received.push(record);
-      }
-
-      assert!(received.len() <= 1, "drained {} past the only push ever made", received.len());
-      assert_eq!(
-        audit_received(&received, 1),
-        Ok(()),
-        "a drain saw records that could not have been published: {received:?}",
-      );
-    });
-
-    producing.join().expect("the producer thread");
-    draining.join().expect("the drain thread");
-  });
 }
 
 /// A delivered record carries the write that preceded its publish.
@@ -94,36 +94,36 @@ fn no_interleaving_delivers_a_record_that_was_not_published() {
 /// exists to rule out, and the reason a sampled test cannot stand in for it.
 #[test]
 fn a_delivered_record_carries_the_write_that_preceded_it() {
-  loom::model(|| {
-    let (mut producer, mut consumer) = ends();
-    let payload = Arc::new(AtomicUsize::new(0));
+    loom::model(|| {
+        let (mut producer, mut consumer) = ends();
+        let payload = Arc::new(AtomicUsize::new(0));
 
-    let producing = loom::thread::spawn({
-      let payload = Arc::clone(&payload);
-      move || {
-        payload.store(WRITTEN, Ordering::Relaxed);
-        producer.try_push(0).expect("an empty ring admits one");
-      }
+        let producing = loom::thread::spawn({
+            let payload = Arc::clone(&payload);
+            move || {
+                payload.store(WRITTEN, Ordering::Relaxed);
+                producer.try_push(0).expect("an empty ring admits one");
+            }
+        });
+
+        let draining = loom::thread::spawn({
+            let payload = Arc::clone(&payload);
+            move || {
+                if consumer.try_recv().is_none() {
+                    return;
+                }
+
+                assert_eq!(
+                    payload.load(Ordering::Relaxed),
+                    WRITTEN,
+                    "a delivered record did not carry the write that preceded its publish",
+                );
+            }
+        });
+
+        producing.join().expect("the producer thread");
+        draining.join().expect("the drain thread");
     });
-
-    let draining = loom::thread::spawn({
-      let payload = Arc::clone(&payload);
-      move || {
-        if consumer.try_recv().is_none() {
-          return;
-        }
-
-        assert_eq!(
-          payload.load(Ordering::Relaxed),
-          WRITTEN,
-          "a delivered record did not carry the write that preceded its publish",
-        );
-      }
-    });
-
-    producing.join().expect("the producer thread");
-    draining.join().expect("the drain thread");
-  });
 }
 
 /// The consumer never observes further than the producer published.
@@ -135,22 +135,22 @@ fn a_delivered_record_carries_the_write_that_preceded_it() {
 /// value check on a ring whose slots happened to be zeroed.
 #[test]
 fn the_consumer_never_sees_further_than_the_producer_published() {
-  loom::model(|| {
-    let (mut producer, consumer) = ends();
+    loom::model(|| {
+        let (mut producer, consumer) = ends();
 
-    let producing = loom::thread::spawn(move || {
-      producer.try_push(0).expect("an empty ring admits one");
+        let producing = loom::thread::spawn(move || {
+            producer.try_push(0).expect("an empty ring admits one");
+        });
+
+        let observing = loom::thread::spawn(move || {
+            assert!(
+                consumer.len() <= 1,
+                "the ring reported {} records after one push",
+                consumer.len()
+            );
+        });
+
+        producing.join().expect("the producer thread");
+        observing.join().expect("the observing thread");
     });
-
-    let observing = loom::thread::spawn(move || {
-      assert!(
-        consumer.len() <= 1,
-        "the ring reported {} records after one push",
-        consumer.len()
-      );
-    });
-
-    producing.join().expect("the producer thread");
-    observing.join().expect("the observing thread");
-  });
 }

@@ -52,18 +52,15 @@ awk '/pub fn (may_claim|free_slots|pending)/,/^}/' ring_seqno/src/lib.rs | grep 
 Live output:
 
 ```
-pub fn may_claim( producer : Seq, consumer : Seq, capacity : Capacity ) -> bool
-{
-  consumer.distance_to( producer ) < capacity.get() as u64
+pub fn may_claim(producer: Seq, consumer: Seq, capacity: Capacity) -> bool {
+    consumer.distance_to(producer) < capacity.get() as u64
 }
-pub fn free_slots( producer : Seq, consumer : Seq, capacity : Capacity ) -> usize
-{
-  let in_flight = consumer.distance_to( producer );
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+pub fn free_slots(producer: Seq, consumer: Seq, capacity: Capacity) -> usize {
+    let in_flight = consumer.distance_to(producer);
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
 }
-pub fn pending( producer : Seq, consumer : Seq ) -> u64
-{
-  consumer.distance_to( producer )
+pub fn pending(producer: Seq, consumer: Seq) -> u64 {
+    consumer.distance_to(producer)
 }
 ```
 

@@ -34,9 +34,9 @@ command grep -E '^pub fn (publish_into|drain_from|recycle)' ring_event/src/lib.r
 Live output:
 
 ```
-pub fn publish_into< S, P >( slot : &mut S, payload : P ) -> Result< (), RingError >
-pub fn drain_from< S >( slot : &S ) -> Option< S::Out< '_ > >
-pub fn recycle< S >( slot : &mut S )
+pub fn publish_into<S, P>(slot: &mut S, payload: P) -> Result<(), RingError>
+pub fn drain_from<S>(slot: &S) -> Option<S::Out<'_>>
+pub fn recycle<S>(slot: &mut S)
 ```
 
 Three operations, three receivers: `&mut`, `&`, `&mut`. `ring_mpsc` and

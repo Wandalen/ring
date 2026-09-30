@@ -38,10 +38,10 @@ Live output:
 ///
 /// ```
 /// use ring_types::SlotIndex;
-/// assert_eq!( SlotIndex( 3 ).get(), 3 );
+/// assert_eq!(SlotIndex(3).get(), 3);
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-pub struct SlotIndex( pub usize );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SlotIndex(pub usize);
 ```
 
 Three lines apart: "never constructed by counting," then a doctest constructing
@@ -116,7 +116,7 @@ command grep '\.0\b' ring_index/src/lib.rs
 Live output:
 
 ```
-  SlotIndex( ( seq.0 as usize ) & capacity.mask() )
+    SlotIndex((seq.0 as usize) & capacity.mask())
 /// In a debug build, if `start.0 + ( count - 1 ) as u64` overflows `u64` for
 ```
 

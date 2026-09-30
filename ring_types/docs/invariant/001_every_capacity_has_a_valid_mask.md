@@ -76,7 +76,7 @@ command grep -c '&mut self' ring_types/src/capacity.rs
 Live output:
 
 ```
-pub struct Capacity( usize );
+pub struct Capacity(usize);
 0
 ```
 

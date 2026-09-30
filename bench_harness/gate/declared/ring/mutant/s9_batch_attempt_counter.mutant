@@ -18,11 +18,11 @@ round-failures: 1
 detector: push_batch_within_eats_one_record_per_attempt
 
 --- from
-      break;
-    }
-    attempt += 1;
+            break;
+        }
+        attempt += 1;
 --- to
-      break;
-    }
-    attempt *= 1;   // PROBE ONLY — G12, was `+=`
+            break;
+        }
+        attempt *= 1; // PROBE ONLY — G12, was `+=`
 --- end

@@ -213,7 +213,7 @@ command grep 'Four of six candidates honour this' ring_bench/src/lib.rs
 Live output:
 
 ```
-  /// Four of six candidates honour this: the mutex queue takes its lock once
+    /// Four of six candidates honour this: the mutex queue takes its lock once
 ```
 
 **Disposition:** applied — `with_batch`'s doc comment now names the split

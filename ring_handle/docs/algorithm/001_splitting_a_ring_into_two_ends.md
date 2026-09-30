@@ -219,9 +219,8 @@ Live output:
   NonNull    0
   unsafe     0
   -- what Split actually holds --
-pub struct Split< T >
-{
-  ring : Ring< T >,
+pub struct Split<T> {
+    ring: Ring<T>,
 }
 ```
 

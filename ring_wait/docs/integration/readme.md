@@ -68,9 +68,9 @@ Live output:
 
 ```
 //!    [`PARKING_CRATES`] and `docs/invariant/001`.
-/// assert!( ring_poll::PARKING_CRATES.contains( &"ring_wait" ) );
-/// assert!( !ring_poll::PARKING_CRATES.contains( &"ring_handle" ) );
-pub const PARKING_CRATES : [ &str; 3 ] = [ "ring_barrier", "ring_shutdown", "ring_wait" ];
+/// assert!(ring_poll::PARKING_CRATES.contains(&"ring_wait"));
+/// assert!(!ring_poll::PARKING_CRATES.contains(&"ring_handle"));
+pub const PARKING_CRATES: [&str; 3] = ["ring_barrier", "ring_shutdown", "ring_wait"];
 1  thread::sleep
 1  yield_now
 0  ::park
@@ -78,12 +78,12 @@ pub const PARKING_CRATES : [ &str; 3 ] = [ "ring_barrier", "ring_shutdown", "rin
 0  Condvar
 1  Duration
 0  Waker
-ring_poll/src/lib.rs:          core::hint::spin_loop();
-ring_poll/src/lib.rs:      core::hint::spin_loop();
-ring_poll/src/lib.rs:      core::hint::spin_loop();
+ring_poll/src/lib.rs:                    core::hint::spin_loop();
+ring_poll/src/lib.rs:            core::hint::spin_loop();
+ring_poll/src/lib.rs:            core::hint::spin_loop();
 ring_publish/src/lib.rs://! [`Publisher::publish`] loops on a `spin_loop` hint with no wait strategy and
-ring_publish/src/lib.rs:      core::hint::spin_loop();
-ring_wait/src/lib.rs:        core::hint::spin_loop();
+ring_publish/src/lib.rs:            core::hint::spin_loop();
+ring_wait/src/lib.rs:                core::hint::spin_loop();
 ```
 
 ### Findings Recorded Here

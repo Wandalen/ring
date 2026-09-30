@@ -33,7 +33,9 @@ round-failures: 6
 detector: on_barrier_never_fires_without_an_announcement
 
 --- from
-      FlushPolicy::OnBarrier if at_barrier => Some( FlushCause::Barrier ),
+            FlushPolicy::OnBarrier => {
+                if at_barrier {
 --- to
-      FlushPolicy::OnBarrier => Some( FlushCause::Barrier ),  // PROBE ONLY — G12
+            FlushPolicy::OnBarrier => {
+                if true { // PROBE ONLY — G12, was `if at_barrier`
 --- end

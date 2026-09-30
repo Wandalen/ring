@@ -28,10 +28,10 @@ Live output:
 
 ```
   -- the restriction: one declaration of the line size, family-wide --
-ring_align/src/lib.rs:pub const CACHE_LINE : usize = 64;
+ring_align/src/lib.rs:pub const CACHE_LINE: usize = 64;
   -- every bare 64 standing in for it, across the family --
-ring_cursor/src/lib.rs:  /// assert_eq!( cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary" );
-ring_mpsc/src/lib.rs:    claim.abs_diff( consume ) >= 64
+ring_cursor/src/lib.rs:    /// assert_eq!(cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary");
+ring_mpsc/src/lib.rs:        claim.abs_diff(consume) >= 64
 ```
 
 The first grep is the invariant and the second is its violations, in one block

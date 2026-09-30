@@ -153,7 +153,7 @@ grep -A3 "pub fn slowest" ring_gating/src/lib.rs | grep "ring_"
 Live output:
 
 ```
-    ring_cursor::slowest( &self.cursors )
+        ring_cursor::slowest(&self.cursors)
 ```
 
 **Disposition:** declined — the wrong-function citation is `ring_gating`'s own

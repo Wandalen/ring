@@ -149,12 +149,12 @@ command grep 'self\.bytes\|self\.len' ring_slot/src/lib.rs
 Live output:
 
 ```
-    self.len
-    self.len == 0
-    self.bytes[ ..payload.len() ].copy_from_slice( payload );
-    self.len = payload.len();
-    &self.bytes[ ..self.len ]
-    self.len = 0;
+        self.len
+        self.len == 0
+        self.bytes[..payload.len()].copy_from_slice(payload);
+        self.len = payload.len();
+        &self.bytes[..self.len]
+        self.len = 0;
 ```
 
 Six accesses. Exactly one writes the array — `copy_from_slice` over
@@ -233,7 +233,7 @@ reason ([`pitfall/002`](../pitfall/002_clear_forgets_it_does_not_erase.md) SL44)
 `zeroing_clear` is declined on the finding's own pricing: `N` bytes of writes per
 publish is the cost the fixed-array shape exists to avoid, and it would buy
 nothing the note does not already state.
-Now prints: `self.bytes[ ..payload.len() ].copy_from_slice( payload );`
+Now prints: `self.bytes[..payload.len()].copy_from_slice(payload);`
 
 ---
 

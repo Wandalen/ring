@@ -73,8 +73,8 @@ grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \
 Live output:
 
 ```
-    self.frontier().map_or( 0, | frontier | from.distance_to( frontier ) )
-    self.frontier().ok_or( RingError::Empty )
+        self.frontier().map_or(0, |frontier| from.distance_to(frontier))
+        self.frontier().ok_or(RingError::Empty)
 ```
 
 **Expected: exactly two hits** — `map_or( 0, … )` in `available` and

@@ -130,7 +130,7 @@ command grep 'is_power_of_two' ring_align/src/lib.rs
 Live output:
 
 ```
-  CACHE_LINE.is_power_of_two(),
+    CACHE_LINE.is_power_of_two(),
 ```
 
 **Disposition:** applied — added `const _ : () = assert!(

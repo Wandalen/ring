@@ -191,10 +191,10 @@ Live output:
   -- the one hit, in full --
 /// allocation hook in this suite to watch its buffer. It is guaranteed
   -- what the tests do count --
-use core::sync::atomic::{ AtomicUsize, Ordering };
-  static DROPPED : AtomicUsize = AtomicUsize::new( 0 );
-      DROPPED.fetch_add( 1, Ordering::Relaxed );
-  assert_eq!( DROPPED.load( Ordering::Relaxed ), 0, "nothing should have dropped yet" );
+use core::sync::atomic::{AtomicUsize, Ordering};
+    static DROPPED: AtomicUsize = AtomicUsize::new(0);
+            DROPPED.fetch_add(1, Ordering::Relaxed);
+    assert_eq!(DROPPED.load(Ordering::Relaxed), 0, "nothing should have dropped yet");
 ```
 
 No clock, no `Duration`, no allocation hook. The one atomic in the file counts

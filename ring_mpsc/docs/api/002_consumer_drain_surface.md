@@ -267,13 +267,13 @@ Live output:
 
 ```
   -- Consumer::is_empty, non-destructive contrast --
-  /// nothing. Contrast [`Batch::is_empty`]: `consumer.drain().is_empty()`
-  /// commits the whole drain as a side effect of taking it, discarding every
-  /// currently published record along the way, whereas `consumer.is_empty()`
+    /// nothing. Contrast [`Batch::is_empty`]: `consumer.drain().is_empty()`
+    /// commits the whole drain as a side effect of taking it, discarding every
+    /// currently published record along the way, whereas `consumer.is_empty()`
   -- Batch::is_empty, the destructive-drain contrast --
-  /// settled fact about a drain that already committed, not a live question
-  /// about the ring. `consumer.drain().is_empty()` discards every currently
-  /// published record as a side effect of the `drain()` call alone — for a
+    /// settled fact about a drain that already committed, not a live question
+    /// about the ring. `consumer.drain().is_empty()` discards every currently
+    /// published record as a side effect of the `drain()` call alone — for a
 ```
 
 **Disposition:** applied — both doc comments in `src/lib.rs` now cross-link

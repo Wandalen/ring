@@ -133,7 +133,7 @@ command grep -F 'names a multi-slot reservation this call never makes' src/lib.r
 Live output:
 
 ```
-  /// wording that names a multi-slot reservation this call never makes —
+    /// wording that names a multi-slot reservation this call never makes —
 ```
 
 **Disposition:** applied — `write`'s own `# Errors` doc comment no longer lets

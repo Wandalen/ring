@@ -9,10 +9,10 @@ description = "Single-producer single-consumer ring API"
 publish = true
 
 [dependencies]
-ring_store = { path = "../ring_store", version = "0.1.0" }
 ring_config = { path = "../ring_config", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 ring_slot = { path = "../ring_slot", version = "0.1.0" }
+ring_store = { path = "../ring_store", version = "0.1.0" }
 ring_types = { path = "../ring_types", version = "0.1.0" }
 
 # `tests/spsc_test.rs`'s `exhaustive` module. Only under

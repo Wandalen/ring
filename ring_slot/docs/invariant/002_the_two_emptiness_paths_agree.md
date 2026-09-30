@@ -175,13 +175,12 @@ command grep -m1 -B1 -A6 -F 'fn a_fresh_typed_slot_is_empty()' ring_slot/tests/s
 Live output:
 
 ```
-#[ test ]
-fn a_fresh_typed_slot_is_empty()
-{
-  let slot = TypedSlot::< u32 >::empty();
-  assert!( slot.is_empty() );
-  assert_eq!( slot.get(), None );
-  assert!( TypedSlot::< String >::default().is_empty() );
+#[test]
+fn a_fresh_typed_slot_is_empty() {
+    let slot = TypedSlot::<u32>::empty();
+    assert!(slot.is_empty());
+    assert_eq!(slot.get(), None);
+    assert!(TypedSlot::<String>::default().is_empty());
 }
 ```
 

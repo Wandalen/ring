@@ -148,7 +148,7 @@ command grep -F 'cannot reach this return value today' src/lib.rs
 Live output:
 
 ```
-  /// and cannot reach this return value today. The one reader that binds it now
+    /// and cannot reach this return value today. The one reader that binds it now
 ```
 
 **Disposition:** applied — `set`'s doc comment no longer sends a reader to

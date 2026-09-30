@@ -32,21 +32,21 @@ Live output:
 
 ```
   -- the family newtypes, and whether the field is public --
-pub struct AtomicSeq( AtomicU64 );
-pub struct Budget( usize );
-pub struct Capacity( usize );
-pub struct PaddedCursor( CacheAligned< AtomicSeq > );
-pub struct Seq( pub u64 );
-pub struct SlotIndex( pub usize );
+pub struct AtomicSeq(AtomicU64);
+pub struct Budget(usize);
+pub struct Capacity(usize);
+pub struct PaddedCursor(CacheAligned<AtomicSeq>);
+pub struct Seq(pub u64);
+pub struct SlotIndex(pub usize);
   -- the one the pattern is named for, which the shape above does not match --
-#[ derive( Debug, Clone, Copy, Default, PartialEq, Eq ) ]
-#[ repr( align( 64 ) ) ]
-pub struct CacheAligned< T >( T );
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[repr(align(64))]
+pub struct CacheAligned<T>(T);
   -- declared owners of the line size, family-wide --
 ring_align/src/lib.rs:1
   -- copies the owner does not prevent --
-ring_mpsc/src/lib.rs:    claim.abs_diff( consume ) >= 64
-ring_cursor/src/lib.rs:  /// assert_eq!( cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary" );
+ring_mpsc/src/lib.rs:        claim.abs_diff(consume) >= 64
+ring_cursor/src/lib.rs:    /// assert_eq!(cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary");
 ```
 
 The second command is not a convenience: the first pattern is the family's

@@ -82,26 +82,26 @@ grep 'may_claim\|free_slots\|laps_between' tests/seq_test.rs | grep assert
 Live output:
 
 ```
-  assert_eq!( laps_between( Seq( 0 ), Seq( 0 ), c ), 0 );
-  assert_eq!( laps_between( Seq( 0 ), Seq( 7 ), c ), 0 );
-  assert_eq!( laps_between( Seq( 0 ), Seq( 8 ), c ), 1 );
-  assert_eq!( laps_between( Seq( 0 ), Seq( 15 ), c ), 1 );
-  assert_eq!( laps_between( Seq( 0 ), Seq( 16 ), c ), 2 );
-  assert_eq!( laps_between( Seq( 1_000_000 ), Seq( 1_000_008 ), c ), 1 );
-  assert_eq!( laps_between( Seq( 1_000_001 ), Seq( 1_000_008 ), c ), 0 );
-  assert_eq!( laps_between( Seq( 100 ), Seq( 4 ), cap( 8 ) ), 0 );
-  assert!( may_claim( Seq( 0 ), Seq( 0 ), c ) );
-  assert!( may_claim( Seq( 3 ), Seq( 0 ), c ) );
-  assert!( !may_claim( Seq( 4 ), Seq( 0 ), c ), "one full lap ahead must be refused" );
-  assert!( !may_claim( Seq( 5 ), Seq( 0 ), c ), "beyond a lap must be refused" );
-  assert!( may_claim( Seq( 4 ), Seq( 1 ), c ) );
-  assert_eq!( free_slots( Seq( 0 ), Seq( 0 ), c ), 4 );
-  assert_eq!( free_slots( Seq( 1 ), Seq( 0 ), c ), 3 );
-  assert_eq!( free_slots( Seq( 4 ), Seq( 0 ), c ), 0 );
-  assert_eq!( free_slots( Seq( 100 ), Seq( 0 ), c ), 0, "saturates rather than wrapping" );
-  assert_eq!( laps_between( consumer, producer, c ), 99 );
-  assert!( !may_claim( producer, consumer, c ) );
-  assert_eq!( free_slots( producer, consumer, c ), 0 );
+    assert_eq!(laps_between(Seq(0), Seq(0), c), 0);
+    assert_eq!(laps_between(Seq(0), Seq(7), c), 0);
+    assert_eq!(laps_between(Seq(0), Seq(8), c), 1);
+    assert_eq!(laps_between(Seq(0), Seq(15), c), 1);
+    assert_eq!(laps_between(Seq(0), Seq(16), c), 2);
+    assert_eq!(laps_between(Seq(1_000_000), Seq(1_000_008), c), 1);
+    assert_eq!(laps_between(Seq(1_000_001), Seq(1_000_008), c), 0);
+    assert_eq!(laps_between(Seq(100), Seq(4), cap(8)), 0);
+    assert!(may_claim(Seq(0), Seq(0), c));
+    assert!(may_claim(Seq(3), Seq(0), c));
+    assert!(!may_claim(Seq(4), Seq(0), c), "one full lap ahead must be refused");
+    assert!(!may_claim(Seq(5), Seq(0), c), "beyond a lap must be refused");
+    assert!(may_claim(Seq(4), Seq(1), c));
+    assert_eq!(free_slots(Seq(0), Seq(0), c), 4);
+    assert_eq!(free_slots(Seq(1), Seq(0), c), 3);
+    assert_eq!(free_slots(Seq(4), Seq(0), c), 0);
+    assert_eq!(free_slots(Seq(100), Seq(0), c), 0, "saturates rather than wrapping");
+    assert_eq!(laps_between(consumer, producer, c), 99);
+    assert!(!may_claim(producer, consumer, c));
+    assert_eq!(free_slots(producer, consumer, c), 0);
 ```
 
 | Edge | Pinned by | Strength |

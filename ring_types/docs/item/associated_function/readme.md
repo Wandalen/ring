@@ -73,15 +73,15 @@ command grep -rn '\.get()' ring_*/src | command grep -v ring_types/ | command gr
 Live output:
 
 ```
-ring_cursor/src/lib.rs:    self.0.get().load( order )
-ring_cursor/src/lib.rs:    self.0.get().store( value, order );
-ring_cursor/src/lib.rs:    self.0.get().fetch_add( n, order )
-ring_cursor/src/lib.rs:    self.0.get().compare_exchange( current, new, success, failure )
-ring_event/src/lib.rs:    self.get()
-ring_mpsc/src/lib.rs:    unsafe { &*self.slots.at( seq ).get() }
-ring_mpsc/src/lib.rs:    unsafe { &mut *self.slots.at( seq ).get() }
-ring_spsc/src/lib.rs:    unsafe { &*self.slots.at( seq ).get() }
-ring_spsc/src/lib.rs:    unsafe { &mut *self.slots.at( seq ).get() }
+ring_cursor/src/lib.rs:        self.0.get().load(order)
+ring_cursor/src/lib.rs:        self.0.get().store(value, order);
+ring_cursor/src/lib.rs:        self.0.get().fetch_add(n, order)
+ring_cursor/src/lib.rs:        self.0.get().compare_exchange(current, new, success, failure)
+ring_event/src/lib.rs:        self.get()
+ring_mpsc/src/lib.rs:        unsafe { &*self.slots.at(seq).get() }
+ring_mpsc/src/lib.rs:        unsafe { &mut *self.slots.at(seq).get() }
+ring_spsc/src/lib.rs:        unsafe { &*self.slots.at(seq).get() }
+ring_spsc/src/lib.rs:        unsafe { &mut *self.slots.at(seq).get() }
 ```
 
 lists exactly those nine. Likewise `.next()` matches `Iterator::next` at

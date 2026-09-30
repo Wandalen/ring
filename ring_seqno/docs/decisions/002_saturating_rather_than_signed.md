@@ -222,7 +222,7 @@ Live output:
 /// as "room to publish" (see `docs/decisions/002_saturating_rather_than_signed.md`),
 /// so a caller that swapped its arguments here gets a plausible, permissive
 /// answer, not a visibly broken one.
-#[ test ]
+#[test]
 ```
 
 **Disposition:** applied — `laps_backward_read_zero`'s doc comment in
@@ -255,14 +255,13 @@ sed -n '/^pub fn free_slots/,/^}$/p' ring_seqno/src/lib.rs
 Live output:
 
 ```
-pub fn free_slots( producer : Seq, consumer : Seq, capacity : Capacity ) -> usize
-{
-  let in_flight = consumer.distance_to( producer );
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+pub fn free_slots(producer: Seq, consumer: Seq, capacity: Capacity) -> usize {
+    let in_flight = consumer.distance_to(producer);
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
 }
 ```
 
-**Disposition:** applied — `free_slots` now widens `capacity.get()` to `u64` before subtracting and narrows only the already-`capacity`-bounded result afterward, so both readings compute in `u64` space and the type mismatch this finding named is gone. Now prints: `( capacity.get() as u64 ).saturating_sub( in_flight ) as usize`
+**Disposition:** applied — `free_slots` now widens `capacity.get()` to `u64` before subtracting and narrows only the already-`capacity`-bounded result afterward, so both readings compute in `u64` space and the type mismatch this finding named is gone. Now prints: `(capacity.get() as u64).saturating_sub(in_flight) as usize`
 
 ---
 

@@ -159,21 +159,21 @@ Live output:
 ```
   none
 escapes across the family: 84 in 15 file(s)
-  /// In a debug build, if `start.0 + count` overflows `u64` — unreachable via
-    Seq( self.start.0 + self.count as u64 )
-    seq.0 >= self.start.0 && seq.0 < self.end().0
-    ( self.start.0..self.end().0 ).map( Seq )
-      && self.start.0 < other.end().0 && other.start.0 < self.end().0
+    /// In a debug build, if `start.0 + count` overflows `u64` — unreachable via
+        Seq(self.start.0 + self.count as u64)
+        seq.0 >= self.start.0 && seq.0 < self.end().0
+        (self.start.0..self.end().0).map(Seq)
+            && self.start.0 < other.end().0
+            && other.start.0 < self.end().0
   error[E0015]: cannot call non-const operator in constant functions
   note: impl defined here, but it is not `const`
-  pub const fn end( &self ) -> Seq
-  {
-    Seq( self.start.0 + self.count as u64 )
-  }
-  pub const fn advanced_by( self, n : u64 ) -> Self
-  {
-    Self( self.0 + n )
-  }
+    pub const fn end(&self) -> Seq {
+        Seq(self.start.0 + self.count as u64)
+    }
+
+    pub const fn advanced_by(self, n: u64) -> Self {
+        Self(self.0 + n)
+    }
 ```
 
 `Seq` implements no `From< Seq > for u64`, no `Deref`, no `Into`. The tuple field

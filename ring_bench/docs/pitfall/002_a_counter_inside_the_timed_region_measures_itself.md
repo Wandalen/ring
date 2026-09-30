@@ -196,9 +196,9 @@ Live output:
   record_wait calls in its suite        : 0
   ring_*/src callers, less its definition : 0
 --- the two assertions, and what the test runs ---
-    let outcome = run( Candidate::MutexQueue, &workload ).unwrap();
-    assert_eq!( stats.in_flight(), 0 );
-    assert_eq!( stats.wait_nanos(), 0 );
+      let outcome = run(Candidate::MutexQueue, &workload).unwrap();
+      assert_eq!(stats.in_flight(), 0);
+      assert_eq!(stats.wait_nanos(), 0);
   candidate variants exercised : Candidate::MutexQueue 
   entries in Candidate::ALL    : 6 5 
 ```

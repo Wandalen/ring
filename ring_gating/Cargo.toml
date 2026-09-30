@@ -9,9 +9,9 @@ description = "Producer gating so it never laps the slowest consumer"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 ring_seqno = { path = "../ring_seqno", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [lints]
 workspace = true

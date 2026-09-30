@@ -72,8 +72,8 @@ done
 Live output:
 
 ```
-ring_spsc   unsafe impl< S : Send > Sync for Ring< S > {}
-ring_mpsc   unsafe impl< S : Send > Sync for Ring< S > {}
+ring_spsc   unsafe impl<S: Send> Sync for Ring<S> {}
+ring_mpsc   unsafe impl<S: Send> Sync for Ring<S> {}
 ```
 
 `ring_core`'s `ProducerInner` has one variant per backend and hands out a uniform

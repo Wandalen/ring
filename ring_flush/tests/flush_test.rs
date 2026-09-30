@@ -59,8 +59,8 @@ use ring_types::{OverflowPolicy, RingError};
 /// full push returns `Ok` having silently discarded the record — which would
 /// make `FlushOutcome::Rejected` unreachable and the capacity check untestable.
 fn ring(slots: usize) -> Ring<u32> {
-  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
-  Ring::new(&config).unwrap()
+    let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
+    Ring::new(&config).unwrap()
 }
 
 /// Bind `policy` over a `staged`-record buffer, with a log, onto `$ring`.
@@ -68,12 +68,12 @@ fn ring(slots: usize) -> Ring<u32> {
 /// `$ends` is assigned rather than declared here because it must outlive the
 /// handles it hands out, and a `let` inside the macro's own block would not.
 macro_rules! flusher {
-  ( $ring : ident, $ends : ident, $staged : expr, $policy : expr ) => {{
-    $ends = $ring.ends();
-    let (producer, consumer) = $ends.split();
-    let buffer = TlsBuffer::<u32>::with_capacity($staged);
-    (Flusher::new(buffer, producer, $policy).unwrap().with_log(), consumer)
-  }};
+    ($ring:ident, $ends:ident, $staged:expr, $policy:expr) => {{
+        $ends = $ring.ends();
+        let (producer, consumer) = $ends.split();
+        let buffer = TlsBuffer::<u32>::with_capacity($staged);
+        (Flusher::new(buffer, producer, $policy).unwrap().with_log(), consumer)
+    }};
 }
 
 // ---------------------------------------------------------------- OnFull
@@ -82,31 +82,28 @@ macro_rules! flusher {
 /// the entry names `Full` as the cause.
 #[test]
 fn on_full_fires_when_the_buffer_is_full() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 4, FlushPolicy::OnFull);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 4, FlushPolicy::OnFull);
 
-  for i in 0..3u32 {
-    flusher.append(i).unwrap();
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "fired below capacity");
-  }
-  assert!(
-    flusher.log().unwrap().is_empty(),
-    "three drives below the trigger logged something"
-  );
+    for i in 0..3u32 {
+        flusher.append(i).unwrap();
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "fired below capacity");
+    }
+    assert!(flusher.log().unwrap().is_empty(), "three drives below the trigger logged something");
 
-  flusher.append(3).unwrap();
-  assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
+    flusher.append(3).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1, "exactly one flush");
-  assert_eq!(entries[0].cause, FlushCause::Full);
-  assert_eq!(entries[0].policy, FlushPolicy::OnFull);
-  assert_eq!(entries[0].count(), 4);
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1, "exactly one flush");
+    assert_eq!(entries[0].cause, FlushCause::Full);
+    assert_eq!(entries[0].policy, FlushPolicy::OnFull);
+    assert_eq!(entries[0].count(), 4);
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 4);
-  assert_eq!(landed, vec![0, 1, 2, 3], "staging order survived the flush");
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 4);
+    assert_eq!(landed, vec![0, 1, 2, 3], "staging order survived the flush");
 }
 
 /// M2 for `OnFull`: the other two policies' conditions do not fire it.
@@ -115,20 +112,17 @@ fn on_full_fires_when_the_buffer_is_full() {
 /// pass through — all below capacity. Zero entries.
 #[test]
 fn on_full_ignores_barriers_and_counts() {
-  let mut r = ring(64);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnFull);
+    let mut r = ring(64);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnFull);
 
-  for i in 0..7u32 {
-    flusher.append(i).unwrap();
-    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::NotTriggered);
-  }
+    for i in 0..7u32 {
+        flusher.append(i).unwrap();
+        assert_eq!(flusher.drive_at_barrier(), FlushOutcome::NotTriggered);
+    }
 
-  assert!(
-    flusher.log().unwrap().is_empty(),
-    "OnFull fired for a reason that is not fullness"
-  );
-  assert_eq!(flusher.staged(), 7, "records left the buffer without a flush");
+    assert!(flusher.log().unwrap().is_empty(), "OnFull fired for a reason that is not fullness");
+    assert_eq!(flusher.staged(), 7, "records left the buffer without a flush");
 }
 
 // -------------------------------------------------------------- OnBarrier
@@ -137,23 +131,23 @@ fn on_full_ignores_barriers_and_counts() {
 /// `drive_at_barrier`.
 #[test]
 fn on_barrier_fires_only_when_a_barrier_is_announced() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  flusher.append(10).unwrap();
-  flusher.append(11).unwrap();
-  assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "a plain drive fired OnBarrier");
+    flusher.append(10).unwrap();
+    flusher.append(11).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "a plain drive fired OnBarrier");
 
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 2 });
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 2 });
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1);
-  assert_eq!(entries[0].cause, FlushCause::Barrier);
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].cause, FlushCause::Barrier);
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 2);
-  assert_eq!(landed, vec![10, 11]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 2);
+    assert_eq!(landed, vec![10, 11]);
 }
 
 /// M2 for `OnBarrier` — **the measurement the whole design rests on.**
@@ -176,26 +170,26 @@ fn on_barrier_fires_only_when_a_barrier_is_announced() {
 /// a point nobody chose.
 #[test]
 fn on_barrier_never_fires_without_an_announcement() {
-  let mut r = ring(64);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBarrier);
+    let mut r = ring(64);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBarrier);
 
-  for i in 0..4u32 {
-    flusher.append(i).unwrap();
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
-  }
+    for i in 0..4u32 {
+        flusher.append(i).unwrap();
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
+    }
 
-  assert_eq!(flusher.append(4), Err(RingError::Full), "a full buffer accepted a record");
+    assert_eq!(flusher.append(4), Err(RingError::Full), "a full buffer accepted a record");
 
-  for _ in 0..20 {
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
-  }
+    for _ in 0..20 {
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
+    }
 
-  assert!(
-    flusher.log().unwrap().is_empty(),
-    "OnBarrier fired without an announcement — the failure this test exists for"
-  );
-  assert_eq!(flusher.staged(), 4);
+    assert!(
+        flusher.log().unwrap().is_empty(),
+        "OnBarrier fired without an announcement — the failure this test exists for"
+    );
+    assert_eq!(flusher.staged(), 4);
 }
 
 // --------------------------------------------------------------- OnBatch
@@ -203,26 +197,26 @@ fn on_barrier_never_fires_without_an_announcement() {
 /// M1 and M5 for `OnBatch( n )`: nothing at `n - 1`, exactly one at `n`.
 #[test]
 fn on_batch_fires_at_the_boundary_and_not_before() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(3));
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(3));
 
-  flusher.append(0).unwrap();
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "fired at n-1");
-  assert!(flusher.log().unwrap().is_empty());
+    flusher.append(0).unwrap();
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "fired at n-1");
+    assert!(flusher.log().unwrap().is_empty());
 
-  flusher.append(2).unwrap();
-  assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 3 });
+    flusher.append(2).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 3 });
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1, "exactly one entry at n");
-  assert_eq!(entries[0].cause, FlushCause::Batch);
-  assert_eq!(entries[0].policy, FlushPolicy::OnBatch(3));
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1, "exactly one entry at n");
+    assert_eq!(entries[0].cause, FlushCause::Batch);
+    assert_eq!(entries[0].policy, FlushPolicy::OnBatch(3));
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 3);
-  assert_eq!(landed, vec![0, 1, 2]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 3);
+    assert_eq!(landed, vec![0, 1, 2]);
 }
 
 /// M2 for `OnBatch`: a barrier does not fire it, however often announced.
@@ -241,18 +235,18 @@ fn on_batch_fires_at_the_boundary_and_not_before() {
 /// violate — green forever, and worth nothing.
 #[test]
 fn on_batch_ignores_barriers() {
-  let mut r = ring(64);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(4));
+    let mut r = ring(64);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(4));
 
-  for i in 0..3u32 {
-    flusher.append(i).unwrap();
-    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::NotTriggered);
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
-  }
+    for i in 0..3u32 {
+        flusher.append(i).unwrap();
+        assert_eq!(flusher.drive_at_barrier(), FlushOutcome::NotTriggered);
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
+    }
 
-  assert!(flusher.log().unwrap().is_empty(), "OnBatch fired for a barrier");
-  assert_eq!(flusher.staged(), 3);
+    assert!(flusher.log().unwrap().is_empty(), "OnBatch fired for a barrier");
+    assert_eq!(flusher.staged(), 3);
 }
 
 /// The batch trigger fires no later than the buffer fills — the property that
@@ -264,30 +258,30 @@ fn on_batch_ignores_barriers() {
 /// never have been full at any point where the trigger had not already held.
 #[test]
 fn the_batch_trigger_arrives_no_later_than_the_buffer_fills() {
-  const CAPACITY: usize = 6;
+    const CAPACITY: usize = 6;
 
-  for n in 1..=CAPACITY {
-    let mut r = ring(64);
-    let mut ends;
-    let (mut flusher, _consumer) = flusher!(r, ends, CAPACITY, FlushPolicy::OnBatch(n));
+    for n in 1..=CAPACITY {
+        let mut r = ring(64);
+        let mut ends;
+        let (mut flusher, _consumer) = flusher!(r, ends, CAPACITY, FlushPolicy::OnBatch(n));
 
-    for appended in 1..=n {
-      assert!(
-        flusher.staged() < CAPACITY,
-        "n={n}: the buffer filled before the batch trigger held"
-      );
-      flusher.append(appended as u32).unwrap();
+        for appended in 1..=n {
+            assert!(
+                flusher.staged() < CAPACITY,
+                "n={n}: the buffer filled before the batch trigger held"
+            );
+            flusher.append(appended as u32).unwrap();
 
-      let outcome = flusher.drive();
-      if appended < n {
-        assert_eq!(outcome, FlushOutcome::NotTriggered, "n={n} fired at {appended}");
-      } else {
-        assert_eq!(outcome, FlushOutcome::Flushed { count: n }, "n={n} did not fire at n");
-      }
+            let outcome = flusher.drive();
+            if appended < n {
+                assert_eq!(outcome, FlushOutcome::NotTriggered, "n={n} fired at {appended}");
+            } else {
+                assert_eq!(outcome, FlushOutcome::Flushed { count: n }, "n={n} did not fire at n");
+            }
+        }
+
+        assert_eq!(flusher.staged(), 0, "n={n}: the flush left records staged");
     }
-
-    assert_eq!(flusher.staged(), 0, "n={n}: the flush left records staged");
-  }
 }
 
 /// Overshoot — P4 of [`docs/state_machine/002`].
@@ -301,30 +295,26 @@ fn the_batch_trigger_arrives_no_later_than_the_buffer_fills() {
 /// does not bound it. `n` sets a floor on batch size, never a ceiling.
 #[test]
 fn an_overshooting_batch_publishes_everything_staged_in_one_claim() {
-  let mut r = ring(32);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 16, FlushPolicy::OnBatch(4));
+    let mut r = ring(32);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 16, FlushPolicy::OnBatch(4));
 
-  // Eight appends with no drive between them — twice the batch size.
-  for i in 0..8u32 {
-    flusher.append(i).unwrap();
-  }
-  assert_eq!(flusher.staged(), 8, "an append fired without a drive");
+    // Eight appends with no drive between them — twice the batch size.
+    for i in 0..8u32 {
+        flusher.append(i).unwrap();
+    }
+    assert_eq!(flusher.staged(), 8, "an append fired without a drive");
 
-  assert_eq!(
-    flusher.drive(),
-    FlushOutcome::Flushed { count: 8 },
-    "the flush was capped at n"
-  );
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 8 }, "the flush was capped at n");
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1, "2n records published as more than one batch");
-  assert_eq!(entries[0].count(), 8);
-  assert_eq!(entries[0].cause, FlushCause::Batch);
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1, "2n records published as more than one batch");
+    assert_eq!(entries[0].count(), 8);
+    assert_eq!(entries[0].cause, FlushCause::Batch);
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 8);
-  assert_eq!(landed, vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 8);
+    assert_eq!(landed, vec![0, 1, 2, 3, 4, 5, 6, 7]);
 }
 
 /// A rejected flush leaves the policy armed — P6 of [`docs/state_machine/002`].
@@ -341,61 +331,53 @@ fn an_overshooting_batch_publishes_everything_staged_in_one_claim() {
 /// policy is still armed. This drives.
 #[test]
 fn a_rejected_flush_leaves_the_policy_armed() {
-  // A 4-slot ring with 3 slots already occupied by another writer, so the
-  // refusal comes from free capacity rather than from total capacity — which
-  // is what makes it recoverable without rebuilding anything.
-  let mut r = ring(4);
-  let mut ends = r.ends();
-  let (mut producer, mut consumer) = ends.split();
-  for i in 100..103u32 {
-    producer.try_push(i).unwrap();
-  }
+    // A 4-slot ring with 3 slots already occupied by another writer, so the
+    // refusal comes from free capacity rather than from total capacity — which
+    // is what makes it recoverable without rebuilding anything.
+    let mut r = ring(4);
+    let mut ends = r.ends();
+    let (mut producer, mut consumer) = ends.split();
+    for i in 100..103u32 {
+        producer.try_push(i).unwrap();
+    }
 
-  let mut buffer = TlsBuffer::with_capacity(8);
-  for i in 0..4u32 {
-    buffer.push(i).unwrap();
-  }
-  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBatch(4)).unwrap().with_log();
+    let mut buffer = TlsBuffer::with_capacity(8);
+    for i in 0..4u32 {
+        buffer.push(i).unwrap();
+    }
+    let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBatch(4)).unwrap().with_log();
 
-  assert_eq!(
-    flusher.drive(),
-    FlushOutcome::Rejected { staged: 4 },
-    "1 free slot took 4 records"
-  );
-  assert_eq!(flusher.staged(), 4);
+    assert_eq!(flusher.drive(), FlushOutcome::Rejected { staged: 4 }, "1 free slot took 4 records");
+    assert_eq!(flusher.staged(), 4);
 
-  // Same trigger, same refusal — the policy did not disarm itself on a rejection.
-  assert_eq!(flusher.drive(), FlushOutcome::Rejected { staged: 4 });
-  assert_eq!(flusher.staged(), 4);
+    // Same trigger, same refusal — the policy did not disarm itself on a rejection.
+    assert_eq!(flusher.drive(), FlushOutcome::Rejected { staged: 4 });
+    assert_eq!(flusher.staged(), 4);
 
-  // Nothing of ours reached the ring; only the other writer's records are there.
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 3);
-  assert_eq!(landed, vec![100, 101, 102], "a rejected flush published anyway");
+    // Nothing of ours reached the ring; only the other writer's records are there.
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 3);
+    assert_eq!(landed, vec![100, 101, 102], "a rejected flush published anyway");
 
-  // Room now exists, and the still-armed policy fires on the very next drive
-  // with the same records, still as one batch.
-  assert_eq!(
-    flusher.drive(),
-    FlushOutcome::Flushed { count: 4 },
-    "the retry lost the trigger"
-  );
-  assert_eq!(flusher.staged(), 0);
+    // Room now exists, and the still-armed policy fires on the very next drive
+    // with the same records, still as one batch.
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 }, "the retry lost the trigger");
+    assert_eq!(flusher.staged(), 0);
 
-  let mut arrived = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut arrived), 4);
-  assert_eq!(arrived, vec![0, 1, 2, 3], "the records changed across the retry");
+    let mut arrived = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut arrived), 4);
+    assert_eq!(arrived, vec![0, 1, 2, 3], "the records changed across the retry");
 
-  // Two refusals and one success, all three recorded and distinguishable.
-  let causes: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.outcome).collect();
-  assert_eq!(
-    causes,
-    vec![
-      FlushOutcome::Rejected { staged: 4 },
-      FlushOutcome::Rejected { staged: 4 },
-      FlushOutcome::Flushed { count: 4 },
-    ]
-  );
+    // Two refusals and one success, all three recorded and distinguishable.
+    let causes: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.outcome).collect();
+    assert_eq!(
+        causes,
+        vec![
+            FlushOutcome::Rejected { staged: 4 },
+            FlushOutcome::Rejected { staged: 4 },
+            FlushOutcome::Flushed { count: 4 },
+        ]
+    );
 }
 
 /// Dropping a driver with records staged publishes **nothing** — Z5 of
@@ -414,26 +396,22 @@ fn a_rejected_flush_leaves_the_policy_armed() {
 /// might refuse, with no caller left to hear about it.
 #[test]
 fn dropping_a_driver_with_records_staged_publishes_nothing() {
-  let mut r = ring(16);
-  let mut ends = r.ends();
-  let (producer, mut consumer) = ends.split();
+    let mut r = ring(16);
+    let mut ends = r.ends();
+    let (producer, mut consumer) = ends.split();
 
-  {
-    let mut buffer = TlsBuffer::with_capacity(8);
-    for i in 0..5u32 {
-      buffer.push(i).unwrap();
-    }
-    let flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
-    assert_eq!(flusher.staged(), 5);
-  } // dropped here, with five records staged and no final drain
+    {
+        let mut buffer = TlsBuffer::with_capacity(8);
+        for i in 0..5u32 {
+            buffer.push(i).unwrap();
+        }
+        let flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
+        assert_eq!(flusher.staged(), 5);
+    } // dropped here, with five records staged and no final drain
 
-  assert_eq!(
-    consumer.len(),
-    0,
-    "a drop published — the publication point is not the caller's"
-  );
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 0);
+    assert_eq!(consumer.len(), 0, "a drop published — the publication point is not the caller's");
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 0);
 }
 
 /// Batches are consecutive rather than cumulative — an `OnBatch( 2 )` policy
@@ -448,24 +426,24 @@ fn dropping_a_driver_with_records_staged_publishes_nothing() {
 /// deletion unnoticed.
 #[test]
 fn batches_are_consecutive_not_cumulative() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(2));
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(2));
 
-  for round in 0..3u32 {
-    flusher.append(round * 2).unwrap();
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "round {round} fired at 1");
-    flusher.append(round * 2 + 1).unwrap();
-    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 2 });
-  }
+    for round in 0..3u32 {
+        flusher.append(round * 2).unwrap();
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "round {round} fired at 1");
+        flusher.append(round * 2 + 1).unwrap();
+        assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 2 });
+    }
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 3, "three batches, three entries");
-  assert!(entries.iter().all(|e| e.cause == FlushCause::Batch && e.count() == 2));
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 3, "three batches, three entries");
+    assert!(entries.iter().all(|e| e.cause == FlushCause::Batch && e.count() == 2));
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 6);
-  assert_eq!(landed, vec![0, 1, 2, 3, 4, 5]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 6);
+    assert_eq!(landed, vec![0, 1, 2, 3, 4, 5]);
 }
 
 // ------------------------------------------------------- outcomes and log
@@ -477,26 +455,26 @@ fn batches_are_consecutive_not_cumulative() {
 /// the causes are compared against the policies that produced them.
 #[test]
 fn every_entry_names_its_own_policys_trigger() {
-  let cases = [
-    (FlushPolicy::OnFull, FlushCause::Full),
-    (FlushPolicy::OnBarrier, FlushCause::Barrier),
-    (FlushPolicy::OnBatch(2), FlushCause::Batch),
-  ];
+    let cases = [
+        (FlushPolicy::OnFull, FlushCause::Full),
+        (FlushPolicy::OnBarrier, FlushCause::Barrier),
+        (FlushPolicy::OnBatch(2), FlushCause::Batch),
+    ];
 
-  for (policy, expected) in cases {
-    let mut r = ring(16);
-    let mut ends;
-    let (mut flusher, _consumer) = flusher!(r, ends, 2, policy);
+    for (policy, expected) in cases {
+        let mut r = ring(16);
+        let mut ends;
+        let (mut flusher, _consumer) = flusher!(r, ends, 2, policy);
 
-    flusher.append(0).unwrap();
-    flusher.append(1).unwrap();
-    let outcome = flusher.drive_at_barrier();
-    assert_eq!(outcome, FlushOutcome::Flushed { count: 2 }, "{policy:?} did not fire");
+        flusher.append(0).unwrap();
+        flusher.append(1).unwrap();
+        let outcome = flusher.drive_at_barrier();
+        assert_eq!(outcome, FlushOutcome::Flushed { count: 2 }, "{policy:?} did not fire");
 
-    let entries = flusher.log().unwrap().entries();
-    assert_eq!(entries.len(), 1, "{policy:?}");
-    assert_eq!(entries[0].cause, expected, "{policy:?} fired for the wrong reason");
-  }
+        let entries = flusher.log().unwrap().entries();
+        assert_eq!(entries.len(), 1, "{policy:?}");
+        assert_eq!(entries[0].cause, expected, "{policy:?} fired for the wrong reason");
+    }
 }
 
 /// M4 — the log entry and the returned outcome agree on every drive call.
@@ -507,123 +485,123 @@ fn every_entry_names_its_own_policys_trigger() {
 /// other test in this file.
 #[test]
 fn the_log_agrees_with_every_outcome_it_recorded() {
-  let mut r = ring(4);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(4);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  let mut fired = Vec::new();
+    let mut fired = Vec::new();
 
-  // Empty trigger, a flush that lands, and a flush the ring refuses.
-  fired.push(flusher.drive_at_barrier());
+    // Empty trigger, a flush that lands, and a flush the ring refuses.
+    fired.push(flusher.drive_at_barrier());
 
-  for i in 0..4u32 {
-    flusher.append(i).unwrap();
-  }
-  fired.push(flusher.drive_at_barrier());
+    for i in 0..4u32 {
+        flusher.append(i).unwrap();
+    }
+    fired.push(flusher.drive_at_barrier());
 
-  for i in 4..8u32 {
-    flusher.append(i).unwrap();
-  }
-  fired.push(flusher.drive_at_barrier());
+    for i in 4..8u32 {
+        flusher.append(i).unwrap();
+    }
+    fired.push(flusher.drive_at_barrier());
 
-  assert_eq!(
-    fired,
-    vec![
-      FlushOutcome::TriggeredEmpty,
-      FlushOutcome::Flushed { count: 4 },
-      FlushOutcome::Rejected { staged: 4 },
-    ],
-    "the three non-NotTriggered outcomes were not all reached"
-  );
+    assert_eq!(
+        fired,
+        vec![
+            FlushOutcome::TriggeredEmpty,
+            FlushOutcome::Flushed { count: 4 },
+            FlushOutcome::Rejected { staged: 4 },
+        ],
+        "the three non-NotTriggered outcomes were not all reached"
+    );
 
-  let recorded: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.outcome).collect();
-  assert_eq!(recorded, fired, "log and outcomes disagree");
+    let recorded: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.outcome).collect();
+    assert_eq!(recorded, fired, "log and outcomes disagree");
 
-  // The rejected batch is still staged, and lands once the ring has room.
-  assert_eq!(flusher.staged(), 4, "a rejected flush lost records");
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 4);
-  assert_eq!(landed, vec![0, 1, 2, 3]);
+    // The rejected batch is still staged, and lands once the ring has room.
+    assert_eq!(flusher.staged(), 4, "a rejected flush lost records");
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 4);
+    assert_eq!(landed, vec![0, 1, 2, 3]);
 
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 4 });
-  let mut second = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut second), 4);
-  assert_eq!(second, vec![4, 5, 6, 7], "the retry published what the refusal held");
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 4 });
+    let mut second = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut second), 4);
+    assert_eq!(second, vec![4, 5, 6, 7], "the retry published what the refusal held");
 }
 
 /// A `NotTriggered` call leaves no entry, which is what makes `is_empty()` the
 /// direct form of "and at no other point".
 #[test]
 fn a_call_that_did_not_fire_is_not_recorded() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  for _ in 0..50 {
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
-  }
+    for _ in 0..50 {
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
+    }
 
-  assert_eq!(flusher.log().unwrap().len(), 0);
+    assert_eq!(flusher.log().unwrap().len(), 0);
 }
 
 /// A trigger that finds nothing staged is recorded, and is not the same event
 /// as a trigger that never fired.
 #[test]
 fn an_empty_trigger_is_recorded_and_is_not_a_non_trigger() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::TriggeredEmpty);
+    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered);
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::TriggeredEmpty);
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1, "the non-trigger and the empty trigger were conflated");
-  assert_eq!(entries[0].outcome, FlushOutcome::TriggeredEmpty);
-  assert_eq!(entries[0].count(), 0);
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1, "the non-trigger and the empty trigger were conflated");
+    assert_eq!(entries[0].outcome, FlushOutcome::TriggeredEmpty);
+    assert_eq!(entries[0].count(), 0);
 }
 
 /// The log can be reset between scenarios, through either route.
 #[test]
 fn the_log_can_be_cleared_between_scenarios() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 1 });
-  assert_eq!(flusher.log().unwrap().len(), 1);
-  assert!(
-    !flusher.log().unwrap().is_empty(),
-    "the log was already empty, so clearing proves nothing"
-  );
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 1 });
+    assert_eq!(flusher.log().unwrap().len(), 1);
+    assert!(
+        !flusher.log().unwrap().is_empty(),
+        "the log was already empty, so clearing proves nothing"
+    );
 
-  flusher.clear_log();
-  assert!(flusher.log().unwrap().is_empty());
+    flusher.clear_log();
+    assert!(flusher.log().unwrap().is_empty());
 
-  let mut standalone = ring_flush::FlushLog::new();
-  assert!(standalone.is_empty());
-  standalone.clear();
-  assert_eq!(standalone, ring_flush::FlushLog::default());
+    let mut standalone = ring_flush::FlushLog::new();
+    assert!(standalone.is_empty());
+    standalone.clear();
+    assert_eq!(standalone, ring_flush::FlushLog::default());
 }
 
 /// Without `with_log`, no log exists — the default, and the reason the crate
 /// needs no cargo feature to keep a release build free of one.
 #[test]
 fn a_driver_has_no_log_unless_asked() {
-  let mut r = ring(16);
-  let mut ends = r.ends();
-  let (producer, _consumer) = ends.split();
-  let buffer = TlsBuffer::<u32>::with_capacity(4);
-  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
+    let mut r = ring(16);
+    let mut ends = r.ends();
+    let (producer, _consumer) = ends.split();
+    let buffer = TlsBuffer::<u32>::with_capacity(4);
+    let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
 
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 1 });
-  assert!(flusher.log().is_none(), "a log appeared without being asked for");
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 1 });
+    assert!(flusher.log().is_none(), "a log appeared without being asked for");
 
-  // Clearing a log that does not exist is a no-op, not a panic.
-  flusher.clear_log();
-  assert!(flusher.log().is_none());
+    // Clearing a log that does not exist is a no-op, not a panic.
+    flusher.clear_log();
+    assert!(flusher.log().is_none());
 }
 
 // ------------------------------------------------------------ validation
@@ -632,25 +610,23 @@ fn a_driver_has_no_log_unless_asked() {
 /// into a different working policy.
 #[test]
 fn an_unusable_batch_size_is_refused_at_binding() {
-  let mut r = ring(16);
-  let mut ends = r.ends();
-  let (producer, _consumer) = ends.split();
+    let mut r = ring(16);
+    let mut ends = r.ends();
+    let (producer, _consumer) = ends.split();
 
-  let zero = Flusher::new(TlsBuffer::<u32>::with_capacity(4), producer, FlushPolicy::OnBatch(0));
-  assert_eq!(zero.unwrap_err(), ConfigError::ZeroBatch);
+    let zero = Flusher::new(TlsBuffer::<u32>::with_capacity(4), producer, FlushPolicy::OnBatch(0));
+    assert_eq!(zero.unwrap_err(), ConfigError::ZeroBatch);
 
-  let mut second = ring(16);
-  let mut ends = second.ends();
-  let (producer, _consumer) = ends.split();
+    let mut second = ring(16);
+    let mut ends = second.ends();
+    let (producer, _consumer) = ends.split();
 
-  let oversize = Flusher::new(TlsBuffer::<u32>::with_capacity(4), producer, FlushPolicy::OnBatch(5));
-  assert_eq!(
-    oversize.unwrap_err(),
-    ConfigError::BatchExceedsCapacity {
-      requested: 5,
-      capacity: 4
-    }
-  );
+    let oversize =
+        Flusher::new(TlsBuffer::<u32>::with_capacity(4), producer, FlushPolicy::OnBatch(5));
+    assert_eq!(
+        oversize.unwrap_err(),
+        ConfigError::BatchExceedsCapacity { requested: 5, capacity: 4 }
+    );
 }
 
 /// A batch size exactly at capacity is legal — it is the largest size that can
@@ -658,28 +634,28 @@ fn an_unusable_batch_size_is_refused_at_binding() {
 /// configuration into a refusal.
 #[test]
 fn a_batch_size_equal_to_capacity_is_accepted() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBatch(4));
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBatch(4));
 
-  for i in 0..4u32 {
-    flusher.append(i).unwrap();
-  }
-  assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
+    for i in 0..4u32 {
+        flusher.append(i).unwrap();
+    }
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
 }
 
 /// Validation applies to `OnBatch` alone — the other two carry no parameter to
 /// be wrong about, and a buffer of any capacity binds them.
 #[test]
 fn the_parameterless_policies_need_no_validation() {
-  for policy in [FlushPolicy::OnFull, FlushPolicy::OnBarrier] {
-    let mut r = ring(16);
-    let mut ends = r.ends();
-    let (producer, _consumer) = ends.split();
-    let bound = Flusher::new(TlsBuffer::<u32>::with_capacity(1), producer, policy);
-    assert!(bound.is_ok(), "{policy:?} was refused");
-    assert_eq!(bound.unwrap().policy(), policy);
-  }
+    for policy in [FlushPolicy::OnFull, FlushPolicy::OnBarrier] {
+        let mut r = ring(16);
+        let mut ends = r.ends();
+        let (producer, _consumer) = ends.split();
+        let bound = Flusher::new(TlsBuffer::<u32>::with_capacity(1), producer, policy);
+        assert!(bound.is_ok(), "{policy:?} was refused");
+        assert_eq!(bound.unwrap().policy(), policy);
+    }
 }
 
 // --------------------------------------------------------- the final drain
@@ -688,59 +664,47 @@ fn the_parameterless_policies_need_no_validation() {
 /// `flush_now()` this crate refuses to expose.
 #[test]
 fn the_final_drain_publishes_whatever_the_policy_would_have_held() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  flusher.append(7).unwrap();
-  flusher.append(8).unwrap();
-  assert_eq!(
-    flusher.drive(),
-    FlushOutcome::NotTriggered,
-    "the policy would have held these"
-  );
+    flusher.append(7).unwrap();
+    flusher.append(8).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "the policy would have held these");
 
-  assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 2 });
+    assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 2 });
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 1);
-  assert_eq!(
-    entries[0].cause,
-    FlushCause::Shutdown,
-    "the final drain hid behind a policy cause"
-  );
-  assert_eq!(
-    entries[0].policy,
-    FlushPolicy::OnBarrier,
-    "the entry lost which policy was bound"
-  );
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].cause, FlushCause::Shutdown, "the final drain hid behind a policy cause");
+    assert_eq!(entries[0].policy, FlushPolicy::OnBarrier, "the entry lost which policy was bound");
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 2);
-  assert_eq!(landed, vec![7, 8]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 2);
+    assert_eq!(landed, vec![7, 8]);
 }
 
 /// A refused final drain keeps the records, and says how many — the outcome the
 /// caller is obliged to retry and that nothing here will retry for it.
 #[test]
 fn a_refused_final_drain_keeps_the_records() {
-  let mut r = ring(2);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(2);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  for i in 0..4u32 {
-    flusher.append(i).unwrap();
-  }
-  assert_eq!(flusher.drain_final(), FlushOutcome::Rejected { staged: 4 });
-  assert_eq!(flusher.staged(), 4, "a rejected final drain discarded the records");
+    for i in 0..4u32 {
+        flusher.append(i).unwrap();
+    }
+    assert_eq!(flusher.drain_final(), FlushOutcome::Rejected { staged: 4 });
+    assert_eq!(flusher.staged(), 4, "a rejected final drain discarded the records");
 
-  // Nothing reached the ring, so there is nothing for the consumer to take.
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 0);
+    // Nothing reached the ring, so there is nothing for the consumer to take.
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 0);
 
-  // And the retry the caller owes still works — the records were never claimed.
-  assert_eq!(flusher.drain_final(), FlushOutcome::Rejected { staged: 4 });
-  assert_eq!(flusher.staged(), 4);
+    // And the retry the caller owes still works — the records were never claimed.
+    assert_eq!(flusher.drain_final(), FlushOutcome::Rejected { staged: 4 });
+    assert_eq!(flusher.staged(), 4);
 }
 
 /// What happens to an append after `drain_final` — Pending 5 of
@@ -761,29 +725,29 @@ fn a_refused_final_drain_keeps_the_records() {
 /// test is the thing that has to change, which is the point of having it.
 #[test]
 fn a_driver_still_works_after_a_final_drain() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(2));
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 8, FlushPolicy::OnBatch(2));
 
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 1 });
-  assert_eq!(flusher.staged(), 0);
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 1 });
+    assert_eq!(flusher.staged(), 0);
 
-  // The append is accepted, not refused, and does not itself publish.
-  flusher.append(2).unwrap();
-  assert_eq!(flusher.staged(), 1);
-  assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "the policy was lost");
+    // The append is accepted, not refused, and does not itself publish.
+    flusher.append(2).unwrap();
+    assert_eq!(flusher.staged(), 1);
+    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "the policy was lost");
 
-  // And the bound policy still fires at its own trigger.
-  flusher.append(3).unwrap();
-  assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 2 });
+    // And the bound policy still fires at its own trigger.
+    flusher.append(3).unwrap();
+    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 2 });
 
-  let causes: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.cause).collect();
-  assert_eq!(causes, vec![FlushCause::Shutdown, FlushCause::Batch]);
+    let causes: Vec<_> = flusher.log().unwrap().entries().iter().map(|e| e.cause).collect();
+    assert_eq!(causes, vec![FlushCause::Shutdown, FlushCause::Batch]);
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 3);
-  assert_eq!(landed, vec![1, 2, 3]);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 3);
+    assert_eq!(landed, vec![1, 2, 3]);
 }
 
 /// A second `drain_final` on an already-drained driver is a no-op that says so.
@@ -796,18 +760,18 @@ fn a_driver_still_works_after_a_final_drain() {
 /// for a policy that declined.
 #[test]
 fn a_second_final_drain_is_an_empty_trigger() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 8, FlushPolicy::OnBarrier);
 
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 1 });
-  assert_eq!(flusher.drain_final(), FlushOutcome::TriggeredEmpty);
-  assert_eq!(flusher.drain_final(), FlushOutcome::TriggeredEmpty);
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.drain_final(), FlushOutcome::Flushed { count: 1 });
+    assert_eq!(flusher.drain_final(), FlushOutcome::TriggeredEmpty);
+    assert_eq!(flusher.drain_final(), FlushOutcome::TriggeredEmpty);
 
-  let entries = flusher.log().unwrap().entries();
-  assert_eq!(entries.len(), 3, "a redundant final drain went unrecorded");
-  assert!(entries.iter().all(|e| e.cause == FlushCause::Shutdown));
+    let entries = flusher.log().unwrap().entries();
+    assert_eq!(entries.len(), 3, "a redundant final drain went unrecorded");
+    assert!(entries.iter().all(|e| e.cause == FlushCause::Shutdown));
 }
 
 // ------------------------------------------------------------ properties
@@ -816,55 +780,55 @@ fn a_second_final_drain_is_an_empty_trigger() {
 /// this asserts that driving does not change it either.
 #[test]
 fn the_bound_policy_never_changes() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBatch(2));
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBatch(2));
 
-  assert_eq!(flusher.policy(), FlushPolicy::OnBatch(2));
-  for i in 0..4u32 {
-    flusher.append(i).unwrap();
-    let _ = flusher.drive();
     assert_eq!(flusher.policy(), FlushPolicy::OnBatch(2));
-  }
+    for i in 0..4u32 {
+        flusher.append(i).unwrap();
+        let _ = flusher.drive();
+        assert_eq!(flusher.policy(), FlushPolicy::OnBatch(2));
+    }
 }
 
 /// `staged()` tracks the buffer and drops to zero across a flush.
 #[test]
 fn staged_follows_the_buffer() {
-  let mut r = ring(16);
-  let mut ends;
-  let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBarrier);
+    let mut r = ring(16);
+    let mut ends;
+    let (mut flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnBarrier);
 
-  assert_eq!(flusher.staged(), 0);
-  flusher.append(1).unwrap();
-  assert_eq!(flusher.staged(), 1);
-  flusher.append(2).unwrap();
-  assert_eq!(flusher.staged(), 2);
-  assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 2 });
-  assert_eq!(flusher.staged(), 0);
+    assert_eq!(flusher.staged(), 0);
+    flusher.append(1).unwrap();
+    assert_eq!(flusher.staged(), 1);
+    flusher.append(2).unwrap();
+    assert_eq!(flusher.staged(), 2);
+    assert_eq!(flusher.drive_at_barrier(), FlushOutcome::Flushed { count: 2 });
+    assert_eq!(flusher.staged(), 0);
 }
 
 /// Every exported type is `Debug`, so a panic message can name what it held.
 #[test]
 fn every_type_can_be_printed() {
-  assert!(format!("{:?}", FlushPolicy::OnBatch(4)).contains("OnBatch"));
-  assert!(format!("{:?}", FlushCause::Shutdown).contains("Shutdown"));
-  assert!(format!("{:?}", FlushOutcome::Rejected { staged: 3 }).contains("Rejected"));
-  assert!(format!("{:?}", ConfigError::ZeroBatch).contains("ZeroBatch"));
-  assert!(format!("{:?}", ring_flush::FlushLog::new()).contains("FlushLog"));
+    assert!(format!("{:?}", FlushPolicy::OnBatch(4)).contains("OnBatch"));
+    assert!(format!("{:?}", FlushCause::Shutdown).contains("Shutdown"));
+    assert!(format!("{:?}", FlushOutcome::Rejected { staged: 3 }).contains("Rejected"));
+    assert!(format!("{:?}", ConfigError::ZeroBatch).contains("ZeroBatch"));
+    assert!(format!("{:?}", ring_flush::FlushLog::new()).contains("FlushLog"));
 
-  let mut r = ring(16);
-  let mut ends;
-  let (flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnFull);
-  assert!(format!("{flusher:?}").contains("Flusher"));
+    let mut r = ring(16);
+    let mut ends;
+    let (flusher, _consumer) = flusher!(r, ends, 4, FlushPolicy::OnFull);
+    assert!(format!("{flusher:?}").contains("Flusher"));
 
-  let entry = ring_flush::FlushEntry {
-    policy: FlushPolicy::OnFull,
-    cause: FlushCause::Full,
-    outcome: FlushOutcome::Flushed { count: 1 },
-  };
-  assert!(format!("{entry:?}").contains("FlushEntry"));
-  assert_eq!(entry.count(), 1);
+    let entry = ring_flush::FlushEntry {
+        policy: FlushPolicy::OnFull,
+        cause: FlushCause::Full,
+        outcome: FlushOutcome::Flushed { count: 1 },
+    };
+    assert!(format!("{entry:?}").contains("FlushEntry"));
+    assert_eq!(entry.count(), 1);
 }
 
 /// `FlushEntry::count()` reads 0 from every outcome that is not `Flushed`.
@@ -880,18 +844,18 @@ fn every_type_can_be_printed() {
 /// above already does for `Flushed`.
 #[test]
 fn count_is_zero_for_every_non_flushed_outcome() {
-  for outcome in [
-    FlushOutcome::NotTriggered,
-    FlushOutcome::TriggeredEmpty,
-    FlushOutcome::Rejected { staged: 4 },
-  ] {
-    let entry = ring_flush::FlushEntry {
-      policy: FlushPolicy::OnFull,
-      cause: FlushCause::Full,
-      outcome,
-    };
-    assert_eq!(entry.count(), 0, "{outcome:?} should report zero records moved");
-  }
+    for outcome in [
+        FlushOutcome::NotTriggered,
+        FlushOutcome::TriggeredEmpty,
+        FlushOutcome::Rejected { staged: 4 },
+    ] {
+        let entry = ring_flush::FlushEntry {
+            policy: FlushPolicy::OnFull,
+            cause: FlushCause::Full,
+            outcome,
+        };
+        assert_eq!(entry.count(), 0, "{outcome:?} should report zero records moved");
+    }
 }
 
 /// `ConfigError` renders for a human and chains as an error.
@@ -911,71 +875,67 @@ fn count_is_zero_for_every_non_flushed_outcome() {
 /// capacity" makes them work it out.
 #[test]
 fn a_binding_refusal_renders_and_chains() {
-  assert_eq!(ConfigError::ZeroBatch.to_string(), "OnBatch( 0 ) fires on every append",);
-  assert_eq!(
-    ConfigError::BatchExceedsCapacity {
-      requested: 5,
-      capacity: 4
-    }
-    .to_string(),
-    "OnBatch( 5 ) never fires in a 4-record buffer",
-  );
+    assert_eq!(ConfigError::ZeroBatch.to_string(), "OnBatch( 0 ) fires on every append",);
+    assert_eq!(
+        ConfigError::BatchExceedsCapacity { requested: 5, capacity: 4 }.to_string(),
+        "OnBatch( 5 ) never fires in a 4-record buffer",
+    );
 
-  // The half `Display` alone does not give: folding into an error trait object,
-  // which is what a consumer holding refusals from three crates has to do.
-  let boxed: Box<dyn core::error::Error> = Box::new(ConfigError::ZeroBatch);
-  assert!(boxed.to_string().contains("every append"));
+    // The half `Display` alone does not give: folding into an error trait object,
+    // which is what a consumer holding refusals from three crates has to do.
+    let boxed: Box<dyn core::error::Error> = Box::new(ConfigError::ZeroBatch);
+    assert!(boxed.to_string().contains("every append"));
 }
 
 /// A policy is consulted by value on the append path, so it must stay `Copy`
 /// and small. A variant carrying a non-`Copy` payload breaks that silently.
 #[test]
 fn the_policy_is_a_value() {
-  fn assert_copy<T: Copy>() {}
-  assert_copy::<FlushPolicy>();
-  assert_copy::<FlushCause>();
-  assert_copy::<FlushOutcome>();
-  assert_copy::<ring_flush::FlushEntry>();
+    fn assert_copy<T: Copy>() {}
+    assert_copy::<FlushPolicy>();
+    assert_copy::<FlushCause>();
+    assert_copy::<FlushOutcome>();
+    assert_copy::<ring_flush::FlushEntry>();
 
-  let policy = FlushPolicy::OnBatch(64);
-  let taken = policy;
-  assert_eq!(policy, taken, "the original was moved rather than copied");
+    let policy = FlushPolicy::OnBatch(64);
+    let taken = policy;
+    assert_eq!(policy, taken, "the original was moved rather than copied");
 
-  assert_eq!(
-    core::mem::size_of::<FlushPolicy>(),
-    2 * core::mem::size_of::<usize>(),
-    "a discriminant plus one usize — a payload was added"
-  );
+    assert_eq!(
+        core::mem::size_of::<FlushPolicy>(),
+        2 * core::mem::size_of::<usize>(),
+        "a discriminant plus one usize — a payload was added"
+    );
 
-  // C4 of `docs/non_functional_requirement/002` — nothing runs when a policy
-  // goes out of scope. The instance asked for a trybuild case; this is the
-  // same guarantee for one line and no build dependency, and it is strictly
-  // stronger: it also rejects a variant carrying a payload that *itself* has a
-  // `Drop` impl, which a check for `impl Drop for FlushPolicy` would miss.
-  assert!(!core::mem::needs_drop::<FlushPolicy>(), "a policy acquired drop glue");
-  assert!(!core::mem::needs_drop::<FlushCause>());
-  assert!(!core::mem::needs_drop::<FlushOutcome>());
-  assert!(!core::mem::needs_drop::<ring_flush::FlushEntry>());
+    // C4 of `docs/non_functional_requirement/002` — nothing runs when a policy
+    // goes out of scope. The instance asked for a trybuild case; this is the
+    // same guarantee for one line and no build dependency, and it is strictly
+    // stronger: it also rejects a variant carrying a payload that *itself* has a
+    // `Drop` impl, which a check for `impl Drop for FlushPolicy` would miss.
+    assert!(!core::mem::needs_drop::<FlushPolicy>(), "a policy acquired drop glue");
+    assert!(!core::mem::needs_drop::<FlushCause>());
+    assert!(!core::mem::needs_drop::<FlushOutcome>());
+    assert!(!core::mem::needs_drop::<ring_flush::FlushEntry>());
 }
 
 /// The append path touches no ring and publishes nothing, however many records
 /// pass through it. Driven, not self-firing, asserted rather than assumed.
 #[test]
 fn appending_never_publishes() {
-  let mut r = ring(64);
-  let mut ends;
-  let (mut flusher, mut consumer) = flusher!(r, ends, 32, FlushPolicy::OnFull);
+    let mut r = ring(64);
+    let mut ends;
+    let (mut flusher, mut consumer) = flusher!(r, ends, 32, FlushPolicy::OnFull);
 
-  for i in 0..32u32 {
-    flusher.append(i).unwrap();
-  }
+    for i in 0..32u32 {
+        flusher.append(i).unwrap();
+    }
 
-  assert_eq!(consumer.len(), 0, "an append reached the ring");
-  assert_eq!(flusher.staged(), 32);
-  assert!(flusher.log().unwrap().is_empty(), "an append flushed");
+    assert_eq!(consumer.len(), 0, "an append reached the ring");
+    assert_eq!(flusher.staged(), 32);
+    assert!(flusher.log().unwrap().is_empty(), "an append flushed");
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 0);
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 0);
 }
 
 /// A driver may cross threads only by being moved, never by being shared.
@@ -1006,6 +966,6 @@ fn appending_never_publishes() {
 /// notice. The assertion below would still pass.
 #[test]
 fn a_driver_is_movable_between_threads_and_never_shared() {
-  fn assert_send<T: Send>() {}
-  assert_send::<ring_flush::Flusher<'_, u32>>();
+    fn assert_send<T: Send>() {}
+    assert_send::<ring_flush::Flusher<'_, u32>>();
 }

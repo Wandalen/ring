@@ -9,16 +9,16 @@ description = "Publication of claimed slots to consumers"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 # Tests only. `tests/handshake_test.rs` is feature 170's reached-test, which is
 # the whole four-operation handshake — so it needs the other three operations'
 # crates. None of them depends on this one, so the graph stays acyclic.
 [dev-dependencies]
+ring_barrier = { path = "../ring_barrier" }
 ring_claim = { path = "../ring_claim" }
 ring_consume = { path = "../ring_consume" }
-ring_barrier = { path = "../ring_barrier" }
 ring_gating = { path = "../ring_gating" }
 
 [target.'cfg(loom)'.dev-dependencies]

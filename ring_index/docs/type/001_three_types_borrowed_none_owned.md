@@ -36,7 +36,7 @@ Live output:
   -- types this crate declares --
   (none)
   -- types it uses --
-use ring_types::{ Capacity, Seq, SlotIndex };
+use ring_types::{Capacity, Seq, SlotIndex};
 ```
 
 ---

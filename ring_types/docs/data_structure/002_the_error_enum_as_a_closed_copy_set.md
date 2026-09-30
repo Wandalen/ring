@@ -226,7 +226,7 @@ which is what "no ring logic" means for the error module.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_types
-printf 'variants:     '; awk '/^pub enum RingError/,/^}/' src/error.rs | grep -cE '^  [A-Z]'
+printf 'variants:     '; awk '/^pub enum RingError/,/^}/' src/error.rs | grep -cE '^    [A-Z]'
 printf 'Display arms: '; awk '/impl fmt::Display/,/^}/' src/error.rs | grep -cE 'Self::[A-Za-z]+.*=>'
 printf 'wildcards:    '; awk '/impl fmt::Display/,/^}/' src/error.rs | grep -c '_ =>'
 # The command above can legitimately exit nonzero -- a count of zero, a diff

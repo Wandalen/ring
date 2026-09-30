@@ -35,13 +35,13 @@ Live output:
 ```
   -- every mention in the family source --
 ring_barrier/src/lib.rs://! [`ring_cursor::slowest`] and lives in neither of them.
-ring_barrier/src/lib.rs:    ring_cursor::slowest( self.dependencies )
-ring_cursor/src/lib.rs:/// assert_eq!( ring_cursor::slowest( &[] ), None );
-ring_cursor/src/lib.rs:/// assert_eq!( ring_cursor::slowest( &cursors ), Some( Seq( 4 ) ) );
-ring_cursor/src/lib.rs:/// assert_eq!( ring_cursor::slowest( &cursors ), Some( Seq( 9 ) ) );
+ring_barrier/src/lib.rs:        ring_cursor::slowest(self.dependencies)
+ring_cursor/src/lib.rs:/// assert_eq!(ring_cursor::slowest(&[]), None);
+ring_cursor/src/lib.rs:/// assert_eq!(ring_cursor::slowest(&cursors), Some(Seq(4)));
+ring_cursor/src/lib.rs:/// assert_eq!(ring_cursor::slowest(&cursors), Some(Seq(9)));
 ring_gating/src/lib.rs://! `ring_cursor::slowest` returns `None` for an empty set rather than `Seq::ZERO`,
-ring_gating/src/lib.rs:  /// The fold itself is [`ring_cursor::slowest`], shared with `ring_barrier`,
-ring_gating/src/lib.rs:    ring_cursor::slowest( &self.cursors )
+ring_gating/src/lib.rs:    /// The fold itself is [`ring_cursor::slowest`], shared with `ring_barrier`,
+ring_gating/src/lib.rs:        ring_cursor::slowest(&self.cursors)
   -- and the test files that now exercise it --
 ring_barrier/tests/allocation_test.rs
 ring_claim/tests/allocation_test.rs

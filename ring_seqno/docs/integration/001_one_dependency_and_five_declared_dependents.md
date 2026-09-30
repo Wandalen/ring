@@ -224,18 +224,18 @@ TEST-ONLY ring_handle -> ring_config
 TEST-ONLY ring_handle -> ring_types
 TEST-ONLY ring_poll -> ring_config
 TEST-ONLY ring_poll -> ring_types
+TEST-ONLY ring_publish -> ring_barrier
 TEST-ONLY ring_publish -> ring_claim
 TEST-ONLY ring_publish -> ring_consume
-TEST-ONLY ring_publish -> ring_barrier
 TEST-ONLY ring_publish -> ring_gating
 TEST-ONLY ring_registry -> ring_config
 TEST-ONLY ring_registry -> ring_core
 TEST-ONLY ring_shutdown -> ring_config
 TEST-ONLY ring_testkit -> ring_config
 TEST-ONLY ring_testkit -> ring_types
-TEST-ONLY ring_tls -> ring_store
 TEST-ONLY ring_tls -> ring_event
 TEST-ONLY ring_tls -> ring_slot
+TEST-ONLY ring_tls -> ring_store
 ```
 
 **Correction (2026-09-28):** this block used to open with two `UNUSED` lines,

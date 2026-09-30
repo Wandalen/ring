@@ -33,9 +33,9 @@ Live output:
 
 ```
 use ring_cursor::PaddedCursor;
-use ring_types::{ Capacity, RingError, Seq };
-    ring_cursor::slowest( &self.cursors )
-      ring_seqno::free_slots( producer, slowest, self.capacity )
+use ring_types::{Capacity, RingError, Seq};
+        ring_cursor::slowest(&self.cursors)
+            ring_seqno::free_slots(producer, slowest, self.capacity)
 ```
 
 **Four lines.** That is the crate's entire coupling to everything below it.

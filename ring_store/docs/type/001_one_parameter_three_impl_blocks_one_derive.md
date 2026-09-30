@@ -96,7 +96,7 @@ Live output:
 ```
 /// # The derived `Debug` renders every slot
 /// embeds a `Buffer` and derives `Debug` in turn inherits this cost and this
-#[ derive( Debug ) ]
+#[derive(Debug)]
 ```
 
 That derive is not optional — the workspace sets `missing_debug_implementations`

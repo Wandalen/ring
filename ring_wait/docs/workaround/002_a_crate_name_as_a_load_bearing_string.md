@@ -298,7 +298,7 @@ printf 'and what fails on drift: %s\n' "$( printf '%s' "$DOC" | command grep -m1
 Live output:
 
 ```
-the array, as declared:  pub const PARKING_CRATES : [ &str; 3 ] = [ "ring_barrier", "ring_shutdown", "ring_wait" ];
+the array, as declared:  pub const PARKING_CRATES: [&str; 3] = ["ring_barrier", "ring_shutdown", "ring_wait"];
 the crate that holds it: ring_poll 
 the test that enforces:  the_tick_path_cannot_reach_a_parking_operation
 what that test reads:    reads the manifests off disk and compares them against this array

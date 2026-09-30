@@ -124,9 +124,9 @@ command grep -A2 -F 'A `count` of zero always succeeds' ring_claim/src/lib.rs
 Live output:
 
 ```
-  /// A `count` of zero always succeeds, even on a full ring — there is
-  /// nothing for back-pressure to block. [`claim_up_to`] treats a zero grant
-  /// as `Full` instead; the two functions disagree here on purpose.
+    /// A `count` of zero always succeeds, even on a full ring — there is
+    /// nothing for back-pressure to block. [`claim_up_to`] treats a zero grant
+    /// as `Full` instead; the two functions disagree here on purpose.
 ```
 
 **Disposition:** applied — `claim`'s doc comment now states the zero-case
@@ -189,9 +189,9 @@ grep -vE '^[[:space:]]*//' ring_claim/src/lib.rs | grep ' as u64'
 Live output:
 
 ```
-    self.start.advanced_by( self.len as u64 )
-      let next = current.advanced_by( count as u64 );
-      let next = current.advanced_by( granted as u64 );
+        self.start.advanced_by(self.len as u64)
+            let next = current.advanced_by(count as u64);
+            let next = current.advanced_by(granted as u64);
 ```
 
 Three casts, all `usize as u64`, all widening on every target this family

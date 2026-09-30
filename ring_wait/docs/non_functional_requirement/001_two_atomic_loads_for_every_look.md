@@ -23,11 +23,11 @@ Live output:
 
 ```
 (no atomic operation in this crate)
-14
+16
 ```
 
 **No match**, against a control — the identical expression over `ring_cursor` —
-that returns fourteen. `ring_wait` names no ordering, performs no atomic operation, and
+that returns sixteen. `ring_wait` names no ordering, performs no atomic operation, and
 emits no fence. The only synchronisation instruction anywhere in it is
 `core::hint::spin_loop()` at `:123`, which is a scheduling hint rather than a
 memory operation.

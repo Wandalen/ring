@@ -111,7 +111,7 @@ Live output:
 ```
 /// # The derived `Debug` renders every slot
 /// embeds a `Buffer` and derives `Debug` in turn inherits this cost and this
-#[ derive( Debug ) ]
+#[derive(Debug)]
 ```
 
 **Finding.** A `Buffer` cannot be cloned, compared, hashed, ordered or defaulted.

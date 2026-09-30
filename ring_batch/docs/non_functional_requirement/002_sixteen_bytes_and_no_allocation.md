@@ -94,7 +94,7 @@ Live output:
 
 ```
   -- what the crate declares about the heap --
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
   -- and across the family --
     crates with #![no_std] : 3 of 33
 ```

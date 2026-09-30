@@ -73,8 +73,8 @@ use ring_core::{Consumer, Producer};
 /// is still the right thing for this array to hold.
 ///
 /// ```
-/// assert!( ring_poll::PARKING_CRATES.contains( &"ring_wait" ) );
-/// assert!( !ring_poll::PARKING_CRATES.contains( &"ring_handle" ) );
+/// assert!(ring_poll::PARKING_CRATES.contains(&"ring_wait"));
+/// assert!(!ring_poll::PARKING_CRATES.contains(&"ring_handle"));
 /// ```
 pub const PARKING_CRATES: [&str; 3] = ["ring_barrier", "ring_shutdown", "ring_wait"];
 
@@ -107,46 +107,46 @@ pub const PARKING_CRATES: [&str; 3] = ["ring_barrier", "ring_shutdown", "ring_wa
 /// ```
 /// use ring_poll::Budget;
 ///
-/// assert_eq!( Budget::once().attempts(), 1 );
-/// assert_eq!( Budget::new( 4 ).attempts(), 4 );
-/// assert_eq!( Budget::new( 0 ).attempts(), 1, "zero attempts is not a budget" );
+/// assert_eq!(Budget::once().attempts(), 1);
+/// assert_eq!(Budget::new(4).attempts(), 4);
+/// assert_eq!(Budget::new(0).attempts(), 1, "zero attempts is not a budget");
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Budget(usize);
 
 impl Budget {
-  /// A budget of exactly one attempt — try, and take the answer.
-  ///
-  /// This is the tick-path default, and the only budget that cannot cost more
-  /// than one ring operation.
-  #[must_use]
-  pub const fn once() -> Self {
-    Self(1)
-  }
+    /// A budget of exactly one attempt — try, and take the answer.
+    ///
+    /// This is the tick-path default, and the only budget that cannot cost more
+    /// than one ring operation.
+    #[must_use]
+    pub const fn once() -> Self {
+        Self(1)
+    }
 
-  /// A budget of `attempts` attempts, clamped upward to one.
-  ///
-  /// Zero is clamped rather than rejected because a helper that "tries zero
-  /// times" is not a bounded retry, it is a no-op with a misleading name, and
-  /// returning `Err` without ever touching the ring is the kind of answer that
-  /// reads as back-pressure when it is nothing of the sort.
-  #[must_use]
-  pub const fn new(attempts: usize) -> Self {
-    if attempts == 0 { Self(1) } else { Self(attempts) }
-  }
+    /// A budget of `attempts` attempts, clamped upward to one.
+    ///
+    /// Zero is clamped rather than rejected because a helper that "tries zero
+    /// times" is not a bounded retry, it is a no-op with a misleading name, and
+    /// returning `Err` without ever touching the ring is the kind of answer that
+    /// reads as back-pressure when it is nothing of the sort.
+    #[must_use]
+    pub const fn new(attempts: usize) -> Self {
+        if attempts == 0 { Self(1) } else { Self(attempts) }
+    }
 
-  /// How many attempts this budget permits — always at least one.
-  #[must_use]
-  pub const fn attempts(self) -> usize {
-    self.0
-  }
+    /// How many attempts this budget permits — always at least one.
+    #[must_use]
+    pub const fn attempts(self) -> usize {
+        self.0
+    }
 }
 
 impl Default for Budget {
-  /// [`Budget::once`] — the tick-path default.
-  fn default() -> Self {
-    Self::once()
-  }
+    /// [`Budget::once`] — the tick-path default.
+    fn default() -> Self {
+        Self::once()
+    }
 }
 
 // ── Progress ──────────────────────────────────────────────────────────────
@@ -160,73 +160,73 @@ impl Default for Budget {
 /// ```
 /// use ring_poll::Progress;
 ///
-/// assert!( !Progress::of( 0 ).is_made() );
-/// assert_eq!( Progress::of( 2 ).then( Progress::of( 3 ) ).count(), 5 );
+/// assert!(!Progress::of(0).is_made());
+/// assert_eq!(Progress::of(2).then(Progress::of(3)).count(), 5);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Progress {
-  /// Records moved, and this many of them.
-  Made(usize),
-  /// Nothing moved.
-  None,
+    /// Records moved, and this many of them.
+    Made(usize),
+    /// Nothing moved.
+    None,
 }
 
 impl Progress {
-  /// [`Progress::Made`] for a non-zero count, [`Progress::None`] for zero.
-  ///
-  /// Constructing through this rather than by hand is what keeps `Made( 0 )`
-  /// — a value that claims progress and carries none — from being spelled.
-  #[must_use]
-  pub const fn of(count: usize) -> Self {
-    if count == 0 { Self::None } else { Self::Made(count) }
-  }
-
-  /// Whether anything moved.
-  // Fix(progress_is_made_classification_not_exhaustive): was `matches!( self,
-  //   Self::Made( _ ) )`, so a third `Progress` variant would silently read
-  //   `false` — "nothing moved" — with nothing forcing a second look. `count`
-  //   just below already carries the exhaustive shape.
-  // Root cause: `matches!` over a single named variant answers every variant
-  //   it was not told about with the same default, compiling cleanly however
-  //   many variants `Progress` gains.
-  // Pitfall: a scheduler gating "is spinning the same systems again worth
-  //   anything?" on this predicate would treat new-kind progress as no
-  //   progress at all.
-  #[must_use]
-  pub const fn is_made(self) -> bool {
-    match self {
-      Self::Made(_) => true,
-      Self::None => false,
+    /// [`Progress::Made`] for a non-zero count, [`Progress::None`] for zero.
+    ///
+    /// Constructing through this rather than by hand is what keeps `Made( 0 )`
+    /// — a value that claims progress and carries none — from being spelled.
+    #[must_use]
+    pub const fn of(count: usize) -> Self {
+        if count == 0 { Self::None } else { Self::Made(count) }
     }
-  }
 
-  /// How many records moved — zero for [`Progress::None`].
-  #[must_use]
-  pub const fn count(self) -> usize {
-    match self {
-      Self::Made(count) => count,
-      Self::None => 0,
+    /// Whether anything moved.
+    // Fix(progress_is_made_classification_not_exhaustive): was `matches!( self,
+    //   Self::Made( _ ) )`, so a third `Progress` variant would silently read
+    //   `false` — "nothing moved" — with nothing forcing a second look. `count`
+    //   just below already carries the exhaustive shape.
+    // Root cause: `matches!` over a single named variant answers every variant
+    //   it was not told about with the same default, compiling cleanly however
+    //   many variants `Progress` gains.
+    // Pitfall: a scheduler gating "is spinning the same systems again worth
+    //   anything?" on this predicate would treat new-kind progress as no
+    //   progress at all.
+    #[must_use]
+    pub const fn is_made(self) -> bool {
+        match self {
+            Self::Made(_) => true,
+            Self::None => false,
+        }
     }
-  }
 
-  /// The two steps of one tick, combined.
-  // Fix(ring_poll_progress_then_overflow): `then` added the two counts with plain
-  // `+`, so `Progress::of( usize::MAX ).then( Progress::of( 1 ) )` panicked in a
-  // debug build and silently returned `Progress::None` in release — the exact
-  // false "no progress" reading this type exists to rule out.
-  // Root cause: `Progress::of` is a public, unconstrained constructor over any
-  // `usize`, so `then`'s two operands are never bounded by anything this crate
-  // controls; only `Tick`'s own private, ring-traffic-driven counter had been
-  // checked against overflow (`docs/data_structure/002` PL12), and that counter's
-  // "impractical to reach" reasoning does not transfer to a public constructor one
-  // direct call away from the same class of bug.
-  // Pitfall: a public constructor wrapping a raw integer puts arithmetic on its
-  // output outside any bound the defining crate controls — audit every site that
-  // combines two of its values, not only the crate's own internal accumulators.
-  #[must_use]
-  pub const fn then(self, other: Self) -> Self {
-    Self::of(self.count().saturating_add(other.count()))
-  }
+    /// How many records moved — zero for [`Progress::None`].
+    #[must_use]
+    pub const fn count(self) -> usize {
+        match self {
+            Self::Made(count) => count,
+            Self::None => 0,
+        }
+    }
+
+    /// The two steps of one tick, combined.
+    // Fix(ring_poll_progress_then_overflow): `then` added the two counts with plain
+    // `+`, so `Progress::of( usize::MAX ).then( Progress::of( 1 ) )` panicked in a
+    // debug build and silently returned `Progress::None` in release — the exact
+    // false "no progress" reading this type exists to rule out.
+    // Root cause: `Progress::of` is a public, unconstrained constructor over any
+    // `usize`, so `then`'s two operands are never bounded by anything this crate
+    // controls; only `Tick`'s own private, ring-traffic-driven counter had been
+    // checked against overflow (`docs/data_structure/002` PL12), and that counter's
+    // "impractical to reach" reasoning does not transfer to a public constructor one
+    // direct call away from the same class of bug.
+    // Pitfall: a public constructor wrapping a raw integer puts arithmetic on its
+    // output outside any bound the defining crate controls — audit every site that
+    // combines two of its values, not only the crate's own internal accumulators.
+    #[must_use]
+    pub const fn then(self, other: Self) -> Self {
+        Self::of(self.count().saturating_add(other.count()))
+    }
 }
 
 // ── The helpers ───────────────────────────────────────────────────────────
@@ -254,40 +254,44 @@ impl Progress {
 /// ```
 /// use ring_config::RingConfig;
 /// use ring_core::Ring;
-/// use ring_poll::{ push_within, Budget };
+/// use ring_poll::{Budget, push_within};
 ///
-/// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 4 ).unwrap() ).unwrap();
+/// let mut ring: Ring<u32> = Ring::new(&RingConfig::new(4).unwrap()).unwrap();
 /// let mut ends = ring.ends();
-/// let ( mut producer, _consumer ) = ends.split();
+/// let (mut producer, _consumer) = ends.split();
 ///
-/// assert!( push_within( &mut producer, 7, Budget::once() ).is_ok() );
+/// assert!(push_within(&mut producer, 7, Budget::once()).is_ok());
 /// ```
-pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: Budget) -> Result<(), T> {
-  let mut held = record;
-  let mut attempt = 0;
-  // `while` rather than `loop` + `break`, deliberately, and the same at the two
-  // other budget-bounded loops below. `ring_shutdown` measured the difference:
-  // `cargo llvm-cov` attributes a `loop`'s exit edge to a region no test can
-  // enter, reporting 72/73 lines where the `while` form reports 73/73 on an
-  // identical suite. Rewriting this as a `loop` reads as pure simplification
-  // and costs a coverage line that will surface days later, attributed to
-  // whatever else moved. The probe is to make the change and re-run
-  // `cargo llvm-cov -p ring_poll`.
-  while attempt < budget.attempts() {
-    match producer.try_push(held) {
-      Ok(()) => return Ok(()),
-      Err(returned) => {
-        held = returned;
-        attempt += 1;
-        if attempt < budget.attempts() {
-          // A pause hint, and nothing more. Yielding here would be the parking
-          // this crate exists to keep off the tick path — see `docs/invariant/001`.
-          core::hint::spin_loop();
+pub fn push_within<T: Send>(
+    producer: &mut Producer<'_, T>,
+    record: T,
+    budget: Budget,
+) -> Result<(), T> {
+    let mut held = record;
+    let mut attempt = 0;
+    // `while` rather than `loop` + `break`, deliberately, and the same at the two
+    // other budget-bounded loops below. `ring_shutdown` measured the difference:
+    // `cargo llvm-cov` attributes a `loop`'s exit edge to a region no test can
+    // enter, reporting 72/73 lines where the `while` form reports 73/73 on an
+    // identical suite. Rewriting this as a `loop` reads as pure simplification
+    // and costs a coverage line that will surface days later, attributed to
+    // whatever else moved. The probe is to make the change and re-run
+    // `cargo llvm-cov -p ring_poll`.
+    while attempt < budget.attempts() {
+        match producer.try_push(held) {
+            Ok(()) => return Ok(()),
+            Err(returned) => {
+                held = returned;
+                attempt += 1;
+                if attempt < budget.attempts() {
+                    // A pause hint, and nothing more. Yielding here would be the parking
+                    // this crate exists to keep off the tick path — see `docs/invariant/001`.
+                    core::hint::spin_loop();
+                }
+            },
         }
-      }
     }
-  }
-  Err(held)
+    Err(held)
 }
 
 /// Publish from `records` in batches, retrying within `budget`, never parking.
@@ -321,34 +325,34 @@ pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: B
 /// ```
 /// use ring_config::RingConfig;
 /// use ring_core::Ring;
-/// use ring_poll::{ push_batch_within, Budget };
+/// use ring_poll::{Budget, push_batch_within};
 ///
-/// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
+/// let mut ring: Ring<u32> = Ring::new(&RingConfig::new(8).unwrap()).unwrap();
 /// let mut ends = ring.ends();
-/// let ( mut producer, _consumer ) = ends.split();
+/// let (mut producer, _consumer) = ends.split();
 ///
-/// let published = push_batch_within( &mut producer, &mut ( 0..5 ), Budget::once() );
-/// assert_eq!( published, 5 );
+/// let published = push_batch_within(&mut producer, &mut (0..5), Budget::once());
+/// assert_eq!(published, 5);
 /// ```
 pub fn push_batch_within<T: Send>(
-  producer: &mut Producer<'_, T>,
-  records: &mut impl Iterator<Item = T>,
-  budget: Budget,
+    producer: &mut Producer<'_, T>,
+    records: &mut impl Iterator<Item = T>,
+    budget: Budget,
 ) -> usize {
-  let mut total = 0;
-  let mut attempt = 0;
-  while attempt < budget.attempts() {
-    let moved = producer.try_push_batch(records);
-    total += moved;
-    if moved == 0 {
-      break;
+    let mut total = 0;
+    let mut attempt = 0;
+    while attempt < budget.attempts() {
+        let moved = producer.try_push_batch(records);
+        total += moved;
+        if moved == 0 {
+            break;
+        }
+        attempt += 1;
+        if attempt < budget.attempts() {
+            core::hint::spin_loop();
+        }
     }
-    attempt += 1;
-    if attempt < budget.attempts() {
-      core::hint::spin_loop();
-    }
-  }
-  total
+    total
 }
 
 /// Take one record, retrying within `budget`, never parking.
@@ -361,28 +365,28 @@ pub fn push_batch_within<T: Send>(
 /// ```
 /// use ring_config::RingConfig;
 /// use ring_core::Ring;
-/// use ring_poll::{ recv_within, Budget };
+/// use ring_poll::{Budget, recv_within};
 ///
-/// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 4 ).unwrap() ).unwrap();
+/// let mut ring: Ring<u32> = Ring::new(&RingConfig::new(4).unwrap()).unwrap();
 /// let mut ends = ring.ends();
-/// let ( mut producer, mut consumer ) = ends.split();
-/// producer.try_push( 9 ).unwrap();
+/// let (mut producer, mut consumer) = ends.split();
+/// producer.try_push(9).unwrap();
 ///
-/// assert_eq!( recv_within( &mut consumer, Budget::once() ), Some( 9 ) );
-/// assert_eq!( recv_within( &mut consumer, Budget::new( 3 ) ), None );
+/// assert_eq!(recv_within(&mut consumer, Budget::once()), Some(9));
+/// assert_eq!(recv_within(&mut consumer, Budget::new(3)), None);
 /// ```
 pub fn recv_within<T: Send>(consumer: &mut Consumer<'_, T>, budget: Budget) -> Option<T> {
-  let mut attempt = 0;
-  while attempt < budget.attempts() {
-    if let Some(record) = consumer.try_recv() {
-      return Some(record);
+    let mut attempt = 0;
+    while attempt < budget.attempts() {
+        if let Some(record) = consumer.try_recv() {
+            return Some(record);
+        }
+        attempt += 1;
+        if attempt < budget.attempts() {
+            core::hint::spin_loop();
+        }
     }
-    attempt += 1;
-    if attempt < budget.attempts() {
-      core::hint::spin_loop();
-    }
-  }
-  None
+    None
 }
 
 /// Take at most `max` records into `out`, stopping at the limit or at the first
@@ -403,27 +407,27 @@ pub fn recv_within<T: Send>(consumer: &mut Consumer<'_, T>, budget: Budget) -> O
 /// use ring_core::Ring;
 /// use ring_poll::drain_up_to;
 ///
-/// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
+/// let mut ring: Ring<u32> = Ring::new(&RingConfig::new(8).unwrap()).unwrap();
 /// let mut ends = ring.ends();
-/// let ( mut producer, mut consumer ) = ends.split();
-/// producer.try_push_batch( &mut ( 0..5 ) );
+/// let (mut producer, mut consumer) = ends.split();
+/// producer.try_push_batch(&mut (0..5));
 ///
 /// let mut out = Vec::new();
-/// assert_eq!( drain_up_to( &mut consumer, &mut out, 3 ), 3 );
-/// assert_eq!( consumer.len(), 2, "the limit held" );
+/// assert_eq!(drain_up_to(&mut consumer, &mut out, 3), 3);
+/// assert_eq!(consumer.len(), 2, "the limit held");
 /// ```
 pub fn drain_up_to<T: Send>(consumer: &mut Consumer<'_, T>, out: &mut Vec<T>, max: usize) -> usize {
-  let mut taken = 0;
-  while taken < max {
-    match consumer.try_recv() {
-      Some(record) => {
-        out.push(record);
-        taken += 1;
-      }
-      None => break,
+    let mut taken = 0;
+    while taken < max {
+        match consumer.try_recv() {
+            Some(record) => {
+                out.push(record);
+                taken += 1;
+            },
+            None => break,
+        }
     }
-  }
-  taken
+    taken
 }
 
 // ── Tick ──────────────────────────────────────────────────────────────────
@@ -467,137 +471,142 @@ pub fn drain_up_to<T: Send>(consumer: &mut Consumer<'_, T>, out: &mut Vec<T>, ma
 /// ```
 /// use ring_config::RingConfig;
 /// use ring_core::Ring;
-/// use ring_poll::{ Budget, Tick };
+/// use ring_poll::{Budget, Tick};
 ///
-/// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
+/// let mut ring: Ring<u32> = Ring::new(&RingConfig::new(8).unwrap()).unwrap();
 /// let mut ends = ring.ends();
-/// let ( mut producer, mut consumer ) = ends.split();
+/// let (mut producer, mut consumer) = ends.split();
 ///
-/// let mut tick = Tick::new( Budget::once() );
-/// tick.push( &mut producer, 1 ).unwrap();
-/// tick.push( &mut producer, 2 ).unwrap();
-/// assert_eq!( tick.recv( &mut consumer ), Some( 1 ) );
-/// assert_eq!( tick.progress().count(), 3, "two published and one taken" );
+/// let mut tick = Tick::new(Budget::once());
+/// tick.push(&mut producer, 1).unwrap();
+/// tick.push(&mut producer, 2).unwrap();
+/// assert_eq!(tick.recv(&mut consumer), Some(1));
+/// assert_eq!(tick.progress().count(), 3, "two published and one taken");
 /// ```
 #[derive(Debug, Clone)]
 pub struct Tick {
-  budget: Budget,
-  moved: usize,
-  lost: usize,
+    budget: Budget,
+    moved: usize,
+    lost: usize,
 }
 
 impl Tick {
-  /// A tick that will spend at most `budget` attempts on each operation.
-  #[must_use]
-  pub const fn new(budget: Budget) -> Self {
-    Self {
-      budget,
-      moved: 0,
-      lost: 0,
+    /// A tick that will spend at most `budget` attempts on each operation.
+    #[must_use]
+    pub const fn new(budget: Budget) -> Self {
+        Self { budget, moved: 0, lost: 0 }
     }
-  }
 
-  /// Clear both counters, keeping the budget — the frame boundary.
-  ///
-  /// The budget is fixed for a tick's life: there is no setter, and this does
-  /// not add one. A scheduler that wants to vary the budget between frames
-  /// builds a new tick, which is the same cost as this call plus recomputing
-  /// the budget it wanted to change anyway.
-  pub const fn reset(&mut self) {
-    self.moved = 0;
-    self.lost = 0;
-  }
-
-  /// The budget each of this tick's operations is held to.
-  #[must_use]
-  pub const fn budget(&self) -> Budget {
-    self.budget
-  }
-
-  /// What this tick has moved so far, across every operation on it.
-  ///
-  /// This counts arrivals and says nothing about cost. A tick that published
-  /// four records and destroyed three getting there reports `Made( 4 )`; the
-  /// three are in [`Tick::lost`].
-  #[must_use]
-  pub const fn progress(&self) -> Progress {
-    Progress::of(self.moved)
-  }
-
-  /// How many records this tick consumed from an iterator and did not publish.
-  ///
-  /// Only [`Tick::push_batch`] can produce a loss: `try_push_batch` pulls a
-  /// record before it can know whether the ring has room, and drops it when the
-  /// answer is no. Every other operation either publishes or hands the record
-  /// back. A caller reading [`Tick::progress`] alone sees what arrived and not
-  /// what it cost.
-  #[must_use]
-  pub const fn lost(&self) -> usize {
-    self.lost
-  }
-
-  /// [`push_within`] against this tick's budget, counting a success.
-  ///
-  /// # Errors
-  ///
-  /// Returns the record when the budget ran out with the ring still full.
-  pub fn push<T: Send>(&mut self, producer: &mut Producer<'_, T>, record: T) -> Result<(), T> {
-    let outcome = push_within(producer, record, self.budget);
-    if outcome.is_ok() {
-      self.moved += 1;
+    /// Clear both counters, keeping the budget — the frame boundary.
+    ///
+    /// The budget is fixed for a tick's life: there is no setter, and this does
+    /// not add one. A scheduler that wants to vary the budget between frames
+    /// builds a new tick, which is the same cost as this call plus recomputing
+    /// the budget it wanted to change anyway.
+    pub const fn reset(&mut self) {
+        self.moved = 0;
+        self.lost = 0;
     }
-    outcome
-  }
 
-  /// [`push_batch_within`] against this tick's budget, counting what moved and
-  /// what it cost.
-  ///
-  /// The free function cannot report the loss: it returns one number, and the
-  /// records it consumed and dropped are not in it. Here the iterator is
-  /// counted on the way past, so `offered - moved` is exactly what the ring
-  /// refused after the record had already been taken. That difference lands in
-  /// [`Tick::lost`], never in the returned count and never in
-  /// [`Tick::progress`].
-  pub fn push_batch<T: Send>(&mut self, producer: &mut Producer<'_, T>, records: &mut impl Iterator<Item = T>) -> usize {
-    let mut offered = 0;
-    let moved = {
-      let mut counted = records.by_ref().inspect(|_| offered += 1);
-      push_batch_within(producer, &mut counted, self.budget)
-    };
-    debug_assert!(
-      offered >= moved,
-      "the batch helper published {moved} of {offered} records it was handed"
-    );
-    self.moved += moved;
-    self.lost += offered - moved;
-    moved
-  }
-
-  /// [`recv_within`] against this tick's budget, counting a success.
-  pub fn recv<T: Send>(&mut self, consumer: &mut Consumer<'_, T>) -> Option<T> {
-    let outcome = recv_within(consumer, self.budget);
-    if outcome.is_some() {
-      self.moved += 1;
+    /// The budget each of this tick's operations is held to.
+    #[must_use]
+    pub const fn budget(&self) -> Budget {
+        self.budget
     }
-    outcome
-  }
 
-  /// [`drain_up_to`] with this tick's own ceiling, counting what moved.
-  ///
-  /// The ceiling is `max` rather than the budget: a budget bounds *retries of a
-  /// failed operation*, a drain limit bounds *successes*. Collapsing the two
-  /// would make `Budget::once()` mean "take at most one record per tick", which
-  /// is not what a single attempt means anywhere else here.
-  pub fn drain<T: Send>(&mut self, consumer: &mut Consumer<'_, T>, out: &mut Vec<T>, max: usize) -> usize {
-    let moved = drain_up_to(consumer, out, max);
-    self.moved += moved;
-    moved
-  }
+    /// What this tick has moved so far, across every operation on it.
+    ///
+    /// This counts arrivals and says nothing about cost. A tick that published
+    /// four records and destroyed three getting there reports `Made( 4 )`; the
+    /// three are in [`Tick::lost`].
+    #[must_use]
+    pub const fn progress(&self) -> Progress {
+        Progress::of(self.moved)
+    }
+
+    /// How many records this tick consumed from an iterator and did not publish.
+    ///
+    /// Only [`Tick::push_batch`] can produce a loss: `try_push_batch` pulls a
+    /// record before it can know whether the ring has room, and drops it when the
+    /// answer is no. Every other operation either publishes or hands the record
+    /// back. A caller reading [`Tick::progress`] alone sees what arrived and not
+    /// what it cost.
+    #[must_use]
+    pub const fn lost(&self) -> usize {
+        self.lost
+    }
+
+    /// [`push_within`] against this tick's budget, counting a success.
+    ///
+    /// # Errors
+    ///
+    /// Returns the record when the budget ran out with the ring still full.
+    pub fn push<T: Send>(&mut self, producer: &mut Producer<'_, T>, record: T) -> Result<(), T> {
+        let outcome = push_within(producer, record, self.budget);
+        if outcome.is_ok() {
+            self.moved += 1;
+        }
+        outcome
+    }
+
+    /// [`push_batch_within`] against this tick's budget, counting what moved and
+    /// what it cost.
+    ///
+    /// The free function cannot report the loss: it returns one number, and the
+    /// records it consumed and dropped are not in it. Here the iterator is
+    /// counted on the way past, so `offered - moved` is exactly what the ring
+    /// refused after the record had already been taken. That difference lands in
+    /// [`Tick::lost`], never in the returned count and never in
+    /// [`Tick::progress`].
+    pub fn push_batch<T: Send>(
+        &mut self,
+        producer: &mut Producer<'_, T>,
+        records: &mut impl Iterator<Item = T>,
+    ) -> usize {
+        let mut offered = 0;
+        let moved = {
+            let mut counted = records.by_ref().inspect(|_| offered += 1);
+            push_batch_within(producer, &mut counted, self.budget)
+        };
+        debug_assert!(
+            offered >= moved,
+            "the batch helper published {moved} of {offered} records it was handed"
+        );
+        self.moved += moved;
+        self.lost += offered - moved;
+        moved
+    }
+
+    /// [`recv_within`] against this tick's budget, counting a success.
+    pub fn recv<T: Send>(&mut self, consumer: &mut Consumer<'_, T>) -> Option<T> {
+        let outcome = recv_within(consumer, self.budget);
+        if outcome.is_some() {
+            self.moved += 1;
+        }
+        outcome
+    }
+
+    /// [`drain_up_to`] with this tick's own ceiling, counting what moved.
+    ///
+    /// The ceiling is `max` rather than the budget: a budget bounds *retries of a
+    /// failed operation*, a drain limit bounds *successes*. Collapsing the two
+    /// would make `Budget::once()` mean "take at most one record per tick", which
+    /// is not what a single attempt means anywhere else here.
+    pub fn drain<T: Send>(
+        &mut self,
+        consumer: &mut Consumer<'_, T>,
+        out: &mut Vec<T>,
+        max: usize,
+    ) -> usize {
+        let moved = drain_up_to(consumer, out, max);
+        self.moved += moved;
+        moved
+    }
 }
 
 impl Default for Tick {
-  /// A tick on [`Budget::once`].
-  fn default() -> Self {
-    Self::new(Budget::once())
-  }
+    /// A tick on [`Budget::once`].
+    fn default() -> Self {
+        Self::new(Budget::once())
+    }
 }

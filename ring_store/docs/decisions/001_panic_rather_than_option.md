@@ -85,10 +85,10 @@ Live output:
 ///
 /// ```
 /// use ring_types::SlotIndex;
-/// assert_eq!( SlotIndex( 3 ).get(), 3 );
+/// assert_eq!(SlotIndex(3).get(), 3);
 /// ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-pub struct SlotIndex( pub usize );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct SlotIndex(pub usize);
 ```
 
 Its own prose says *never constructed by counting*, and its own doctest, three
@@ -170,11 +170,11 @@ command grep -A4 -F 'is not validated against' ring_store/src/lib.rs
 Live output:
 
 ```
-  /// `SlotIndex` is not validated against this buffer's capacity — one built
-  /// any other way than through `ring_index::of` for this same capacity is
-  /// the caller's responsibility, and one that reached here out of range is a
-  /// caller that mixed two rings' capacities, which is a defect rather than a
-  /// condition to handle.
+    /// `SlotIndex` is not validated against this buffer's capacity — one built
+    /// any other way than through `ring_index::of` for this same capacity is
+    /// the caller's responsibility, and one that reached here out of range is a
+    /// caller that mixed two rings' capacities, which is a defect rather than a
+    /// condition to handle.
 ```
 
 **Disposition:** applied — `Buffer::get`'s `# Panics` doc in

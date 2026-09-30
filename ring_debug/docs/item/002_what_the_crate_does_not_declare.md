@@ -68,9 +68,9 @@ impl core::error::Error for Violation {}
 ring crates with an Error impl:   7
 of those, any with a fn source:   0
 -- non_exhaustive: the attribute, and the unrelated Debug call it is a substring of --
-ring_spsc/src/lib.rs:        .finish_non_exhaustive()
-ring_testkit/src/lib.rs:  #[ non_exhaustive ]
-ring_types/src/error.rs:  #[ non_exhaustive ]
+ring_spsc/src/lib.rs:              .finish_non_exhaustive()
+ring_testkit/src/lib.rs:  #[non_exhaustive]
+ring_types/src/error.rs:  #[non_exhaustive]
 ```
 
 ### Types

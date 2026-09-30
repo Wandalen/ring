@@ -31,12 +31,12 @@ command grep -m1 -A5 -F '  /// Empty every slot, keeping the allocation.' ring_s
 Live output:
 
 ```
-  /// Empty every slot, keeping the allocation.
-  ///
-  /// A reset for a recycled ring: reallocating would defeat the allocation
-  /// behaviour the ring was chosen for, so this sweeps every slot back to
-  /// empty in place instead. No consumer in the family calls this today —
-  /// `ring_shutdown` does not depend on this crate, and its reopen story is a
+    /// Empty every slot, keeping the allocation.
+    ///
+    /// A reset for a recycled ring: reallocating would defeat the allocation
+    /// behaviour the ring was chosen for, so this sweeps every slot back to
+    /// empty in place instead. No consumer in the family calls this today —
+    /// `ring_shutdown` does not depend on this crate, and its reopen story is a
 ```
 
 `ring_shutdown` does not depend on `ring_store`, and the word does not occur in
@@ -73,7 +73,7 @@ grep -r 'buffer\.clear()\|Buffer::clear' ring_*/src/*.rs ring_*/tests/*.rs 2>/de
 Live output:
 
 ```
-ring_store/tests/buffer_test.rs:  buffer.clear();
+ring_store/tests/buffer_test.rs:    buffer.clear();
 ```
 
 **Finding.** The stated requester cannot reach the operation. `ring_shutdown`
@@ -98,16 +98,16 @@ command grep -A9 -F '/// Empty every slot, keeping the allocation.' ring_store/s
 Live output:
 
 ```
-  /// Empty every slot, keeping the allocation.
-  ///
-  /// A reset for a recycled ring: reallocating would defeat the allocation
-  /// behaviour the ring was chosen for, so this sweeps every slot back to
-  /// empty in place instead. No consumer in the family calls this today —
-  /// `ring_shutdown` does not depend on this crate, and its reopen story is a
-  /// different state machine, over `Stopped`, not a payload sweep. The
-  /// emptiness delivered is only as strong as `Slot::clear` for the shape in
-  /// use: a `TypedSlot`'s previous payload is dropped, but a `BytesSlot`'s
-  /// bytes stay resident and only the length marking them unreachable moves.
+    /// Empty every slot, keeping the allocation.
+    ///
+    /// A reset for a recycled ring: reallocating would defeat the allocation
+    /// behaviour the ring was chosen for, so this sweeps every slot back to
+    /// empty in place instead. No consumer in the family calls this today —
+    /// `ring_shutdown` does not depend on this crate, and its reopen story is a
+    /// different state machine, over `Stopped`, not a payload sweep. The
+    /// emptiness delivered is only as strong as `Slot::clear` for the shape in
+    /// use: a `TypedSlot`'s previous payload is dropped, but a `BytesSlot`'s
+    /// bytes stay resident and only the length marking them unreachable moves.
 ```
 
 **Disposition:** applied — `Buffer::clear`'s doc comment in
@@ -162,16 +162,16 @@ command grep -A9 -F '/// Empty every slot, keeping the allocation.' ring_store/s
 Live output:
 
 ```
-  /// Empty every slot, keeping the allocation.
-  ///
-  /// A reset for a recycled ring: reallocating would defeat the allocation
-  /// behaviour the ring was chosen for, so this sweeps every slot back to
-  /// empty in place instead. No consumer in the family calls this today —
-  /// `ring_shutdown` does not depend on this crate, and its reopen story is a
-  /// different state machine, over `Stopped`, not a payload sweep. The
-  /// emptiness delivered is only as strong as `Slot::clear` for the shape in
-  /// use: a `TypedSlot`'s previous payload is dropped, but a `BytesSlot`'s
-  /// bytes stay resident and only the length marking them unreachable moves.
+    /// Empty every slot, keeping the allocation.
+    ///
+    /// A reset for a recycled ring: reallocating would defeat the allocation
+    /// behaviour the ring was chosen for, so this sweeps every slot back to
+    /// empty in place instead. No consumer in the family calls this today —
+    /// `ring_shutdown` does not depend on this crate, and its reopen story is a
+    /// different state machine, over `Stopped`, not a payload sweep. The
+    /// emptiness delivered is only as strong as `Slot::clear` for the shape in
+    /// use: a `TypedSlot`'s previous payload is dropped, but a `BytesSlot`'s
+    /// bytes stay resident and only the length marking them unreachable moves.
 ```
 
 **Disposition:** applied — `Buffer::clear`'s doc comment in

@@ -37,8 +37,8 @@ Live output:
 ```
   impl blocks / new / Default / Drop in src : 0
   -- what the test file imports --
-use ring_index::{ aliases, of, run };
-use ring_types::{ Capacity, Seq, SlotIndex };
+use ring_index::{aliases, of, run};
+use ring_types::{Capacity, Seq, SlotIndex};
   -- dev-dependencies --
   rings, buffers or threads built in the tests : 0
 ```

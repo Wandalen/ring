@@ -285,8 +285,8 @@ command grep -A1 -F 'Costs one load plus one more per registered consumer' ring_
 Live output:
 
 ```
-  /// Costs one load plus one more per registered consumer — cheap for a
-  /// diagnostic, worth avoiding in a hot loop with many consumers.
+    /// Costs one load plus one more per registered consumer — cheap for a
+    /// diagnostic, worth avoiding in a hot loop with many consumers.
 ```
 
 **Disposition:** applied — `headroom`'s doc comment now states its
@@ -407,10 +407,10 @@ command grep -r 'claimer\.\(claim\|claim_up_to\|claimed\|headroom\|cursor\|consu
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:    let claim = self.claimer.claim( 1 )?;
-ring_mpsc/src/lib.rs:    self.claimer.headroom()
-ring_mpsc/src/lib.rs:    self.claimer.claimed()
-ring_mpsc/src/lib.rs:    let claim = self.claimer.cursor().addr();
+ring_mpsc/src/lib.rs:        let claim = self.claimer.claim(1)?;
+ring_mpsc/src/lib.rs:        self.claimer.headroom()
+ring_mpsc/src/lib.rs:        self.claimer.claimed()
+ring_mpsc/src/lib.rs:        let claim = self.claimer.cursor().addr();
 ```
 
 | Item | External callers | Where |
@@ -446,7 +446,7 @@ grep -r 'claim_up_to' */src/*.rs */tests/*.rs | grep -v '^ring_claim/'
 Live output:
 
 ```
-ring_publish/tests/publish_test.rs:  // `claim_up_to` can legitimately grant a shorter range than asked for.
+ring_publish/tests/publish_test.rs:    // `claim_up_to` can legitimately grant a shorter range than asked for.
 ```
 
 A sibling crate's test explains what it does, in prose, without calling it. That

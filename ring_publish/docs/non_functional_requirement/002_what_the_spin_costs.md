@@ -99,9 +99,9 @@ ring_handle/tests/handle_test.rs
 ring_mpsc/tests/mpsc_test.rs
 ring_poll/tests/poll_test.rs
 ring_wait/tests/wait_test.rs
-ring_publish/tests/handshake_test.rs:            std::thread::yield_now();
-ring_publish/tests/handshake_test.rs:              std::thread::yield_now();
-ring_publish/tests/publish_test.rs:      std::thread::yield_now();
+ring_publish/tests/handshake_test.rs:                        std::thread::yield_now();
+ring_publish/tests/handshake_test.rs:                            std::thread::yield_now();
+ring_publish/tests/publish_test.rs:            std::thread::yield_now();
 ```
 
 | Crate | Times something |

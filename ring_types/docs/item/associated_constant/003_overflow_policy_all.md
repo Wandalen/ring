@@ -111,7 +111,7 @@ command grep -r 'OverflowPolicy::ALL' ring_*/src | command grep -v '^ring_types/
 Live output:
 
 ```
-ring_stats/src/lib.rs:    OverflowPolicy::ALL.iter().map( | p | self.dropped( *p ) ).fold( 0, u64::saturating_add )
+ring_stats/src/lib.rs:        OverflowPolicy::ALL.iter().map(|p| self.dropped(*p)).fold(0, u64::saturating_add)
 ```
 
 This is one line — **the family's only production use of any `ALL` array**.

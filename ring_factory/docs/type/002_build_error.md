@@ -310,14 +310,14 @@ done
 Live output:
 
 ```
-  WorkloadError   #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  RunError        #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  Violation       #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  BuildError      #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  ConfigError     #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  RegistryError   #[ derive( Debug, Clone, PartialEq, Eq ) ] 
-  Anomaly         #[ non_exhaustive ] #[ derive( Debug, Clone, Copy, PartialEq, Eq ) ] 
-  RingError       #[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash ) ] #[ non_exhaustive ] 
+  WorkloadError   #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  RunError        #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  Violation       #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  BuildError      #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  ConfigError     #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  RegistryError   #[derive(Debug, Clone, PartialEq, Eq)] 
+  Anomaly         #[non_exhaustive] #[derive(Debug, Clone, Copy, PartialEq, Eq)] 
+  RingError       #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)] #[non_exhaustive] 
 ```
 
 Seven of the eight derive `Copy`. The one that does not is `RegistryError`, and

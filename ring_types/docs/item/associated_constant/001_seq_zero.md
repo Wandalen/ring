@@ -103,12 +103,12 @@ command grep -rn 'Seq::ZERO' ring_*/src | command grep -v '^ring_types/' \
 Live output:
 
 ```
-ring_atomic/src/lib.rs:    Self::new( Seq::ZERO )
-ring_atomic/src/lib.rs:    Self::new( Seq::ZERO )
-ring_cursor/src/lib.rs:      producer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      consumer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      producer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      consumer : PaddedCursor::new( Seq::ZERO ),
+ring_atomic/src/lib.rs:        Self::new(Seq::ZERO)
+ring_atomic/src/lib.rs:        Self::new(Seq::ZERO)
+ring_cursor/src/lib.rs:            producer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            consumer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            producer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            consumer: PaddedCursor::new(Seq::ZERO),
 ```
 
 returns exactly those six lines. Dropping the second filter returns 59 — the

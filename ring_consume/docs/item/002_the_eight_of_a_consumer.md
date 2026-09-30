@@ -106,10 +106,10 @@ command grep -m1 -A3 -F '  /// The returned reference is a full [`SeqCell`], so 
 Live output:
 
 ```
-  /// The returned reference is a full [`SeqCell`], so it also permits a
-  /// direct `store` — which bypasses `commit`'s guard entirely, along with
-  /// every guarantee this type provides. The only sound reason to call this
-  /// accessor is to assert wiring identity, as the doctest below does with
+    /// The returned reference is a full [`SeqCell`], so it also permits a
+    /// direct `store` — which bypasses `commit`'s guard entirely, along with
+    /// every guarantee this type provides. The only sound reason to call this
+    /// accessor is to assert wiring identity, as the doctest below does with
 ```
 
 **Disposition:** applied — `cursor()`'s doc comment now says the sentence

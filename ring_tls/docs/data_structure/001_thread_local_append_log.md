@@ -140,8 +140,8 @@ Live output:
 ```
 thread_local! in the whole family: 3
 and every construction site is an ordinary local or field:
-ring_bench/src/lib.rs:  let buffer = TlsBuffer::< Record >::with_capacity( workload.batch() );
-ring_testkit/src/lib.rs:    let mut staging : TlsBuffer< u32 > = TlsBuffer::with_capacity( self.stage_limit );
+ring_bench/src/lib.rs:    let buffer = TlsBuffer::<Record>::with_capacity(workload.batch());
+ring_testkit/src/lib.rs:        let mut staging: TlsBuffer<u32> = TlsBuffer::with_capacity(self.stage_limit);
 ```
 
 No thread-local storage anywhere in thirty-three crates. The `tls` in the

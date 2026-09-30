@@ -213,7 +213,7 @@ ls ring_flush/docs/algorithm/
 Live output:
 
 ```
-    // Steps 1, 3 and 4 — seal, drain, reset. `TlsBuffer::drain` empties the
+        // Steps 1, 3 and 4 — seal, drain, reset. `TlsBuffer::drain` empties the
 001_evaluating_a_policy_at_an_append.md
 002_sequencing_seal_drain_reset.md
 readme.md

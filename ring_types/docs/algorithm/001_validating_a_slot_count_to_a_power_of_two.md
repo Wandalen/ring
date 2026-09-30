@@ -212,7 +212,7 @@ grep -r 'Capacity::new' ring_*/src/*.rs | grep -v '^ring_types/' \
 Live output:
 
 ```
-ring_config/src/lib.rs:        capacity : Capacity::new( slots )?,
+ring_config/src/lib.rs:            capacity: Capacity::new(slots)?,
 ```
 
 **The validation this algorithm describes therefore guards one door.** Everything

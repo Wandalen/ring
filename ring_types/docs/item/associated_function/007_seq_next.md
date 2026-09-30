@@ -66,9 +66,9 @@ command grep -r '\.next()' ring_*/src | command grep -v '^ring_types/' \
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:      end = end.next();
-ring_spsc/src/lib.rs:    self.ring.cursors.producer().store( self.seq.next(), HANDOFF );
-ring_tls/src/lib.rs:    let item = self.items.next()?;
+ring_mpsc/src/lib.rs:            end = end.next();
+ring_spsc/src/lib.rs:        self.ring.cursors.producer().store(self.seq.next(), HANDOFF);
+ring_tls/src/lib.rs:        let item = self.items.next()?;
 ```
 
 Three lines, in this order.

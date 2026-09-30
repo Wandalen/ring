@@ -32,8 +32,8 @@ grep -r '\.min()' ring_*/src/*.rs
 Live output:
 
 ```
-ring_cursor/src/lib.rs:  cursors.iter().map( | c | c.load( GATING ) ).min()
-ring_seqno/src/lib.rs:  cursors.iter().copied().min()
+ring_cursor/src/lib.rs:    cursors.iter().map(|c| c.load(GATING)).min()
+ring_seqno/src/lib.rs:    cursors.iter().copied().min()
 ```
 
 **Finding SQ4.** Two folds, and both functions are named `slowest`. For four

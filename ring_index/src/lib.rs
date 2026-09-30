@@ -35,18 +35,18 @@ use ring_types::{Capacity, Seq, SlotIndex};
 /// the aliasing the gating machinery exists to prevent from being *observed*.
 ///
 /// ```
-/// use ring_types::{ Capacity, Seq, SlotIndex };
 /// use ring_index::of;
+/// use ring_types::{Capacity, Seq, SlotIndex};
 ///
-/// let cap = Capacity::new( 8 ).unwrap();
-/// assert_eq!( of( Seq( 0 ), cap ), SlotIndex( 0 ) );
-/// assert_eq!( of( Seq( 7 ), cap ), SlotIndex( 7 ) );
-/// assert_eq!( of( Seq( 8 ), cap ), SlotIndex( 0 ) );   // one lap on
-/// assert_eq!( of( Seq( 13 ), cap ), SlotIndex( 5 ) );
+/// let cap = Capacity::new(8).unwrap();
+/// assert_eq!(of(Seq(0), cap), SlotIndex(0));
+/// assert_eq!(of(Seq(7), cap), SlotIndex(7));
+/// assert_eq!(of(Seq(8), cap), SlotIndex(0)); // one lap on
+/// assert_eq!(of(Seq(13), cap), SlotIndex(5));
 /// ```
 #[must_use]
 pub fn of(seq: Seq, capacity: Capacity) -> SlotIndex {
-  SlotIndex((seq.0 as usize) & capacity.mask())
+    SlotIndex((seq.0 as usize) & capacity.mask())
 }
 
 /// Whether two sequences address the same slot — true exactly when they are a
@@ -60,17 +60,17 @@ pub fn of(seq: Seq, capacity: Capacity) -> SlotIndex {
 /// can be tested against it; it does not prevent anything itself.
 ///
 /// ```
-/// use ring_types::{ Capacity, Seq };
 /// use ring_index::aliases;
+/// use ring_types::{Capacity, Seq};
 ///
-/// let cap = Capacity::new( 4 ).unwrap();
-/// assert!( aliases( Seq( 1 ), Seq( 5 ), cap ) );
-/// assert!( aliases( Seq( 1 ), Seq( 9 ), cap ) );
-/// assert!( !aliases( Seq( 1 ), Seq( 2 ), cap ) );
+/// let cap = Capacity::new(4).unwrap();
+/// assert!(aliases(Seq(1), Seq(5), cap));
+/// assert!(aliases(Seq(1), Seq(9), cap));
+/// assert!(!aliases(Seq(1), Seq(2), cap));
 /// ```
 #[must_use]
 pub fn aliases(a: Seq, b: Seq, capacity: Capacity) -> bool {
-  of(a, capacity) == of(b, capacity)
+    of(a, capacity) == of(b, capacity)
 }
 
 /// The slots a contiguous run of `count` sequences starting at `start`
@@ -105,14 +105,14 @@ pub fn aliases(a: Seq, b: Seq, capacity: Capacity) -> bool {
 /// for a sequence that never occurred.
 ///
 /// ```
-/// use ring_types::{ Capacity, Seq, SlotIndex };
 /// use ring_index::run;
+/// use ring_types::{Capacity, Seq, SlotIndex};
 ///
-/// let cap = Capacity::new( 4 ).unwrap();
-/// assert_eq!( run( Seq( 2 ), 4, cap ), vec![ SlotIndex( 2 ), SlotIndex( 3 ), SlotIndex( 0 ), SlotIndex( 1 ) ] );
-/// assert_eq!( run( Seq( 0 ), 0, cap ), vec![] );
+/// let cap = Capacity::new(4).unwrap();
+/// assert_eq!(run(Seq(2), 4, cap), vec![SlotIndex(2), SlotIndex(3), SlotIndex(0), SlotIndex(1)]);
+/// assert_eq!(run(Seq(0), 0, cap), vec![]);
 /// ```
 #[must_use]
 pub fn run(start: Seq, count: usize, capacity: Capacity) -> Vec<SlotIndex> {
-  (0..count as u64).map(|n| of(start.advanced_by(n), capacity)).collect()
+    (0..count as u64).map(|n| of(start.advanced_by(n), capacity)).collect()
 }

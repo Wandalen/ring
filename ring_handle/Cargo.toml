@@ -14,7 +14,7 @@ default = []
 # `docs/integration/001`'s requirement 1 — the same handle behaviour across
 # every backend — can be tested against all three rather than the two that
 # need no feature.
-crossbeam = [ "ring_core/crossbeam" ]
+crossbeam = ["ring_core/crossbeam"]
 
 [dependencies]
 ring_core = { path = "../ring_core", version = "0.1.0" }

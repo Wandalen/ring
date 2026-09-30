@@ -41,9 +41,9 @@ grep -rl 'OverflowPolicy::[A-Za-z]*\s*=>' */src/*.rs
 Live output:
 
 ```
-        core::hint::spin_loop();
-      std::thread::yield_now();
-      std::thread::sleep( std::time::Duration::from_micros( 50 ) );
+                core::hint::spin_loop();
+            std::thread::yield_now();
+            std::thread::sleep(std::time::Duration::from_micros(50));
 1
 ring_wait/src/lib.rs
 ring_overflow/src/lib.rs

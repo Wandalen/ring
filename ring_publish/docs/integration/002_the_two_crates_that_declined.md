@@ -144,8 +144,8 @@ grep -r 'const PUBLISH' */src/*.rs
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:pub const PUBLISH : Ordering = Ordering::Release;
-ring_publish/src/lib.rs:const PUBLISH : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+ring_mpsc/src/lib.rs:pub const PUBLISH: Ordering = Ordering::Release;
+ring_publish/src/lib.rs:const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
 ```
 
 | | `ring_publish:60-67` | `ring_mpsc:224-237` |

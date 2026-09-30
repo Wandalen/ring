@@ -40,9 +40,9 @@ rediscovering.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- declared public --'
-command grep -cE '^(pub |  pub )(const|fn|struct|use)' ring_cursor/src/lib.rs
+command grep -cE '^(pub |    pub )(const|fn|struct|use)' ring_cursor/src/lib.rs
 echo '  -- reachable, and undeclarable: a trait impl method carries no pub --'
-command grep -E '^  fn (load|store|fetch_add|compare_exchange)' ring_cursor/src/lib.rs
+command grep -E '^    fn (load|store|fetch_add|compare_exchange)' ring_cursor/src/lib.rs
 ```
 
 Live output:
@@ -51,10 +51,10 @@ Live output:
   -- declared public --
 17
   -- reachable, and undeclarable: a trait impl method carries no pub --
-  fn load( &self, order : Ordering ) -> Seq
-  fn store( &self, value : Seq, order : Ordering )
-  fn fetch_add( &self, n : u64, order : Ordering ) -> Seq
-  fn compare_exchange( &self, current : Seq, new : Seq, success : Ordering, failure : Ordering )
+    fn load(&self, order: Ordering) -> Seq {
+    fn store(&self, value: Seq, order: Ordering) {
+    fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+    fn compare_exchange(
 ```
 
 **A declaration census, and four items no declaration census can reach.** A

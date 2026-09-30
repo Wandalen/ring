@@ -86,13 +86,13 @@ Both parameters meet in this crate's own doc example:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-command grep -m1 -F '  /// let buffer : Buffer< BytesSlot< 8 > > = Buffer::new( Capacity::new( 16 ).unwrap() );' ring_store/src/lib.rs
+command grep -m1 -F '    /// let buffer: Buffer<BytesSlot<8>> = Buffer::new(Capacity::new(16).unwrap());' ring_store/src/lib.rs
 ```
 
 Live output:
 
 ```
-  /// let buffer : Buffer< BytesSlot< 8 > > = Buffer::new( Capacity::new( 16 ).unwrap() );
+    /// let buffer: Buffer<BytesSlot<8>> = Buffer::new(Capacity::new(16).unwrap());
 ```
 
 **Finding.** Two sizes, one line, opposite treatments. The slot's width — `8` —

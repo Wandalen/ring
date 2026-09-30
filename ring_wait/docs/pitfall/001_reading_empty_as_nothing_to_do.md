@@ -41,8 +41,8 @@ grep -vE "^[[:space:]]*//" ring_wait/src/lib.rs \
 Live output:
 
 ```
-  Err( RingError::Empty )
-  wait_until( kind, spins, || pair.may_claim() ).map_err( | _ | RingError::Full )
+    Err(RingError::Empty)
+    wait_until(kind, spins, || pair.may_claim()).map_err(|_| RingError::Full)
 ```
 
 **Exactly two hits** — `Empty` as `wait_until`'s give-up value, `Full` in

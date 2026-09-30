@@ -136,7 +136,7 @@ command grep -F 'refusals, not losses: the item was handed back to the caller' s
 Live output:
 
 ```
-  /// refusals, not losses: the item was handed back to the caller, not dropped.
+    /// refusals, not losses: the item was handed back to the caller, not dropped.
 ```
 
 **Disposition:** applied — `dropped`'s doc comment now states the exception the

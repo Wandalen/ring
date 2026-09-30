@@ -9,8 +9,8 @@ description = "Consumer barrier over the minimum of dependent cursors"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_wait = { path = "../ring_wait", version = "0.1.0" }
 
 # Tests only. Three of them assert the relationship between this crate's answers

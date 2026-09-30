@@ -73,11 +73,11 @@ command grep -B4 'RegistryError::NameTaken' ring_factory/src/lib.rs
 Live output:
 
 ```
-      Ok( () ) => Ok( () ),
-      // The name is discarded rather than carried into `BuildError`: the caller
-      // passed it in and still has it. Carrying it would also put a `String` in
-      // a `Copy` error type for no new information.
-      Err( ( RegistryError::NameTaken { .. }, _refused ) ) => Err( BuildError::NameTaken ),
+            Ok(()) => Ok(()),
+            // The name is discarded rather than carried into `BuildError`: the caller
+            // passed it in and still has it. Carrying it would also put a `String` in
+            // a `Copy` error type for no new information.
+            Err((RegistryError::NameTaken { .. }, _refused)) => Err(BuildError::NameTaken),
 ```
 
 That is correct, and it is the reason the crate's "a refused registration leaks

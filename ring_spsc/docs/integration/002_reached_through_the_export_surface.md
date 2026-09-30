@@ -193,11 +193,11 @@ cat ring_core/src/*.rs | grep -vE '^\s*(//|///|//!)' | grep 'ring_spsc'
 Live output:
 
 ```
-  Spsc( ring_spsc::Ring< TypedSlot< T > > ),
-      false => Storage::Spsc( ring_spsc::Ring::with_config( config ) ),
-  Spsc( &'a mut ring_spsc::Ring< TypedSlot< T > > ),
-  Spsc( ring_spsc::Producer< 'a, TypedSlot< T > > ),
-  Spsc( ring_spsc::Consumer< 'a, TypedSlot< T > > ),
+    Spsc(ring_spsc::Ring<TypedSlot<T>>),
+            false => Storage::Spsc(ring_spsc::Ring::with_config(config)),
+    Spsc(&'a mut ring_spsc::Ring<TypedSlot<T>>),
+    Spsc(ring_spsc::Producer<'a, TypedSlot<T>>),
+    Spsc(ring_spsc::Consumer<'a, TypedSlot<T>>),
 ```
 
 Five lines, five variant declarations or constructor calls. No method of this

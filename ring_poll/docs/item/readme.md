@@ -36,11 +36,11 @@ printf 'finding headings inside:    %s\n' "$( command grep -hoE '^### PL[0-9]+ '
 printf 'rows in the table below:    %s\n' "$( command grep -coE '^\| PL[0-9]+ ' readme.md )"
 printf 'each instance has a recipe: %s\n' "$( command grep -lc '^### Regenerate' [0-9][0-9][0-9]_*.md | wc -l )"
 printf 'declarations catalogued:    %s\n' "$( command grep -cE '^pub (fn|struct|enum|const|type|mod|use|trait) ' ../../src/lib.rs || true )"
-printf 'public fns and methods:     %s\n' "$( command grep -cE '^(pub|  pub) (const )?fn ' ../../src/lib.rs || true )"
+printf 'public fns and methods:     %s\n' "$( command grep -cE '^(pub|    pub) (const )?fn ' ../../src/lib.rs || true )"
 printf 'impl blocks:                %s\n' "$( command grep -cE '^impl ' ../../src/lib.rs || true )"
 printf 'declaration kinds present:  %s\n' "$( command grep -oE '^pub (fn|struct|enum|const|type|mod|use|trait) ' ../../src/lib.rs | sed 's/^pub //' | sort -u | tr '\n' ' ' )"
 printf 'declaration kinds absent:   %s\n' "$( for k in fn struct enum const type mod use trait; do command grep -qE "^pub $k " ../../src/lib.rs || printf '%s ' "$k"; done )"
-printf 'items doc-commented:        %s\n' "$( command grep -B1 -E '^(pub|  pub) (const )?fn |^pub (struct|enum|const) ' ../../src/lib.rs | command grep -c '///' || true )"
+printf 'items doc-commented:        %s\n' "$( command grep -B1 -E '^(pub|    pub) (const )?fn |^pub (struct|enum|const) ' ../../src/lib.rs | command grep -c '///' || true )"
 ```
 
 Live output:

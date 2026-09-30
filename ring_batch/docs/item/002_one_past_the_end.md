@@ -36,9 +36,10 @@ Live output:
   -- the pre-BA28-fix doc clause, searched for in the current source (expect 0 -- see BA28 below) --
     hits: 0
   -- every internal caller --
-    seq.0 >= self.start.0 && seq.0 < self.end().0
-    ( self.start.0..self.end().0 ).map( Seq )
-      && self.start.0 < other.end().0 && other.start.0 < self.end().0
+        seq.0 >= self.start.0 && seq.0 < self.end().0
+        (self.start.0..self.end().0).map(Seq)
+            && self.start.0 < other.end().0
+            && other.start.0 < self.end().0
   -- every other arithmetic operator in the crate body --
     (none)
 ```
@@ -89,7 +90,7 @@ command grep 'the cell itself will usually have moved past it' ring_batch/src/li
 Live output:
 
 ```
-  /// under contention the cell itself will usually have moved past it by
+    /// under contention the cell itself will usually have moved past it by
 ```
 
 **Disposition:** applied — `end()`'s doc comment no longer says "the value the
@@ -121,9 +122,9 @@ Live output:
 
 ```
   -- every consumer in the test suite --
-  assert_eq!( batch.end(), Seq( 13 ) );
-  assert_eq!( batch.start(), batch.end() );
-        pair[ 0 ].end().0 <= pair[ 1 ].start().0,
+    assert_eq!(batch.end(), Seq(13));
+    assert_eq!(batch.start(), batch.end());
+                pair[0].end().0 <= pair[1].start().0,
 ```
 
 **Finding.** Two of the three test call sites assert `end()`'s own value; the

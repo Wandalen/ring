@@ -33,7 +33,7 @@ Live output:
 
 ```
 //! partially-filled slot reads back exactly what was written and nothing else,
-  /// The bytes written, and only those — never the unused tail.
+    /// The bytes written, and only those — never the unused tail.
 ```
 
 Half one — *reads back exactly what was written* — is upheld by `write` copying
@@ -116,16 +116,15 @@ Live output:
 ```
 /// A shorter write over a longer one truncates the reading — the stale tail must
 /// not reappear, which across ring laps would be a data leak between publishes.
-#[ test ]
-fn a_shorter_write_does_not_leak_the_longer_one()
-{
-  let mut slot = BytesSlot::< 8 >::empty();
-  slot.write( b"AAAAAAAA" ).unwrap();
-  assert_eq!( slot.read(), b"AAAAAAAA" );
+#[test]
+fn a_shorter_write_does_not_leak_the_longer_one() {
+    let mut slot = BytesSlot::<8>::empty();
+    slot.write(b"AAAAAAAA").unwrap();
+    assert_eq!(slot.read(), b"AAAAAAAA");
 
-  slot.write( b"bb" ).unwrap();
-  assert_eq!( slot.read(), b"bb", "the previous payload's tail must not reappear" );
-  assert_eq!( slot.len(), 2 );
+    slot.write(b"bb").unwrap();
+    assert_eq!(slot.read(), b"bb", "the previous payload's tail must not reappear");
+    assert_eq!(slot.len(), 2);
 }
 ```
 

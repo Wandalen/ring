@@ -24,11 +24,9 @@ round-failures: 1
 detector: push_batch_within_eats_one_record_per_attempt
 
 --- from
-  while attempt < budget.attempts()
-  {
-    let moved = producer.try_push_batch( records );
+    while attempt < budget.attempts() {
+        let moved = producer.try_push_batch(records);
 --- to
-  while attempt <= budget.attempts()   // PROBE ONLY — G12, was `<`
-  {
-    let moved = producer.try_push_batch( records );
+    while attempt <= budget.attempts() { // PROBE ONLY — G12, was `<`
+        let moved = producer.try_push_batch(records);
 --- end

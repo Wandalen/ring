@@ -126,13 +126,13 @@ command grep -r '\.addr()' --include=*.rs | command grep -vE ':[[:space:]]*(///|
 Live output:
 
 ```
-ring_cursor/src/lib.rs:     on_distinct_lines( self.producer.addr(), self.consumer.addr() )
-ring_cursor/tests/cursor_test.rs:     let gap = window[ 1 ].addr() - window[ 0 ].addr();
-ring_cursor/tests/cursor_test.rs:   for ( name, addr ) in [ ( "producer", pair.producer().addr() ), ( "consumer", pair.consumer().addr() ) ]
-ring_cursor/tests/cursor_test.rs:   let gap = pair.producer().addr().abs_diff( pair.consumer().addr() );
-ring_gating/tests/gating_test.rs:     assert_eq!( window[ 1 ].addr() - window[ 0 ].addr(), 64 );
-ring_mpsc/src/lib.rs:     let claim = self.claimer.cursor().addr();
-ring_mpsc/src/lib.rs:     let consume = self.ring.consumer_cursor().addr();
+ring_cursor/src/lib.rs:         on_distinct_lines(self.producer.addr(), self.consumer.addr())
+ring_cursor/tests/cursor_test.rs:         let gap = window[1].addr() - window[0].addr();
+ring_cursor/tests/cursor_test.rs:     for (name, addr) in [("producer", pair.producer().addr()), ("consumer", pair.consumer().addr())]
+ring_cursor/tests/cursor_test.rs:     let gap = pair.producer().addr().abs_diff(pair.consumer().addr());
+ring_gating/tests/gating_test.rs:         assert_eq!(window[1].addr() - window[0].addr(), 64);
+ring_mpsc/src/lib.rs:         let claim = self.claimer.cursor().addr();
+ring_mpsc/src/lib.rs:         let consume = self.ring.consumer_cursor().addr();
 ```
 
 | Caller | Use |
@@ -205,23 +205,23 @@ Live output:
   -- crates a PaddedCursor can reach (they declare ring_cursor) --
 ring_barrier ring_claim ring_consume ring_debug ring_gating ring_mpsc ring_publish ring_shutdown ring_spsc ring_wait 
   -- every .fetch_add( call site in those crates, src/ and tests/ alike --
-ring_barrier/tests/allocation_test.rs:    ALLOCATIONS.fetch_add( 1, Ordering::Relaxed );
-ring_barrier/tests/allocation_test.rs:    BYTES.fetch_add( layout.size(), Ordering::Relaxed );
-ring_claim/tests/allocation_test.rs:    ALLOCATIONS.fetch_add( 1, Ordering::Relaxed );
-ring_claim/tests/allocation_test.rs:    BYTES.fetch_add( layout.size(), Ordering::Relaxed );
-ring_claim/tests/claim_test.rs:  let stolen = claimer.cursor().fetch_add( 4, Ordering::AcqRel );
-ring_consume/tests/allocation_test.rs:    ALLOCATIONS.fetch_add( 1, Ordering::Relaxed );
-ring_consume/tests/allocation_test.rs:    BYTES.fetch_add( layout.size(), Ordering::Relaxed );
-ring_cursor/src/lib.rs:    self.0.get().fetch_add( n, order )
-ring_cursor/tests/allocation_test.rs:    ALLOCATIONS.fetch_add( 1, Ordering::Relaxed );
-ring_cursor/tests/allocation_test.rs:    BYTES.fetch_add( layout.size(), Ordering::Relaxed );
-ring_cursor/tests/cursor_test.rs:          let _ = cursor.fetch_add( 1, Ordering::AcqRel );
-ring_cursor/tests/cursor_test.rs:        let _ = pair.consumer().fetch_add( 1, Ordering::AcqRel );
-ring_cursor/tests/cursor_test.rs:        let _ = pair.producer().fetch_add( 1, Ordering::AcqRel );
-ring_cursor/tests/cursor_test.rs:  assert_eq!( cursor.fetch_add( 5, Ordering::AcqRel ), Seq( 10 ), "returns the pre-advance value" );
-ring_mpsc/tests/mpsc_test.rs:                  full_retries.fetch_add( 1, Ordering::Relaxed );
-ring_mpsc/tests/mpsc_test.rs:      DROPPED.fetch_add( 1, Ordering::Relaxed );
-ring_spsc/tests/spsc_test.rs:      DROPPED[ TAG ].fetch_add( 1, Ordering::Relaxed );
+ring_barrier/tests/allocation_test.rs:        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+ring_barrier/tests/allocation_test.rs:        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+ring_claim/tests/allocation_test.rs:        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+ring_claim/tests/allocation_test.rs:        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+ring_claim/tests/claim_test.rs:    let stolen = claimer.cursor().fetch_add(4, Ordering::AcqRel);
+ring_consume/tests/allocation_test.rs:        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+ring_consume/tests/allocation_test.rs:        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+ring_cursor/src/lib.rs:        self.0.get().fetch_add(n, order)
+ring_cursor/tests/allocation_test.rs:        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+ring_cursor/tests/allocation_test.rs:        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+ring_cursor/tests/cursor_test.rs:                    let _ = cursor.fetch_add(1, Ordering::AcqRel);
+ring_cursor/tests/cursor_test.rs:                let _ = pair.consumer().fetch_add(1, Ordering::AcqRel);
+ring_cursor/tests/cursor_test.rs:                let _ = pair.producer().fetch_add(1, Ordering::AcqRel);
+ring_cursor/tests/cursor_test.rs:    assert_eq!(cursor.fetch_add(5, Ordering::AcqRel), Seq(10), "returns the pre-advance value");
+ring_mpsc/tests/mpsc_test.rs:                  full_retries.fetch_add(1, Ordering::Relaxed);
+ring_mpsc/tests/mpsc_test.rs:            DROPPED.fetch_add(1, Ordering::Relaxed);
+ring_spsc/tests/spsc_test.rs:            DROPPED[TAG].fetch_add(1, Ordering::Relaxed);
 ```
 
 Every line above is on an unrelated `AtomicUsize` — an allocation probe's

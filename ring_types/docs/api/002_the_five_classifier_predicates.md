@@ -60,12 +60,12 @@ Live output:
 
 ```
 == is_configuration ==
-ring_gating/src/lib.rs:  /// assert!( too_wide.is_configuration(), "never retry this one" );
-ring_gating/src/lib.rs:  /// assert!( !RingError::Full.is_configuration(), "but do retry this one" );
+ring_gating/src/lib.rs:    /// assert!(too_wide.is_configuration(), "never retry this one");
+ring_gating/src/lib.rs:    /// assert!(!RingError::Full.is_configuration(), "but do retry this one");
 == is_transient ==
-ring_shutdown/src/lib.rs:  /// assert!( !RingError::Closed.is_transient() );
+ring_shutdown/src/lib.rs:    /// assert!(!RingError::Closed.is_transient());
 == is_non_blocking ==
-ring_config/src/lib.rs:    self.wait.is_non_blocking()
+ring_config/src/lib.rs:        self.wait.is_non_blocking()
 == reports_failure ==
 == drops_silently ==
 ```

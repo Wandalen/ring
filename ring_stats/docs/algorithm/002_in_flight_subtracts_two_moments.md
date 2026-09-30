@@ -209,7 +209,7 @@ command grep -F 'reading taken under traffic is evidence of nothing' src/lib.rs
 Live output:
 
 ```
-  /// reading taken under traffic is evidence of nothing. Held against a
+    /// reading taken under traffic is evidence of nothing. Held against a
 ```
 
 **Disposition:** applied — closed by the same doc edit ST3 records: `in_flight`'s

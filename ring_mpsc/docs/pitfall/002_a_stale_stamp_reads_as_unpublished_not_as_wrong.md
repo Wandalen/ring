@@ -88,13 +88,13 @@ command grep -B2 'Do not weaken the comparison\|Equality, not' src/lib.rs
 Live output:
 
 ```
-  /// or because the stamp still holds the previous lap's sequence.
-  ///
-  /// **Do not weaken the comparison below.** `stamp != UNSTAMPED` and
+    /// or because the stamp still holds the previous lap's sequence.
+    ///
+    /// **Do not weaken the comparison below.** `stamp != UNSTAMPED` and
 --
-    for _ in 0 .. max
-    {
-      // Equality, not `!= UNSTAMPED` or `>= end` — a stamp from the previous
+
+        for _ in 0..max {
+            // Equality, not `!= UNSTAMPED` or `>= end` — a stamp from the previous
 ```
 
 **Disposition:** applied — `contiguous_end` (`src/lib.rs`) now carries a guard

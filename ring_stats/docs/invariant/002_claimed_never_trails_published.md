@@ -169,7 +169,7 @@ command grep -F 'is where three separate roads end' src/lib.rs
 Live output:
 
 ```
-  /// **Zero is where three separate roads end.** A healthy ring reads it
+    /// **Zero is where three separate roads end.** A healthy ring reads it
 ```
 
 **Disposition:** applied — `in_flight`'s doc comment now names the convergence

@@ -97,8 +97,8 @@ Live output:
 
 ```
 ring_store/src/lib.rs://! delegated to `ring_index`. No `unsafe` — a `Box<[S]>` of `Default` slots is
-ring_store/src/lib.rs:  /// Bounded on `Default` alone rather than on `Slot`, because allocation needs
-ring_store/src/lib.rs:  /// `Default` without being a `Slot`. Wrapping the buffer instead would mean a
+ring_store/src/lib.rs:    /// Bounded on `Default` alone rather than on `Slot`, because allocation needs
+ring_store/src/lib.rs:    /// `Default` without being a `Slot`. Wrapping the buffer instead would mean a
 ```
 
 Three mentions, all in the consuming crate. One is incidental — `:21`, inside a

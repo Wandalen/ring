@@ -43,40 +43,40 @@ use ring_types::RingError;
 ///
 /// ```
 /// use ring_event::Fill;
-/// use ring_slot::{ Slot, TypedSlot };
+/// use ring_slot::{Slot, TypedSlot};
 ///
-/// let mut slot = TypedSlot::< u32 >::empty();
-/// 7u32.fill( &mut slot ).unwrap();
-/// assert_eq!( slot.get(), Some( &7 ) );
+/// let mut slot = TypedSlot::<u32>::empty();
+/// 7u32.fill(&mut slot).unwrap();
+/// assert_eq!(slot.get(), Some(&7));
 /// ```
 pub trait Fill<S> {
-  /// Write `self` into `slot`, replacing whatever it held.
-  ///
-  /// # Errors
-  ///
-  /// Whatever the slot shape refuses — [`RingError::BatchTooLarge`] for a byte
-  /// payload longer than the slot, which is a configuration error rather than
-  /// back-pressure: no amount of draining makes the payload fit. A typed
-  /// payload cannot fail, and says so by never returning `Err`.
-  fn fill(self, slot: &mut S) -> Result<(), RingError>;
+    /// Write `self` into `slot`, replacing whatever it held.
+    ///
+    /// # Errors
+    ///
+    /// Whatever the slot shape refuses — [`RingError::BatchTooLarge`] for a byte
+    /// payload longer than the slot, which is a configuration error rather than
+    /// back-pressure: no amount of draining makes the payload fit. A typed
+    /// payload cannot fail, and says so by never returning `Err`.
+    fn fill(self, slot: &mut S) -> Result<(), RingError>;
 }
 
 impl<T> Fill<TypedSlot<T>> for T {
-  fn fill(self, slot: &mut TypedSlot<T>) -> Result<(), RingError> {
-    // Discarding the displaced value is `fill`'s documented contract — "write
-    // `self` into `slot`, replacing whatever it held" — not an oversight. A
-    // caller that needs the old record calls `TypedSlot::set` directly and
-    // binds it; this trait exists to give both slot shapes one signature, and
-    // `BytesSlot` has nothing to hand back.
-    slot.set(self);
-    Ok(())
-  }
+    fn fill(self, slot: &mut TypedSlot<T>) -> Result<(), RingError> {
+        // Discarding the displaced value is `fill`'s documented contract — "write
+        // `self` into `slot`, replacing whatever it held" — not an oversight. A
+        // caller that needs the old record calls `TypedSlot::set` directly and
+        // binds it; this trait exists to give both slot shapes one signature, and
+        // `BytesSlot` has nothing to hand back.
+        slot.set(self);
+        Ok(())
+    }
 }
 
 impl<const N: usize> Fill<BytesSlot<N>> for &[u8] {
-  fn fill(self, slot: &mut BytesSlot<N>) -> Result<(), RingError> {
-    slot.write(self)
-  }
+    fn fill(self, slot: &mut BytesSlot<N>) -> Result<(), RingError> {
+        slot.write(self)
+    }
 }
 
 /// A slot that knows what a reader gets back from it.
@@ -90,52 +90,52 @@ impl<const N: usize> Fill<BytesSlot<N>> for &[u8] {
 /// use ring_slot::TypedSlot;
 ///
 /// let mut slot = TypedSlot::empty();
-/// assert_eq!( slot.peek(), None, "an unpublished slot reads as nothing" );
-/// slot.set( 3u8 );
-/// assert_eq!( slot.peek(), Some( &3 ) );
+/// assert_eq!(slot.peek(), None, "an unpublished slot reads as nothing");
+/// slot.set(3u8);
+/// assert_eq!(slot.peek(), Some(&3));
 /// ```
 pub trait Peek {
-  /// What a reader is handed when the slot holds something.
-  type Out<'a>
-  where
-    Self: 'a;
+    /// What a reader is handed when the slot holds something.
+    type Out<'a>
+    where
+        Self: 'a;
 
-  /// The slot's contents, or `None` when nothing was published into it.
-  ///
-  /// `None` is not an error: a claimed-but-unpublished slot is the state
-  /// feature 170's handshake is built to keep a consumer out of, and this is
-  /// how a drain observes it.
-  ///
-  /// # A `BytesSlot` cannot distinguish empty from zero-length
-  ///
-  /// A [`BytesSlot`] records a length and nothing more, so a deliberately
-  /// published zero-byte payload reads back as `None` — identical to a slot
-  /// nobody has touched. This is a real limitation, not an oversight, and it is
-  /// not worth a flag byte per slot to remove: the ring already carries the
-  /// distinction, in the published-sequence handshake, and a caller that needs
-  /// "somebody published nothing" must read it there rather than from the slot.
-  /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
-  /// cheaper way to send a payload-free signal.
-  fn peek(&self) -> Option<Self::Out<'_>>;
+    /// The slot's contents, or `None` when nothing was published into it.
+    ///
+    /// `None` is not an error: a claimed-but-unpublished slot is the state
+    /// feature 170's handshake is built to keep a consumer out of, and this is
+    /// how a drain observes it.
+    ///
+    /// # A `BytesSlot` cannot distinguish empty from zero-length
+    ///
+    /// A [`BytesSlot`] records a length and nothing more, so a deliberately
+    /// published zero-byte payload reads back as `None` — identical to a slot
+    /// nobody has touched. This is a real limitation, not an oversight, and it is
+    /// not worth a flag byte per slot to remove: the ring already carries the
+    /// distinction, in the published-sequence handshake, and a caller that needs
+    /// "somebody published nothing" must read it there rather than from the slot.
+    /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
+    /// cheaper way to send a payload-free signal.
+    fn peek(&self) -> Option<Self::Out<'_>>;
 }
 
 impl<T> Peek for TypedSlot<T> {
-  type Out<'a>
-    = &'a T
-  where
-    T: 'a;
+    type Out<'a>
+        = &'a T
+    where
+        T: 'a;
 
-  fn peek(&self) -> Option<&T> {
-    self.get()
-  }
+    fn peek(&self) -> Option<&T> {
+        self.get()
+    }
 }
 
 impl<const N: usize> Peek for BytesSlot<N> {
-  type Out<'a> = &'a [u8];
+    type Out<'a> = &'a [u8];
 
-  fn peek(&self) -> Option<&[u8]> {
-    if self.is_empty() { None } else { Some(self.read()) }
-  }
+    fn peek(&self) -> Option<&[u8]> {
+        if self.is_empty() { None } else { Some(self.read()) }
+    }
 }
 
 /// Publish `payload` into `slot` — the one write path both shapes take.
@@ -152,23 +152,23 @@ impl<const N: usize> Peek for BytesSlot<N> {
 /// Whatever [`Fill`] refuses for this pairing.
 ///
 /// ```
-/// use ring_event::{ drain_from, publish_into };
-/// use ring_slot::{ BytesSlot, TypedSlot };
+/// use ring_event::{drain_from, publish_into};
+/// use ring_slot::{BytesSlot, TypedSlot};
 ///
 /// // The same two calls, over two unrelated slot shapes.
 /// let mut typed = TypedSlot::empty();
-/// publish_into( &mut typed, 42u16 ).unwrap();
-/// assert_eq!( drain_from( &typed ), Some( &42 ) );
+/// publish_into(&mut typed, 42u16).unwrap();
+/// assert_eq!(drain_from(&typed), Some(&42));
 ///
-/// let mut bytes = BytesSlot::< 8 >::empty();
-/// publish_into( &mut bytes, &b"hi"[ .. ] ).unwrap();
-/// assert_eq!( drain_from( &bytes ), Some( &b"hi"[ .. ] ) );
+/// let mut bytes = BytesSlot::<8>::empty();
+/// publish_into(&mut bytes, &b"hi"[..]).unwrap();
+/// assert_eq!(drain_from(&bytes), Some(&b"hi"[..]));
 /// ```
 pub fn publish_into<S, P>(slot: &mut S, payload: P) -> Result<(), RingError>
 where
-  P: Fill<S>,
+    P: Fill<S>,
 {
-  payload.fill(slot)
+    payload.fill(slot)
 }
 
 /// Read `slot` — the one read path both shapes take.
@@ -184,25 +184,25 @@ where
 /// slot is factored out to the caller that knows when the read is finished.
 ///
 /// ```
-/// use ring_event::{ drain_from, publish_into, recycle };
-/// use ring_slot::{ BytesSlot, Slot };
+/// use ring_event::{drain_from, publish_into, recycle};
+/// use ring_slot::{BytesSlot, Slot};
 ///
-/// let slot = BytesSlot::< 4 >::empty();
-/// assert_eq!( drain_from( &slot ), None );
+/// let slot = BytesSlot::<4>::empty();
+/// assert_eq!(drain_from(&slot), None);
 ///
-/// let mut slot = BytesSlot::< 4 >::empty();
-/// publish_into( &mut slot, &b"ab"[ .. ] ).unwrap();
-/// assert_eq!( drain_from( &slot ), Some( &b"ab"[ .. ] ) );
-/// assert!( !slot.is_empty(), "reading it did not free it" );
+/// let mut slot = BytesSlot::<4>::empty();
+/// publish_into(&mut slot, &b"ab"[..]).unwrap();
+/// assert_eq!(drain_from(&slot), Some(&b"ab"[..]));
+/// assert!(!slot.is_empty(), "reading it did not free it");
 ///
-/// recycle( &mut slot );
-/// assert!( slot.is_empty(), "this is the call that does" );
+/// recycle(&mut slot);
+/// assert!(slot.is_empty(), "this is the call that does");
 /// ```
 pub fn drain_from<S>(slot: &S) -> Option<S::Out<'_>>
 where
-  S: Peek,
+    S: Peek,
 {
-  slot.peek()
+    slot.peek()
 }
 
 /// Empty `slot` through the shared path.
@@ -212,17 +212,17 @@ where
 /// the identical-path claim does not cover.
 ///
 /// ```
-/// use ring_event::{ drain_from, publish_into, recycle };
+/// use ring_event::{drain_from, publish_into, recycle};
 /// use ring_slot::TypedSlot;
 ///
 /// let mut slot = TypedSlot::empty();
-/// publish_into( &mut slot, 1u8 ).unwrap();
-/// recycle( &mut slot );
-/// assert_eq!( drain_from( &slot ), None );
+/// publish_into(&mut slot, 1u8).unwrap();
+/// recycle(&mut slot);
+/// assert_eq!(drain_from(&slot), None);
 /// ```
 pub fn recycle<S>(slot: &mut S)
 where
-  S: Slot,
+    S: Slot,
 {
-  slot.clear();
+    slot.clear();
 }

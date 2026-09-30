@@ -34,7 +34,7 @@ done
 Live output:
 
 ```
-ring_barrier/tests/barrier_test.rs        1
+ring_barrier/tests/barrier_test.rs             1
 ```
 
 One call, in `a_barrier_exposes_the_same_cursors_it_was_given`, which exists to
@@ -65,8 +65,8 @@ done
 Live output:
 
 ```
-ring_barrier/tests/allocation_test.rs     2
-ring_barrier/tests/barrier_test.rs        8
+ring_barrier/tests/allocation_test.rs          2
+ring_barrier/tests/barrier_test.rs             8
 ```
 
 Eight calls across two files, both this crate's own. **The family's only
@@ -171,11 +171,11 @@ grep -r "\.cursor(" --include=*.rs ring_consume/src/ ring_publish/src/ | sed 's|
 Live output:
 
 ```
-ring_barrier/tests/barrier_test.rs:  assert_eq!( barrier.dependencies().len(), 2 );
-ring_barrier/src/lib.rs:  /// assert_eq!( Barrier::over( &cursors ).dependencies().len(), 2 );
-ring_consume/src/lib.rs:  /// assert_eq!( consumer.cursor().load( Ordering::Acquire ), Seq::ZERO );
-ring_consume/src/lib.rs:  /// assert!( core::ptr::eq( consumer.cursor(), &position ), "the very same cursor" );
-ring_publish/src/lib.rs:  /// assert_eq!( publisher.cursor().load( Ordering::Acquire ), Seq::ZERO );
+ring_barrier/tests/barrier_test.rs:    assert_eq!(barrier.dependencies().len(), 2);
+ring_barrier/src/lib.rs:    /// assert_eq!(Barrier::over(&cursors).dependencies().len(), 2);
+ring_consume/src/lib.rs:    /// assert_eq!(consumer.cursor().load(Ordering::Acquire), Seq::ZERO);
+ring_consume/src/lib.rs:    /// assert!(core::ptr::eq(consumer.cursor(), &position), "the very same cursor");
+ring_publish/src/lib.rs:    /// assert_eq!(publisher.cursor().load(Ordering::Acquire), Seq::ZERO);
 ```
 
 ### Items

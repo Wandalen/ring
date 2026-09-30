@@ -105,12 +105,12 @@ grep 'unsafe {' src/lib.rs | grep -vE '^[0-9]+: *(//|///|//!)'
 Live output:
 
 ```
-    unsafe { &*self.slots.at( seq ).get() }
-    unsafe { &mut *self.slots.at( seq ).get() }
-    unsafe { self.ring.slot_mut( self.seq ) }
-    unsafe { self.ring.slot_mut( self.seq ) }
-    Some( unsafe { self.ring.slot( self.start.advanced_by( offset as u64 ) ) } )
-    Some( unsafe { self.ring.slot_mut( self.start.advanced_by( offset as u64 ) ) } )
+        unsafe { &*self.slots.at(seq).get() }
+        unsafe { &mut *self.slots.at(seq).get() }
+        unsafe { self.ring.slot_mut(self.seq) }
+        unsafe { self.ring.slot_mut(self.seq) }
+        Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
+        Some(unsafe { self.ring.slot_mut(self.start.advanced_by(offset as u64)) })
 ```
 
 Four blocks: two in `Reserved`'s accessors, two in `Batch`'s. `Reserved` is

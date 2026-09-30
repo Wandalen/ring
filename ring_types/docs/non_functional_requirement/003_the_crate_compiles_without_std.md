@@ -67,8 +67,8 @@ use core::fmt;
 use crate::RingError;
 pub use capacity::Capacity;
 pub use error::RingError;
-pub use id::{ Seq, SlotIndex };
-pub use policy::{ OverflowPolicy, WaitKind };
+pub use id::{Seq, SlotIndex};
+pub use policy::{OverflowPolicy, WaitKind};
 ```
 
 The first exits 1 once doc-comment mentions of `std::` are filtered out. The second returns six lines: four crate-local `pub use`

@@ -145,8 +145,8 @@ done
 Live output:
 
 ```
-ring_bench/src/lib.rs               5
-ring_publish/src/lib.rs             1
+ring_bench/src/lib.rs                    5
+ring_publish/src/lib.rs                  1
 ```
 
 | Crate | Bare `loop` blocks | Exit condition | Depends on another thread |

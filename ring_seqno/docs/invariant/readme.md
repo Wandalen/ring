@@ -42,6 +42,6 @@ command grep -c 'unsafe' ring_seqno/src/lib.rs || true
 Live output:
 
 ```
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 0
 ```

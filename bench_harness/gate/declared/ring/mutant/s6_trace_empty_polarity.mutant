@@ -20,11 +20,9 @@ round-failures: 1
 detector: clearing_empties_the_log_without_switching_it_off
 
 --- from
-  pub fn is_empty( &self ) -> bool
-  {
-    self.len() == 0
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
 --- to
-  pub fn is_empty( &self ) -> bool
-  {
-    true   // PROBE ONLY — G12, was `self.len() == 0`
+    pub fn is_empty(&self) -> bool {
+        true // PROBE ONLY — G12, was `self.len() == 0`
 --- end

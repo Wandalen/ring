@@ -220,7 +220,7 @@ wait_until       1
 wait             1
 for_space        1
 for_data         1
-#![ deny( missing_docs ) ]
+#![deny(missing_docs)]
 ```
 
 One each, for all seven. The enabled lint is `deny( missing_docs )`, which

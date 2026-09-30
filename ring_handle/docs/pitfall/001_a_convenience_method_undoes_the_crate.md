@@ -190,7 +190,7 @@ Live output:
   -- F4 names a compile-fail case in ring_poll --
     ls: cannot access 'ring_poll/tests/ui': No such file or directory
   -- F6 names a bounded-time test in ring_poll; that test exists --
-        elapsed < Duration::from_millis( 500 ),
+            elapsed < Duration::from_millis(500),
   -- and no file in ring_poll names this surface --
     ring_handle:: in ring_poll src+tests: 0
   -- F8 names a counting shim in ring_spsc --
@@ -254,10 +254,10 @@ Live output:
 
 ```
   -- the rule the mitigation table prices as a future cost --
-      const FORBIDDEN : [ &str; 7 ] =
-      [ "thread::sleep", "yield_now", "::park", "park(", "Condvar", "Duration", "Waker" ];
+        const FORBIDDEN: [&str; 7] =
+            ["thread::sleep", "yield_now", "::park", "park(", "Condvar", "Duration", "Waker"];
     
-      let source = include_str!( "../src/lib.rs" );
+        let source = include_str!("../src/lib.rs");
   -- an F6-shaped edit, checked against that same list --
     miss thread::sleep
     miss yield_now

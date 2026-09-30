@@ -161,8 +161,8 @@ command grep -A1 -F "O(n) in the" ring_trace/src/lib.rs
 Live output:
 
 ```
-  /// O(n) in the log's current length, and the scan runs under the same lock
-  /// `record` takes — unlike [`len`](Self::len), which is a field read. Do not
+    /// O(n) in the log's current length, and the scan runs under the same lock
+    /// `record` takes — unlike [`len`](Self::len), which is a field read. Do not
 ```
 
 **Disposition:** applied — the cheap repair: `count_of`'s doc now states its

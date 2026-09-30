@@ -39,8 +39,8 @@ grep -r '\.min()' ring_*/src/*.rs | sort
 Live output:
 
 ```
-ring_cursor/src/lib.rs:  cursors.iter().map( | c | c.load( GATING ) ).min()
-ring_seqno/src/lib.rs:  cursors.iter().copied().min()
+ring_cursor/src/lib.rs:    cursors.iter().map(|c| c.load(GATING)).min()
+ring_seqno/src/lib.rs:    cursors.iter().copied().min()
 ```
 
 **Two hits, where the whole argument below was built on there being one.**
@@ -190,13 +190,13 @@ grep -r '\.available(' ring_*/src/*.rs | grep -vE ':\s*///'
 Live output:
 
 ```
-ring_barrier/src/lib.rs:    count <= self.available( from )
-ring_consume/src/lib.rs:    let run = self.available();
-ring_consume/src/lib.rs:    let run = self.available();
-ring_consume/src/lib.rs:    let run = self.available();
-ring_core/src/lib.rs:      ConsumerInner::Spsc( consumer ) => consumer.available(),
-ring_core/src/lib.rs:      ConsumerInner::Mpsc( consumer ) => consumer.available(),
-ring_mpsc/src/lib.rs:    self.available() == 0
+ring_barrier/src/lib.rs:        count <= self.available(from)
+ring_consume/src/lib.rs:        let run = self.available();
+ring_consume/src/lib.rs:        let run = self.available();
+ring_consume/src/lib.rs:        let run = self.available();
+ring_core/src/lib.rs:            ConsumerInner::Spsc(consumer) => consumer.available(),
+ring_core/src/lib.rs:            ConsumerInner::Mpsc(consumer) => consumer.available(),
+ring_mpsc/src/lib.rs:        self.available() == 0
 ```
 
 `Barrier::available` has **no caller outside `ring_barrier`** — only its own

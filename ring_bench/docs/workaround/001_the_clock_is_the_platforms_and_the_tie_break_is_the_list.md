@@ -92,12 +92,12 @@ Live output:
   Instant::now calls        : 6
   -- every use of it in the suite --
 //! - `write_nanos()` can return a constant. Its own doc comment says never to
-    let _elapsed = outcome.write_nanos();
-    let _ = outcome.write_nanos();
+        let _elapsed = outcome.write_nanos();
+        let _ = outcome.write_nanos();
   -- and the one ordering it feeds --
-  /// [`Candidate::ALL`], because `min_by_key` returns the first minimum and the
-  /// Pitfall: `min_by_key` has a documented tie behaviour and inherits its
-      .min_by_key( | outcome | outcome.write_nanos )
+    /// [`Candidate::ALL`], because `min_by_key` returns the first minimum and the
+    /// Pitfall: `min_by_key` has a documented tie behaviour and inherits its
+            .min_by_key(|outcome| outcome.write_nanos)
 ```
 
 Three mentions in the suite: one in a module comment stating the rule, and two

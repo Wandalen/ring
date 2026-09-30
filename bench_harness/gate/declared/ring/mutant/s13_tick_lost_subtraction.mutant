@@ -20,9 +20,9 @@ round-failures: 1
 detector: a_tick_records_a_fully_refused_batch_as_lost_not_moved
 
 --- from
-    self.moved += moved;
-    self.lost += offered - moved;
+        self.moved += moved;
+        self.lost += offered - moved;
 --- to
-    self.moved += moved;
-    self.lost += offered / moved;   // PROBE ONLY — G12, was `offered - moved`
+        self.moved += moved;
+        self.lost += offered / moved; // PROBE ONLY — G12, was `offered - moved`
 --- end

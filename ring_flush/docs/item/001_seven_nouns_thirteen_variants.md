@@ -113,8 +113,8 @@ Live output:
 | `FlushCause` | 1 | **1** |
 | `FlushEntry` | not predicted | 40 |
   -- size assertions in the suite --
-ring_flush/tests/flush_test.rs:    core::mem::size_of::< FlushPolicy >(),
-ring_flush/tests/flush_test.rs:    2 * core::mem::size_of::< usize >(),
+ring_flush/tests/flush_test.rs:        core::mem::size_of::<FlushPolicy>(),
+ring_flush/tests/flush_test.rs:        2 * core::mem::size_of::<usize>(),
 ```
 
 `FlushOutcome` is sixteen bytes, `FlushCause` one, `FlushEntry` forty — measured

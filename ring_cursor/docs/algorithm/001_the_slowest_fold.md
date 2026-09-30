@@ -153,8 +153,8 @@ Live output:
 
 ```
   -- production call sites --
-ring_barrier/src/lib.rs:     ring_cursor::slowest( self.dependencies )
-ring_gating/src/lib.rs:     ring_cursor::slowest( &self.cursors )
+ring_barrier/src/lib.rs:         ring_cursor::slowest(self.dependencies)
+ring_gating/src/lib.rs:         ring_cursor::slowest(&self.cursors)
   -- and the test files that now measure it --
 ring_barrier/tests/allocation_test.rs
 ring_claim/tests/allocation_test.rs

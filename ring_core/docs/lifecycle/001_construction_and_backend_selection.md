@@ -150,9 +150,9 @@ grep -oE '^fn [a-z_]+' tests/core_test.rs | sed 's/^fn //' | grep 'drop_oldest\|
 Live output:
 
 ```
-  /// [`RingError::PolicyUnsupported`] for `OverflowPolicy::DropOldest`, which neither
-  /// assert_eq!( Ring::< u8 >::new( &evicting ).unwrap_err(), RingError::PolicyUnsupported );
-      return Err( RingError::PolicyUnsupported );
+    /// [`RingError::PolicyUnsupported`] for `OverflowPolicy::DropOldest`, which neither
+    /// assert_eq!(Ring::<u8>::new(&evicting).unwrap_err(), RingError::PolicyUnsupported);
+            return Err(RingError::PolicyUnsupported);
 the_crossbeam_backend_ignores_the_producer_count
 drop_oldest_is_rejected_by_the_in_house_backends
 crossbeam_honours_drop_oldest_by_evicting
@@ -177,17 +177,16 @@ command grep -m1 -B2 -A8 -F '    // `match` rather than `if`/`else`: under the f
 Live output:
 
 ```
-    }
+        }
 
-    // `match` rather than `if`/`else`: under the family's brace style the `else`
-    // keyword lands on a line of its own, where `llvm-cov` opens a region that
-    // nothing can ever execute — so the crate reads 120/121 with both arms
-    // demonstrably covered. `tests/manual/readme.md` C4 records the measurement.
-    let storage = match config.is_multi_producer()
-    {
-      true => Storage::Mpsc( ring_mpsc::Ring::with_config( config ) ),
-      false => Storage::Spsc( ring_spsc::Ring::with_config( config ) ),
-    };
+        // `match` rather than `if`/`else`: under the family's brace style the `else`
+        // keyword lands on a line of its own, where `llvm-cov` opens a region that
+        // nothing can ever execute — so the crate reads 120/121 with both arms
+        // demonstrably covered. `tests/manual/readme.md` C4 records the measurement.
+        let storage = match config.is_multi_producer() {
+            true => Storage::Mpsc(ring_mpsc::Ring::with_config(config)),
+            false => Storage::Spsc(ring_spsc::Ring::with_config(config)),
+        };
 ```
 
 The comment names the reason: `llvm-cov` attributes an `if`/`else` on a boolean

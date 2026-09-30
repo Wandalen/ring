@@ -27,11 +27,11 @@ done
 Live output:
 
 ```
-ring_types
 ring_cursor
+ring_types
+ring_barrier
 ring_claim
 ring_consume
-ring_barrier
 ring_gating
 ring_mpsc/Cargo.toml  [package]  # Eight, not the seven this manifest was scaffolded with. `ring_publish` and
 ring_publish/Cargo.toml  [package]  name = "ring_publish"

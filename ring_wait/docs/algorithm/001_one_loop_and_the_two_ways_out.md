@@ -171,8 +171,8 @@ Live output:
 /// # Errors
 /// # Panics
 /// # Errors
-/// assert!( outcome.is_ok() );
-/// assert_eq!( looks, 3, "stopped as soon as it was ready" );
+/// assert!(outcome.is_ok());
+/// assert_eq!(looks, 3, "stopped as soon as it was ready");
 (no crate in the family uses one)
 ```
 

@@ -251,12 +251,12 @@ command grep -m1 -A5 -F "/// One consumer" ring_gating/src/lib.rs
 Live output:
 
 ```
-  /// One consumer's cursor, for that consumer to advance.
-  ///
-  /// The `&self` receiver does not make the return value read-only: a
-  /// `PaddedCursor` wraps an atomic, so `&PaddedCursor` is enough to store
-  /// through it. Membership is fixed once the set is constructed; a cursor's
-  /// stored position is not.
+    /// One consumer's cursor, for that consumer to advance.
+    ///
+    /// The `&self` receiver does not make the return value read-only: a
+    /// `PaddedCursor` wraps an atomic, so `&PaddedCursor` is enough to store
+    /// through it. Membership is fixed once the set is constructed; a cursor's
+    /// stored position is not.
 ```
 
 **Disposition:** applied — `cursor()`'s own doc comment in `src/lib.rs` now

@@ -178,8 +178,8 @@ command grep -A1 -F 'A `max` of zero is also `Full`' ring_claim/src/lib.rs
 Live output:
 
 ```
-  /// A `max` of zero is also `Full`, since there is no partial success at
-  /// zero to report — this differs from [`claim`], which treats a `count`
+    /// A `max` of zero is also `Full`, since there is no partial success at
+    /// zero to report — this differs from [`claim`], which treats a `count`
 ```
 
 **Disposition:** applied — both clauses now exist: `claim_up_to`'s

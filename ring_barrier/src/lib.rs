@@ -65,211 +65,221 @@ use ring_types::{RingError, Seq, WaitKind};
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
+///
 /// use ring_barrier::Barrier;
-/// use ring_cursor::{ PaddedCursor, SeqCell };
+/// use ring_cursor::{PaddedCursor, SeqCell};
 /// use ring_types::Seq;
 ///
-/// let published = [ PaddedCursor::default() ];
-/// published[ 0 ].store( Seq( 5 ), Ordering::Release );
+/// let published = [PaddedCursor::default()];
+/// published[0].store(Seq(5), Ordering::Release);
 ///
-/// let barrier = Barrier::over( &published );
-/// assert_eq!( barrier.frontier(), Some( Seq( 5 ) ) );
-/// assert_eq!( barrier.available( Seq( 2 ) ), 3, "sequences 2, 3 and 4" );
+/// let barrier = Barrier::over(&published);
+/// assert_eq!(barrier.frontier(), Some(Seq(5)));
+/// assert_eq!(barrier.available(Seq(2)), 3, "sequences 2, 3 and 4");
 /// ```
 #[derive(Debug, Clone, Copy)]
 pub struct Barrier<'a> {
-  dependencies: &'a [PaddedCursor],
+    dependencies: &'a [PaddedCursor],
 }
 
 impl<'a> Barrier<'a> {
-  /// A barrier over every cursor in `dependencies`.
-  ///
-  /// A slice, so that the one cursor a single-producer consumer waits on needs
-  /// no aggregate to be wrapped in — `core::slice::from_ref` is the whole of it.
-  ///
-  /// ```
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::PaddedCursor;
-  ///
-  /// let pair = [ PaddedCursor::default(), PaddedCursor::default() ];
-  /// assert_eq!( Barrier::over( &pair ).len(), 2 );
-  ///
-  /// let one = PaddedCursor::default();
-  /// assert_eq!( Barrier::over( core::slice::from_ref( &one ) ).len(), 1 );
-  /// ```
-  #[must_use]
-  pub const fn over(dependencies: &'a [PaddedCursor]) -> Self {
-    Self { dependencies }
-  }
+    /// A barrier over every cursor in `dependencies`.
+    ///
+    /// A slice, so that the one cursor a single-producer consumer waits on needs
+    /// no aggregate to be wrapped in — `core::slice::from_ref` is the whole of it.
+    ///
+    /// ```
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::PaddedCursor;
+    ///
+    /// let pair = [PaddedCursor::default(), PaddedCursor::default()];
+    /// assert_eq!(Barrier::over(&pair).len(), 2);
+    ///
+    /// let one = PaddedCursor::default();
+    /// assert_eq!(Barrier::over(core::slice::from_ref(&one)).len(), 1);
+    /// ```
+    #[must_use]
+    pub const fn over(dependencies: &'a [PaddedCursor]) -> Self {
+        Self { dependencies }
+    }
 
-  /// Every cursor this barrier waits on.
-  ///
-  /// ```
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::PaddedCursor;
-  ///
-  /// let cursors = [ PaddedCursor::default(), PaddedCursor::default() ];
-  /// assert_eq!( Barrier::over( &cursors ).dependencies().len(), 2 );
-  /// ```
-  #[must_use]
-  pub const fn dependencies(&self) -> &'a [PaddedCursor] {
-    self.dependencies
-  }
+    /// Every cursor this barrier waits on.
+    ///
+    /// ```
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::PaddedCursor;
+    ///
+    /// let cursors = [PaddedCursor::default(), PaddedCursor::default()];
+    /// assert_eq!(Barrier::over(&cursors).dependencies().len(), 2);
+    /// ```
+    #[must_use]
+    pub const fn dependencies(&self) -> &'a [PaddedCursor] {
+        self.dependencies
+    }
 
-  /// How many cursors this barrier waits on.
-  ///
-  /// ```
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::PaddedCursor;
-  ///
-  /// let cursors = [ PaddedCursor::default(), PaddedCursor::default(), PaddedCursor::default() ];
-  /// assert_eq!( Barrier::over( &cursors ).len(), 3 );
-  /// assert!( !Barrier::over( &cursors ).is_empty() );
-  /// ```
-  #[must_use]
-  pub const fn len(&self) -> usize {
-    self.dependencies.len()
-  }
+    /// How many cursors this barrier waits on.
+    ///
+    /// ```
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::PaddedCursor;
+    ///
+    /// let cursors = [PaddedCursor::default(), PaddedCursor::default(), PaddedCursor::default()];
+    /// assert_eq!(Barrier::over(&cursors).len(), 3);
+    /// assert!(!Barrier::over(&cursors).is_empty());
+    /// ```
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.dependencies.len()
+    }
 
-  /// Whether this barrier waits on nothing.
-  ///
-  /// ```
-  /// use ring_barrier::Barrier;
-  /// assert!( Barrier::over( &[] ).is_empty() );
-  /// ```
-  #[must_use]
-  pub const fn is_empty(&self) -> bool {
-    self.dependencies.is_empty()
-  }
+    /// Whether this barrier waits on nothing.
+    ///
+    /// ```
+    /// use ring_barrier::Barrier;
+    /// assert!(Barrier::over(&[]).is_empty());
+    /// ```
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.dependencies.is_empty()
+    }
 
-  /// One dependency's cursor, for that dependency to advance.
-  ///
-  /// ```
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::PaddedCursor;
-  ///
-  /// let cursors = [ PaddedCursor::default() ];
-  /// let barrier = Barrier::over( &cursors );
-  /// assert!( barrier.cursor( 0 ).is_some() );
-  /// assert!( barrier.cursor( 1 ).is_none() );
-  /// ```
-  #[must_use]
-  pub fn cursor(&self, index: usize) -> Option<&'a PaddedCursor> {
-    self.dependencies.get(index)
-  }
+    /// One dependency's cursor, for that dependency to advance.
+    ///
+    /// ```
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::PaddedCursor;
+    ///
+    /// let cursors = [PaddedCursor::default()];
+    /// let barrier = Barrier::over(&cursors);
+    /// assert!(barrier.cursor(0).is_some());
+    /// assert!(barrier.cursor(1).is_none());
+    /// ```
+    #[must_use]
+    pub fn cursor(&self, index: usize) -> Option<&'a PaddedCursor> {
+        self.dependencies.get(index)
+    }
 
-  /// The furthest sequence every dependency has reached, or `None` when there
-  /// are no dependencies.
-  ///
-  /// The minimum, for the same reason `ring_gating` takes a minimum: a consumer
-  /// that read past *any* dependency would be reading a slot that dependency
-  /// has not finished producing or forwarding. One lagging dependency holds the
-  /// whole barrier, which is the point of having one.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::{ PaddedCursor, SeqCell };
-  /// use ring_types::Seq;
-  ///
-  /// let cursors = [ PaddedCursor::default(), PaddedCursor::default(), PaddedCursor::default() ];
-  /// for ( i, cursor ) in cursors.iter().enumerate()
-  /// {
-  ///   cursor.store( Seq( 10 + i as u64 ), Ordering::Release );
-  /// }
-  /// assert_eq!( Barrier::over( &cursors ).frontier(), Some( Seq( 10 ) ) );
-  /// ```
-  #[must_use]
-  pub fn frontier(&self) -> Option<Seq> {
-    ring_cursor::slowest(self.dependencies)
-  }
+    /// The furthest sequence every dependency has reached, or `None` when there
+    /// are no dependencies.
+    ///
+    /// The minimum, for the same reason `ring_gating` takes a minimum: a consumer
+    /// that read past *any* dependency would be reading a slot that dependency
+    /// has not finished producing or forwarding. One lagging dependency holds the
+    /// whole barrier, which is the point of having one.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::{PaddedCursor, SeqCell};
+    /// use ring_types::Seq;
+    ///
+    /// let cursors = [PaddedCursor::default(), PaddedCursor::default(), PaddedCursor::default()];
+    /// for (i, cursor) in cursors.iter().enumerate() {
+    ///     cursor.store(Seq(10 + i as u64), Ordering::Release);
+    /// }
+    /// assert_eq!(Barrier::over(&cursors).frontier(), Some(Seq(10)));
+    /// ```
+    #[must_use]
+    pub fn frontier(&self) -> Option<Seq> {
+        ring_cursor::slowest(self.dependencies)
+    }
 
-  /// How many sequences a consumer at `from` may read right now.
-  ///
-  /// Zero when the barrier has no dependencies — see the module documentation
-  /// for why that is not the same answer `ring_gating` gives an empty set.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::{ PaddedCursor, SeqCell };
-  /// use ring_types::Seq;
-  ///
-  /// let cursors = [ PaddedCursor::default() ];
-  /// cursors[ 0 ].store( Seq( 4 ), Ordering::Release );
-  ///
-  /// let barrier = Barrier::over( &cursors );
-  /// assert_eq!( barrier.available( Seq::ZERO ), 4 );
-  /// assert_eq!( barrier.available( Seq( 4 ) ), 0, "caught up" );
-  /// assert_eq!( barrier.available( Seq( 9 ) ), 0, "and never negative" );
-  /// ```
-  #[must_use]
-  pub fn available(&self, from: Seq) -> u64 {
-    self.frontier().map_or(0, |frontier| from.distance_to(frontier))
-  }
+    /// How many sequences a consumer at `from` may read right now.
+    ///
+    /// Zero when the barrier has no dependencies — see the module documentation
+    /// for why that is not the same answer `ring_gating` gives an empty set.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::{PaddedCursor, SeqCell};
+    /// use ring_types::Seq;
+    ///
+    /// let cursors = [PaddedCursor::default()];
+    /// cursors[0].store(Seq(4), Ordering::Release);
+    ///
+    /// let barrier = Barrier::over(&cursors);
+    /// assert_eq!(barrier.available(Seq::ZERO), 4);
+    /// assert_eq!(barrier.available(Seq(4)), 0, "caught up");
+    /// assert_eq!(barrier.available(Seq(9)), 0, "and never negative");
+    /// ```
+    #[must_use]
+    pub fn available(&self, from: Seq) -> u64 {
+        self.frontier().map_or(0, |frontier| from.distance_to(frontier))
+    }
 
-  /// Whether a consumer at `from` may read `count` sequences without passing
-  /// any dependency.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::{ PaddedCursor, SeqCell };
-  /// use ring_types::Seq;
-  ///
-  /// let cursors = [ PaddedCursor::default() ];
-  /// cursors[ 0 ].store( Seq( 3 ), Ordering::Release );
-  ///
-  /// let barrier = Barrier::over( &cursors );
-  /// assert!( barrier.admits( Seq::ZERO, 3 ) );
-  /// assert!( !barrier.admits( Seq::ZERO, 4 ) );
-  /// ```
-  #[must_use]
-  pub fn admits(&self, from: Seq, count: u64) -> bool {
-    count <= self.available(from)
-  }
+    /// Whether a consumer at `from` may read `count` sequences without passing
+    /// any dependency.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::{PaddedCursor, SeqCell};
+    /// use ring_types::Seq;
+    ///
+    /// let cursors = [PaddedCursor::default()];
+    /// cursors[0].store(Seq(3), Ordering::Release);
+    ///
+    /// let barrier = Barrier::over(&cursors);
+    /// assert!(barrier.admits(Seq::ZERO, 3));
+    /// assert!(!barrier.admits(Seq::ZERO, 4));
+    /// ```
+    #[must_use]
+    pub fn admits(&self, from: Seq, count: u64) -> bool {
+        count <= self.available(from)
+    }
 
-  /// Wait until at least `count` sequences are readable from `from`, then
-  /// report the frontier.
-  ///
-  /// The returned sequence is the frontier as re-read immediately after the
-  /// wait succeeded, not the frontier at the exact instant it succeeded — a
-  /// dependency may have advanced between the two reads, so the value is
-  /// only guaranteed to be at least as far as what was checked. It is also
-  /// not `from + count` — a consumer that waited for one item and found six
-  /// should drain six, and returning the requested count instead would
-  /// throw away the batch that waiting just discovered.
-  ///
-  /// # Errors
-  ///
-  /// [`RingError::Empty`] when the `spins` budget runs out with fewer than
-  /// `count` available, which for a consumer means exactly what it says.
-  ///
-  /// An empty barrier (no dependencies) also returns this error for
-  /// `count == 0`, even though [`Barrier::admits`] answers `true` for a
-  /// zero-length request regardless of dependencies. `admits` only has to
-  /// return a bool; this method additionally has to report a frontier, and an
-  /// empty barrier has none to report. Falling back to `from` in that one case
-  /// would not be a generalization of what non-empty barriers do — a
-  /// non-empty barrier reports its true frontier at `count == 0` too, never
-  /// `from` — so it would read as consistent while actually being a different,
-  /// fabricated rule. [`RingError::Empty`] is the honest answer.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_barrier::Barrier;
-  /// use ring_cursor::{ PaddedCursor, SeqCell };
-  /// use ring_types::{ Seq, WaitKind };
-  ///
-  /// let cursors = [ PaddedCursor::default() ];
-  /// let barrier = Barrier::over( &cursors );
-  /// assert!( barrier.wait_for( Seq::ZERO, 1, WaitKind::None, 1 ).is_err() );
-  ///
-  /// cursors[ 0 ].store( Seq( 6 ), Ordering::Release );
-  /// assert_eq!( barrier.wait_for( Seq::ZERO, 1, WaitKind::None, 1 ), Ok( Seq( 6 ) ) );
-  /// ```
-  pub fn wait_for(&self, from: Seq, count: u64, kind: WaitKind, spins: usize) -> Result<Seq, RingError> {
-    ring_wait::wait_until(kind, spins, || self.admits(from, count))?;
-    self.frontier().ok_or(RingError::Empty)
-  }
+    /// Wait until at least `count` sequences are readable from `from`, then
+    /// report the frontier.
+    ///
+    /// The returned sequence is the frontier as re-read immediately after the
+    /// wait succeeded, not the frontier at the exact instant it succeeded — a
+    /// dependency may have advanced between the two reads, so the value is
+    /// only guaranteed to be at least as far as what was checked. It is also
+    /// not `from + count` — a consumer that waited for one item and found six
+    /// should drain six, and returning the requested count instead would
+    /// throw away the batch that waiting just discovered.
+    ///
+    /// # Errors
+    ///
+    /// [`RingError::Empty`] when the `spins` budget runs out with fewer than
+    /// `count` available, which for a consumer means exactly what it says.
+    ///
+    /// An empty barrier (no dependencies) also returns this error for
+    /// `count == 0`, even though [`Barrier::admits`] answers `true` for a
+    /// zero-length request regardless of dependencies. `admits` only has to
+    /// return a bool; this method additionally has to report a frontier, and an
+    /// empty barrier has none to report. Falling back to `from` in that one case
+    /// would not be a generalization of what non-empty barriers do — a
+    /// non-empty barrier reports its true frontier at `count == 0` too, never
+    /// `from` — so it would read as consistent while actually being a different,
+    /// fabricated rule. [`RingError::Empty`] is the honest answer.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_barrier::Barrier;
+    /// use ring_cursor::{PaddedCursor, SeqCell};
+    /// use ring_types::{Seq, WaitKind};
+    ///
+    /// let cursors = [PaddedCursor::default()];
+    /// let barrier = Barrier::over(&cursors);
+    /// assert!(barrier.wait_for(Seq::ZERO, 1, WaitKind::None, 1).is_err());
+    ///
+    /// cursors[0].store(Seq(6), Ordering::Release);
+    /// assert_eq!(barrier.wait_for(Seq::ZERO, 1, WaitKind::None, 1), Ok(Seq(6)));
+    /// ```
+    pub fn wait_for(
+        &self,
+        from: Seq,
+        count: u64,
+        kind: WaitKind,
+        spins: usize,
+    ) -> Result<Seq, RingError> {
+        ring_wait::wait_until(kind, spins, || self.admits(from, count))?;
+        self.frontier().ok_or(RingError::Empty)
+    }
 }

@@ -172,7 +172,7 @@ grep -E '&mut self|fn push|resize|insert|remove' ring_gating/src/lib.rs
 Live output:
 
 ```
-    cursors.resize_with( consumers, PaddedCursor::default );
+        cursors.resize_with(consumers, PaddedCursor::default);
 ```
 
 So the slice is right for a different reason than "the set changes over time": it

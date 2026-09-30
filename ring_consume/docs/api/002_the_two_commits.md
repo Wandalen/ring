@@ -90,9 +90,9 @@ command grep -m1 -A2 -F '  /// Call this only when the whole available run has b
 Live output:
 
 ```
-  /// Call this only when the whole available run has been read. After a
-  /// partial read, use [`commit`]`( first_unread )` instead — committing
-  /// everything here tells the producer that slots which were never read are
+    /// Call this only when the whole available run has been read. After a
+    /// partial read, use [`commit`]`( first_unread )` instead — committing
+    /// everything here tells the producer that slots which were never read are
 ```
 
 **Disposition:** applied — `commit_available`'s doc comment now carries
@@ -156,16 +156,16 @@ safer one no worked example of correct use.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 grep -A2 'ordinary call site never takes the error arm' ring_consume/src/lib.rs
-grep 'consumer.commit( run.end() )' ring_consume/src/lib.rs
+grep 'consumer.commit(run.end())' ring_consume/src/lib.rs
 ```
 
 Live output:
 
 ```
-  /// The ordinary call site never takes the error arm shown above: a value
-  /// read from [`available`] is always still in range when it reaches
-  /// `commit`, because between the two calls the run can only grow.
-  /// assert_eq!( consumer.commit( run.end() ), Ok( Seq( 4 ) ) );
+    /// The ordinary call site never takes the error arm shown above: a value
+    /// read from [`available`] is always still in range when it reaches
+    /// `commit`, because between the two calls the run can only grow.
+    /// assert_eq!(consumer.commit(run.end()), Ok(Seq(4)));
 ```
 
 `cargo test --release -p ring_consume` (isolated `CARGO_TARGET_DIR`) confirms the
@@ -176,7 +176,7 @@ cases are unaffected.
 
 **Disposition:** applied — `commit`'s doc comment now carries a second example
 showing the ordinary `available()` → read → `commit( run.end() )` sequence
-succeeding, immediately after the one that only shows refusals. Now prints: `assert_eq!( consumer.commit( run.end() ), Ok( Seq( 4 ) ) );`
+succeeding, immediately after the one that only shows refusals. Now prints: `assert_eq!(consumer.commit(run.end()), Ok(Seq(4)));`
 
 ---
 

@@ -110,10 +110,10 @@ command grep -m1 -A3 -F '  /// In a debug build, if `start.0 + count` overflows'
 Live output:
 
 ```
-  /// In a debug build, if `start.0 + count` overflows `u64` — unreachable via
-  /// the cursor in practice (2⁶⁴ sequences at one claim per nanosecond is 584
-  /// years) but reachable in one line through [`BatchClaim::new`], which is
-  /// public, `const`, and takes both fields unvalidated. In a release build
+    /// In a debug build, if `start.0 + count` overflows `u64` — unreachable via
+    /// the cursor in practice (2⁶⁴ sequences at one claim per nanosecond is 584
+    /// years) but reachable in one line through [`BatchClaim::new`], which is
+    /// public, `const`, and takes both fields unvalidated. In a release build
 ```
 
 **Disposition:** applied — added a `# Panics` section to `end()`'s doc comment

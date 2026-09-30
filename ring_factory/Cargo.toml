@@ -13,7 +13,7 @@ publish = true
 # `Factory::build_crossbeam`. Feature 187 is a build-time opt-in, so the door to
 # it is a separate function rather than a `RingConfig` field — see the crate
 # docs, "The refusal that carries a route".
-crossbeam = [ "ring_core/crossbeam" ]
+crossbeam = ["ring_core/crossbeam"]
 
 [dependencies]
 ring_config = { path = "../ring_config", version = "0.1.0" }

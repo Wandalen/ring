@@ -49,12 +49,12 @@ Live output:
 
 ```
   -- the family idiom for stating what an operation does not do --
-    ring_flush/src/lib.rs:  /// Stage one record. No atomic, no lock, no allocation, and **no flush**.
-    ring_tls/src/lib.rs:  /// Append one item. No atomic, no lock, no allocation.
+    ring_flush/src/lib.rs:    /// Stage one record. No atomic, no lock, no allocation, and **no flush**.
+    ring_tls/src/lib.rs:    /// Append one item. No atomic, no lock, no allocation.
   -- every crate whose lib.rs says anything about allocation --
     crates mentioning allocation in lib.rs: 13 of 33
   -- and everything the contract itself says about it --
-      /// - *Box it.* That allocates on the failure path, to fix a size the caller
+        /// - *Box it.* That allocates on the failure path, to fix a size the caller
     of those, sentences saying a read makes none: 0
 ```
 

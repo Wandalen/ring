@@ -216,9 +216,9 @@ command grep -m1 -A2 -F '/// What this cell has been asked to do so far' ring_at
 Live output:
 
 ```
-  /// What this cell has been asked to do so far — read as four separate
-  /// values, so meaningful only when nothing else is touching the cell.
-  ///
+    /// What this cell has been asked to do so far — read as four separate
+    /// values, so meaningful only when nothing else is touching the cell.
+    ///
 ```
 
 **Disposition:** applied — `counts`'s contract in `src/lib.rs` now carries

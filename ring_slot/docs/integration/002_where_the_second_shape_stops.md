@@ -114,10 +114,10 @@ Live output:
 ring_bench TypedSlot mentions: 5
 ring_bench BytesSlot mentions: 0
 use ring_slot::TypedSlot;
-  let mut ring : ring_spsc::Ring< TypedSlot< Record > > =
-    drained.extend( batch.iter().filter_map( TypedSlot::get ).copied() );
-  let mut ring : ring_mpsc::Ring< TypedSlot< Record > > =
-    drained.extend( batch.iter().filter_map( TypedSlot::get ).copied() );
+    let mut ring: ring_spsc::Ring<TypedSlot<Record>> =
+        drained.extend(batch.iter().filter_map(TypedSlot::get).copied());
+    let mut ring: ring_mpsc::Ring<TypedSlot<Record>> =
+        drained.extend(batch.iter().filter_map(TypedSlot::get).copied());
 ```
 
 **Finding.** `ring_slot`'s own module comment states the reason both shapes

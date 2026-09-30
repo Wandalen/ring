@@ -53,12 +53,12 @@ grep -r 'Ordering::Acquire' --include=*.rs ring_*/src/ \
 Live output:
 
 ```
-ring_batch/src/lib.rs:  let at = producer.load( Ordering::Acquire );
-ring_batch/src/lib.rs:  let behind = consumer.load( Ordering::Acquire );
-ring_cursor/src/lib.rs:pub const GATING : Ordering = Ordering::Acquire;
-ring_debug/src/lib.rs:const OBSERVE : Ordering = Ordering::Acquire;
-ring_mpsc/src/lib.rs:pub const OBSERVE : Ordering = Ordering::Acquire;
-ring_shutdown/src/lib.rs:    self.closed.load( Ordering::Acquire )
+ring_batch/src/lib.rs:    let at = producer.load(Ordering::Acquire);
+ring_batch/src/lib.rs:    let behind = consumer.load(Ordering::Acquire);
+ring_cursor/src/lib.rs:pub const GATING: Ordering = Ordering::Acquire;
+ring_debug/src/lib.rs:const OBSERVE: Ordering = Ordering::Acquire;
+ring_mpsc/src/lib.rs:pub const OBSERVE: Ordering = Ordering::Acquire;
+ring_shutdown/src/lib.rs:        self.closed.load(Ordering::Acquire)
 ```
 
 Six hits, in four independent statements of the same decision:
@@ -99,9 +99,9 @@ Live output:
 
 ```
 (no matches — Acquire is never written fully qualified)
-ring_claim/src/lib.rs:const CLAIM_SUCCESS : core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
-ring_consume/src/lib.rs:const COMMIT : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
-ring_publish/src/lib.rs:const PUBLISH : core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+ring_claim/src/lib.rs:const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
+ring_consume/src/lib.rs:const COMMIT: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
+ring_publish/src/lib.rs:const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Release;
 ```
 
 Not one crate in the family names `Acquire` directly in library code, while

@@ -41,8 +41,8 @@ mod id;
 mod policy;
 pub use capacity::Capacity;
 pub use error::RingError;
-pub use id::{ Seq, SlotIndex };
-pub use policy::{ OverflowPolicy, WaitKind };
+pub use id::{Seq, SlotIndex};
+pub use policy::{OverflowPolicy, WaitKind};
 ```
 
 | Export | Kind | Declared in | Consuming crates |

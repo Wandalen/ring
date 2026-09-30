@@ -79,7 +79,7 @@ grep -r '\.take(' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sed '
 Live output:
 
 ```
-ring_slot/src/lib.rs:    self.0.take()
+ring_slot/src/lib.rs:        self.0.take()
 ```
 
 One line, and it is `take`'s own body. No consumer in the family calls it — a

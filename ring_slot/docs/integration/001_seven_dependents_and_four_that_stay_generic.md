@@ -134,7 +134,7 @@ grep 'Slot::is_empty' ring_store/src/lib.rs
 Live output:
 
 ```
-    self.slots.iter().all( Slot::is_empty )
+        self.slots.iter().all(Slot::is_empty)
 ```
 
 **Finding.** The genericity holds all the way up. `ring_store` is generic, and

@@ -58,7 +58,7 @@ Live output:
 
 ```
 -- ring_publish
-  /// earlier claim has not been published yet. Deliberately not a `RingError`:
+    /// earlier claim has not been published yet. Deliberately not a `RingError`:
 -- ring_types
 //! | `error` | [`RingError`] — the one error type the family returns |
 pub use error::RingError;

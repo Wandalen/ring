@@ -9,10 +9,10 @@ description = "Batch claim objects spanning a sequence range"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
-ring_seqno = { path = "../ring_seqno", version = "0.1.0" }
 ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
 ring_index = { path = "../ring_index", version = "0.1.0" }
+ring_seqno = { path = "../ring_seqno", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [lints]
 workspace = true

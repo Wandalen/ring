@@ -21,7 +21,7 @@ command grep -r 'is_power_of_two' ring_*/src | command grep -v ring_types/
 Live output:
 
 ```
-ring_align/src/lib.rs:  CACHE_LINE.is_power_of_two(),
+ring_align/src/lib.rs:    CACHE_LINE.is_power_of_two(),
 ```
 
 returns one line, and it is not one of the fifteen. `ring_align` does not consume

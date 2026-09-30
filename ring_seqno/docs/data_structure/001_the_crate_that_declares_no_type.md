@@ -19,7 +19,7 @@ Live output:
 
 ```
 0
-use ring_types::{ Capacity, Seq };
+use ring_types::{Capacity, Seq};
 ```
 
 ```rust

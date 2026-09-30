@@ -55,11 +55,11 @@ command grep -m1 -A5 -F '  /// Slots allocated — always equal to `capacity().g
 Live output:
 
 ```
-  ///
-  /// Present as a distinct reading from [`Buffer::capacity`] precisely so a test
-  /// can assert the two agree; a buffer that over-allocated would still report
-  /// the requested capacity.
-  ///
+    ///
+    /// Present as a distinct reading from [`Buffer::capacity`] precisely so a test
+    /// can assert the two agree; a buffer that over-allocated would still report
+    /// the requested capacity.
+    ///
 ```
 
 `capacity()` returns the number that was asked for; `len()` returns the number of
@@ -121,12 +121,12 @@ command grep -m1 -A5 -F '  /// Always false — a `Capacity` cannot be zero, so 
 Live output:
 
 ```
-  /// Always false — a `Capacity` cannot be zero, so a buffer always has slots.
-  ///
-  /// Exists because [`Buffer::len`] does; a `len` without an `is_empty` is a
-  /// lint, and a hand-written `is_empty` that could disagree with `len` is
-  /// worse than one that provably cannot.
-  ///
+    /// Always false — a `Capacity` cannot be zero, so a buffer always has slots.
+    ///
+    /// Exists because [`Buffer::len`] does; a `len` without an `is_empty` is a
+    /// lint, and a hand-written `is_empty` that could disagree with `len` is
+    /// worse than one that provably cannot.
+    ///
 ```
 
 Measured against every capacity the type permits:

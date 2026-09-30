@@ -75,12 +75,12 @@ grep -r 'Ordering::Acquire' --include=*.rs */src/ \
 Live output:
 
 ```
-ring_batch/src/lib.rs:  let at = producer.load( Ordering::Acquire );
-ring_batch/src/lib.rs:  let behind = consumer.load( Ordering::Acquire );
-ring_cursor/src/lib.rs:pub const GATING : Ordering = Ordering::Acquire;
-ring_debug/src/lib.rs:const OBSERVE : Ordering = Ordering::Acquire;
-ring_mpsc/src/lib.rs:pub const OBSERVE : Ordering = Ordering::Acquire;
-ring_shutdown/src/lib.rs:    self.closed.load( Ordering::Acquire )
+ring_batch/src/lib.rs:    let at = producer.load(Ordering::Acquire);
+ring_batch/src/lib.rs:    let behind = consumer.load(Ordering::Acquire);
+ring_cursor/src/lib.rs:pub const GATING: Ordering = Ordering::Acquire;
+ring_debug/src/lib.rs:const OBSERVE: Ordering = Ordering::Acquire;
+ring_mpsc/src/lib.rs:pub const OBSERVE: Ordering = Ordering::Acquire;
+ring_shutdown/src/lib.rs:        self.closed.load(Ordering::Acquire)
 ```
 
 | Site | Form | Cites `ring_cursor` in prose? | Could reach `GATING`? |

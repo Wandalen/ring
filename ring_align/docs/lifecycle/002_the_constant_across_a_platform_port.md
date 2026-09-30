@@ -39,34 +39,34 @@ command grep -n '\b64\b' ring_align/src/lib.rs ring_align/tests/align_test.rs \
 Live output:
 
 ```
-ring_align/src/lib.rs: #[ repr( align( 64 ) ) ]
+ring_align/src/lib.rs: #[repr(align(64))]
 ring_align/src/lib.rs: // family has used (64, 128) and unchecked until now (-> docs/algorithm/001
 ring_align/src/lib.rs: //! No `unsafe` is needed for any of it — `#[ repr( align( 64 ) ) ]` is a safe
 ring_align/src/lib.rs: /// 64 on x86-64 and on AArch64's common configuration. Apple Silicon uses 128,
 ring_align/src/lib.rs: /// and a value too small is the failure that matters — two cursors 64 bytes
-ring_align/src/lib.rs: /// assert!( on_distinct_lines( 63, 64 ) );    // straddling the boundary
-ring_align/src/lib.rs: /// assert_eq!( ring_align::CACHE_LINE, 64 );
-ring_align/src/lib.rs: pub const CACHE_LINE : usize = 64;
-ring_align/tests/align_test.rs:     "CACHE_LINE dropped below 64 - every assertion in this suite would still \
-ring_align/tests/align_test.rs:     core::hint::black_box( CACHE_LINE ) >= 64,
-ring_align/tests/align_test.rs:   // `CACHE_LINE >= 64` (both operands are literals today), which otherwise
-ring_align/tests/align_test.rs:   assert!( !on_distinct_lines( 64, 127 ) );
-ring_align/tests/align_test.rs:   assert!( on_distinct_lines( 0, 64 ) );
-ring_align/tests/align_test.rs:   assert!( on_distinct_lines( 63, 64 ), "63 and 64 straddle the boundary" );
-ring_align/tests/align_test.rs:   assert_eq!( CACHE_LINE, 64 );
+ring_align/src/lib.rs: /// assert!(on_distinct_lines(63, 64)); // straddling the boundary
+ring_align/src/lib.rs: /// assert_eq!(ring_align::CACHE_LINE, 64);
+ring_align/src/lib.rs: pub const CACHE_LINE: usize = 64;
+ring_align/tests/align_test.rs:         "CACHE_LINE dropped below 64 - every assertion in this suite would still \
+ring_align/tests/align_test.rs:         core::hint::black_box(CACHE_LINE) >= 64,
+ring_align/tests/align_test.rs:     // `CACHE_LINE >= 64` (both operands are literals today), which otherwise
+ring_align/tests/align_test.rs:     assert!(!on_distinct_lines(64, 127));
+ring_align/tests/align_test.rs:     assert!(on_distinct_lines(0, 64));
+ring_align/tests/align_test.rs:     assert!(on_distinct_lines(63, 64), "63 and 64 straddle the boundary");
+ring_align/tests/align_test.rs:     assert_eq!(CACHE_LINE, 64);
 ring_align/tests/align_test.rs: //! structural assertion — 64-byte size and alignment — is what a test can
 ring_align/tests/align_test.rs: /// The constant is 64 — the line size on the family's stated target platforms.
-ring_cursor/src/lib.rs:   /// assert_eq!( cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary" );
+ring_cursor/src/lib.rs:     /// assert_eq!(cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary");
 ring_cursor/src/lib.rs: //! Alignment alone does not separate two cursors. A 64-aligned type of size 8
 ring_cursor/src/lib.rs: //! `#[ repr( align( 64 ) ) ]` happens to round the size up too, so both hold —
 ring_cursor/src/lib.rs: //! about a type; two fields being 64 bytes apart is the fact the promise was
 ring_cursor/src/lib.rs: //! family inherits it without a second author deciding 64 was probably fine.
-ring_cursor/src/lib.rs: /// assert_eq!( core::mem::align_of::< PaddedCursor >(), 64 );
-ring_cursor/src/lib.rs: /// assert_eq!( core::mem::size_of::< PaddedCursor >(), 64 );
-ring_mpsc/src/lib.rs:     claim.abs_diff( consume ) >= 64
-ring_mpsc/src/lib.rs:   /// assert_eq!( ring.capacity().get(), 64 );
-ring_mpsc/src/lib.rs:   /// it. Unpadded on purpose: [`PaddedCursor`] would make this array 64 times
-ring_mpsc/src/lib.rs:   /// let ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 64 ).unwrap() );
+ring_cursor/src/lib.rs: /// assert_eq!(core::mem::align_of::<PaddedCursor>(), 64);
+ring_cursor/src/lib.rs: /// assert_eq!(core::mem::size_of::<PaddedCursor>(), 64);
+ring_mpsc/src/lib.rs:         claim.abs_diff(consume) >= 64
+ring_mpsc/src/lib.rs:     /// assert_eq!(ring.capacity().get(), 64);
+ring_mpsc/src/lib.rs:     /// it. Unpadded on purpose: [`PaddedCursor`] would make this array 64 times
+ring_mpsc/src/lib.rs:     /// let ring: Ring<TypedSlot<u8>> = Ring::new(Capacity::new(64).unwrap());
 ```
 
 Sites are named by their enclosing item, not by line number: the table was

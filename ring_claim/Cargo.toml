@@ -9,9 +9,9 @@ description = "Sequence-range claiming without waiting"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 ring_gating = { path = "../ring_gating", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [lints]
 workspace = true

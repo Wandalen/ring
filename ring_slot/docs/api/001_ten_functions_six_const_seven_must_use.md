@@ -357,7 +357,7 @@ command grep -F 'confirming a freshly claimed slot came' src/lib.rs
 Live output:
 
 ```
-  /// is `ring_core`'s `debug_assert`, confirming a freshly claimed slot came
+    /// is `ring_core`'s `debug_assert`, confirming a freshly claimed slot came
 ```
 
 **Disposition:** applied — `set`'s doc comment no longer points a reader at

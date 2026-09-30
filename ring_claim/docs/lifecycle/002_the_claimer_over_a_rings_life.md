@@ -247,8 +247,8 @@ command grep -A1 -F 'wraps to zero in a release' ring_types/src/id.rs
 Live output:
 
 ```
-  /// Panics on overflow in a debug build and wraps to zero in a release
-  /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
+    /// Panics on overflow in a debug build and wraps to zero in a release
+    /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
 ```
 
 **Disposition:** applied — `Seq::next`'s doc comment in `ring_types` no

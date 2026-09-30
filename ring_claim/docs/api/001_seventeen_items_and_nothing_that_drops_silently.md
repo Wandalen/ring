@@ -154,39 +154,39 @@ command grep -r 'ring_claim' ring_publish/tests/*.rs
 Live output:
 
 ```
-ring_claim/src/lib.rs:/// let claim = Claim::new( Seq( 4 ), 3 );
-ring_claim/src/lib.rs:  /// assert_eq!( Claim::new( Seq::ZERO, 0 ).len(), 0 );
-ring_claim/src/lib.rs:  /// assert_eq!( Claim::new( Seq( 9 ), 2 ).start(), Seq( 9 ) );
-ring_claim/src/lib.rs:  /// assert_eq!( Claim::new( Seq( 9 ), 2 ).end(), Seq( 11 ) );
-ring_claim/src/lib.rs:  /// assert_eq!( Claim::new( Seq::ZERO, 5 ).len(), 5 );
-ring_claim/src/lib.rs:  /// assert!( Claim::new( Seq( 3 ), 0 ).is_empty() );
-ring_claim/src/lib.rs:  /// let claim = Claim::new( Seq( 4 ), 2 );
-ring_claim/src/lib.rs:  /// let seen : Vec< u64 > = Claim::new( Seq( 2 ), 3 ).sequences().map( | s | s.0 ).collect();
-ring_claim/src/lib.rs:  /// let first = Claim::new( Seq( 0 ), 4 );
-ring_claim/src/lib.rs:  /// assert!( !first.overlaps( Claim::new( Seq( 4 ), 4 ) ), "adjacent, not overlapping" );
-ring_claim/src/lib.rs:  /// assert!( first.overlaps( Claim::new( Seq( 3 ), 4 ) ) );
-ring_claim/src/lib.rs:  /// assert!( !first.overlaps( Claim::new( Seq( 0 ), 0 ) ), "an empty claim covers nothing" );
-ring_claim/src/lib.rs:        Ok( _ ) => return Ok( Claim::new( current, count ) ),
-ring_claim/src/lib.rs:        Ok( _ ) => return Ok( Claim::new( current, granted ) ),
-ring_claim/tests/claim_test.rs:  let claim = Claim::new( Seq( 4 ), 3 );
-ring_claim/tests/claim_test.rs:  let empty = Claim::new( Seq( 5 ), 0 );
-ring_claim/tests/claim_test.rs:  assert!( !empty.overlaps( Claim::new( Seq( 0 ), 100 ) ), "a zero-width range covers no slot" );
-ring_claim/tests/claim_test.rs:  assert!( !Claim::new( Seq( 0 ), 100 ).overlaps( empty ), "and the check is symmetric" );
-ring_claim/tests/claim_test.rs:      let claim = Claim::new( Seq( start ), len );
-ring_claim/tests/claim_test.rs:  let first = Claim::new( Seq( 0 ), 4 );
-ring_claim/tests/claim_test.rs:  let second = Claim::new( Seq( 4 ), 4 );
-ring_claim/tests/claim_test.rs:          let a = Claim::new( Seq( a_start ), a_len );
-ring_claim/tests/claim_test.rs:          let b = Claim::new( Seq( b_start ), b_len );
-ring_claim/tests/claim_test.rs:  const A : Claim = Claim::new( Seq( 4 ), 4 );
-ring_claim/tests/claim_test.rs:  const B : Claim = Claim::new( Seq( 6 ), 4 );
-ring_claim/tests/claim_test.rs:  const C : Claim = Claim::new( Seq( 8 ), 4 );
-ring_claim/tests/claim_test.rs:  let a = Claim::new( start, 4 );
+ring_claim/src/lib.rs:/// let claim = Claim::new(Seq(4), 3);
+ring_claim/src/lib.rs:    /// assert_eq!(Claim::new(Seq::ZERO, 0).len(), 0);
+ring_claim/src/lib.rs:    /// assert_eq!(Claim::new(Seq(9), 2).start(), Seq(9));
+ring_claim/src/lib.rs:    /// assert_eq!(Claim::new(Seq(9), 2).end(), Seq(11));
+ring_claim/src/lib.rs:    /// assert_eq!(Claim::new(Seq::ZERO, 5).len(), 5);
+ring_claim/src/lib.rs:    /// assert!(Claim::new(Seq(3), 0).is_empty());
+ring_claim/src/lib.rs:    /// let claim = Claim::new(Seq(4), 2);
+ring_claim/src/lib.rs:    /// let seen: Vec<u64> = Claim::new(Seq(2), 3).sequences().map(|s| s.0).collect();
+ring_claim/src/lib.rs:    /// let first = Claim::new(Seq(0), 4);
+ring_claim/src/lib.rs:    /// assert!(!first.overlaps(Claim::new(Seq(4), 4)), "adjacent, not overlapping");
+ring_claim/src/lib.rs:    /// assert!(first.overlaps(Claim::new(Seq(3), 4)));
+ring_claim/src/lib.rs:    /// assert!(!first.overlaps(Claim::new(Seq(0), 0)), "an empty claim covers nothing");
+ring_claim/src/lib.rs:                Ok(_) => return Ok(Claim::new(current, count)),
+ring_claim/src/lib.rs:                Ok(_) => return Ok(Claim::new(current, granted)),
+ring_claim/tests/claim_test.rs:    let claim = Claim::new(Seq(4), 3);
+ring_claim/tests/claim_test.rs:    let empty = Claim::new(Seq(5), 0);
+ring_claim/tests/claim_test.rs:    assert!(!empty.overlaps(Claim::new(Seq(0), 100)), "a zero-width range covers no slot");
+ring_claim/tests/claim_test.rs:    assert!(!Claim::new(Seq(0), 100).overlaps(empty), "and the check is symmetric");
+ring_claim/tests/claim_test.rs:            let claim = Claim::new(Seq(start), len);
+ring_claim/tests/claim_test.rs:    let first = Claim::new(Seq(0), 4);
+ring_claim/tests/claim_test.rs:    let second = Claim::new(Seq(4), 4);
+ring_claim/tests/claim_test.rs:                    let a = Claim::new(Seq(a_start), a_len);
+ring_claim/tests/claim_test.rs:                    let b = Claim::new(Seq(b_start), b_len);
+ring_claim/tests/claim_test.rs:    const A: Claim = Claim::new(Seq(4), 4);
+ring_claim/tests/claim_test.rs:    const B: Claim = Claim::new(Seq(6), 4);
+ring_claim/tests/claim_test.rs:    const C: Claim = Claim::new(Seq(8), 4);
+ring_claim/tests/claim_test.rs:    let a = Claim::new(start, 4);
 ring_publish/tests/handshake_test.rs://! - the **claimed** cursor is private to [`ring_claim::Claimer`]; nobody reads it
-ring_publish/tests/handshake_test.rs:  use ring_claim::Claimer;
-ring_publish/tests/handshake_test.rs:  use ring_claim::Claimer;
-ring_publish/tests/handshake_test.rs:  /// CL44 in `ring_claim/docs/pitfall/001_dropping_a_claim.md` describes this
-ring_publish/tests/handshake_test.rs:  /// and could not host a reproduction: `ring_claim` has no dependency, normal
-ring_publish/tests/handshake_test.rs:  /// that fails to arrive. This file can — `ring_claim` is one of its four
+ring_publish/tests/handshake_test.rs:    use ring_claim::Claimer;
+ring_publish/tests/handshake_test.rs:    use ring_claim::Claimer;
+ring_publish/tests/handshake_test.rs:    /// CL44 in `ring_claim/docs/pitfall/001_dropping_a_claim.md` describes this
+ring_publish/tests/handshake_test.rs:    /// and could not host a reproduction: `ring_claim` has no dependency, normal
+ring_publish/tests/handshake_test.rs:    /// that fails to arrive. This file can — `ring_claim` is one of its four
 ```
 
 | Where | Sites | What they are |
@@ -220,12 +220,12 @@ grep 'self\.\(claimed\|headroom\|end\)(' ring_claim/src/lib.rs | grep -v '///'
 Live output:
 
 ```
-    seq.0 >= self.start.0 && seq.0 < self.end().0
-    ( self.start.0..self.end().0 ).map( Seq )
-      && other.start.0 < self.end().0
-    self.consumers.headroom( self.claimed() )
-    let mut current = self.claimed();
-    let mut current = self.claimed();
+        seq.0 >= self.start.0 && seq.0 < self.end().0
+        (self.start.0..self.end().0).map(Seq)
+            && other.start.0 < self.end().0
+        self.consumers.headroom(self.claimed())
+        let mut current = self.claimed();
+        let mut current = self.claimed();
 ```
 
 | Caller | Callee | Why |

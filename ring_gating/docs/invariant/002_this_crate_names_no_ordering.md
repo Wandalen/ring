@@ -115,11 +115,11 @@ grep -r 'unsafe impl' ring_*/src/*.rs
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:#![ allow( unsafe_code ) ]
-ring_spsc/src/lib.rs:#![ allow( unsafe_code ) ]
+ring_mpsc/src/lib.rs:#![allow(unsafe_code)]
+ring_spsc/src/lib.rs:#![allow(unsafe_code)]
 ring_mpsc/src/lib.rs://! is the fact [`Ring`]'s `unsafe impl Sync` argument rests on
-ring_mpsc/src/lib.rs:unsafe impl< S : Send > Sync for Ring< S > {}
-ring_spsc/src/lib.rs:unsafe impl< S : Send > Sync for Ring< S > {}
+ring_mpsc/src/lib.rs:unsafe impl<S: Send> Sync for Ring<S> {}
+ring_spsc/src/lib.rs:unsafe impl<S: Send> Sync for Ring<S> {}
 ```
 
 Two opt-outs, two `unsafe impl`s, and `ring_gating` is neither.

@@ -92,7 +92,7 @@ printf 'public drains outside a token: %s\n' "$( cd ..; command grep -ohE 'pub f
 Live output:
 
 ```
-the token as declared:         pub struct Stopped< 'a > { shutdown : &'a Shutdown, } 
+the token as declared:         pub struct Stopped<'a> { shutdown: &'a Shutdown, } 
 alternatives it rejects:       4
 of those, also filed as open:  1
 ground given in the type doc:  Breaks idempotence, which teardown needs: an unwind path and a normal path both close, and neither should have to know which is first

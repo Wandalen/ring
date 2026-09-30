@@ -136,9 +136,9 @@ Live output:
 
 ```
 [dev-dependencies]
-ring_store = { path = "../ring_store" }
 ring_event = { path = "../ring_event" }
 ring_slot = { path = "../ring_slot" }
+ring_store = { path = "../ring_store" }
 
 [lints]
 1

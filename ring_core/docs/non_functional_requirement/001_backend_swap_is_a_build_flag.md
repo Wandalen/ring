@@ -146,7 +146,7 @@ rather than left implicit:`
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_core
 printf 'inline attrs: '; grep -c 'inline' src/lib.rs
-printf 'pub fns:      '; grep -cE '^  pub (const )?fn ' src/lib.rs
+printf 'pub fns:      '; grep -cE '^    pub (const )?fn ' src/lib.rs
 ```
 
 Live output:

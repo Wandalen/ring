@@ -29,19 +29,19 @@ command grep 'Instant::now\|started.elapsed\|let received' ring_bench/src/lib.rs
 Live output:
 
 ```
-  let received = drained.len();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
-  let started = Instant::now();
-  let write_nanos = started.elapsed().as_nanos();
+    let received = drained.len();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
+    let started = Instant::now();
+    let write_nanos = started.elapsed().as_nanos();
 ```
 
 | Side | What is there |

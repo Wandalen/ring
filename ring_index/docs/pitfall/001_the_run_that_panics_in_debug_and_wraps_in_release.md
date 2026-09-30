@@ -87,12 +87,12 @@ command grep -m1 -A5 -F '  /// The next sequence after this one.' ring_types/src
 Live output:
 
 ```
-  /// The next sequence after this one.
-  ///
-  /// Panics on overflow in a debug build and wraps to zero in a release
-  /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
-  /// silently invert every gate comparison in the family, which is why the
-  /// non-wrapping argument has to hold: at 10⁹ publications per second a
+    /// The next sequence after this one.
+    ///
+    /// Panics on overflow in a debug build and wraps to zero in a release
+    /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
+    /// silently invert every gate comparison in the family, which is why the
+    /// non-wrapping argument has to hold: at 10⁹ publications per second a
 ```
 
 Rust's `+` on `u64` does not saturate in release. It wraps:
@@ -157,11 +157,11 @@ command grep -rn 'u64::MAX' ring_*/src/*.rs | command grep -vE ':[0-9]+: *//[^/!
 Live output:
 
 ```
-ring_atomic/src/lib.rs:    /// `u64`, and the addition wraps: `fetch_add( u64::MAX )` moves the cursor
+ring_atomic/src/lib.rs:      /// `u64`, and the addition wraps: `fetch_add( u64::MAX )` moves the cursor
 ring_index/src/lib.rs:  /// from `ring_mpsc::UNSTAMPED`, the family's `Seq( u64::MAX )` sentinel,
-ring_mpsc/src/lib.rs:  /// assert_eq!( ring_mpsc::UNSTAMPED, Seq( u64::MAX ) );
-ring_mpsc/src/lib.rs:  pub const UNSTAMPED : Seq = Seq( u64::MAX );
-ring_trace/src/lib.rs:    /// `ring_mpsc::UNSTAMPED` (`Seq(u64::MAX)`). See `pitfall/001` TR41.
+ring_mpsc/src/lib.rs:  /// assert_eq!(ring_mpsc::UNSTAMPED, Seq(u64::MAX));
+ring_mpsc/src/lib.rs:  pub const UNSTAMPED: Seq = Seq(u64::MAX);
+ring_trace/src/lib.rs:      /// `ring_mpsc::UNSTAMPED` (`Seq(u64::MAX)`). See `pitfall/001` TR41.
 ```
 
 **Finding.** `ring_mpsc` reserves `Seq( u64::MAX )` as its "this slot has never

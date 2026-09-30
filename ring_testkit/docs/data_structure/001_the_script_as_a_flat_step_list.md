@@ -150,7 +150,7 @@ command grep -F 'staging capacity — unused: no Stage/StageMany/Flush step belo
 Live output:
 
 ```
-//! let script = Script::new( 4 )    // staging capacity — unused: no Stage/StageMany/Flush step below
+//! let script = Script::new(4) // staging capacity — unused: no Stage/StageMany/Flush step below
 ```
 
 **Disposition:** applied — the crate-level doc example now carries an inline

@@ -112,10 +112,10 @@ command grep 'Default' ring_types/src/*.rs | sort
 Live output:
 
 ```
-ring_types/src/id.rs:#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-ring_types/src/id.rs:#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-ring_types/src/policy.rs:#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
-ring_types/src/policy.rs:#[ derive( Debug, Clone, Copy, PartialEq, Eq, Hash, Default ) ]
+ring_types/src/id.rs:#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+ring_types/src/id.rs:#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+ring_types/src/policy.rs:#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+ring_types/src/policy.rs:#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 ```
 
 *(`| sort` is not cosmetic — the installed `grep` groups multi-file output in

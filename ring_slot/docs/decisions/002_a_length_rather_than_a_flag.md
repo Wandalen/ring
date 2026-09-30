@@ -153,17 +153,17 @@ grep -i 'zero.length\|zero_length\|distinguish' ring_slot/src/lib.rs \
 Live output:
 
 ```
-  /// # A `BytesSlot` cannot distinguish empty from zero-length
-  ///
-  /// A [`BytesSlot`] records a length and nothing more, so a deliberately
-  /// published zero-byte payload reads back as `None` — identical to a slot
-  /// nobody has touched. This is a real limitation, not an oversight, and it is
-  /// not worth a flag byte per slot to remove: the ring already carries the
-  /// distinction, in the published-sequence handshake, and a caller that needs
-  /// "somebody published nothing" must read it there rather than from the slot.
-  /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
-  /// cheaper way to send a payload-free signal.
-  fn peek( &self ) -> Option< Self::Out< '_ > >;
+    /// # A `BytesSlot` cannot distinguish empty from zero-length
+    ///
+    /// A [`BytesSlot`] records a length and nothing more, so a deliberately
+    /// published zero-byte payload reads back as `None` — identical to a slot
+    /// nobody has touched. This is a real limitation, not an oversight, and it is
+    /// not worth a flag byte per slot to remove: the ring already carries the
+    /// distinction, in the published-sequence handshake, and a caller that needs
+    /// "somebody published nothing" must read it there rather than from the slot.
+    /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
+    /// cheaper way to send a payload-free signal.
+    fn peek(&self) -> Option<Self::Out<'_>>;
 }
 // cleared slot's former payload and distinguish two slots no caller can tell
 ```

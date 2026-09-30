@@ -55,8 +55,8 @@ use ring_tls::TlsBuffer;
 use ring_types::OverflowPolicy;
 
 fn ring(slots: usize) -> Ring<u32> {
-  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
-  Ring::new(&config).unwrap()
+    let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
+    Ring::new(&config).unwrap()
 }
 
 /// The staging buffer does not grow across `N` appends, for any policy.
@@ -65,32 +65,32 @@ fn ring(slots: usize) -> Ring<u32> {
 /// reallocate reports the same number.
 #[test]
 fn appending_never_grows_the_staging_buffer() {
-  const N: u32 = 512;
+    const N: u32 = 512;
 
-  // `OnBatch( N )` rather than anything larger: N2 caps the batch size at the
-  // buffer's capacity, so `OnBatch( 600 )` against a 512-record buffer is
-  // rejected at binding — correctly, and it is `an_unusable_batch_size_is_refused_at_binding`'s
-  // job to say so. The batch still never fires here, because nothing drives.
-  for policy in [FlushPolicy::OnBarrier, FlushPolicy::OnFull, FlushPolicy::OnBatch(N as usize)] {
-    let mut r = ring(1024);
-    let mut ends = r.ends();
-    let (producer, _consumer) = ends.split();
+    // `OnBatch( N )` rather than anything larger: N2 caps the batch size at the
+    // buffer's capacity, so `OnBatch( 600 )` against a 512-record buffer is
+    // rejected at binding — correctly, and it is `an_unusable_batch_size_is_refused_at_binding`'s
+    // job to say so. The batch still never fires here, because nothing drives.
+    for policy in [FlushPolicy::OnBarrier, FlushPolicy::OnFull, FlushPolicy::OnBatch(N as usize)] {
+        let mut r = ring(1024);
+        let mut ends = r.ends();
+        let (producer, _consumer) = ends.split();
 
-    let buffer = TlsBuffer::with_capacity(N as usize);
-    let before = buffer.capacity();
-    let mut flusher = Flusher::new(buffer, producer, policy).expect("n is within capacity");
+        let buffer = TlsBuffer::with_capacity(N as usize);
+        let before = buffer.capacity();
+        let mut flusher = Flusher::new(buffer, producer, policy).expect("n is within capacity");
 
-    for i in 0..N {
-      flusher.append(i).expect("within capacity");
+        for i in 0..N {
+            flusher.append(i).expect("within capacity");
+        }
+
+        assert_eq!(flusher.staged(), N as usize, "{policy:?}: an append was lost");
+        assert_eq!(
+            flusher.buffer_capacity(),
+            before,
+            "{policy:?}: the staging buffer reallocated during {N} appends"
+        );
     }
-
-    assert_eq!(flusher.staged(), N as usize, "{policy:?}: an append was lost");
-    assert_eq!(
-      flusher.buffer_capacity(),
-      before,
-      "{policy:?}: the staging buffer reallocated during {N} appends"
-    );
-  }
 }
 
 /// A full staging buffer refuses rather than growing.
@@ -100,21 +100,21 @@ fn appending_never_grows_the_staging_buffer() {
 /// if the buffer is genuinely driven to its limit.
 #[test]
 fn a_full_staging_buffer_refuses_and_keeps_its_capacity() {
-  let mut r = ring(1024);
-  let mut ends = r.ends();
-  let (producer, _consumer) = ends.split();
+    let mut r = ring(1024);
+    let mut ends = r.ends();
+    let (producer, _consumer) = ends.split();
 
-  let buffer = TlsBuffer::with_capacity(8);
-  let before = buffer.capacity();
-  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
+    let buffer = TlsBuffer::with_capacity(8);
+    let before = buffer.capacity();
+    let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap();
 
-  for i in 0..8u32 {
-    flusher.append(i).expect("within capacity");
-  }
-  assert!(flusher.append(8).is_err(), "a full staging buffer accepted a record");
+    for i in 0..8u32 {
+        flusher.append(i).expect("within capacity");
+    }
+    assert!(flusher.append(8).is_err(), "a full staging buffer accepted a record");
 
-  assert_eq!(flusher.staged(), 8);
-  assert_eq!(flusher.buffer_capacity(), before, "the buffer grew instead of refusing");
+    assert_eq!(flusher.staged(), 8);
+    assert_eq!(flusher.buffer_capacity(), before, "the buffer grew instead of refusing");
 }
 
 /// A thousand non-firing drives change nothing observable.
@@ -124,23 +124,23 @@ fn a_full_staging_buffer_refuses_and_keeps_its_capacity() {
 /// worth pinning even without an allocator.
 #[test]
 fn a_drive_that_does_not_fire_changes_nothing() {
-  let mut r = ring(1024);
-  let mut ends = r.ends();
-  let (producer, consumer) = ends.split();
+    let mut r = ring(1024);
+    let mut ends = r.ends();
+    let (producer, consumer) = ends.split();
 
-  let buffer = TlsBuffer::with_capacity(64);
-  let before = buffer.capacity();
-  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap().with_log();
-  flusher.append(1).unwrap();
+    let buffer = TlsBuffer::with_capacity(64);
+    let before = buffer.capacity();
+    let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBarrier).unwrap().with_log();
+    flusher.append(1).unwrap();
 
-  for _ in 0..1_000 {
-    assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "OnBarrier fired unannounced");
-  }
+    for _ in 0..1_000 {
+        assert_eq!(flusher.drive(), FlushOutcome::NotTriggered, "OnBarrier fired unannounced");
+    }
 
-  assert_eq!(flusher.staged(), 1);
-  assert_eq!(flusher.buffer_capacity(), before);
-  assert_eq!(consumer.len(), 0, "a non-firing drive published");
-  assert!(flusher.log().unwrap().is_empty(), "a non-firing drive was recorded");
+    assert_eq!(flusher.staged(), 1);
+    assert_eq!(flusher.buffer_capacity(), before);
+    assert_eq!(consumer.len(), 0, "a non-firing drive published");
+    assert!(flusher.log().unwrap().is_empty(), "a non-firing drive was recorded");
 }
 
 /// A driver given no log never acquires one, however much it flushes.
@@ -151,22 +151,22 @@ fn a_drive_that_does_not_fire_changes_nothing() {
 /// returning `None` is not a proxy for anything.
 #[test]
 fn an_unobserved_driver_never_acquires_a_log() {
-  let mut r = ring(1024);
-  let mut ends = r.ends();
-  let (producer, mut consumer) = ends.split();
+    let mut r = ring(1024);
+    let mut ends = r.ends();
+    let (producer, mut consumer) = ends.split();
 
-  let buffer = TlsBuffer::with_capacity(64);
-  let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBatch(4)).unwrap();
+    let buffer = TlsBuffer::with_capacity(64);
+    let mut flusher = Flusher::new(buffer, producer, FlushPolicy::OnBatch(4)).unwrap();
 
-  for round in 0..16u32 {
-    for i in 0..4u32 {
-      flusher.append(round * 4 + i).unwrap();
+    for round in 0..16u32 {
+        for i in 0..4u32 {
+            flusher.append(round * 4 + i).unwrap();
+        }
+        assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
+        assert!(flusher.log().is_none(), "a driver acquired a log it was never given");
     }
-    assert_eq!(flusher.drive(), FlushOutcome::Flushed { count: 4 });
-    assert!(flusher.log().is_none(), "a driver acquired a log it was never given");
-  }
 
-  let mut landed = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut landed), 64);
-  assert_eq!(landed.len(), 64, "sixty-four records were staged and flushed");
+    let mut landed = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut landed), 64);
+    assert_eq!(landed.len(), 64, "sixty-four records were staged and flushed");
 }

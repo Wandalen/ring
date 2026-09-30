@@ -70,7 +70,7 @@ command grep -r 'WaitKind::ALL\|is_non_blocking' ring_*/src | command grep -v ri
 Live output:
 
 ```
-ring_config/src/lib.rs:    self.wait.is_non_blocking()
+ring_config/src/lib.rs:        self.wait.is_non_blocking()
 ring_wait/src/lib.rs://! [`ring_types::WaitKind::is_non_blocking`] is true for exactly that variant.
 ```
 

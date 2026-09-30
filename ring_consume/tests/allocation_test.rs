@@ -74,20 +74,20 @@ struct Counting;
 // `fetch_add` calls touch only this file's own statics and never the
 // allocation itself.
 unsafe impl GlobalAlloc for Counting {
-  unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-    ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-    BYTES.fetch_add(layout.size(), Ordering::Relaxed);
-    // SAFETY: `layout` is passed through untouched, so the caller's own
-    // guarantee that it is non-zero-sized and well-formed still holds.
-    unsafe { std::alloc::System.alloc(layout) }
-  }
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+        // SAFETY: `layout` is passed through untouched, so the caller's own
+        // guarantee that it is non-zero-sized and well-formed still holds.
+        unsafe { std::alloc::System.alloc(layout) }
+    }
 
-  unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-    // SAFETY: `ptr` and `layout` are passed through untouched, so the
-    // caller's own guarantee that they describe a live allocation from this
-    // allocator still holds.
-    unsafe { std::alloc::System.dealloc(ptr, layout) }
-  }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // SAFETY: `ptr` and `layout` are passed through untouched, so the
+        // caller's own guarantee that they describe a live allocation from this
+        // allocator still holds.
+        unsafe { std::alloc::System.dealloc(ptr, layout) }
+    }
 }
 
 #[global_allocator]
@@ -95,86 +95,86 @@ static ALLOCATOR: Counting = Counting;
 
 /// Allocations and bytes charged while `body` ran.
 fn measure<R>(body: impl FnOnce() -> R) -> (usize, usize, R) {
-  let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
-  let bytes_before = BYTES.load(Ordering::Relaxed);
-  let value = body();
-  let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
-  let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
-  (calls, bytes, value)
+    let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
+    let bytes_before = BYTES.load(Ordering::Relaxed);
+    let value = body();
+    let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
+    let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
+    (calls, bytes, value)
 }
 
 #[test]
 fn no_read_of_the_available_range_allocates() {
-  // Everything is built before the first measurement, so no construction cost
-  // is charged to a call below.
-  let published = [PaddedCursor::new(Seq(4096))];
-  let position = PaddedCursor::default();
-  let consumer = Consumer::new(&position, Barrier::over(&published));
+    // Everything is built before the first measurement, so no construction cost
+    // is charged to a call below.
+    let published = [PaddedCursor::new(Seq(4096))];
+    let position = PaddedCursor::default();
+    let consumer = Consumer::new(&position, Barrier::over(&published));
 
-  let idle_position = PaddedCursor::default();
-  let idle = Consumer::new(&idle_position, Barrier::over(&[]));
+    let idle_position = PaddedCursor::default();
+    let idle = Consumer::new(&idle_position, Barrier::over(&[]));
 
-  // The control arm, first: if this reads zero the counter is not working and
-  // every assertion below is vacuous.
-  let (control_calls, _, buffer) = measure(|| Vec::<Seq>::with_capacity(8));
-  assert!(
-    control_calls >= 1,
-    "a control that must allocate reported {control_calls} calls — the counting \
+    // The control arm, first: if this reads zero the counter is not working and
+    // every assertion below is vacuous.
+    let (control_calls, _, buffer) = measure(|| Vec::<Seq>::with_capacity(8));
+    assert!(
+        control_calls >= 1,
+        "a control that must allocate reported {control_calls} calls — the counting \
      allocator is not installed, so a zero from the measured calls below would \
      mean nothing"
-  );
-  drop(buffer);
+    );
+    drop(buffer);
 
-  // CN34's rows, in the order its table lists them. `position()` never
-  // consulted the barrier and so never allocated; the three that follow did.
-  let (calls, bytes, _) = measure(|| {
-    for _ in 0..1000 {
-      core::hint::black_box(consumer.position());
-    }
-  });
-  assert_eq!((calls, bytes), (0, 0), "position() ×1000");
+    // CN34's rows, in the order its table lists them. `position()` never
+    // consulted the barrier and so never allocated; the three that follow did.
+    let (calls, bytes, _) = measure(|| {
+        for _ in 0..1000 {
+            core::hint::black_box(consumer.position());
+        }
+    });
+    assert_eq!((calls, bytes), (0, 0), "position() ×1000");
 
-  let (calls, bytes, _) = measure(|| {
-    for _ in 0..1000 {
-      core::hint::black_box(consumer.available());
-    }
-  });
-  assert_eq!((calls, bytes), (0, 0), "available() ×1000");
+    let (calls, bytes, _) = measure(|| {
+        for _ in 0..1000 {
+            core::hint::black_box(consumer.available());
+        }
+    });
+    assert_eq!((calls, bytes), (0, 0), "available() ×1000");
 
-  let (calls, bytes, _) = measure(|| {
-    for _ in 0..1000 {
-      core::hint::black_box(consumer.available_up_to(8));
-    }
-  });
-  assert_eq!((calls, bytes), (0, 0), "available_up_to( 8 ) ×1000");
+    let (calls, bytes, _) = measure(|| {
+        for _ in 0..1000 {
+            core::hint::black_box(consumer.available_up_to(8));
+        }
+    });
+    assert_eq!((calls, bytes), (0, 0), "available_up_to( 8 ) ×1000");
 
-  // The first call commits the whole 4096-slot run; the remaining 999 find an
-  // empty run and commit nothing. That asymmetry is the point rather than an
-  // oversight: all 1000 consult the barrier *before* learning the answer is
-  // zero, so all 1000 used to allocate, including the 999 that did no work.
-  let (calls, bytes, _) = measure(|| {
-    for _ in 0..1000 {
-      core::hint::black_box(consumer.available_up_to(4).end());
-      core::hint::black_box(consumer.commit_available());
-    }
-  });
-  assert_eq!((calls, bytes), (0, 0), "commit_available() ×1000");
+    // The first call commits the whole 4096-slot run; the remaining 999 find an
+    // empty run and commit nothing. That asymmetry is the point rather than an
+    // oversight: all 1000 consult the barrier *before* learning the answer is
+    // zero, so all 1000 used to allocate, including the 999 that did no work.
+    let (calls, bytes, _) = measure(|| {
+        for _ in 0..1000 {
+            core::hint::black_box(consumer.available_up_to(4).end());
+            core::hint::black_box(consumer.commit_available());
+        }
+    });
+    assert_eq!((calls, bytes), (0, 0), "commit_available() ×1000");
 
-  // The two rows that read zero before the fix as well, and therefore cannot
-  // tell the two states apart. Kept because their silence is the finding.
-  let (calls, bytes, run) = measure(|| idle.available());
-  assert!(run.is_empty(), "no dependencies, nothing available");
-  assert_eq!(
-    (calls, bytes),
-    (0, 0),
-    "available() on an empty barrier — zero before the fix too, and therefore no evidence"
-  );
+    // The two rows that read zero before the fix as well, and therefore cannot
+    // tell the two states apart. Kept because their silence is the finding.
+    let (calls, bytes, run) = measure(|| idle.available());
+    assert!(run.is_empty(), "no dependencies, nothing available");
+    assert_eq!(
+        (calls, bytes),
+        (0, 0),
+        "available() on an empty barrier — zero before the fix too, and therefore no evidence"
+    );
 
-  let (calls, bytes, committed) = measure(|| idle.commit_available());
-  assert_eq!(committed, Seq::ZERO, "nothing available, nothing committed");
-  assert_eq!(
-    (calls, bytes),
-    (0, 0),
-    "commit_available() on an empty barrier — zero before the fix too, and therefore no evidence"
-  );
+    let (calls, bytes, committed) = measure(|| idle.commit_available());
+    assert_eq!(committed, Seq::ZERO, "nothing available, nothing committed");
+    assert_eq!(
+        (calls, bytes),
+        (0, 0),
+        "commit_available() on an empty barrier — zero before the fix too, and therefore no evidence"
+    );
 }

@@ -154,17 +154,17 @@ grep -B2 -A2 "WaitKind::None => false" ring_wait/src/lib.rs
 Live output:
 
 ```
-fn a_non_blocking_wait_looks_exactly_once()
-{
-  let deps = deps_zeroed( 1 );
-  let barrier = Barrier::over( &deps );
+fn a_non_blocking_wait_looks_exactly_once() {
+    let deps = deps_zeroed(1);
+    let barrier = Barrier::over(&deps);
 
-  let started = std::time::Instant::now();
-  assert!( barrier.wait_for( Seq::ZERO, 1, WaitKind::None, usize::MAX ).is_err() );
-      true
+    let started = std::time::Instant::now();
+    assert!(barrier.wait_for(Seq::ZERO, 1, WaitKind::None, usize::MAX).is_err());
+
+            true
+        },
+        WaitKind::None => false,
     }
-    WaitKind::None => false,
-  }
 }
 ```
 

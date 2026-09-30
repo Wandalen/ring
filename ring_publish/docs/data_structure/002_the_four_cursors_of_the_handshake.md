@@ -122,46 +122,46 @@ grep -rhoE 'claim(er)?\.[a-z_]+\(' ring_publish/tests/handshake_test.rs | sort |
 Live output:
 
 ```
-ring_batch/src/lib.rs:  BatchClaim::new( cursor.fetch_add( count as u64, order ), count )
-ring_claim/src/lib.rs:        Ok( _ ) => return Ok( Claim::new( current, count ) ),
-ring_claim/src/lib.rs:        Ok( _ ) => return Ok( Claim::new( current, granted ) ),
-ring_mpsc/src/lib.rs:    let claim = self.claimer.cursor().addr();
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 14 ), 6 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 3 ), 20 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 5 ), 0 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 10 ), 3 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 4 ), 0 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 10 ), 3 );
-ring_batch/tests/batch_test.rs:  let batch = BatchClaim::new( Seq( 10 ), 0 );
-ring_batch/tests/batch_test.rs:  let a = BatchClaim::new( Seq( 4 ), 4 ); // 4..8
-ring_batch/tests/batch_test.rs:  assert!( !a.overlaps( &BatchClaim::new( Seq( 0 ), 4 ) ), "abutting below" );
-ring_batch/tests/batch_test.rs:  assert!( !a.overlaps( &BatchClaim::new( Seq( 8 ), 4 ) ), "abutting above" );
-ring_batch/tests/batch_test.rs:  assert!( a.overlaps( &BatchClaim::new( Seq( 7 ), 4 ) ), "one sequence shared" );
-ring_batch/tests/batch_test.rs:  assert!( a.overlaps( &BatchClaim::new( Seq( 1 ), 4 ) ), "one sequence shared, below" );
-ring_batch/tests/batch_test.rs:  assert!( a.overlaps( &BatchClaim::new( Seq( 0 ), 16 ) ), "fully contained" );
-ring_batch/tests/batch_test.rs:  let empty = BatchClaim::new( Seq( 5 ), 0 );
-ring_batch/tests/batch_test.rs:  let wide = BatchClaim::new( Seq( 0 ), 16 );
-ring_batch/tests/batch_test.rs:  let a = BatchClaim::new( Seq( 1 ), 2 );
-ring_batch/tests/batch_test.rs:  assert_ne!( a, BatchClaim::new( Seq( 1 ), 3 ) );
-ring_batch/tests/batch_test.rs:  assert_eq!( batch, BatchClaim::new( Seq( 4 ), 2 ) );
-ring_claim/tests/claim_test.rs:  let claim = Claim::new( Seq( 4 ), 3 );
-ring_claim/tests/claim_test.rs:  let empty = Claim::new( Seq( 5 ), 0 );
-ring_claim/tests/claim_test.rs:  assert!( !empty.overlaps( Claim::new( Seq( 0 ), 100 ) ), "a zero-width range covers no slot" );
-ring_claim/tests/claim_test.rs:  assert!( !Claim::new( Seq( 0 ), 100 ).overlaps( empty ), "and the check is symmetric" );
-ring_claim/tests/claim_test.rs:      let claim = Claim::new( Seq( start ), len );
-ring_claim/tests/claim_test.rs:  let first = Claim::new( Seq( 0 ), 4 );
-ring_claim/tests/claim_test.rs:  let second = Claim::new( Seq( 4 ), 4 );
-ring_claim/tests/claim_test.rs:          let a = Claim::new( Seq( a_start ), a_len );
-ring_claim/tests/claim_test.rs:          let b = Claim::new( Seq( b_start ), b_len );
-ring_claim/tests/claim_test.rs:  assert_eq!( claimer.cursor().load( Ordering::Acquire ), Seq::ZERO );
-ring_claim/tests/claim_test.rs:  assert_eq!( claimer.cursor().load( Ordering::Acquire ), Seq( 3 ) );
-ring_claim/tests/claim_test.rs:  let stolen = claimer.cursor().fetch_add( 4, Ordering::AcqRel );
-ring_claim/tests/claim_test.rs:  claimer.cursor().store( Seq::ZERO, Ordering::Release );
-ring_claim/tests/claim_test.rs:  const A : Claim = Claim::new( Seq( 4 ), 4 );
-ring_claim/tests/claim_test.rs:  const B : Claim = Claim::new( Seq( 6 ), 4 );
-ring_claim/tests/claim_test.rs:  const C : Claim = Claim::new( Seq( 8 ), 4 );
-ring_claim/tests/claim_test.rs:  let a = Claim::new( start, 4 );
-ring_tls/tests/tls_test.rs:  assert_eq!( claim, BatchClaim::new( Seq::ZERO, 0 ) );
+ring_batch/src/lib.rs:    BatchClaim::new(cursor.fetch_add(count as u64, order), count)
+ring_claim/src/lib.rs:                Ok(_) => return Ok(Claim::new(current, count)),
+ring_claim/src/lib.rs:                Ok(_) => return Ok(Claim::new(current, granted)),
+ring_mpsc/src/lib.rs:        let claim = self.claimer.cursor().addr();
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(14), 6);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(3), 20);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(5), 0);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(10), 3);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(4), 0);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(10), 3);
+ring_batch/tests/batch_test.rs:    let batch = BatchClaim::new(Seq(10), 0);
+ring_batch/tests/batch_test.rs:    let a = BatchClaim::new(Seq(4), 4); // 4..8
+ring_batch/tests/batch_test.rs:    assert!(!a.overlaps(&BatchClaim::new(Seq(0), 4)), "abutting below");
+ring_batch/tests/batch_test.rs:    assert!(!a.overlaps(&BatchClaim::new(Seq(8), 4)), "abutting above");
+ring_batch/tests/batch_test.rs:    assert!(a.overlaps(&BatchClaim::new(Seq(7), 4)), "one sequence shared");
+ring_batch/tests/batch_test.rs:    assert!(a.overlaps(&BatchClaim::new(Seq(1), 4)), "one sequence shared, below");
+ring_batch/tests/batch_test.rs:    assert!(a.overlaps(&BatchClaim::new(Seq(0), 16)), "fully contained");
+ring_batch/tests/batch_test.rs:    let empty = BatchClaim::new(Seq(5), 0);
+ring_batch/tests/batch_test.rs:    let wide = BatchClaim::new(Seq(0), 16);
+ring_batch/tests/batch_test.rs:    let a = BatchClaim::new(Seq(1), 2);
+ring_batch/tests/batch_test.rs:    assert_ne!(a, BatchClaim::new(Seq(1), 3));
+ring_batch/tests/batch_test.rs:    assert_eq!(batch, BatchClaim::new(Seq(4), 2));
+ring_claim/tests/claim_test.rs:    let claim = Claim::new(Seq(4), 3);
+ring_claim/tests/claim_test.rs:    let empty = Claim::new(Seq(5), 0);
+ring_claim/tests/claim_test.rs:    assert!(!empty.overlaps(Claim::new(Seq(0), 100)), "a zero-width range covers no slot");
+ring_claim/tests/claim_test.rs:    assert!(!Claim::new(Seq(0), 100).overlaps(empty), "and the check is symmetric");
+ring_claim/tests/claim_test.rs:            let claim = Claim::new(Seq(start), len);
+ring_claim/tests/claim_test.rs:    let first = Claim::new(Seq(0), 4);
+ring_claim/tests/claim_test.rs:    let second = Claim::new(Seq(4), 4);
+ring_claim/tests/claim_test.rs:                    let a = Claim::new(Seq(a_start), a_len);
+ring_claim/tests/claim_test.rs:                    let b = Claim::new(Seq(b_start), b_len);
+ring_claim/tests/claim_test.rs:    assert_eq!(claimer.cursor().load(Ordering::Acquire), Seq::ZERO);
+ring_claim/tests/claim_test.rs:    assert_eq!(claimer.cursor().load(Ordering::Acquire), Seq(3));
+ring_claim/tests/claim_test.rs:    let stolen = claimer.cursor().fetch_add(4, Ordering::AcqRel);
+ring_claim/tests/claim_test.rs:    claimer.cursor().store(Seq::ZERO, Ordering::Release);
+ring_claim/tests/claim_test.rs:    const A: Claim = Claim::new(Seq(4), 4);
+ring_claim/tests/claim_test.rs:    const B: Claim = Claim::new(Seq(6), 4);
+ring_claim/tests/claim_test.rs:    const C: Claim = Claim::new(Seq(8), 4);
+ring_claim/tests/claim_test.rs:    let a = Claim::new(start, 4);
+ring_tls/tests/tls_test.rs:    assert_eq!(claim, BatchClaim::new(Seq::ZERO, 0));
 (no matches outside the documentation)
      21 claimer.claim(
       1 claimer.claimed(

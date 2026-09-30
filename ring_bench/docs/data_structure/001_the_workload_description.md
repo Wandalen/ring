@@ -314,17 +314,17 @@ Live output:
 
 ```
   -- every read of RingConfig::batch in the family, src and tests --
-    ring_bench/tests/bench_test.rs:  assert_eq!( workload.config().batch(), 32 );
-    ring_bench/tests/bench_test.rs:    workload.config().batch(),
-    ring_bench/tests/bench_test.rs:      workload.config().batch(),
+    ring_bench/tests/bench_test.rs:    assert_eq!(workload.config().batch(), 32);
+    ring_bench/tests/bench_test.rs:        workload.config().batch(),
+    ring_bench/tests/bench_test.rs:            workload.config().batch(),
     outside ring_config and ring_bench : 0
   -- inside ring_config, every one of them a doctest line --
-      /// assert_eq!( cfg.with_batch( 0 ).batch(), 1 );
-      /// assert_eq!( cfg.with_batch( 8 ).batch(), 8 );
-      /// assert_eq!( cfg.with_batch( 999 ).batch(), 16 );
-      /// assert_eq!( RingConfig::new( 8 ).unwrap().batch(), 1 );
+        /// assert_eq!(cfg.with_batch(0).batch(), 1);
+        /// assert_eq!(cfg.with_batch(8).batch(), 8);
+        /// assert_eq!(cfg.with_batch(999).batch(), 16);
+        /// assert_eq!(RingConfig::new(8).unwrap().batch(), 1);
   -- what the field is documented to guarantee --
-      /// The batch size, always between one and the capacity inclusive.
+        /// The batch size, always between one and the capacity inclusive.
   -- and what the crate downstream of it tells its readers --
     //! `RingConfig` has already validated `capacity` and clamped `batch` and
 ```

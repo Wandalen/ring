@@ -50,7 +50,7 @@ grep -vE "^[[:space:]]*//" ring_publish/src/lib.rs \
 Live output:
 
 ```
-    self.cursor.compare_exchange( start, end, PUBLISH, GATING ).map( | _ | end )
+        self.cursor.compare_exchange(start, end, PUBLISH, GATING).map(|_| end)
 ```
 
 **Expected: exactly one hit** — the `compare_exchange` in `try_publish`. Run

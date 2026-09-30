@@ -123,14 +123,14 @@ command grep -m1 -A2 -F '  /// `get` returns `&S`, and `TypedSlot::take` needs `
 Live output:
 
 ```
-  /// **This is the only way to move a record out of a batch**, because taking a
-  /// value from a slot needs `&mut` — [`TypedSlot::take`] cannot be reached
-  /// through [`get`]. A consumer that reads without consuming uses [`get`]; one
-  /// that owns what it drained needs this.
+    /// **This is the only way to move a record out of a batch**, because taking a
+    /// value from a slot needs `&mut` — [`TypedSlot::take`] cannot be reached
+    /// through [`get`]. A consumer that reads without consuming uses [`get`]; one
+    /// that owns what it drained needs this.
 ---
-  /// `get` returns `&S`, and `TypedSlot::take` needs `&mut S`, so before
-  /// `get_mut` existed there was no path from a drained batch to an owned `T` at
-  /// all — only to a borrow of one. `ring_mpsc`'s batch had the counterpart from
+    /// `get` returns `&S`, and `TypedSlot::take` needs `&mut S`, so before
+    /// `get_mut` existed there was no path from a drained batch to an owned `T` at
+    /// all — only to a borrow of one. `ring_mpsc`'s batch had the counterpart from
 ```
 
 Two statements of the same rule, in `ring_spsc`'s source and `ring_spsc`'s test

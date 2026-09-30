@@ -278,7 +278,7 @@ Live output:
   ring_shutdown -> ring_handle in Cargo.toml: 0
   ring_shutdown naming ring_handle in src:    0
   -- what ring_shutdown actually wraps --
-use ring_core::{ Consumer, Producer };
+use ring_core::{Consumer, Producer};
 ```
 
 Zero in all three directions. `ring_shutdown` imports `ring_core::{ Consumer,

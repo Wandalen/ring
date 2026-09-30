@@ -9,8 +9,8 @@ description = "Flush policies deciding when thread-local staging reaches the rin
 publish = true
 
 [dependencies]
-ring_tls = { path = "../ring_tls", version = "0.1.0" }
 ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_tls = { path = "../ring_tls", version = "0.1.0" }
 ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [dev-dependencies]

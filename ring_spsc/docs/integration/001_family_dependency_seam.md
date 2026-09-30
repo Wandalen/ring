@@ -237,8 +237,8 @@ done
 Live output:
 
 ```
-ring_spsc   5 deps: ring_store ring_config ring_cursor ring_slot ring_types 
-ring_mpsc   8 deps: ring_atomic ring_store ring_claim ring_config ring_cursor ring_gating ring_slot ring_types 
+ring_spsc   5 deps: ring_config ring_cursor ring_slot ring_store ring_types 
+ring_mpsc   8 deps: ring_atomic ring_claim ring_config ring_cursor ring_gating ring_slot ring_store ring_types 
 ```
 
 The difference is not a subset relationship by accident — each of the three

@@ -9,14 +9,14 @@ description = "Thread-local staging buffers ahead of a ring flush"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
 ring_batch = { path = "../ring_batch", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [dev-dependencies]
-ring_store = { path = "../ring_store" }
 ring_event = { path = "../ring_event" }
 ring_slot = { path = "../ring_slot" }
+ring_store = { path = "../ring_store" }
 
 [lints]
 workspace = true

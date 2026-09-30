@@ -47,7 +47,7 @@ Live output:
   3
   -- what those three import instead of std --
 use core::fmt;
-use core::sync::atomic::{ AtomicU64, Ordering };
+use core::sync::atomic::{AtomicU64, Ordering};
   -- heap-typed declarations across the same three --
 1
   -- lines in resolve doc block mentioning ordering, atomics or threads --

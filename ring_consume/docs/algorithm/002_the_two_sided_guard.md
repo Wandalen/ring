@@ -58,20 +58,20 @@ asserts the whole set by name.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-sed -n '/# Errors/,/^  \/\/\/ ```$/p' ring_consume/src/lib.rs | head -12
+sed -n '/# Errors/,/^    \/\/\/ ```$/p' ring_consume/src/lib.rs | head -12
 ```
 
 Live output:
 
 ```
-  /// # Errors
-  ///
-  /// [`RingError::Empty`] when `through` is past what is available: the
-  /// consumer would be freeing slots it has not read. [`RingError::Empty`] also
-  /// when `through` is behind the current position, which would re-read slots
-  /// the producer has already been cleared to reuse.
-  ///
-  /// ```
+    /// # Errors
+    ///
+    /// [`RingError::Empty`] when `through` is past what is available: the
+    /// consumer would be freeing slots it has not read. [`RingError::Empty`] also
+    /// when `through` is behind the current position, which would re-read slots
+    /// the producer has already been cleared to reuse.
+    ///
+    /// ```
 ```
 
 Quoted from the source:

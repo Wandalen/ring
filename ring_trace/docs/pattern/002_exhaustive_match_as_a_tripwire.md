@@ -58,10 +58,10 @@ Live output:
 
 ```
   -- the tripwire, and the rationale the crate gives for it --
-  ///
-  /// Written as an exhaustive `match` rather than a derive so that adding a
-  /// discriminant fails to compile here, where a human then has to say what the
-  /// new operation is called.
+    ///
+    /// Written as an exhaustive `match` rather than a derive so that adding a
+    /// discriminant fails to compile here, where a human then has to say what the
+    /// new operation is called.
   -- who else in the family states a compile-time claim --
     ring_overflow/src/lib.rs:
     ring_slot/src/lib.rs:

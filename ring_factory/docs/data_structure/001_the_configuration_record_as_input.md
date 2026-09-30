@@ -27,13 +27,12 @@ sed -n '/^pub struct RingConfig/,/^}/p' ring_config/src/lib.rs
 Live output:
 
 ```
-pub struct RingConfig
-{
-  capacity : Capacity,
-  wait : WaitKind,
-  overflow : OverflowPolicy,
-  producers : usize,
-  batch : usize,
+pub struct RingConfig {
+    capacity: Capacity,
+    wait: WaitKind,
+    overflow: OverflowPolicy,
+    producers: usize,
+    batch: usize,
 }
 ```
 

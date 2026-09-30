@@ -20,10 +20,9 @@ command grep -A3 'pub const fn is_multi_producer' ring_config/src/lib.rs
 Live output:
 
 ```
-  pub const fn is_multi_producer( &self ) -> bool
-  {
-    self.producers > 1
-  }
+    pub const fn is_multi_producer(&self) -> bool {
+        self.producers > 1
+    }
 ```
 
 `ring_config`'s own documentation calls this "the one derived reading in the

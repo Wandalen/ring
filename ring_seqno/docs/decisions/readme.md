@@ -45,9 +45,9 @@ command grep 'saturating_sub\|distance_to' ring_seqno/src/lib.rs
 Live output:
 
 ```
-  earlier.distance_to( later ) / capacity.get() as u64
-  consumer.distance_to( producer ) < capacity.get() as u64
-  let in_flight = consumer.distance_to( producer );
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
-  consumer.distance_to( producer )
+    earlier.distance_to(later) / capacity.get() as u64
+    consumer.distance_to(producer) < capacity.get() as u64
+    let in_flight = consumer.distance_to(producer);
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
+    consumer.distance_to(producer)
 ```

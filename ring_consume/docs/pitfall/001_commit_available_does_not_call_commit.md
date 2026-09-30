@@ -153,9 +153,9 @@ command grep -m1 -A2 -F '  // Duplicates `commit`'"'"'s store rather than delega
 Live output:
 
 ```
-  // Duplicates `commit`'s store rather than delegating to it: `run.end()` is
-  // always inside `commit`'s accepted range, so delegating would mean either
-  // discarding an unreachable `Err` (`unwrap_or`, itself a smell) or changing
+    // Duplicates `commit`'s store rather than delegating to it: `run.end()` is
+    // always inside `commit`'s accepted range, so delegating would mean either
+    // discarding an unreachable `Err` (`unwrap_or`, itself a smell) or changing
 ```
 
 **Disposition:** applied — the tradeoff nobody had written down is now a

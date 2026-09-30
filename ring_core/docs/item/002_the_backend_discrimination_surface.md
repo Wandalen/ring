@@ -60,13 +60,13 @@ ring_handle/src/lib.rs://! | `try_clone` is **withheld** | `ring_core::Producer:
 ring_handle/src/lib.rs:/// producer, which is the difference from `ring_core::Producer::try_clone`.
 ring_testkit/src/lib.rs:/// # Backend-blind
 ring_bench/tests/bench_test.rs:/// whose `Ends::split` yields one producer with no `try_clone` beside it.
-ring_factory/tests/factory_test.rs:use ring_core::{ Backend, Ring };
-ring_factory/tests/factory_test.rs:assert_eq!( single.backend(), Backend::Spsc );
-ring_factory/tests/factory_test.rs:assert_eq!( multi.backend(), Backend::Mpsc );
+ring_factory/tests/factory_test.rs:use ring_core::{Backend, Ring};
+ring_factory/tests/factory_test.rs:assert_eq!(single.backend(), Backend::Spsc);
+ring_factory/tests/factory_test.rs:assert_eq!(multi.backend(), Backend::Mpsc);
 ring_handle/tests/handle_test.rs://! is no `Clone` and no `try_clone` — and a test cannot call a method that does
 ring_handle/tests/handle_test.rs:let backend = ring.backend();
 ring_handle/tests/ui_test.rs:/// | `producer_try_clones` | `ring_core`'s duplication is not forwarded | This crate — N2, and the `Deref` detector |
-ring_handle/tests/ui_test.rs:cases.compile_fail( "tests/ui/producer_try_clones.rs" );
+ring_handle/tests/ui_test.rs:cases.compile_fail("tests/ui/producer_try_clones.rs");
 ```
 
 Read the list rather than the count. Every `src/` line is a doc comment, and all

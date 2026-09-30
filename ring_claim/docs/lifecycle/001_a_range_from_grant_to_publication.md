@@ -104,23 +104,23 @@ command grep -m1 -A16 -F '/// # Panics' ring_publish/src/lib.rs
 Live output:
 
 ```
-  /// # Panics
-  ///
-  /// Never. It deadlocks instead, and there are two ways in.
-  ///
-  /// A caller that publishes a range it never claimed waits for a turn that
-  /// cannot arrive. That is a caller bug this crate cannot detect, and
-  /// `try_publish` is the variant for a caller that wants to decide for itself.
-  ///
-  /// A caller whose *predecessor* dropped its claim without publishing waits
-  /// just as long, and that one is not the waiting caller's bug at all. The
-  /// module documentation's termination argument — a predecessor "cannot
-  /// abandon" a slot write it has already started — describes correct
-  /// producers rather than a property the types enforce:
-  /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
-  /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
-  /// that. Of the two deadlocks this is the reachable one, and the only
-  /// defence against it is that every producer publishes what it claims.
+    /// # Panics
+    ///
+    /// Never. It deadlocks instead, and there are two ways in.
+    ///
+    /// A caller that publishes a range it never claimed waits for a turn that
+    /// cannot arrive. That is a caller bug this crate cannot detect, and
+    /// `try_publish` is the variant for a caller that wants to decide for itself.
+    ///
+    /// A caller whose *predecessor* dropped its claim without publishing waits
+    /// just as long, and that one is not the waiting caller's bug at all. The
+    /// module documentation's termination argument — a predecessor "cannot
+    /// abandon" a slot write it has already started — describes correct
+    /// producers rather than a property the types enforce:
+    /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
+    /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
+    /// that. Of the two deadlocks this is the reachable one, and the only
+    /// defence against it is that every producer publishes what it claims.
 ```
 
 **Disposition:** applied — the omission was in `ring_publish`, and that is where

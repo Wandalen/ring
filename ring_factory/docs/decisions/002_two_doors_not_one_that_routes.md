@@ -203,13 +203,13 @@ command grep -A6 "signature matches \[\`build\`\](Self::build)" ring_factory/src
 Live output:
 
 ```
-  /// None currently. The signature matches [`build`](Self::build) so the two
-  /// are interchangeable at a call site, which is the point of a swappable
-  /// backend — **at a call site fixed ahead of time**, never inside a wrapper
-  /// that reads `cfg` and picks between them at runtime. That would
-  /// reintroduce exactly the second input `docs/invariant/001` forbids, and
-  /// nothing in either signature stops it from being written.
-  #[ cfg( feature = "crossbeam" ) ]
+    /// None currently. The signature matches [`build`](Self::build) so the two
+    /// are interchangeable at a call site, which is the point of a swappable
+    /// backend — **at a call site fixed ahead of time**, never inside a wrapper
+    /// that reads `cfg` and picks between them at runtime. That would
+    /// reintroduce exactly the second input `docs/invariant/001` forbids, and
+    /// nothing in either signature stops it from being written.
+    #[cfg(feature = "crossbeam")]
 ```
 
 **Disposition:** applied — `Factory::build_crossbeam`'s doc comment in

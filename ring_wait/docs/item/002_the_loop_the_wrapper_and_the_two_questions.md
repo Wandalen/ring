@@ -179,7 +179,7 @@ caller anywhere outside this crate's own tests.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-grep 'pause( WaitKind' ring_wait/src/lib.rs
+grep 'pause(WaitKind' ring_wait/src/lib.rs
 # which arms reach std
 grep -A2 'WaitKind::Yield =>\|WaitKind::Park =>' ring_wait/src/lib.rs | grep 'std::'
 ```
@@ -187,9 +187,9 @@ grep -A2 'WaitKind::Yield =>\|WaitKind::Park =>' ring_wait/src/lib.rs | grep 'st
 Live output:
 
 ```
-/// assert!( pause( WaitKind::Spin, 0 ), "spin says keep going" );
-/// assert!( !pause( WaitKind::None, 0 ), "None says stop after the first look" );
-      std::thread::yield_now();
+/// assert!(pause(WaitKind::Spin, 0), "spin says keep going");
+/// assert!(!pause(WaitKind::None, 0), "None says stop after the first look");
+            std::thread::yield_now();
 ```
 
 The doctest asserts `pause( WaitKind::Spin, 0 )` is true and

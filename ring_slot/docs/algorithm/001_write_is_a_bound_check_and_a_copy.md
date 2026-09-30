@@ -129,7 +129,7 @@ Live output:
 
 ```
   -- every statement-position control-flow construct in the crate --
-      if payload.len() > N
+          if payload.len() > N 
   -- and, independently: any loop at all, doc comments stripped --
     loop/while/for-in outside comments: 0
 ```

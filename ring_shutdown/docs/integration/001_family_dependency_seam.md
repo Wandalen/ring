@@ -77,7 +77,7 @@ family crates, default:        18
 features this crate declares:  0
 non-family, --all-features:    0
 where the externals do enter:  crossbeam-queue v0.3.14 crossbeam-utils v0.8.23 
-the feature that admits them:  crossbeam = [ "dep:crossbeam-queue" ]
+the feature that admits them:  crossbeam = ["dep:crossbeam-queue"]
 what the crate is tested with: cargo nextest run --all-features
 ```
 

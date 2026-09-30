@@ -102,12 +102,12 @@ command grep -A5 -F 'Counts an event, not a loss' ring_overflow/src/lib.rs
 Live output:
 
 ```
-  // Counts an event, not a loss: this runs on every policy, including `Fail`,
-  // whose own share is retrievable separately via `stats.dropped(
-  // OverflowPolicy::Fail )` — `Resolution::Refused.lost_an_item()` is `false`,
-  // so this call and that predicate answer different questions about the
-  // same arrival.
-  stats.record_drop( policy, 1 );
+    // Counts an event, not a loss: this runs on every policy, including `Fail`,
+    // whose own share is retrievable separately via `stats.dropped(
+    // OverflowPolicy::Fail )` — `Resolution::Refused.lost_an_item()` is `false`,
+    // so this call and that predicate answer different questions about the
+    // same arrival.
+    stats.record_drop(policy, 1);
 ```
 
 **Disposition:** applied — a source comment now sits directly above

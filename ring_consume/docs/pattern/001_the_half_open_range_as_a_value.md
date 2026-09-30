@@ -119,18 +119,18 @@ command grep -r 'must_use = ' ring_*/src/*.rs | sed 's|ring/||'
 Live output:
 
 ```
-ring_atomic/src/lib.rs:  #[ must_use = "the returned sequence is the claim — dropping it claims a range nobody will use" ]
-ring_claim/src/lib.rs:#[ must_use = "a claimed range that is never published strands its slots and stalls every consumer" ]
-ring_flush/src/lib.rs:#[ must_use = "an ignored outcome is exactly how a misconfigured OnBarrier stays silent" ]
-ring_shutdown/src/lib.rs:  #[ must_use = "a Stopped is the only route to a drain; bind it, or bind `_` to close and nothing else" ]
-ring_shutdown/src/lib.rs:  #[ must_use = "this is the record itself, not a copy — dropping it loses it" ]
-ring_shutdown/src/lib.rs:#[ must_use = "a Wake::Closed means stop, not publish" ]
-ring_slot/src/lib.rs:  #[ must_use = "this is the only way a payload leaves the slot; dropping it here destroys the record" ]
-ring_spsc/src/lib.rs:#[ must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot" ]
-ring_spsc/src/lib.rs:#[ must_use = "a batch commits on drop; dropping it immediately discards the records it covers" ]
-ring_testkit/src/lib.rs:#[ must_use = "nothing frees this — dropping the reference leaks the ring with no way to reach it again" ]
-ring_testkit/src/lib.rs:#[ must_use = "nothing frees either allocation — dropping the pair leaks both with no way to reach them again" ]
-ring_testkit/src/lib.rs:  #[ must_use = "the Outcome is the measurement — `script.run( &mut ring );` as a statement drives the ring and discards everything it observed" ]
+ring_atomic/src/lib.rs:    #[must_use = "the returned sequence is the claim — dropping it claims a range nobody will use"]
+ring_claim/src/lib.rs:#[must_use = "a claimed range that is never published strands its slots and stalls every consumer"]
+ring_flush/src/lib.rs:#[must_use = "an ignored outcome is exactly how a misconfigured OnBarrier stays silent"]
+ring_shutdown/src/lib.rs:    #[must_use = "a Stopped is the only route to a drain; bind it, or bind `_` to close and nothing else"]
+ring_shutdown/src/lib.rs:    #[must_use = "this is the record itself, not a copy — dropping it loses it"]
+ring_shutdown/src/lib.rs:#[must_use = "a Wake::Closed means stop, not publish"]
+ring_slot/src/lib.rs:    #[must_use = "this is the only way a payload leaves the slot; dropping it here destroys the record"]
+ring_spsc/src/lib.rs:#[must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot"]
+ring_spsc/src/lib.rs:#[must_use = "a batch commits on drop; dropping it immediately discards the records it covers"]
+ring_testkit/src/lib.rs:#[must_use = "nothing frees this — dropping the reference leaks the ring with no way to reach it again"]
+ring_testkit/src/lib.rs:#[must_use = "nothing frees either allocation — dropping the pair leaks both with no way to reach them again"]
+ring_testkit/src/lib.rs:    #[must_use = "the Outcome is the measurement — `script.run( &mut ring );` as a statement drives the ring and discards everything it observed"]
 ```
 
 Live output — every messaged `must_use` in all 33 crates:

@@ -41,7 +41,7 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs | grep ' as '
 Live output:
 
 ```
-    self.slowest().map( | s | s.advanced_by( self.capacity.get() as u64 ) )
+        self.slowest().map(|s| s.advanced_by(self.capacity.get() as u64))
 ```
 
 **One `as` in the whole crate**, and it is the safe direction: `usize → u64`

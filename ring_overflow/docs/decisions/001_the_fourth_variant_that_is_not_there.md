@@ -117,10 +117,10 @@ command grep -A3 -F 'Narrower than the name suggests' ring_overflow/src/lib.rs
 Live output:
 
 ```
-  /// **Narrower than the name suggests.** A publish that finds room and
-  /// succeeds normally never constructs a `Resolution` at all, so this
-  /// predicate never sees that case — what it actually answers is "did the
-  /// item get in *by evicting something*", not "did the item get in".
+    /// **Narrower than the name suggests.** A publish that finds room and
+    /// succeeds normally never constructs a `Resolution` at all, so this
+    /// predicate never sees that case — what it actually answers is "did the
+    /// item get in *by evicting something*", not "did the item get in".
 ```
 
 **Disposition:** applied — `accepted_incoming`'s doc comment in

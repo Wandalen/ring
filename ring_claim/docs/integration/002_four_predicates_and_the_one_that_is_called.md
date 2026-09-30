@@ -191,7 +191,7 @@ command grep -r '\.check(' ring_*/src/*.rs | command grep -vc '///'
 Live output:
 
 ```
-  /// # Not a step in a claim
+    /// # Not a step in a claim
 0
 ```
 

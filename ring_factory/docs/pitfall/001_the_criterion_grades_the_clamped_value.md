@@ -22,20 +22,20 @@ this:
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 echo '  -- with_batch: floor and cap --'
-command grep -A2 'with_batch( 0 ).batch(), 1' ring_config/src/lib.rs
+command grep -A2 'with_batch(0).batch(), 1' ring_config/src/lib.rs
 echo '  -- with_producers: floor --'
-command grep 'with_producers( 0 ).producers(), 1' ring_config/src/lib.rs
+command grep 'with_producers(0).producers(), 1' ring_config/src/lib.rs
 ```
 
 Live output:
 
 ```
   -- with_batch: floor and cap --
-  /// assert_eq!( cfg.with_batch( 0 ).batch(), 1 );
-  /// assert_eq!( cfg.with_batch( 8 ).batch(), 8 );
-  /// assert_eq!( cfg.with_batch( 999 ).batch(), 16 );
+    /// assert_eq!(cfg.with_batch(0).batch(), 1);
+    /// assert_eq!(cfg.with_batch(8).batch(), 8);
+    /// assert_eq!(cfg.with_batch(999).batch(), 16);
   -- with_producers: floor --
-  /// assert_eq!( RingConfig::new( 8 ).unwrap().with_producers( 0 ).producers(), 1 );
+    /// assert_eq!(RingConfig::new(8).unwrap().with_producers(0).producers(), 1);
 ```
 
 So a caller who asks for a batch of 999 on a sixteen-slot ring gets a batch of
@@ -188,8 +188,8 @@ Live output:
 
 ```
   -- the two silently corrected fields --
-    self.producers = if producers == 0 { 1 } else { producers };
-    self.batch = if capped == 0 { 1 } else { capped };
+        self.producers = if producers == 0 { 1 } else { producers };
+        self.batch = if capped == 0 { 1 } else { capped };
   -- and what reads them on the build arc --
   ring_factory  producers(): 0  batch(): 0
   ring_core     producers(): 0  batch(): 0

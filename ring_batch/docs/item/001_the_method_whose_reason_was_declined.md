@@ -97,7 +97,7 @@ command grep 'whole-run contention test does not call this' ring_batch/src/lib.r
 Live output:
 
 ```
-  /// whole-run contention test does not call this — it uses a `HashSet`
+    /// whole-run contention test does not call this — it uses a `HashSet`
 ```
 
 **Disposition:** applied — `overlaps`'s own doc comment no longer claims it was

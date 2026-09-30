@@ -34,12 +34,12 @@ grep -r "spin_loop" */src/*.rs
 Live output:
 
 ```
-ring_poll/src/lib.rs:          core::hint::spin_loop();
-ring_poll/src/lib.rs:      core::hint::spin_loop();
-ring_poll/src/lib.rs:      core::hint::spin_loop();
+ring_poll/src/lib.rs:                    core::hint::spin_loop();
+ring_poll/src/lib.rs:            core::hint::spin_loop();
+ring_poll/src/lib.rs:            core::hint::spin_loop();
 ring_publish/src/lib.rs://! [`Publisher::publish`] loops on a `spin_loop` hint with no wait strategy and
-ring_publish/src/lib.rs:      core::hint::spin_loop();
-ring_wait/src/lib.rs:        core::hint::spin_loop();
+ring_publish/src/lib.rs:            core::hint::spin_loop();
+ring_wait/src/lib.rs:                core::hint::spin_loop();
 ```
 
 | # | Site | Predicate | Pause | Budget |

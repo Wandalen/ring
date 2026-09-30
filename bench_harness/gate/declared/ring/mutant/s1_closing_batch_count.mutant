@@ -50,9 +50,9 @@ round-failures: 1
 detector: a_partial_final_batch_is_published_rather_than_abandoned
 
 --- from
-            taken += commit_batch( queue, &mut staged, capacity );
-            reported.fetch_add( taken, Ordering::Relaxed );
+                taken += commit_batch(queue, &mut staged, capacity);
+                reported.fetch_add(taken, Ordering::Relaxed);
 --- to
-            taken -= commit_batch( queue, &mut staged, capacity );   // PROBE ONLY — G12, was `+=`
-            reported.fetch_add( taken, Ordering::Relaxed );
+                taken -= commit_batch(queue, &mut staged, capacity); // PROBE ONLY — G12, was `+=`
+                reported.fetch_add(taken, Ordering::Relaxed);
 --- end

@@ -50,7 +50,7 @@ printf '%s\n' "$out" | command grep -E '^test result:' | sed -E 's/; finished in
 Live output:
 
 ```
-pub struct Capacity( usize );
+pub struct Capacity(usize);
 test a_pair_is_two_lines_plus_its_capacity ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 21 filtered out; finished
 ```

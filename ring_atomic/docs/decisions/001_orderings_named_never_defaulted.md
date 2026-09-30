@@ -40,15 +40,15 @@ Live output:
 //! correct and every benchmark meaningless, which for a workstream whose whole
 //! output is a measured verdict is the worse failure. That governs the cells
   -- every ordering the crate body chooses without asking --
-    let loads = self.loads.load( Ordering::Relaxed );
-    let stores = self.stores.load( Ordering::Relaxed );
-    let fetch_adds = self.fetch_adds.load( Ordering::Relaxed );
-    let compare_exchanges = self.compare_exchanges.load( Ordering::Relaxed );
-      counter.store( 0, Ordering::Relaxed );
-    self.loads.fetch_add( 1, Ordering::Relaxed );
-    self.stores.fetch_add( 1, Ordering::Relaxed );
-    self.fetch_adds.fetch_add( 1, Ordering::Relaxed );
-    self.compare_exchanges.fetch_add( 1, Ordering::Relaxed );
+        let loads = self.loads.load(Ordering::Relaxed);
+        let stores = self.stores.load(Ordering::Relaxed);
+        let fetch_adds = self.fetch_adds.load(Ordering::Relaxed);
+        let compare_exchanges = self.compare_exchanges.load(Ordering::Relaxed);
+            counter.store(0, Ordering::Relaxed);
+        self.loads.fetch_add(1, Ordering::Relaxed);
+        self.stores.fetch_add(1, Ordering::Relaxed);
+        self.fetch_adds.fetch_add(1, Ordering::Relaxed);
+        self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
 ```
 
 ---

@@ -197,7 +197,7 @@ grep -vE "^[[:space:]]*//" ring_claim/src/lib.rs | grep -E "impl.*Drop"
 Live output:
 
 ```
-#[ must_use = "a claimed range that is never published strands its slots and stalls every consumer" ]
+#[must_use = "a claimed range that is never published strands its slots and stalls every consumer"]
 ```
 
 **Expected:** one messaged `must_use` from the first, and **no output at all**

@@ -36,9 +36,9 @@ Live output:
   -- this crate (expect 0 -- invariant holds) --
     matches: 0
   -- control: the same check where the literal is genuinely written --
-    pub const CACHE_LINE : usize = 64;
+    pub const CACHE_LINE: usize = 64;
     // family has used (64, 128) and unchecked until now (-> docs/algorithm/001
-    #[ repr( align( 64 ) ) ]
+    #[repr(align(64))]
 ```
 
 **Expected: nothing under the first heading, something under the second.** Every
@@ -94,10 +94,10 @@ Live output:
 //! A type of size 8 with `align_of == 64` satisfies the first clause and packs
 //! start, not how much room it occupies. A type of size 64 with `align_of == 8`
 //! the cursors together despite each still measuring 64 bytes on its own.
-    64,
-    64,
-    "the 64 above is ring_align::CACHE_LINE, not a coincidence"
-  let large = CursorPair::new( cap( 64 ) );
+        64,
+        64,
+        "the 64 above is ring_align::CACHE_LINE, not a coincidence"
+    let large = CursorPair::new(cap(64));
 ```
 
 `tests/cursor_test.rs` asserts against `64` *and* against `CACHE_LINE`, in the

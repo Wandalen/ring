@@ -73,12 +73,12 @@ result and nothing about *where in the script* it went wrong → TK40.
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_testkit
 printf 'assert/panic in src, non-doc:  %s\n' "$( command grep -vE '^\s*//' src/lib.rs | command grep -cE 'assert|unwrap\(|expect\(|panic!' || true )"
-printf 'Outcome public fields:         %s\n' "$( awk '/^pub struct Outcome/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -cE '^  pub ' || true )"
+printf 'Outcome public fields:         %s\n' "$( awk '/^pub struct Outcome/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -cE '^    pub ' || true )"
 printf 'functions returning Result:    %s\n' "$( command grep -cE '^ *pub fn .*-> Result<' src/lib.rs || true )"
 printf 'Display arms:                  %s\n' "$( awk '/impl core::fmt::Display for Anomaly/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -c 'write!' || true )"
 printf 'the Error impl, in full:       %s\n' "$( command grep -m1 'impl core::error::Error' src/lib.rs )"
 printf 'Display messages naming a step: %s\n' "$( awk '/impl core::fmt::Display for Anomaly/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -c 'step' || true )"
-printf 'Outcome fields naming a step:  %s\n' "$( awk '/^pub struct Outcome/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -E '^  pub ' | command grep -cE 'step|index' || true )"
+printf 'Outcome fields naming a step:  %s\n' "$( awk '/^pub struct Outcome/{f=1} f && /^}$/{exit} f' src/lib.rs | command grep -E '^    pub ' | command grep -cE 'step|index' || true )"
 printf 'tests that box an Anomaly:     %s\n' "$( command grep -c 'dyn core::error::Error' tests/testkit_test.rs || true )"
 printf 'tests returning Result:        %s\n' "$( cat tests/*.rs | command grep -cE 'fn [a-z_]+\( *\) *-> *Result' || true )"
 printf 'to_string call sites in tests: %s\n' "$( cat tests/*.rs | command grep -c 'to_string()' || true )"

@@ -230,7 +230,7 @@ command grep -F 'first in the fixed pass order the checks run in, not first by p
 Live output:
 
 ```
-  /// first in the fixed pass order the checks run in, not first by position in
+    /// first in the fixed pass order the checks run in, not first by position in
 ```
 
 **Disposition:** applied — `Outcome::audit`'s doc summary now states that

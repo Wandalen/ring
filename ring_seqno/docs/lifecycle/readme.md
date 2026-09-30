@@ -43,7 +43,7 @@ command grep 'Capacity::new(' ring_seqno/src/lib.rs
 Live output:
 
 ```
-/// let cap = Capacity::new( 8 ).unwrap();
-/// let cap = Capacity::new( 4 ).unwrap();
-/// let cap = Capacity::new( 4 ).unwrap();
+/// let cap = Capacity::new(8).unwrap();
+/// let cap = Capacity::new(4).unwrap();
+/// let cap = Capacity::new(4).unwrap();
 ```

@@ -194,13 +194,13 @@ command grep -A6 -F 'Not a promise to overwrite' ring_slot/src/lib.rs
 Live output:
 
 ```
-  /// **Not a promise to overwrite.** For a shape that owns what it stores
-  /// (`TypedSlot`), the old value's destructor runs, so nothing survives the
-  /// call. For a shape that stores by copying into fixed storage
-  /// (`BytesSlot`), the bytes are not zeroed — only the length that marks
-  /// them unreachable through this trait's own API moves. Both are "empty"
-  /// by [`Slot::is_empty`]; only one is empty in memory.
-  ///
+    /// **Not a promise to overwrite.** For a shape that owns what it stores
+    /// (`TypedSlot`), the old value's destructor runs, so nothing survives the
+    /// call. For a shape that stores by copying into fixed storage
+    /// (`BytesSlot`), the bytes are not zeroed — only the length that marks
+    /// them unreachable through this trait's own API moves. Both are "empty"
+    /// by [`Slot::is_empty`]; only one is empty in memory.
+    ///
 ```
 
 **Disposition:** applied — `Slot::clear`'s trait doc comment in

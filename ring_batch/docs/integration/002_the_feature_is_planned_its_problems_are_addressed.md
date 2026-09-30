@@ -169,7 +169,7 @@ Live output:
 //! per operation, not per item, so a batch of sixty-four costs roughly what a
 //! single item costs."
   -- the crate that measures claims like it --
-ring_factory ring_tls ring_flush ring_stats ring_spsc ring_mpsc ring_core ring_slot ring_types 
+ring_factory ring_flush ring_mpsc ring_spsc ring_stats ring_tls ring_core ring_slot ring_types 
   -- ring_batch in ring_bench code and manifest : 0 files --
   -- ring_batch in ring_bench documents         : 2 files --
 ```

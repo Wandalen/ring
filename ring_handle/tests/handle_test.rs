@@ -41,7 +41,7 @@ use ring_types::OverflowPolicy;
 
 /// A ring of `slots` capacity, in the default (SPSC, drop-newest) configuration.
 fn ring(slots: usize) -> Ring<u32> {
-  Ring::new(&RingConfig::new(slots).unwrap()).unwrap()
+    Ring::new(&RingConfig::new(slots).unwrap()).unwrap()
 }
 
 /// A ring of `slots` capacity that refuses rather than dropping.
@@ -49,8 +49,8 @@ fn ring(slots: usize) -> Ring<u32> {
 /// The default policy is `DropNewest`, under which a full push reports `Ok`
 /// having discarded the record — so a test *about* a refusal needs this one.
 fn refusing_ring(slots: usize) -> Ring<u32> {
-  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
-  Ring::new(&config).unwrap()
+    let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
+    Ring::new(&config).unwrap()
 }
 
 // ── The reached-test ──────────────────────────────────────────────────────
@@ -63,32 +63,32 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
 /// there could not be — `Split::new` consumed it.
 #[test]
 fn the_two_ends_travel_to_separate_threads() {
-  let mut split = Split::new(ring(64));
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
+    let mut split = Split::new(ring(64));
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
 
-  let received = std::thread::scope(|scope| {
-    scope.spawn(move || {
-      let mut next: u32 = 0;
-      while next < 32 {
-        let moved = producer.try_push_batch(&mut (next..32));
-        next += u32::try_from(moved).unwrap();
-      }
+    let received = std::thread::scope(|scope| {
+        scope.spawn(move || {
+            let mut next: u32 = 0;
+            while next < 32 {
+                let moved = producer.try_push_batch(&mut (next..32));
+                next += u32::try_from(moved).unwrap();
+            }
+        });
+
+        scope
+            .spawn(move || {
+                let mut got = Vec::new();
+                while got.len() < 32 {
+                    consumer.try_recv_batch(&mut got);
+                }
+                got
+            })
+            .join()
+            .unwrap()
     });
 
-    scope
-      .spawn(move || {
-        let mut got = Vec::new();
-        while got.len() < 32 {
-          consumer.try_recv_batch(&mut got);
-        }
-        got
-      })
-      .join()
-      .unwrap()
-  });
-
-  assert_eq!(received, (0..32).collect::<Vec<_>>(), "in order, and all of it");
+    assert_eq!(received, (0..32).collect::<Vec<_>>(), "in order, and all of it");
 }
 
 // ── Producer ──────────────────────────────────────────────────────────────
@@ -96,43 +96,43 @@ fn the_two_ends_travel_to_separate_threads() {
 /// A refusal hands the record back unchanged, so a caller can retry it.
 #[test]
 fn a_refused_push_hands_the_record_back_unchanged() {
-  let mut split = Split::new(refusing_ring(2));
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
+    let mut split = Split::new(refusing_ring(2));
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
 
-  producer.try_push(1).unwrap();
-  producer.try_push(2).unwrap();
-  let refused = producer.try_push(3).unwrap_err();
-  assert_eq!(refused, 3, "the record itself, not a copy of a description of it");
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    let refused = producer.try_push(3).unwrap_err();
+    assert_eq!(refused, 3, "the record itself, not a copy of a description of it");
 
-  assert_eq!(consumer.try_recv(), Some(1));
-  assert_eq!(producer.try_push(refused), Ok(()), "and it goes in once there is room");
+    assert_eq!(consumer.try_recv(), Some(1));
+    assert_eq!(producer.try_push(refused), Ok(()), "and it goes in once there is room");
 }
 
 /// A batch that does not fit is partially accepted, and the count says so.
 #[test]
 fn try_push_batch_reports_partial_acceptance() {
-  let mut split = Split::new(refusing_ring(4));
-  let mut ends = split.ends();
-  let (mut producer, consumer) = ends.split();
+    let mut split = Split::new(refusing_ring(4));
+    let mut ends = split.ends();
+    let (mut producer, consumer) = ends.split();
 
-  assert_eq!(producer.try_push_batch(&mut (0..10)), 4);
-  assert_eq!(consumer.len(), 4);
+    assert_eq!(producer.try_push_batch(&mut (0..10)), 4);
+    assert_eq!(consumer.len(), 4);
 }
 
 /// `free_capacity` and `is_full` are one contract in two spellings.
 #[test]
 fn free_capacity_and_is_full_agree() {
-  let mut split = Split::new(refusing_ring(4));
-  let mut ends = split.ends();
-  let (mut producer, _consumer) = ends.split();
+    let mut split = Split::new(refusing_ring(4));
+    let mut ends = split.ends();
+    let (mut producer, _consumer) = ends.split();
 
-  assert_eq!(producer.free_capacity(), 4);
-  assert!(!producer.is_full());
+    assert_eq!(producer.free_capacity(), 4);
+    assert!(!producer.is_full());
 
-  producer.try_push_batch(&mut (0..4));
-  assert_eq!(producer.free_capacity(), 0);
-  assert!(producer.is_full(), "is_full is free_capacity() == 0, literally");
+    producer.try_push_batch(&mut (0..4));
+    assert_eq!(producer.free_capacity(), 0);
+    assert!(producer.is_full(), "is_full is free_capacity() == 0, literally");
 }
 
 // ── Consumer ──────────────────────────────────────────────────────────────
@@ -140,17 +140,17 @@ fn free_capacity_and_is_full_agree() {
 /// A batch drain moves what is waiting and reports how much.
 #[test]
 fn try_recv_batch_moves_what_is_waiting() {
-  let mut split = Split::new(ring(8));
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..5));
-  assert!(!consumer.is_empty(), "nothing was waiting, so receiving proves nothing");
+    let mut split = Split::new(ring(8));
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
+    producer.try_push_batch(&mut (0..5));
+    assert!(!consumer.is_empty(), "nothing was waiting, so receiving proves nothing");
 
-  let mut out = Vec::new();
-  assert_eq!(consumer.try_recv_batch(&mut out), 5);
-  assert_eq!(out, vec![0, 1, 2, 3, 4]);
-  assert!(consumer.is_empty());
-  assert_eq!(consumer.len(), 0);
+    let mut out = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut out), 5);
+    assert_eq!(out, vec![0, 1, 2, 3, 4]);
+    assert!(consumer.is_empty());
+    assert_eq!(consumer.len(), 0);
 }
 
 /// The drain's bound is fixed at the call that made it, not as it runs.
@@ -161,24 +161,24 @@ fn try_recv_batch_moves_what_is_waiting() {
 /// after the iterator exists is not yielded by it.
 #[test]
 fn drain_is_bounded_at_the_call_that_made_it() {
-  let mut split = Split::new(ring(16));
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..3));
+    let mut split = Split::new(ring(16));
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
+    producer.try_push_batch(&mut (0..3));
 
-  let taken: Vec<u32> = {
-    let mut drain = consumer.drain();
-    assert_eq!(drain.size_hint(), (0, Some(3)), "the bound was read once, up front");
+    let taken: Vec<u32> = {
+        let mut drain = consumer.drain();
+        assert_eq!(drain.size_hint(), (0, Some(3)), "the bound was read once, up front");
 
-    producer.try_push(99).unwrap();
+        producer.try_push(99).unwrap();
 
-    let taken = drain.by_ref().collect();
-    assert_eq!(drain.size_hint(), (0, Some(0)));
-    taken
-  };
+        let taken = drain.by_ref().collect();
+        assert_eq!(drain.size_hint(), (0, Some(0)));
+        taken
+    };
 
-  assert_eq!(taken, vec![0, 1, 2], "the record published mid-drain is not in it");
-  assert_eq!(consumer.try_recv(), Some(99), "it is still there, for the next drain");
+    assert_eq!(taken, vec![0, 1, 2], "the record published mid-drain is not in it");
+    assert_eq!(consumer.try_recv(), Some(99), "it is still there, for the next drain");
 }
 
 /// A drain stops when the ring empties, in lockstep with its own bound.
@@ -192,28 +192,28 @@ fn drain_is_bounded_at_the_call_that_made_it() {
 /// that finds nothing.
 #[test]
 fn drain_stops_when_the_ring_empties_first() {
-  let mut split = Split::new(ring(8));
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..2));
+    let mut split = Split::new(ring(8));
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
+    producer.try_push_batch(&mut (0..2));
 
-  let mut drain = consumer.drain();
-  assert_eq!(drain.next(), Some(0));
-  assert_eq!(drain.next(), Some(1));
-  assert_eq!(drain.size_hint(), (0, Some(0)), "the bound already reached zero");
-  assert_eq!(drain.next(), None, "so this call returns via the bound check, not a receive");
+    let mut drain = consumer.drain();
+    assert_eq!(drain.next(), Some(0));
+    assert_eq!(drain.next(), Some(1));
+    assert_eq!(drain.size_hint(), (0, Some(0)), "the bound already reached zero");
+    assert_eq!(drain.next(), None, "so this call returns via the bound check, not a receive");
 }
 
 /// Draining an empty ring yields nothing and costs no ring operation.
 #[test]
 fn drain_of_an_empty_ring_yields_nothing() {
-  let mut split = Split::new(ring(8));
-  let mut ends = split.ends();
-  let (_producer, mut consumer) = ends.split();
+    let mut split = Split::new(ring(8));
+    let mut ends = split.ends();
+    let (_producer, mut consumer) = ends.split();
 
-  let mut drain = consumer.drain();
-  assert_eq!(drain.size_hint(), (0, Some(0)));
-  assert_eq!(drain.next(), None);
+    let mut drain = consumer.drain();
+    assert_eq!(drain.size_hint(), (0, Some(0)));
+    assert_eq!(drain.next(), None);
 }
 
 /// An empty ring answers immediately rather than spinning until something
@@ -226,20 +226,20 @@ fn drain_of_an_empty_ring_yields_nothing() {
 /// nanosecond from another.
 #[test]
 fn an_empty_ring_answers_promptly() {
-  let mut split = Split::new(ring(8));
-  let mut ends = split.ends();
-  let (_producer, mut consumer) = ends.split();
+    let mut split = Split::new(ring(8));
+    let mut ends = split.ends();
+    let (_producer, mut consumer) = ends.split();
 
-  let started = std::time::Instant::now();
-  for _ in 0..10_000 {
-    assert_eq!(consumer.try_recv(), None);
-  }
-  let elapsed = started.elapsed();
+    let started = std::time::Instant::now();
+    for _ in 0..10_000 {
+        assert_eq!(consumer.try_recv(), None);
+    }
+    let elapsed = started.elapsed();
 
-  assert!(
-    elapsed < std::time::Duration::from_millis(500),
-    "10 000 empty drains took {elapsed:?}; a 50µs park each would be ~500ms"
-  );
+    assert!(
+        elapsed < std::time::Duration::from_millis(500),
+        "10 000 empty drains took {elapsed:?}; a 50µs park each would be ~500ms"
+    );
 }
 
 /// Dropping one handle leaves the other usable.
@@ -250,27 +250,27 @@ fn an_empty_ring_answers_promptly() {
 /// it asserted rather than assumed.
 #[test]
 fn dropping_one_handle_leaves_the_other_usable() {
-  let mut split = Split::new(refusing_ring(4));
-  {
-    let mut ends = split.ends();
-    let (mut producer, consumer) = ends.split();
-
-    producer.try_push(7).unwrap();
+    let mut split = Split::new(refusing_ring(4));
     {
-      // The consumer's lifetime ends at this brace. Scoping it rather than
-      // calling `drop` keeps clippy's `drop_non_drop` quiet, which is fair:
-      // neither handle has a destructor, and the point here is the *borrow*
-      // ending, not a destructor running.
-      let _gone = consumer;
-    }
-    producer.try_push(8).unwrap();
-    assert_eq!(producer.free_capacity(), 2, "both landed, with the consumer already gone");
-  }
+        let mut ends = split.ends();
+        let (mut producer, consumer) = ends.split();
 
-  let mut ends = split.ends();
-  let (_producer, mut consumer) = ends.split();
-  assert_eq!(consumer.try_recv(), Some(7), "and the ring kept what was published");
-  assert_eq!(consumer.try_recv(), Some(8));
+        producer.try_push(7).unwrap();
+        {
+            // The consumer's lifetime ends at this brace. Scoping it rather than
+            // calling `drop` keeps clippy's `drop_non_drop` quiet, which is fair:
+            // neither handle has a destructor, and the point here is the *borrow*
+            // ending, not a destructor running.
+            let _gone = consumer;
+        }
+        producer.try_push(8).unwrap();
+        assert_eq!(producer.free_capacity(), 2, "both landed, with the consumer already gone");
+    }
+
+    let mut ends = split.ends();
+    let (_producer, mut consumer) = ends.split();
+    assert_eq!(consumer.try_recv(), Some(7), "and the ring kept what was published");
+    assert_eq!(consumer.try_recv(), Some(8));
 }
 
 /// Records left in the ring are dropped exactly once when the ring goes.
@@ -281,33 +281,33 @@ fn dropping_one_handle_leaves_the_other_usable() {
 /// this needs a type whose destructor counts.
 #[test]
 fn undrained_records_are_dropped_exactly_once() {
-  use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicUsize, Ordering};
 
-  static DROPPED: AtomicUsize = AtomicUsize::new(0);
+    static DROPPED: AtomicUsize = AtomicUsize::new(0);
 
-  struct Counted;
+    struct Counted;
 
-  impl Drop for Counted {
-    fn drop(&mut self) {
-      DROPPED.fetch_add(1, Ordering::Relaxed);
+    impl Drop for Counted {
+        fn drop(&mut self) {
+            DROPPED.fetch_add(1, Ordering::Relaxed);
+        }
     }
-  }
 
-  let config = RingConfig::new(8).unwrap().with_overflow(OverflowPolicy::Fail);
-  let mut split = Split::new(Ring::<Counted>::new(&config).unwrap());
-  {
-    let mut ends = split.ends();
-    let (mut producer, mut consumer) = ends.split();
+    let config = RingConfig::new(8).unwrap().with_overflow(OverflowPolicy::Fail);
+    let mut split = Split::new(Ring::<Counted>::new(&config).unwrap());
+    {
+        let mut ends = split.ends();
+        let (mut producer, mut consumer) = ends.split();
 
-    for _ in 0..5 {
-      producer.try_push(Counted).ok().unwrap();
+        for _ in 0..5 {
+            producer.try_push(Counted).ok().unwrap();
+        }
+        drop(consumer.try_recv().unwrap());
+        assert_eq!(DROPPED.load(Ordering::Relaxed), 1, "the drained one, and only it");
     }
-    drop(consumer.try_recv().unwrap());
-    assert_eq!(DROPPED.load(Ordering::Relaxed), 1, "the drained one, and only it");
-  }
 
-  drop(split);
-  assert_eq!(DROPPED.load(Ordering::Relaxed), 5, "the four still in the ring, once each");
+    drop(split);
+    assert_eq!(DROPPED.load(Ordering::Relaxed), 5, "the four still in the ring, once each");
 }
 
 /// Given the same publication sequence, two runs drain identically.
@@ -319,21 +319,21 @@ fn undrained_records_are_dropped_exactly_once() {
 /// history produces a fixed drain.
 #[test]
 fn draining_at_the_same_point_is_deterministic() {
-  fn run() -> Vec<u32> {
-    let mut split = Split::new(ring(16));
-    let mut ends = split.ends();
-    let (mut producer, mut consumer) = ends.split();
+    fn run() -> Vec<u32> {
+        let mut split = Split::new(ring(16));
+        let mut ends = split.ends();
+        let (mut producer, mut consumer) = ends.split();
 
-    producer.try_push_batch(&mut (0..5));
-    let first: Vec<u32> = consumer.drain().collect();
-    producer.try_push_batch(&mut (5..9));
-    let second: Vec<u32> = consumer.drain().collect();
+        producer.try_push_batch(&mut (0..5));
+        let first: Vec<u32> = consumer.drain().collect();
+        producer.try_push_batch(&mut (5..9));
+        let second: Vec<u32> = consumer.drain().collect();
 
-    first.into_iter().chain(second).collect()
-  }
+        first.into_iter().chain(second).collect()
+    }
 
-  assert_eq!(run(), run(), "same publication history, same drain");
-  assert_eq!(run(), (0..9).collect::<Vec<_>>());
+    assert_eq!(run(), run(), "same publication history, same drain");
+    assert_eq!(run(), (0..9).collect::<Vec<_>>());
 }
 
 // ── Across the backends ───────────────────────────────────────────────────
@@ -347,26 +347,26 @@ fn draining_at_the_same_point_is_deterministic() {
 /// `crossbeam` and is covered below.
 #[test]
 fn the_in_house_backends_behave_alike() {
-  for producers in [1, 4] {
-    let config = RingConfig::new(8)
-      .unwrap()
-      .with_producers(producers)
-      .with_overflow(OverflowPolicy::Fail);
-    let ring = Ring::<u32>::new(&config).unwrap();
-    let backend = ring.backend();
+    for producers in [1, 4] {
+        let config = RingConfig::new(8)
+            .unwrap()
+            .with_producers(producers)
+            .with_overflow(OverflowPolicy::Fail);
+        let ring = Ring::<u32>::new(&config).unwrap();
+        let backend = ring.backend();
 
-    let mut split = Split::new(ring);
-    let mut ends = split.ends();
-    let (mut producer, mut consumer) = ends.split();
+        let mut split = Split::new(ring);
+        let mut ends = split.ends();
+        let (mut producer, mut consumer) = ends.split();
 
-    assert_eq!(producer.try_push_batch(&mut (0..8)), 8, "{backend:?} took the batch");
-    assert!(producer.is_full(), "{backend:?} reports full at capacity");
-    assert_eq!(producer.try_push(99).unwrap_err(), 99, "{backend:?} hands the record back");
+        assert_eq!(producer.try_push_batch(&mut (0..8)), 8, "{backend:?} took the batch");
+        assert!(producer.is_full(), "{backend:?} reports full at capacity");
+        assert_eq!(producer.try_push(99).unwrap_err(), 99, "{backend:?} hands the record back");
 
-    let drained: Vec<u32> = consumer.drain().collect();
-    assert_eq!(drained, (0..8).collect::<Vec<_>>(), "{backend:?} drained in order");
-    assert!(consumer.is_empty(), "{backend:?} is empty afterwards");
-  }
+        let drained: Vec<u32> = consumer.drain().collect();
+        assert_eq!(drained, (0..8).collect::<Vec<_>>(), "{backend:?} drained in order");
+        assert!(consumer.is_empty(), "{backend:?} is empty afterwards");
+    }
 }
 
 /// The same surface, on feature 187's interim backend.
@@ -377,18 +377,18 @@ fn the_in_house_backends_behave_alike() {
 #[cfg(feature = "crossbeam")]
 #[test]
 fn the_crossbeam_backend_behaves_alike() {
-  let config = RingConfig::new(8).unwrap().with_overflow(OverflowPolicy::Fail);
-  let mut split = Split::new(Ring::<u32>::new_crossbeam(&config).unwrap());
-  let mut ends = split.ends();
-  let (mut producer, mut consumer) = ends.split();
+    let config = RingConfig::new(8).unwrap().with_overflow(OverflowPolicy::Fail);
+    let mut split = Split::new(Ring::<u32>::new_crossbeam(&config).unwrap());
+    let mut ends = split.ends();
+    let (mut producer, mut consumer) = ends.split();
 
-  assert_eq!(producer.try_push_batch(&mut (0..8)), 8);
-  assert!(producer.is_full());
-  assert_eq!(producer.try_push(99).unwrap_err(), 99);
+    assert_eq!(producer.try_push_batch(&mut (0..8)), 8);
+    assert!(producer.is_full());
+    assert_eq!(producer.try_push(99).unwrap_err(), 99);
 
-  let drained: Vec<u32> = consumer.drain().collect();
-  assert_eq!(drained, (0..8).collect::<Vec<_>>());
-  assert!(consumer.is_empty());
+    let drained: Vec<u32> = consumer.drain().collect();
+    assert_eq!(drained, (0..8).collect::<Vec<_>>());
+    assert!(consumer.is_empty());
 }
 
 // ── The structure ─────────────────────────────────────────────────────────
@@ -402,18 +402,18 @@ fn the_crossbeam_backend_behaves_alike() {
 /// Equality of sizes is that property, measured.
 #[test]
 fn the_wrapper_costs_nothing() {
-  use core::mem::size_of;
+    use core::mem::size_of;
 
-  assert_eq!(
-    size_of::<ring_handle::Producer<'_, u32>>(),
-    size_of::<ring_core::Producer<'_, u32>>(),
-    "the producer newtype adds no field"
-  );
-  assert_eq!(
-    size_of::<ring_handle::Consumer<'_, u32>>(),
-    size_of::<ring_core::Consumer<'_, u32>>(),
-    "nor does the consumer"
-  );
+    assert_eq!(
+        size_of::<ring_handle::Producer<'_, u32>>(),
+        size_of::<ring_core::Producer<'_, u32>>(),
+        "the producer newtype adds no field"
+    );
+    assert_eq!(
+        size_of::<ring_handle::Consumer<'_, u32>>(),
+        size_of::<ring_core::Consumer<'_, u32>>(),
+        "nor does the consumer"
+    );
 }
 
 /// Q1 and Q2 of `docs/non_functional_requirement/002_send_without_sync.md`:
@@ -425,11 +425,11 @@ fn the_wrapper_costs_nothing() {
 /// a thread test that stopped compiling.
 #[test]
 fn both_handles_are_send() {
-  fn assert_send<T: Send>() {}
+    fn assert_send<T: Send>() {}
 
-  assert_send::<ring_handle::Split<u32>>();
-  assert_send::<ring_handle::Producer<'_, u32>>();
-  assert_send::<ring_handle::Consumer<'_, u32>>();
+    assert_send::<ring_handle::Split<u32>>();
+    assert_send::<ring_handle::Producer<'_, u32>>();
+    assert_send::<ring_handle::Consumer<'_, u32>>();
 }
 
 // Q5 — `Sync` is absent on both handles — is pinned by
@@ -467,29 +467,22 @@ fn both_handles_are_send() {
 /// mechanism table — "if anyone looks" — still covers those.
 #[test]
 fn no_parking_shaped_name_appears_in_the_source() {
-  const FORBIDDEN: [&str; 7] = [
-    "thread::sleep",
-    "yield_now",
-    "::park",
-    "park(",
-    "Condvar",
-    "Duration",
-    "Waker",
-  ];
+    const FORBIDDEN: [&str; 7] =
+        ["thread::sleep", "yield_now", "::park", "park(", "Condvar", "Duration", "Waker"];
 
-  let source = include_str!("../src/lib.rs");
-  let code: String = source
-    .lines()
-    .map(|line| line.split("//").next().unwrap_or(""))
-    .collect::<Vec<_>>()
-    .join("\n");
+    let source = include_str!("../src/lib.rs");
+    let code: String = source
+        .lines()
+        .map(|line| line.split("//").next().unwrap_or(""))
+        .collect::<Vec<_>>()
+        .join("\n");
 
-  let found: Vec<&str> = FORBIDDEN.into_iter().filter(|name| code.contains(*name)).collect();
+    let found: Vec<&str> = FORBIDDEN.into_iter().filter(|name| code.contains(*name)).collect();
 
-  assert!(
-    found.is_empty(),
-    "parking-shaped names in ring_handle's code: {found:?} — see docs/invariant/002"
-  );
+    assert!(
+        found.is_empty(),
+        "parking-shaped names in ring_handle's code: {found:?} — see docs/invariant/002"
+    );
 }
 
 /// Every exported type is `Debug`, so a panic message can name what it held —
@@ -507,25 +500,25 @@ fn no_parking_shaped_name_appears_in_the_source() {
 /// what catches it.
 #[test]
 fn every_handle_can_be_printed() {
-  let mut split = Split::new(ring(4));
-  assert!(format!("{split:?}").contains("Split"));
+    let mut split = Split::new(ring(4));
+    assert!(format!("{split:?}").contains("Split"));
 
-  let mut ends = split.ends();
-  assert!(format!("{ends:?}").contains("Ends"));
+    let mut ends = split.ends();
+    assert!(format!("{ends:?}").contains("Ends"));
 
-  let (mut producer, mut consumer) = ends.split();
-  assert!(format!("{producer:?}").contains("Producer"));
+    let (mut producer, mut consumer) = ends.split();
+    assert!(format!("{producer:?}").contains("Producer"));
 
-  producer.try_push(1).unwrap();
-  producer.try_push(2).unwrap();
-  let loaded = consumer.len();
-  assert_eq!(loaded, 2);
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    let loaded = consumer.len();
+    assert_eq!(loaded, 2);
 
-  assert!(format!("{consumer:?}").contains("Consumer"));
-  assert_eq!(consumer.len(), loaded, "formatting the consumer drained it");
+    assert!(format!("{consumer:?}").contains("Consumer"));
+    assert_eq!(consumer.len(), loaded, "formatting the consumer drained it");
 
-  assert!(format!("{:?}", consumer.drain()).contains("Drain"));
-  assert_eq!(consumer.len(), loaded, "formatting a Drain drained it");
+    assert!(format!("{:?}", consumer.drain()).contains("Drain"));
+    assert_eq!(consumer.len(), loaded, "formatting a Drain drained it");
 }
 
 /// HD44: `Consumer`'s `#[ derive( Debug ) ]` forwards through `ring_core` and
@@ -539,19 +532,19 @@ fn every_handle_can_be_printed() {
 /// `the_wrapper_costs_nothing`'s `size_of` equality.
 #[test]
 fn debug_output_length_does_not_grow_with_item_count() {
-  let mut split_one = Split::new(ring(8));
-  let mut ends_one = split_one.ends();
-  let (mut producer_one, consumer_one) = ends_one.split();
-  producer_one.try_push(1).unwrap();
+    let mut split_one = Split::new(ring(8));
+    let mut ends_one = split_one.ends();
+    let (mut producer_one, consumer_one) = ends_one.split();
+    producer_one.try_push(1).unwrap();
 
-  let mut split_many = Split::new(ring(8));
-  let mut ends_many = split_many.ends();
-  let (mut producer_many, consumer_many) = ends_many.split();
-  producer_many.try_push_batch(&mut (0..8));
+    let mut split_many = Split::new(ring(8));
+    let mut ends_many = split_many.ends();
+    let (mut producer_many, consumer_many) = ends_many.split();
+    producer_many.try_push_batch(&mut (0..8));
 
-  assert_eq!(
-    format!("{consumer_one:?}").len(),
-    format!("{consumer_many:?}").len(),
-    "Consumer's Debug output length grew with item count — it is printing slot contents"
-  );
+    assert_eq!(
+        format!("{consumer_one:?}").len(),
+        format!("{consumer_many:?}").len(),
+        "Consumer's Debug output length grew with item count — it is printing slot contents"
+    );
 }

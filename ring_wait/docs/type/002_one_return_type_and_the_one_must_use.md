@@ -173,7 +173,7 @@ grep "must_use" ring_wait/src/lib.rs
 Live output:
 
 ```
-#[ must_use ]
+#[must_use]
 ```
 
 **One hit, at `:82`**, on `escalation_hint`:

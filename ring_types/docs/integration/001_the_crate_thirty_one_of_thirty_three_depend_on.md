@@ -132,8 +132,8 @@ mod id;
 mod policy;
 pub use capacity::Capacity;
 pub use error::RingError;
-pub use id::{ Seq, SlotIndex };
-pub use policy::{ OverflowPolicy, WaitKind };
+pub use id::{Seq, SlotIndex};
+pub use policy::{OverflowPolicy, WaitKind};
 ```
 
 That is one path per name, which is what lets the module layout be rearranged

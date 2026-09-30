@@ -175,21 +175,21 @@ grep "wait_until\|self.frontier()" ring_barrier/src/lib.rs | tail -3
 Live output:
 
 ```
-  /// Wait until at least `count` sequences are readable from `from`, then
-  /// report the frontier.
-  ///
-  /// The returned sequence is the frontier as re-read immediately after the
-  /// wait succeeded, not the frontier at the exact instant it succeeded — a
-  /// dependency may have advanced between the two reads, so the value is
-  /// only guaranteed to be at least as far as what was checked. It is also
-  /// not `from + count` — a consumer that waited for one item and found six
-  /// should drain six, and returning the requested count instead would
-  /// throw away the batch that waiting just discovered.
-  ///
-  /// # Errors
-    self.frontier().map_or( 0, | frontier | from.distance_to( frontier ) )
-    ring_wait::wait_until( kind, spins, || self.admits( from, count ) )?;
-    self.frontier().ok_or( RingError::Empty )
+    /// Wait until at least `count` sequences are readable from `from`, then
+    /// report the frontier.
+    ///
+    /// The returned sequence is the frontier as re-read immediately after the
+    /// wait succeeded, not the frontier at the exact instant it succeeded — a
+    /// dependency may have advanced between the two reads, so the value is
+    /// only guaranteed to be at least as far as what was checked. It is also
+    /// not `from + count` — a consumer that waited for one item and found six
+    /// should drain six, and returning the requested count instead would
+    /// throw away the batch that waiting just discovered.
+    ///
+    /// # Errors
+        self.frontier().map_or(0, |frontier| from.distance_to(frontier))
+        ring_wait::wait_until(kind, spins, || self.admits(from, count))?;
+        self.frontier().ok_or(RingError::Empty)
 ```
 
 The rustdoc now names the second read explicitly:
@@ -202,18 +202,18 @@ command grep -m1 -A11 -F '  /// Wait until at least `count` sequences are readab
 Live output:
 
 ```
-  /// Wait until at least `count` sequences are readable from `from`, then
-  /// report the frontier.
-  ///
-  /// The returned sequence is the frontier as re-read immediately after the
-  /// wait succeeded, not the frontier at the exact instant it succeeded — a
-  /// dependency may have advanced between the two reads, so the value is
-  /// only guaranteed to be at least as far as what was checked. It is also
-  /// not `from + count` — a consumer that waited for one item and found six
-  /// should drain six, and returning the requested count instead would
-  /// throw away the batch that waiting just discovered.
-  ///
-  /// # Errors
+    /// Wait until at least `count` sequences are readable from `from`, then
+    /// report the frontier.
+    ///
+    /// The returned sequence is the frontier as re-read immediately after the
+    /// wait succeeded, not the frontier at the exact instant it succeeded — a
+    /// dependency may have advanced between the two reads, so the value is
+    /// only guaranteed to be at least as far as what was checked. It is also
+    /// not `from + count` — a consumer that waited for one item and found six
+    /// should drain six, and returning the requested count instead would
+    /// throw away the batch that waiting just discovered.
+    ///
+    /// # Errors
 ```
 
 **Disposition:** applied — `wait_for`'s rustdoc in `src/lib.rs` now says the

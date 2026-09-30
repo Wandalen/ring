@@ -119,11 +119,11 @@ grep -r 'from_ref' --include=*.rs ring_align/ ring_cursor/
 Live output:
 
 ```
-ring_align/tests/align_test.rs:  let a = core::ptr::from_ref( &pair.producer ) as usize;
-ring_align/tests/align_test.rs:  let b = core::ptr::from_ref( &pair.consumer ) as usize;
-ring_align/tests/align_test.rs:  let a = core::ptr::from_ref( &pair.producer ) as usize;
-ring_align/tests/align_test.rs:  let b = core::ptr::from_ref( &pair.consumer ) as usize;
-ring_cursor/src/lib.rs:    core::ptr::from_ref( self ) as usize
+ring_align/tests/align_test.rs:    let a = core::ptr::from_ref(&pair.producer) as usize;
+ring_align/tests/align_test.rs:    let b = core::ptr::from_ref(&pair.consumer) as usize;
+ring_align/tests/align_test.rs:    let a = core::ptr::from_ref(&pair.producer) as usize;
+ring_align/tests/align_test.rs:    let b = core::ptr::from_ref(&pair.consumer) as usize;
+ring_cursor/src/lib.rs:        core::ptr::from_ref(self) as usize
 ```
 
 Both `ring_align`'s own two tests and one accessor,

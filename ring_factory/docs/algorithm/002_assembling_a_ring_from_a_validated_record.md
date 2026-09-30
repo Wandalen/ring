@@ -46,7 +46,7 @@ done
 Live output:
 
 ```
-ring_store    6
+ring_store     6
 ring_cursor    15
 ring_spsc      3
 ring_mpsc      3

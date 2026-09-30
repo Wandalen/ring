@@ -61,9 +61,9 @@ grep -E ' as (u64|usize|u32|i64)' ring_claim/src/lib.rs
 Live output:
 
 ```
-    self.start.advanced_by( self.len as u64 )
-      let next = current.advanced_by( count as u64 );
-      let next = current.advanced_by( granted as u64 );
+        self.start.advanced_by(self.len as u64)
+            let next = current.advanced_by(count as u64);
+            let next = current.advanced_by(granted as u64);
 ```
 
 Three casts in the crate, and they are the complete list:

@@ -17,9 +17,9 @@ grep -E '^pub struct (Capacity|Seq|SlotIndex)' ring_types/src/capacity.rs ring_t
 Live output:
 
 ```
-ring_types/src/capacity.rs:pub struct Capacity( usize );
-ring_types/src/id.rs:pub struct Seq( pub u64 );
-ring_types/src/id.rs:pub struct SlotIndex( pub usize );
+ring_types/src/capacity.rs:pub struct Capacity(usize);
+ring_types/src/id.rs:pub struct Seq(pub u64);
+ring_types/src/id.rs:pub struct SlotIndex(pub usize);
 ```
 
 **One private field and two public ones**, in a crate whose entire job is to make
@@ -48,14 +48,14 @@ command grep -rE 'Seq\( ?[a-z0-9_]|SlotIndex\( ?[a-z0-9_(]' ring_*/src/*.rs \
 Live output:
 
 ```
-ring_atomic/src/lib.rs:    Seq( self.0.load( order ) )
-ring_atomic/src/lib.rs:    Seq( self.0.fetch_add( n, order ) )
-ring_batch/src/lib.rs:    Seq( self.start.0 + self.count as u64 )
-ring_index/src/lib.rs:  SlotIndex( ( seq.0 as usize ) & capacity.mask() )
-ring_mpsc/src/lib.rs:pub const UNSTAMPED : Seq = Seq( u64::MAX );
-ring_mpsc/src/lib.rs:    if end == from { None } else { Some( Seq( end.0 - 1 ) ) }
-ring_tls/src/lib.rs:    let seq = Seq( self.next );
-ring_trace/src/lib.rs:    Seq( self.seq.0.saturating_add( self.count as u64 ) )
+ring_atomic/src/lib.rs:        Seq(self.0.load(order))
+ring_atomic/src/lib.rs:        Seq(self.0.fetch_add(n, order))
+ring_batch/src/lib.rs:        Seq(self.start.0 + self.count as u64)
+ring_index/src/lib.rs:    SlotIndex((seq.0 as usize) & capacity.mask())
+ring_mpsc/src/lib.rs:pub const UNSTAMPED: Seq = Seq(u64::MAX);
+ring_mpsc/src/lib.rs:        if end == from { None } else { Some(Seq(end.0 - 1)) }
+ring_tls/src/lib.rs:        let seq = Seq(self.next);
+ring_trace/src/lib.rs:        Seq(self.seq.0.saturating_add(self.count as u64))
 ```
 
 **Seven sites in five crates**, and the comment filter is doing real work here:
@@ -90,7 +90,7 @@ the family; they do not appear in the same places.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-for p in 'Seq::ZERO' 'Seq( 0 )'; do
+for p in 'Seq::ZERO' 'Seq(0)'; do
   all=$( grep -rF "$p" ring_*/src/*.rs | grep -vc '^ring_types/' )
   code=$( grep -rF "$p" ring_*/src/*.rs | grep -v '^ring_types/' \
           | grep -vcE ': *(//|///|//!)' )
@@ -102,7 +102,7 @@ Live output:
 
 ```
 Seq::ZERO    all  59   code   6
-Seq( 0 )     all  19   code   0
+Seq(0)       all  19   code   0
 ```
 
 **Every `Seq( 0 )` in every dependent crate is inside a doc comment.** Production

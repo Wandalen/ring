@@ -9,8 +9,8 @@ description = "Full-ring overflow policies"
 publish = true
 
 [dependencies]
-ring_types = { path = "../ring_types", version = "0.1.0" }
 ring_stats = { path = "../ring_stats", version = "0.1.0" }
+ring_types = { path = "../ring_types", version = "0.1.0" }
 
 [lints]
 workspace = true

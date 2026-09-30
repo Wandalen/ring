@@ -28,13 +28,41 @@ round-failures: 1
 detector: a_dropnewest_ring_reports_successes_it_did_not_keep
 
 --- from
-  stats.record_claim( received as u64 );
-  stats.record_publish( received as u64 );
-  stats.record_consume( received as u64 );
-  stats.record_drop( workload.config().overflow(), ( offered - received ) as u64 );
+    stats.record_claim(received as u64);
+    stats.record_publish(received as u64);
+    stats.record_consume(received as u64);
+    // Fix(BN53): this feeds `record_drop` from the same `offered - received`
+    // subtraction as `Outcome::dropped` (-> BN22), but runs before `Outcome`
+    // exists — BN22's guard sits on the two accessor methods that expose the
+    // subtraction afterward, and cannot cover a computation that happens
+    // earlier on the same values. Unguarded, a violation here would silently
+    // wrap to a near-`u64::MAX` stat instead of panicking, exactly the failure
+    // mode BN22 named and fixed one call site over.
+    //
+    // Root cause: the guard was added to the two accessors that expose the
+    // subtraction, not to the earlier internal computation that performs the
+    // identical subtraction first.
+    // Pitfall: guarding a derived accessor does not guard every computation
+    // that shares its expression — each call site needs its own assertion.
+    assert!(received <= offered, "received exceeded offered");
+    stats.record_drop(workload.config().overflow(), (offered - received) as u64);
 --- to
-  stats.record_claim( reported as u64 );      // PROBE ONLY — G12, was `received`
-  stats.record_publish( reported as u64 );
-  stats.record_consume( reported as u64 );
-  stats.record_drop( workload.config().overflow(), ( offered - reported ) as u64 );
+    stats.record_claim(reported as u64); // PROBE ONLY — G12, was `received`
+    stats.record_publish(reported as u64);
+    stats.record_consume(reported as u64);
+    // Fix(BN53): this feeds `record_drop` from the same `offered - received`
+    // subtraction as `Outcome::dropped` (-> BN22), but runs before `Outcome`
+    // exists — BN22's guard sits on the two accessor methods that expose the
+    // subtraction afterward, and cannot cover a computation that happens
+    // earlier on the same values. Unguarded, a violation here would silently
+    // wrap to a near-`u64::MAX` stat instead of panicking, exactly the failure
+    // mode BN22 named and fixed one call site over.
+    //
+    // Root cause: the guard was added to the two accessors that expose the
+    // subtraction, not to the earlier internal computation that performs the
+    // identical subtraction first.
+    // Pitfall: guarding a derived accessor does not guard every computation
+    // that shares its expression — each call site needs its own assertion.
+    assert!(received <= offered, "received exceeded offered");
+    stats.record_drop(workload.config().overflow(), (offered - reported) as u64);
 --- end

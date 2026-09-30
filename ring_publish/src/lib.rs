@@ -75,148 +75,149 @@ const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Rele
 /// use ring_types::Seq;
 ///
 /// let publisher = Publisher::new();
-/// assert_eq!( publisher.published(), Seq::ZERO );
+/// assert_eq!(publisher.published(), Seq::ZERO);
 ///
-/// assert_eq!( publisher.try_publish( Seq::ZERO, 3 ), Ok( Seq( 3 ) ) );
-/// assert_eq!( publisher.published(), Seq( 3 ) );
+/// assert_eq!(publisher.try_publish(Seq::ZERO, 3), Ok(Seq(3)));
+/// assert_eq!(publisher.published(), Seq(3));
 /// ```
 #[derive(Debug, Default)]
 pub struct Publisher {
-  cursor: PaddedCursor,
+    cursor: PaddedCursor,
 }
 
 impl Publisher {
-  /// A publisher with nothing published.
-  ///
-  /// ```
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  /// assert_eq!( Publisher::new().published(), Seq::ZERO );
-  /// ```
-  #[must_use]
-  pub fn new() -> Self {
-    Self::default()
-  }
-
-  /// The published cursor, for a consumer's barrier to be built over.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_cursor::SeqCell;
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  ///
-  /// let publisher = Publisher::new();
-  /// assert_eq!( publisher.cursor().load( Ordering::Acquire ), Seq::ZERO );
-  /// ```
-  #[must_use]
-  pub const fn cursor(&self) -> &PaddedCursor {
-    &self.cursor
-  }
-
-  /// How far publication has reached — one past the last readable sequence.
-  ///
-  /// ```
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  ///
-  /// let publisher = Publisher::new();
-  /// let _ = publisher.try_publish( Seq::ZERO, 2 );
-  /// assert_eq!( publisher.published(), Seq( 2 ) );
-  /// ```
-  #[must_use]
-  pub fn published(&self) -> Seq {
-    self.cursor.load(GATING)
-  }
-
-  /// Publish `len` sequences starting at `start`, if it is this producer's
-  /// turn.
-  ///
-  /// # Errors
-  ///
-  /// The current published position, when it is not `start` — meaning some
-  /// earlier claim has not been published yet. Deliberately not a `RingError`:
-  /// this is not a failure, it is `compare_exchange`'s "try again", and the
-  /// value returned is what to try against next.
-  ///
-  /// ```
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  ///
-  /// let publisher = Publisher::new();
-  ///
-  /// // Producer B finished first, but A's range is still unwritten.
-  /// assert_eq!( publisher.try_publish( Seq( 4 ), 4 ), Err( Seq::ZERO ) );
-  /// assert_eq!( publisher.published(), Seq::ZERO, "and nothing moved" );
-  ///
-  /// assert_eq!( publisher.try_publish( Seq::ZERO, 4 ), Ok( Seq( 4 ) ) );
-  /// assert_eq!( publisher.try_publish( Seq( 4 ), 4 ), Ok( Seq( 8 ) ), "now it is B's turn" );
-  /// ```
-  pub fn try_publish(&self, start: Seq, len: usize) -> Result<Seq, Seq> {
-    let end = start.advanced_by(len as u64);
-    self.cursor.compare_exchange(start, end, PUBLISH, GATING).map(|_| end)
-  }
-
-  /// Publish `len` sequences starting at `start`, waiting for this producer's
-  /// turn.
-  ///
-  /// Spins rather than taking a [`ring_types::WaitKind`] — see the module
-  /// documentation for why a strategy would be wrong here rather than merely
-  /// absent.
-  ///
-  /// ```
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  ///
-  /// let publisher = Publisher::new();
-  /// assert_eq!( publisher.publish( Seq::ZERO, 3 ), Seq( 3 ) );
-  /// assert_eq!( publisher.publish( Seq( 3 ), 1 ), Seq( 4 ) );
-  /// ```
-  ///
-  /// # Panics
-  ///
-  /// Never. It deadlocks instead, and there are two ways in.
-  ///
-  /// A caller that publishes a range it never claimed waits for a turn that
-  /// cannot arrive. That is a caller bug this crate cannot detect, and
-  /// `try_publish` is the variant for a caller that wants to decide for itself.
-  ///
-  /// A caller whose *predecessor* dropped its claim without publishing waits
-  /// just as long, and that one is not the waiting caller's bug at all. The
-  /// module documentation's termination argument — a predecessor "cannot
-  /// abandon" a slot write it has already started — describes correct
-  /// producers rather than a property the types enforce:
-  /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
-  /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
-  /// that. Of the two deadlocks this is the reachable one, and the only
-  /// defence against it is that every producer publishes what it claims.
-  pub fn publish(&self, start: Seq, len: usize) -> Seq {
-    loop {
-      if let Ok(end) = self.try_publish(start, len) {
-        return end;
-      }
-      core::hint::spin_loop();
+    /// A publisher with nothing published.
+    ///
+    /// ```
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    /// assert_eq!(Publisher::new().published(), Seq::ZERO);
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
     }
-  }
 
-  /// Whether `seq` has been published and is therefore readable.
-  ///
-  /// The consumer-facing question feature 170 is graded on: a slot claimed but
-  /// not published must answer `false`.
-  ///
-  /// ```
-  /// use ring_publish::Publisher;
-  /// use ring_types::Seq;
-  ///
-  /// let publisher = Publisher::new();
-  /// let _ = publisher.try_publish( Seq::ZERO, 2 );
-  ///
-  /// assert!( publisher.is_published( Seq::ZERO ) );
-  /// assert!( publisher.is_published( Seq( 1 ) ) );
-  /// assert!( !publisher.is_published( Seq( 2 ) ), "claimed, perhaps, but not published" );
-  /// ```
-  #[must_use]
-  pub fn is_published(&self, seq: Seq) -> bool {
-    seq < self.published()
-  }
+    /// The published cursor, for a consumer's barrier to be built over.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_cursor::SeqCell;
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    ///
+    /// let publisher = Publisher::new();
+    /// assert_eq!(publisher.cursor().load(Ordering::Acquire), Seq::ZERO);
+    /// ```
+    #[must_use]
+    pub const fn cursor(&self) -> &PaddedCursor {
+        &self.cursor
+    }
+
+    /// How far publication has reached — one past the last readable sequence.
+    ///
+    /// ```
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    ///
+    /// let publisher = Publisher::new();
+    /// let _ = publisher.try_publish(Seq::ZERO, 2);
+    /// assert_eq!(publisher.published(), Seq(2));
+    /// ```
+    #[must_use]
+    pub fn published(&self) -> Seq {
+        self.cursor.load(GATING)
+    }
+
+    /// Publish `len` sequences starting at `start`, if it is this producer's
+    /// turn.
+    ///
+    /// # Errors
+    ///
+    /// The current published position, when it is not `start` — meaning some
+    /// earlier claim has not been published yet. Deliberately not a `RingError`:
+    /// this is not a failure, it is `compare_exchange`'s "try again", and the
+    /// value returned is what to try against next.
+    ///
+    /// ```
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    ///
+    /// let publisher = Publisher::new();
+    ///
+    /// // Producer B finished first, but A's range is still unwritten.
+    /// assert_eq!(publisher.try_publish(Seq(4), 4), Err(Seq::ZERO));
+    /// assert_eq!(publisher.published(), Seq::ZERO, "and nothing moved");
+    ///
+    /// assert_eq!(publisher.try_publish(Seq::ZERO, 4), Ok(Seq(4)));
+    /// assert_eq!(publisher.try_publish(Seq(4), 4), Ok(Seq(8)), "now it is B's turn");
+    /// ```
+    pub fn try_publish(&self, start: Seq, len: usize) -> Result<Seq, Seq> {
+        let end = start.advanced_by(len as u64);
+        self.cursor.compare_exchange(start, end, PUBLISH, GATING).map(|_| end)
+    }
+
+    /// Publish `len` sequences starting at `start`, waiting for this producer's
+    /// turn.
+    ///
+    /// Spins rather than taking a [`ring_types::WaitKind`] — see the module
+    /// documentation for why a strategy would be wrong here rather than merely
+    /// absent.
+    ///
+    /// ```
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    ///
+    /// let publisher = Publisher::new();
+    /// assert_eq!(publisher.publish(Seq::ZERO, 3), Seq(3));
+    /// assert_eq!(publisher.publish(Seq(3), 1), Seq(4));
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Never. It deadlocks instead, and there are two ways in.
+    ///
+    /// A caller that publishes a range it never claimed waits for a turn that
+    /// cannot arrive. That is a caller bug this crate cannot detect, and
+    /// `try_publish` is the variant for a caller that wants to decide for itself.
+    ///
+    /// A caller whose *predecessor* dropped its claim without publishing waits
+    /// just as long, and that one is not the waiting caller's bug at all. The
+    /// module documentation's termination argument — a predecessor "cannot
+    /// abandon" a slot write it has already started — describes correct
+    /// producers rather than a property the types enforce:
+    /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
+    /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
+    /// that. Of the two deadlocks this is the reachable one, and the only
+    /// defence against it is that every producer publishes what it claims.
+    pub fn publish(&self, start: Seq, len: usize) -> Seq {
+        loop {
+            if let Ok(end) = self.try_publish(start, len) {
+                return end;
+            }
+            core::hint::spin_loop();
+        }
+    }
+
+    /// Whether `seq` has been published and is therefore readable.
+    ///
+    /// The consumer-facing question feature 170 is graded on: a slot claimed but
+    /// not published must answer `false`.
+    ///
+    /// ```
+    /// use ring_publish::Publisher;
+    /// use ring_types::Seq;
+    ///
+    /// let publisher = Publisher::new();
+    /// let _ = publisher.try_publish(Seq::ZERO, 2);
+    ///
+    /// assert!(publisher.is_published(Seq::ZERO));
+    /// assert!(publisher.is_published(Seq(1)));
+    /// assert!(!publisher.is_published(Seq(2)), "claimed, perhaps, but not published");
+    /// ```
+    #[must_use]
+    pub fn is_published(&self, seq: Seq) -> bool {
+        seq < self.published()
+    }
 }

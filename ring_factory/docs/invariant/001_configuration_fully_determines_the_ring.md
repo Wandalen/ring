@@ -25,7 +25,7 @@ command grep 'derive' ring_config/src/lib.rs | head -1
 Live output:
 
 ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq ) ]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 ```
 
 **This is stronger than "the fields are honoured" and weaker than
@@ -66,7 +66,7 @@ Live output:
 default = []
 # Feature 187: an optional third backend, so consumers needing a working
 # multi-producer channel are not blocked on the in-house ring being finished.
-crossbeam = [ "dep:crossbeam-queue" ]
+crossbeam = ["dep:crossbeam-queue"]
 ```
 
 **This sharpens the invariant rather than breaking it, and the distinction is
@@ -223,7 +223,7 @@ Live output:
   unsafe         0
   lazy           0
   -- and the receiver --
-#[ derive( Debug, Clone ) ]
+#[derive(Debug, Clone)]
 pub struct Factory;
 ```
 

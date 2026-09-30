@@ -79,8 +79,8 @@ Live output:
 
 ```
 /// ```
-#[ derive( Debug, Default ) ]
-pub struct PaddedCursor( CacheAligned< AtomicSeq > );
+#[derive(Debug, Default)]
+pub struct PaddedCursor(CacheAligned<AtomicSeq>);
 ```
 
 `AtomicU64` is not `Clone`, so `AtomicSeq` is not, so `PaddedCursor` is not, so

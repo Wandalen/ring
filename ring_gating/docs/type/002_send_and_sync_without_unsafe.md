@@ -82,8 +82,8 @@ grep -r 'allow( *unsafe_code' ring_*/src/*.rs
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:#![ allow( unsafe_code ) ]
-ring_spsc/src/lib.rs:#![ allow( unsafe_code ) ]
+ring_mpsc/src/lib.rs:#![allow(unsafe_code)]
+ring_spsc/src/lib.rs:#![allow(unsafe_code)]
 ```
 
 ### What This Buys

@@ -185,7 +185,7 @@ Live output:
     Draining     src 0   tests 0
     Accounted    src 0   tests 0
   -- the one nonzero hit, in full --
-      /// Refused and silently discarded records both count here — from the
+        /// Refused and silently discarded records both count here — from the
   -- and where this crate does put a "State Machines" heading --
     docs/type/001_candidate.md:### State Machines
     docs/lifecycle/001_from_a_description_to_a_verdict.md:### State Machines

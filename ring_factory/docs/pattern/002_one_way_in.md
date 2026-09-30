@@ -246,15 +246,15 @@ command grep -rE '^\s*pub (const )?fn (new|with_config|new_crossbeam|build|build
 Live output:
 
 ```
-ring_spsc/src/lib.rs:  pub fn new
-ring_spsc/src/lib.rs:  pub fn with_config
-ring_mpsc/src/lib.rs:  pub fn new
-ring_mpsc/src/lib.rs:  pub fn with_config
-ring_core/src/lib.rs:  pub fn new
-ring_core/src/lib.rs:  pub fn new_crossbeam
-ring_factory/src/lib.rs:  pub fn build< S : Send >
-ring_factory/src/lib.rs:  pub fn build_named< S : Send >
-ring_factory/src/lib.rs:  pub fn build_crossbeam< S : Send >
+ring_spsc/src/lib.rs:    pub fn new
+ring_spsc/src/lib.rs:    pub fn with_config
+ring_mpsc/src/lib.rs:    pub fn new
+ring_mpsc/src/lib.rs:    pub fn with_config
+ring_core/src/lib.rs:    pub fn new
+ring_core/src/lib.rs:    pub fn new_crossbeam
+ring_factory/src/lib.rs:    pub fn build<S: Send>
+ring_factory/src/lib.rs:    pub fn build_named<S: Send>
+ring_factory/src/lib.rs:    pub fn build_crossbeam<S: Send>
 ```
 
 Nine, and four of them arrived *after* the five were counted: `ring_core`'s two

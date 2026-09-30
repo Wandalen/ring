@@ -154,8 +154,8 @@ command grep -A1 -F 'nothing here forces that' ring_trace/tests/trace_test.rs
 Live output:
 
 ```
-  // ALL must stay in step with the enum, but nothing here forces that: the
-  // exhaustive match below fails to compile when a discriminant is *added* to
+    // ALL must stay in step with the enum, but nothing here forces that: the
+    // exhaustive match below fails to compile when a discriminant is *added* to
 ```
 
 **Disposition:** applied — the test's comment now states the true guard chain:

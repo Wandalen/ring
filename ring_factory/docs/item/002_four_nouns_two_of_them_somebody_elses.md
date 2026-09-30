@@ -88,7 +88,7 @@ rm -rf -- ./-fc_item_probe
 Live output:
 
 ```
-#[ derive( Debug, Clone ) ]
+#[derive(Debug, Clone)]
 pub struct Factory;
   -- what that costs, measured --
 size_of::<Factory>()    = 0

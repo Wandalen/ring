@@ -58,12 +58,12 @@
 /// edit nobody makes: a drain on `Producer` is obviously wrong to its author.
 #[test]
 fn the_forbidden_programs_are_rejected() {
-  let cases = trybuild::TestCases::new();
-  cases.compile_fail("tests/ui/producer_drains.rs");
-  cases.compile_fail("tests/ui/consumer_publishes.rs");
-  cases.compile_fail("tests/ui/producer_clones.rs");
-  cases.compile_fail("tests/ui/consumer_clones.rs");
-  cases.compile_fail("tests/ui/producer_shared_across_threads.rs");
-  cases.compile_fail("tests/ui/producer_try_clones.rs");
-  cases.compile_fail("tests/ui/ring_used_after_split.rs");
+    let cases = trybuild::TestCases::new();
+    cases.compile_fail("tests/ui/producer_drains.rs");
+    cases.compile_fail("tests/ui/consumer_publishes.rs");
+    cases.compile_fail("tests/ui/producer_clones.rs");
+    cases.compile_fail("tests/ui/consumer_clones.rs");
+    cases.compile_fail("tests/ui/producer_shared_across_threads.rs");
+    cases.compile_fail("tests/ui/producer_try_clones.rs");
+    cases.compile_fail("tests/ui/ring_used_after_split.rs");
 }

@@ -14,12 +14,12 @@ publish = true
 # so there is no published cursor for either removed crate to act on.
 [dependencies]
 ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
-ring_store = { path = "../ring_store", version = "0.1.0" }
 ring_claim = { path = "../ring_claim", version = "0.1.0" }
 ring_config = { path = "../ring_config", version = "0.1.0" }
 ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 ring_gating = { path = "../ring_gating", version = "0.1.0" }
 ring_slot = { path = "../ring_slot", version = "0.1.0" }
+ring_store = { path = "../ring_store", version = "0.1.0" }
 ring_types = { path = "../ring_types", version = "0.1.0" }
 
 # `tests/mpsc_test.rs`'s `exhaustive` module, under `RUSTFLAGS="--cfg loom"`

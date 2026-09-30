@@ -72,15 +72,15 @@ grep -rE '^\s*[a-z_]+ *: *(Vec< *)?PaddedCursor' ring_*/src/*.rs
 Live output:
 
 ```
-ring_claim/src/lib.rs:  cursor : PaddedCursor,
-ring_cursor/src/lib.rs:  producer : PaddedCursor,
-ring_cursor/src/lib.rs:  consumer : PaddedCursor,
-ring_cursor/src/lib.rs:      producer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      consumer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      producer : PaddedCursor::new( Seq::ZERO ),
-ring_cursor/src/lib.rs:      consumer : PaddedCursor::new( Seq::ZERO ),
-ring_gating/src/lib.rs:  cursors : Vec< PaddedCursor >,
-ring_publish/src/lib.rs:  cursor : PaddedCursor,
+ring_claim/src/lib.rs:    cursor: PaddedCursor,
+ring_cursor/src/lib.rs:    producer: PaddedCursor,
+ring_cursor/src/lib.rs:    consumer: PaddedCursor,
+ring_cursor/src/lib.rs:            producer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            consumer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            producer: PaddedCursor::new(Seq::ZERO),
+ring_cursor/src/lib.rs:            consumer: PaddedCursor::new(Seq::ZERO),
+ring_gating/src/lib.rs:    cursors: Vec<PaddedCursor>,
+ring_publish/src/lib.rs:    cursor: PaddedCursor,
 ```
 
 Four structs in all 33 crates store a `PaddedCursor`, across five fields — two

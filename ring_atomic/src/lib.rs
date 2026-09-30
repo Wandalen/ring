@@ -77,13 +77,14 @@ use ring_types::Seq;
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
-/// use ring_atomic::{ AtomicSeq, SeqCell };
+///
+/// use ring_atomic::{AtomicSeq, SeqCell};
 /// use ring_types::Seq;
 ///
-/// let cell = AtomicSeq::new( Seq( 4 ) );
-/// assert_eq!( cell.load( Ordering::Acquire ), Seq( 4 ) );
-/// assert_eq!( cell.fetch_add( 3, Ordering::AcqRel ), Seq( 4 ) );
-/// assert_eq!( cell.load( Ordering::Acquire ), Seq( 7 ) );
+/// let cell = AtomicSeq::new(Seq(4));
+/// assert_eq!(cell.load(Ordering::Acquire), Seq(4));
+/// assert_eq!(cell.fetch_add(3, Ordering::AcqRel), Seq(4));
+/// assert_eq!(cell.load(Ordering::Acquire), Seq(7));
 /// ```
 /// # Why `Sync`
 ///
@@ -105,121 +106,130 @@ use ring_types::Seq;
 /// Pitfall: object safety is not object *usability* — check what the `dyn` form
 /// auto-implements, not only that it compiles.
 pub trait SeqCell: Sync {
-  /// Read the current sequence.
-  fn load(&self, order: Ordering) -> Seq;
+    /// Read the current sequence.
+    fn load(&self, order: Ordering) -> Seq;
 
-  /// Overwrite the sequence.
-  fn store(&self, value: Seq, order: Ordering);
+    /// Overwrite the sequence.
+    fn store(&self, value: Seq, order: Ordering);
 
-  /// Advance by `n` and return the sequence as it was *before* the advance —
-  /// which is the first sequence the caller now owns.
-  ///
-  /// # Monotonicity
-  ///
-  /// **Not guaranteed by this method.** `n` is a `u64` because the cell is a
-  /// `u64`, and the addition wraps: `fetch_add( u64::MAX )` moves the cursor
-  /// *back* by one and returns a value indistinguishable from a legitimate
-  /// claim of a huge range. `AtomicSeq::new` likewise accepts any `Seq`, so a
-  /// cursor seeded from persistence or a fixture can start arbitrarily close to
-  /// the top. Callers own the monotonicity that `ring_types` and `ring_consume`
-  /// each describe as something "every gate in the family relies on".
-  ///
-  /// Fix(AT21, AT41, AT42): the word *monotonic* did not appear anywhere in the
-  /// crate that owns every operation those two statements are about, and no
-  /// test touched the boundary. `fetch_add_wraps_at_the_top_of_u64` now records
-  /// what happens there. No runtime check was added — at a billion advances per
-  /// second the horizon is 585 years, and the cost of a branch on every claim
-  /// is not worth paying for it — but silence was not the alternative.
-  ///
-  /// Root cause: the reverse direction comes free with `u64` addition and
-  /// nothing in the signature or the contract rules it out.
-  /// Pitfall: an unreachable-by-counting state is still reachable in one call
-  /// by anyone who seeds the cursor.
-  #[must_use = "the returned sequence is the claim — dropping it claims a range nobody will use"]
-  fn fetch_add(&self, n: u64, order: Ordering) -> Seq;
+    /// Advance by `n` and return the sequence as it was *before* the advance —
+    /// which is the first sequence the caller now owns.
+    ///
+    /// # Monotonicity
+    ///
+    /// **Not guaranteed by this method.** `n` is a `u64` because the cell is a
+    /// `u64`, and the addition wraps: `fetch_add( u64::MAX )` moves the cursor
+    /// *back* by one and returns a value indistinguishable from a legitimate
+    /// claim of a huge range. `AtomicSeq::new` likewise accepts any `Seq`, so a
+    /// cursor seeded from persistence or a fixture can start arbitrarily close to
+    /// the top. Callers own the monotonicity that `ring_types` and `ring_consume`
+    /// each describe as something "every gate in the family relies on".
+    ///
+    /// Fix(AT21, AT41, AT42): the word *monotonic* did not appear anywhere in the
+    /// crate that owns every operation those two statements are about, and no
+    /// test touched the boundary. `fetch_add_wraps_at_the_top_of_u64` now records
+    /// what happens there. No runtime check was added — at a billion advances per
+    /// second the horizon is 585 years, and the cost of a branch on every claim
+    /// is not worth paying for it — but silence was not the alternative.
+    ///
+    /// Root cause: the reverse direction comes free with `u64` addition and
+    /// nothing in the signature or the contract rules it out.
+    /// Pitfall: an unreachable-by-counting state is still reachable in one call
+    /// by anyone who seeds the cursor.
+    #[must_use = "the returned sequence is the claim — dropping it claims a range nobody will use"]
+    fn fetch_add(&self, n: u64, order: Ordering) -> Seq;
 
-  /// Advance from `current` to `new` only if the cell still reads `current`.
-  ///
-  /// # Errors
-  ///
-  /// The sequence actually found, when it was not `current` — the multi-producer
-  /// claim's retry input.
-  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq>;
+    /// Advance from `current` to `new` only if the cell still reads `current`.
+    ///
+    /// # Errors
+    ///
+    /// The sequence actually found, when it was not `current` — the multi-producer
+    /// claim's retry input.
+    fn compare_exchange(
+        &self,
+        current: Seq,
+        new: Seq,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<Seq, Seq>;
 }
 
 /// The production sequence cell: one `AtomicU64`, no bookkeeping.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
-/// use ring_atomic::{ AtomicSeq, SeqCell };
+///
+/// use ring_atomic::{AtomicSeq, SeqCell};
 /// use ring_types::Seq;
 ///
 /// let cell = AtomicSeq::default();
-/// assert_eq!( cell.load( Ordering::Relaxed ), Seq::ZERO );
-/// cell.store( Seq( 9 ), Ordering::Release );
-/// assert_eq!( cell.load( Ordering::Acquire ), Seq( 9 ) );
+/// assert_eq!(cell.load(Ordering::Relaxed), Seq::ZERO);
+/// cell.store(Seq(9), Ordering::Release);
+/// assert_eq!(cell.load(Ordering::Acquire), Seq(9));
 /// ```
 #[derive(Debug)]
 pub struct AtomicSeq(AtomicU64);
 
 impl Default for AtomicSeq {
-  /// A cell at [`Seq::ZERO`].
-  ///
-  /// Written out rather than derived so that it does not depend on whichever
-  /// `AtomicU64` is in scope having its own `Default` — one of the two comes
-  /// from `loom` and its trait impls are its own business, not something this
-  /// crate should be pinned to.
-  fn default() -> Self {
-    Self::new(Seq::ZERO)
-  }
+    /// A cell at [`Seq::ZERO`].
+    ///
+    /// Written out rather than derived so that it does not depend on whichever
+    /// `AtomicU64` is in scope having its own `Default` — one of the two comes
+    /// from `loom` and its trait impls are its own business, not something this
+    /// crate should be pinned to.
+    fn default() -> Self {
+        Self::new(Seq::ZERO)
+    }
 }
 
 impl AtomicSeq {
-  /// A cell holding `value`.
-  ///
-  /// `const` in an ordinary build. Not under `--cfg loom`, whose atomics carry
-  /// per-execution model state and have no `const` constructor — see the module
-  /// documentation on the seam.
-  ///
-  /// ```
-  /// use ring_atomic::AtomicSeq;
-  /// use ring_types::Seq;
-  /// let _ = AtomicSeq::new( Seq( 1 ) );
-  /// ```
-  #[cfg(not(loom))]
-  #[must_use]
-  pub const fn new(value: Seq) -> Self {
-    Self(AtomicU64::new(value.0))
-  }
+    /// A cell holding `value`.
+    ///
+    /// `const` in an ordinary build. Not under `--cfg loom`, whose atomics carry
+    /// per-execution model state and have no `const` constructor — see the module
+    /// documentation on the seam.
+    ///
+    /// ```
+    /// use ring_atomic::AtomicSeq;
+    /// use ring_types::Seq;
+    /// let _ = AtomicSeq::new(Seq(1));
+    /// ```
+    #[cfg(not(loom))]
+    #[must_use]
+    pub const fn new(value: Seq) -> Self {
+        Self(AtomicU64::new(value.0))
+    }
 
-  /// A cell holding `value` — the `--cfg loom` build, where it is not `const`.
-  #[cfg(loom)]
-  #[must_use]
-  pub fn new(value: Seq) -> Self {
-    Self(AtomicU64::new(value.0))
-  }
+    /// A cell holding `value` — the `--cfg loom` build, where it is not `const`.
+    #[cfg(loom)]
+    #[must_use]
+    pub fn new(value: Seq) -> Self {
+        Self(AtomicU64::new(value.0))
+    }
 }
 
 impl SeqCell for AtomicSeq {
-  fn load(&self, order: Ordering) -> Seq {
-    Seq(self.0.load(order))
-  }
+    fn load(&self, order: Ordering) -> Seq {
+        Seq(self.0.load(order))
+    }
 
-  fn store(&self, value: Seq, order: Ordering) {
-    self.0.store(value.0, order);
-  }
+    fn store(&self, value: Seq, order: Ordering) {
+        self.0.store(value.0, order);
+    }
 
-  fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
-    Seq(self.0.fetch_add(n, order))
-  }
+    fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+        Seq(self.0.fetch_add(n, order))
+    }
 
-  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
-    self
-      .0
-      .compare_exchange(current.0, new.0, success, failure)
-      .map(Seq)
-      .map_err(Seq)
-  }
+    fn compare_exchange(
+        &self,
+        current: Seq,
+        new: Seq,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<Seq, Seq> {
+        self.0.compare_exchange(current.0, new.0, success, failure).map(Seq).map_err(Seq)
+    }
 }
 
 /// How many atomic operations of each kind a [`CountingSeq`] has served.
@@ -229,7 +239,7 @@ impl SeqCell for AtomicSeq {
 ///
 /// ```
 /// use ring_atomic::OpCounts;
-/// assert_eq!( OpCounts::default().total, 0 );
+/// assert_eq!(OpCounts::default().total, 0);
 /// ```
 ///
 /// # Not a Coherent Observation
@@ -258,16 +268,16 @@ impl SeqCell for AtomicSeq {
 /// not the data.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct OpCounts {
-  /// Reads served.
-  pub loads: usize,
-  /// Writes served.
-  pub stores: usize,
-  /// Advances served — the batch claim's own operation.
-  pub fetch_adds: usize,
-  /// Compare-exchanges served, successful or not — the contended claim's.
-  pub compare_exchanges: usize,
-  /// Every operation above, summed.
-  pub total: usize,
+    /// Reads served.
+    pub loads: usize,
+    /// Writes served.
+    pub stores: usize,
+    /// Advances served — the batch claim's own operation.
+    pub fetch_adds: usize,
+    /// Compare-exchanges served, successful or not — the contended claim's.
+    pub compare_exchanges: usize,
+    /// Every operation above, summed.
+    pub total: usize,
 }
 
 /// A sequence cell that behaves exactly like [`AtomicSeq`] and counts what it
@@ -288,142 +298,145 @@ pub struct OpCounts {
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
-/// use ring_atomic::{ CountingSeq, SeqCell };
+///
+/// use ring_atomic::{CountingSeq, SeqCell};
 /// use ring_types::Seq;
 ///
 /// let cell = CountingSeq::default();
-/// assert_eq!( cell.counts().total, 0 );
+/// assert_eq!(cell.counts().total, 0);
 ///
-/// let first = cell.fetch_add( 64, Ordering::AcqRel );
-/// assert_eq!( first, Seq::ZERO );
+/// let first = cell.fetch_add(64, Ordering::AcqRel);
+/// assert_eq!(first, Seq::ZERO);
 ///
 /// // One operation bought all 64 slots.
-/// assert_eq!( cell.counts().fetch_adds, 1 );
-/// assert_eq!( cell.counts().total, 1 );
+/// assert_eq!(cell.counts().fetch_adds, 1);
+/// assert_eq!(cell.counts().total, 1);
 /// ```
 #[derive(Debug)]
 pub struct CountingSeq {
-  cell: AtomicSeq,
-  loads: AtomicUsize,
-  stores: AtomicUsize,
-  fetch_adds: AtomicUsize,
-  compare_exchanges: AtomicUsize,
+    cell: AtomicSeq,
+    loads: AtomicUsize,
+    stores: AtomicUsize,
+    fetch_adds: AtomicUsize,
+    compare_exchanges: AtomicUsize,
 }
 
 impl Default for CountingSeq {
-  /// A counting cell at [`Seq::ZERO`], with every count at zero.
-  fn default() -> Self {
-    Self::new(Seq::ZERO)
-  }
+    /// A counting cell at [`Seq::ZERO`], with every count at zero.
+    fn default() -> Self {
+        Self::new(Seq::ZERO)
+    }
 }
 
 impl CountingSeq {
-  /// A counting cell holding `value`, with every count at zero.
-  ///
-  /// `const` in an ordinary build, and not under `--cfg loom`, for the reason
-  /// given on [`AtomicSeq::new`].
-  ///
-  /// ```
-  /// use ring_atomic::CountingSeq;
-  /// use ring_types::Seq;
-  /// assert_eq!( CountingSeq::new( Seq( 2 ) ).counts().total, 0 );
-  /// ```
-  #[cfg(not(loom))]
-  #[must_use]
-  pub const fn new(value: Seq) -> Self {
-    Self {
-      cell: AtomicSeq::new(value),
-      loads: AtomicUsize::new(0),
-      stores: AtomicUsize::new(0),
-      fetch_adds: AtomicUsize::new(0),
-      compare_exchanges: AtomicUsize::new(0),
+    /// A counting cell holding `value`, with every count at zero.
+    ///
+    /// `const` in an ordinary build, and not under `--cfg loom`, for the reason
+    /// given on [`AtomicSeq::new`].
+    ///
+    /// ```
+    /// use ring_atomic::CountingSeq;
+    /// use ring_types::Seq;
+    /// assert_eq!(CountingSeq::new(Seq(2)).counts().total, 0);
+    /// ```
+    #[cfg(not(loom))]
+    #[must_use]
+    pub const fn new(value: Seq) -> Self {
+        Self {
+            cell: AtomicSeq::new(value),
+            loads: AtomicUsize::new(0),
+            stores: AtomicUsize::new(0),
+            fetch_adds: AtomicUsize::new(0),
+            compare_exchanges: AtomicUsize::new(0),
+        }
     }
-  }
 
-  /// A counting cell holding `value` — the `--cfg loom` build, not `const`.
-  #[cfg(loom)]
-  #[must_use]
-  pub fn new(value: Seq) -> Self {
-    Self {
-      cell: AtomicSeq::new(value),
-      loads: AtomicUsize::new(0),
-      stores: AtomicUsize::new(0),
-      fetch_adds: AtomicUsize::new(0),
-      compare_exchanges: AtomicUsize::new(0),
+    /// A counting cell holding `value` — the `--cfg loom` build, not `const`.
+    #[cfg(loom)]
+    #[must_use]
+    pub fn new(value: Seq) -> Self {
+        Self {
+            cell: AtomicSeq::new(value),
+            loads: AtomicUsize::new(0),
+            stores: AtomicUsize::new(0),
+            fetch_adds: AtomicUsize::new(0),
+            compare_exchanges: AtomicUsize::new(0),
+        }
     }
-  }
 
-  /// What this cell has been asked to do so far — read as four separate
-  /// values, so meaningful only when nothing else is touching the cell.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_atomic::{ CountingSeq, SeqCell };
-  ///
-  /// let cell = CountingSeq::default();
-  /// cell.load( Ordering::Relaxed );
-  /// assert_eq!( cell.counts().loads, 1 );
-  /// ```
-  ///
-  /// # Not a Snapshot
-  ///
-  /// This is **four independent `Relaxed` loads**, not one atomic read. Under
-  /// concurrent use the four fields can come from four different instants, and
-  /// [`OpCounts::total`] is the sum of readings that were never simultaneously
-  /// true. Assert on a single field, or take the reading while nothing else
-  /// touches the cell — never on a *relationship between two fields*.
-  ///
-  /// Fix(AT3): a two-million-sample probe against a writer whose own loop keeps
-  /// `loads >= stores` true at every instant found 11,575 returned structs
-  /// reporting `stores > loads`, the widest by 5,456. Concurrency is not
-  /// hypothetical here: every `SeqCell` in the family is shared between a
-  /// producer and a consumer, and this crate's own contention test drives four
-  /// threads against one cell.
-  ///
-  /// Root cause: bundling several independent atomic reads into one struct
-  /// makes the struct look like a single observation.
-  /// Pitfall: a cross-field assertion on this type fails intermittently, and
-  /// its author will look for the cause in the code under test.
-  #[must_use]
-  pub fn counts(&self) -> OpCounts {
-    let loads = self.loads.load(Ordering::Relaxed);
-    let stores = self.stores.load(Ordering::Relaxed);
-    let fetch_adds = self.fetch_adds.load(Ordering::Relaxed);
-    let compare_exchanges = self.compare_exchanges.load(Ordering::Relaxed);
-    OpCounts {
-      loads,
-      stores,
-      fetch_adds,
-      compare_exchanges,
-      total: loads + stores + fetch_adds + compare_exchanges,
+    /// What this cell has been asked to do so far — read as four separate
+    /// values, so meaningful only when nothing else is touching the cell.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_atomic::{CountingSeq, SeqCell};
+    ///
+    /// let cell = CountingSeq::default();
+    /// cell.load(Ordering::Relaxed);
+    /// assert_eq!(cell.counts().loads, 1);
+    /// ```
+    ///
+    /// # Not a Snapshot
+    ///
+    /// This is **four independent `Relaxed` loads**, not one atomic read. Under
+    /// concurrent use the four fields can come from four different instants, and
+    /// [`OpCounts::total`] is the sum of readings that were never simultaneously
+    /// true. Assert on a single field, or take the reading while nothing else
+    /// touches the cell — never on a *relationship between two fields*.
+    ///
+    /// Fix(AT3): a two-million-sample probe against a writer whose own loop keeps
+    /// `loads >= stores` true at every instant found 11,575 returned structs
+    /// reporting `stores > loads`, the widest by 5,456. Concurrency is not
+    /// hypothetical here: every `SeqCell` in the family is shared between a
+    /// producer and a consumer, and this crate's own contention test drives four
+    /// threads against one cell.
+    ///
+    /// Root cause: bundling several independent atomic reads into one struct
+    /// makes the struct look like a single observation.
+    /// Pitfall: a cross-field assertion on this type fails intermittently, and
+    /// its author will look for the cause in the code under test.
+    #[must_use]
+    pub fn counts(&self) -> OpCounts {
+        let loads = self.loads.load(Ordering::Relaxed);
+        let stores = self.stores.load(Ordering::Relaxed);
+        let fetch_adds = self.fetch_adds.load(Ordering::Relaxed);
+        let compare_exchanges = self.compare_exchanges.load(Ordering::Relaxed);
+        OpCounts {
+            loads,
+            stores,
+            fetch_adds,
+            compare_exchanges,
+            total: loads + stores + fetch_adds + compare_exchanges,
+        }
     }
-  }
 
-  /// Return every count to zero, leaving the sequence itself untouched.
-  ///
-  /// Four independent `Relaxed` stores, not one atomic reset — safe to read
-  /// as complete only while nothing else is touching the cell. For a test
-  /// that sets up a state through the cell and then wants to count only what
-  /// the operation under test does; confirming the sequence survived costs a
-  /// count of its own, since the confirming read is itself counted.
-  ///
-  /// ```
-  /// use core::sync::atomic::Ordering;
-  /// use ring_atomic::{ CountingSeq, SeqCell };
-  /// use ring_types::Seq;
-  ///
-  /// let cell = CountingSeq::default();
-  /// cell.store( Seq( 5 ), Ordering::Release );
-  /// cell.reset_counts();
-  ///
-  /// assert_eq!( cell.counts().total, 0 );
-  /// assert_eq!( cell.load( Ordering::Acquire ), Seq( 5 ), "the sequence survives" );
-  /// ```
-  pub fn reset_counts(&self) {
-    for counter in [&self.loads, &self.stores, &self.fetch_adds, &self.compare_exchanges] {
-      counter.store(0, Ordering::Relaxed);
+    /// Return every count to zero, leaving the sequence itself untouched.
+    ///
+    /// Four independent `Relaxed` stores, not one atomic reset — safe to read
+    /// as complete only while nothing else is touching the cell. For a test
+    /// that sets up a state through the cell and then wants to count only what
+    /// the operation under test does; confirming the sequence survived costs a
+    /// count of its own, since the confirming read is itself counted.
+    ///
+    /// ```
+    /// use core::sync::atomic::Ordering;
+    ///
+    /// use ring_atomic::{CountingSeq, SeqCell};
+    /// use ring_types::Seq;
+    ///
+    /// let cell = CountingSeq::default();
+    /// cell.store(Seq(5), Ordering::Release);
+    /// cell.reset_counts();
+    ///
+    /// assert_eq!(cell.counts().total, 0);
+    /// assert_eq!(cell.load(Ordering::Acquire), Seq(5), "the sequence survives");
+    /// ```
+    pub fn reset_counts(&self) {
+        for counter in [&self.loads, &self.stores, &self.fetch_adds, &self.compare_exchanges] {
+            counter.store(0, Ordering::Relaxed);
+        }
     }
-  }
 }
 
 /// Each method bumps its counter **before** delegating to the cell.
@@ -446,23 +459,29 @@ impl CountingSeq {
 /// Pitfall: "the counts are exact" is a statement about quiescence, and every
 /// test that establishes it is a test taken at rest.
 impl SeqCell for CountingSeq {
-  fn load(&self, order: Ordering) -> Seq {
-    self.loads.fetch_add(1, Ordering::Relaxed);
-    self.cell.load(order)
-  }
+    fn load(&self, order: Ordering) -> Seq {
+        self.loads.fetch_add(1, Ordering::Relaxed);
+        self.cell.load(order)
+    }
 
-  fn store(&self, value: Seq, order: Ordering) {
-    self.stores.fetch_add(1, Ordering::Relaxed);
-    self.cell.store(value, order);
-  }
+    fn store(&self, value: Seq, order: Ordering) {
+        self.stores.fetch_add(1, Ordering::Relaxed);
+        self.cell.store(value, order);
+    }
 
-  fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
-    self.fetch_adds.fetch_add(1, Ordering::Relaxed);
-    self.cell.fetch_add(n, order)
-  }
+    fn fetch_add(&self, n: u64, order: Ordering) -> Seq {
+        self.fetch_adds.fetch_add(1, Ordering::Relaxed);
+        self.cell.fetch_add(n, order)
+    }
 
-  fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
-    self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
-    self.cell.compare_exchange(current, new, success, failure)
-  }
+    fn compare_exchange(
+        &self,
+        current: Seq,
+        new: Seq,
+        success: Ordering,
+        failure: Ordering,
+    ) -> Result<Seq, Seq> {
+        self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
+        self.cell.compare_exchange(current, new, success, failure)
+    }
 }

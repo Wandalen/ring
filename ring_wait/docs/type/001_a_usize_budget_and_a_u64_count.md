@@ -86,7 +86,7 @@ Live output:
 
 ```
 (no cast or conversion in this crate)
-    let end = start.advanced_by( len as u64 );
+        let end = start.advanced_by(len as u64);
 ```
 
 **No match**, while the control returns `ring_publish`'s single `len as u64`, so

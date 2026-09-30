@@ -164,7 +164,7 @@ command grep -F 'not declare this crate as a dependency, so that call does not e
 Live output:
 
 ```
-  /// not declare this crate as a dependency, so that call does not exist yet;
+    /// not declare this crate as a dependency, so that call does not exist yet;
 ```
 
 **Disposition:** applied — `reset`'s doc comment now says "Named for" rather than

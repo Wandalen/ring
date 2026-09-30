@@ -9,10 +9,10 @@ description = "Publisher stop, drain, and waiter join"
 publish = true
 
 [dependencies]
-ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
-ring_wait = { path = "../ring_wait", version = "0.1.0" }
 ring_core = { path = "../ring_core", version = "0.1.0" }
+ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
 ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_wait = { path = "../ring_wait", version = "0.1.0" }
 
 [dev-dependencies]
 ring_config = { path = "../ring_config" }

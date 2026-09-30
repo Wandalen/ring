@@ -13,15 +13,15 @@ publish = false
 # candidate. Feature 186 names that candidate; feature 187 makes it optional.
 # The comparison therefore has five candidates by default and six with this on,
 # which `Candidate::ALL` reflects rather than hides.
-crossbeam = [ "ring_factory/crossbeam" ]
+crossbeam = ["ring_factory/crossbeam"]
 
 [dependencies]
 ring_factory = { path = "../ring_factory" }
-ring_tls = { path = "../ring_tls" }
 ring_flush = { path = "../ring_flush" }
-ring_stats = { path = "../ring_stats" }
-ring_spsc = { path = "../ring_spsc" }
 ring_mpsc = { path = "../ring_mpsc" }
+ring_spsc = { path = "../ring_spsc" }
+ring_stats = { path = "../ring_stats" }
+ring_tls = { path = "../ring_tls" }
 # Message 960 did not assign these three. Each is needed to write a signature,
 # which is the same reason `ring_factory` had to add two — see that crate's
 # `docs/integration/001`. Third occurrence in the family, and the first where

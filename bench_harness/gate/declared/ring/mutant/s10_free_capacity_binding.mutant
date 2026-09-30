@@ -23,12 +23,10 @@ round-failures: 1
 detector: free_capacity_never_overstates_the_room_available
 
 --- from
-  pub fn free_capacity( &self ) -> usize
-  {
-    match &self.inner
+    pub fn free_capacity(&self) -> usize {
+        match &self.inner
 --- to
-  pub fn free_capacity( &self ) -> usize
-  {
-    if true { return 0; }   // PROBE ONLY — G12, was the match below
-    match &self.inner
+    pub fn free_capacity(&self) -> usize {
+        if true { return 0; } // PROBE ONLY — G12, was the match below
+        match &self.inner
 --- end

@@ -175,8 +175,8 @@ command grep -r '\.mask(' ring_*/src | command grep -v '^ring_types/'
 Live output:
 
 ```
-ring_index/src/lib.rs:  SlotIndex( ( seq.0 as usize ) & capacity.mask() )
-ring_mpsc/src/lib.rs:    let index = ( seq.0 as usize ) & self.capacity().mask();
+ring_index/src/lib.rs:    SlotIndex((seq.0 as usize) & capacity.mask())
+ring_mpsc/src/lib.rs:        let index = (seq.0 as usize) & self.capacity().mask();
 ```
 
 `ring_mpsc` — the family's largest crate at 50 items — writes `ring_index::of`'s

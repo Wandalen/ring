@@ -122,7 +122,7 @@ command grep -F 'so this sum cannot tell a loss from a refusal' src/lib.rs
 Live output:
 
 ```
-  /// policy the same drop verb, so this sum cannot tell a loss from a refusal.
+    /// policy the same drop verb, so this sum cannot tell a loss from a refusal.
 ```
 
 **Disposition:** applied — closed by the same doc edit `pattern/001` § ST38

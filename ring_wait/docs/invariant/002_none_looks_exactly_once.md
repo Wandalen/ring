@@ -162,7 +162,7 @@ Live output:
 // `loom::model` closure — so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
-#![ cfg( not( loom ) ) ]
+#![cfg(not(loom))]
 29
 0
 0 — no loom-gated module

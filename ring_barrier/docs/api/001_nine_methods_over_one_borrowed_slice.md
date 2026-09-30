@@ -116,11 +116,11 @@ done
 Live output:
 
 ```
-ring_barrier/tests/allocation_test.rs     5
-ring_barrier/tests/barrier_test.rs        29
-ring_consume/tests/allocation_test.rs     2
-ring_consume/tests/consume_test.rs        18
-ring_publish/tests/handshake_test.rs      10
+ring_barrier/tests/allocation_test.rs          5
+ring_barrier/tests/barrier_test.rs             29
+ring_consume/tests/allocation_test.rs          2
+ring_consume/tests/consume_test.rs             18
+ring_publish/tests/handshake_test.rs           10
 ```
 
 | Site | `Barrier::over` |

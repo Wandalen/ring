@@ -149,18 +149,18 @@ Live output:
 -- control: the identical expression over a manifest that does set it --
 overflow-checks = true
 -- next, as it reads now --
-  /// Panics on overflow in a debug build and wraps to zero in a release
-  /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
-  /// silently invert every gate comparison in the family, which is why the
-  /// non-wrapping argument has to hold: at 10⁹ publications per second a
-  /// `u64` runs for roughly 584 years, well past any reachable workload.
+    /// Panics on overflow in a debug build and wraps to zero in a release
+    /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
+    /// silently invert every gate comparison in the family, which is why the
+    /// non-wrapping argument has to hold: at 10⁹ publications per second a
+    /// `u64` runs for roughly 584 years, well past any reachable workload.
 -- advanced_by, which had nothing and now has this --
-  /// Overflow behaves exactly as [`Seq::next`] documents — debug panics,
-  /// release wraps to zero. The reachability argument does not carry over
-  /// unchanged: `next` needs 2⁶⁴ increments to reach the wrap, while this
-  /// takes `n` from the caller and reaches it in a single call from any
-  /// position. A caller deriving `n` from a batch length or a configured
-  /// count owns that bound; nothing here checks it.
+    /// Overflow behaves exactly as [`Seq::next`] documents — debug panics,
+    /// release wraps to zero. The reachability argument does not carry over
+    /// unchanged: `next` needs 2⁶⁴ increments to reach the wrap, while this
+    /// takes `n` from the caller and reaches it in a single call from any
+    /// position. A caller deriving `n` from a batch length or a configured
+    /// count owns that bound; nothing here checks it.
 -- and the word SQ44 was about --
    occurrences of the original claim: 0
 ```

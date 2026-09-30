@@ -103,27 +103,27 @@ grep -r '\.publish(' ring_publish/src/lib.rs ring_publish/tests/*.rs \
 Live output:
 
 ```
-ring_publish/tests/handshake_test.rs:          publisher.publish( claim.start(), claim.len() );
-ring_publish/tests/handshake_test.rs:          publisher.publish( lap.start(), lap.len() );
-ring_publish/tests/handshake_test.rs:          publisher.publish( seq, claim.len() );
-ring_publish/tests/handshake_test.rs:    publisher.publish( first.start(), first.len() );
-ring_publish/tests/handshake_test.rs:    publisher.publish( second.start(), second.len() );
-ring_publish/tests/handshake_test.rs:    publisher.publish( claim.start(), claim.len() );
-ring_publish/tests/handshake_test.rs:      publisher.publish( claim.start(), claim.len() );
-ring_publish/tests/handshake_test.rs:          publisher.publish( seq, claim.len() );
-ring_publish/tests/handshake_test.rs:            publisher.publish( seq, claim.len() );
-ring_publish/tests/handshake_test.rs:    publisher.publish( claim.start(), claim.len() );
-ring_publish/tests/publish_test.rs:  publisher.publish( Seq::ZERO, 3 );
-ring_publish/tests/publish_test.rs:  publisher.publish( Seq::ZERO, 8 );
-ring_publish/tests/publish_test.rs:  publisher.publish( Seq::ZERO, 5 );
-ring_publish/tests/publish_test.rs:  assert_eq!( publisher.publish( Seq::ZERO, 3 ), Seq( 3 ) );
-ring_publish/tests/publish_test.rs:  assert_eq!( publisher.publish( Seq( 3 ), 1 ), Seq( 4 ) );
-ring_publish/tests/publish_test.rs:  assert_eq!( publisher.publish( Seq( 4 ), 6 ), Seq( 10 ) );
-ring_publish/tests/publish_test.rs:      publisher.publish( Seq( 4 ), 4 )
-ring_publish/tests/publish_test.rs:    assert_eq!( publisher.publish( Seq::ZERO, 4 ), Seq( 4 ), "A goes first" );
-ring_publish/tests/publish_test.rs:      scope.spawn( move || publisher.publish( start, WIDTH as usize ) );
-ring_publish/tests/publish_test.rs:  publisher.publish( Seq::ZERO, 3 );
-ring_publish/tests/publish_test.rs:    publisher.publish( Seq( frontier ), 1 );
+ring_publish/tests/handshake_test.rs:                    publisher.publish(claim.start(), claim.len());
+ring_publish/tests/handshake_test.rs:                    publisher.publish(lap.start(), lap.len());
+ring_publish/tests/handshake_test.rs:                    publisher.publish(seq, claim.len());
+ring_publish/tests/handshake_test.rs:        publisher.publish(first.start(), first.len());
+ring_publish/tests/handshake_test.rs:        publisher.publish(second.start(), second.len());
+ring_publish/tests/handshake_test.rs:        publisher.publish(claim.start(), claim.len());
+ring_publish/tests/handshake_test.rs:            publisher.publish(claim.start(), claim.len());
+ring_publish/tests/handshake_test.rs:                    publisher.publish(seq, claim.len());
+ring_publish/tests/handshake_test.rs:                        publisher.publish(seq, claim.len());
+ring_publish/tests/handshake_test.rs:        publisher.publish(claim.start(), claim.len());
+ring_publish/tests/publish_test.rs:    publisher.publish(Seq::ZERO, 3);
+ring_publish/tests/publish_test.rs:    publisher.publish(Seq::ZERO, 8);
+ring_publish/tests/publish_test.rs:    publisher.publish(Seq::ZERO, 5);
+ring_publish/tests/publish_test.rs:    assert_eq!(publisher.publish(Seq::ZERO, 3), Seq(3));
+ring_publish/tests/publish_test.rs:    assert_eq!(publisher.publish(Seq(3), 1), Seq(4));
+ring_publish/tests/publish_test.rs:    assert_eq!(publisher.publish(Seq(4), 6), Seq(10));
+ring_publish/tests/publish_test.rs:            publisher.publish(Seq(4), 4)
+ring_publish/tests/publish_test.rs:        assert_eq!(publisher.publish(Seq::ZERO, 4), Seq(4), "A goes first");
+ring_publish/tests/publish_test.rs:            scope.spawn(move || publisher.publish(start, WIDTH as usize));
+ring_publish/tests/publish_test.rs:    publisher.publish(Seq::ZERO, 3);
+ring_publish/tests/publish_test.rs:        publisher.publish(Seq(frontier), 1);
 ```
 
 Twenty-one call sites. **Fifteen** are statements ending in `;` that discard the

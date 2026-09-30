@@ -61,8 +61,8 @@ command grep -rn '\.mask()' ring_*/src | command grep -v ring_types/ | command g
 Live output:
 
 ```
-ring_index/src/lib.rs:  SlotIndex( ( seq.0 as usize ) & capacity.mask() )
-ring_mpsc/src/lib.rs:    let index = ( seq.0 as usize ) & self.capacity().mask();
+ring_index/src/lib.rs:    SlotIndex((seq.0 as usize) & capacity.mask())
+ring_mpsc/src/lib.rs:        let index = (seq.0 as usize) & self.capacity().mask();
 ```
 
 returns exactly those two lines.

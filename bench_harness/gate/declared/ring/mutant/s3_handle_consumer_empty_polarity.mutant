@@ -20,11 +20,9 @@ round-failures: 1
 detector: try_recv_batch_moves_what_is_waiting
 
 --- from
-  pub fn is_empty( &self ) -> bool
-  {
-    self.inner.is_empty()
+    pub fn is_empty(&self) -> bool {
+        self.inner.is_empty()
 --- to
-  pub fn is_empty( &self ) -> bool
-  {
-    true   // PROBE ONLY — G12, was `self.inner.is_empty()`
+    pub fn is_empty(&self) -> bool {
+        true // PROBE ONLY — G12, was `self.inner.is_empty()`
 --- end

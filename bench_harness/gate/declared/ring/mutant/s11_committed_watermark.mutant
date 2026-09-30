@@ -18,11 +18,9 @@ round-failures: 1
 detector: a_second_drain_sees_what_was_published_after_the_first
 
 --- from
-  pub fn committed( &self ) -> Seq
-  {
-    self.consumer_cursor().load( GATING )
+    pub fn committed(&self) -> Seq {
+        self.consumer_cursor().load(GATING)
 --- to
-  pub fn committed( &self ) -> Seq
-  {
-    Default::default()   // PROBE ONLY — G12, was `self.consumer_cursor().load( GATING )`
+    pub fn committed(&self) -> Seq {
+        Default::default() // PROBE ONLY — G12, was `self.consumer_cursor().load(GATING)`
 --- end

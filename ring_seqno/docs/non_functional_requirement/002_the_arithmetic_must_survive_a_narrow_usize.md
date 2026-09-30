@@ -37,9 +37,9 @@ grep ' as u64\| as usize' ring_seqno/src/lib.rs
 Live output:
 
 ```
-  earlier.distance_to( later ) / capacity.get() as u64
-  consumer.distance_to( producer ) < capacity.get() as u64
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+    earlier.distance_to(later) / capacity.get() as u64
+    consumer.distance_to(producer) < capacity.get() as u64
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
 ```
 
 | Line | Function | Cast | Direction |
@@ -235,15 +235,14 @@ sed -n '/^pub fn free_slots/,/^}$/p' ring_seqno/src/lib.rs
 Live output:
 
 ```
-pub fn free_slots( producer : Seq, consumer : Seq, capacity : Capacity ) -> usize
-{
-  let in_flight = consumer.distance_to( producer );
-  ( capacity.get() as u64 ).saturating_sub( in_flight ) as usize
+pub fn free_slots(producer: Seq, consumer: Seq, capacity: Capacity) -> usize {
+    let in_flight = consumer.distance_to(producer);
+    (capacity.get() as u64).saturating_sub(in_flight) as usize
 }
 ```
 
 **Disposition:** applied — took the "real answer" this file already names: `free_slots` now computes `in_flight` in `u64`, saturating-subtracts it from the widened capacity, and narrows only the already-bounded `usize`-sized result, so all three readings widen identically and the divergence this finding describes cannot occur on any target. Verified via `cargo test -p ring_seqno --all-features`, 2026-09-04 — ring_seqno's 11 unit tests plus 5 doctests all pass, including `free_slots_agrees_with_may_claim_across_two_laps` and `free_slots_spans_zero_to_capacity`, unchanged and still green against the new body. Now prints:
-`let in_flight = consumer.distance_to( producer );`
+`let in_flight = consumer.distance_to(producer);`
 
 ---
 

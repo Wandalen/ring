@@ -208,7 +208,7 @@ the criterion the test file quotes:
 global_allocator declarations, whole family: 4
 what both halves are actually asserted against:
 //! Both halves are asserted against `ring_atomic::CountingSeq`, the counting
-use ring_atomic::{ AtomicSeq, CountingSeq, SeqCell };
+use ring_atomic::{AtomicSeq, CountingSeq, SeqCell};
 ```
 
 Both halves of the criterion are asserted against `ring_atomic::CountingSeq` —

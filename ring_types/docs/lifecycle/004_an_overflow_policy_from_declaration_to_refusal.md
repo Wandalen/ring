@@ -251,7 +251,7 @@ grep -r 'RingError::PolicyUnsupported' ring_*/src/*.rs | grep -v '^ring_types/' 
 Live output:
 
 ```
-ring_core/src/lib.rs:      return Err( RingError::PolicyUnsupported );
+ring_core/src/lib.rs:            return Err(RingError::PolicyUnsupported);
 ```
 
 One line. The six-state arc this instance describes narrows, at the refusal step,

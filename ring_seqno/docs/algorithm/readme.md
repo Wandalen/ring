@@ -52,9 +52,9 @@ command grep -rn '[^/*] / \|\.min()' --include=*.rs ring_*/src/ \
 Live output:
 
 ```
-ring_align/src/lib.rs:   a / CACHE_LINE != b / CACHE_LINE
-ring_bench/src/lib.rs:   let producer = ( record / workload.records_per_producer() as Record ) as usize;
-ring_cursor/src/lib.rs:   cursors.iter().map( | c | c.load( GATING ) ).min()
-ring_seqno/src/lib.rs:   cursors.iter().copied().min()
-ring_seqno/src/lib.rs:   earlier.distance_to( later ) / capacity.get() as u64
+ring_align/src/lib.rs:     a / CACHE_LINE != b / CACHE_LINE
+ring_bench/src/lib.rs:     let producer = (record / workload.records_per_producer() as Record) as usize;
+ring_cursor/src/lib.rs:     cursors.iter().map(|c| c.load(GATING)).min()
+ring_seqno/src/lib.rs:     cursors.iter().copied().min()
+ring_seqno/src/lib.rs:     earlier.distance_to(later) / capacity.get() as u64
 ```

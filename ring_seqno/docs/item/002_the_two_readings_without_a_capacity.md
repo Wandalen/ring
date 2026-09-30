@@ -97,13 +97,13 @@ grep -r '\.available(' ring_*/src/*.rs | grep -vE ':\s*///'
 Live output:
 
 ```
-ring_barrier/src/lib.rs:    count <= self.available( from )
-ring_consume/src/lib.rs:    let run = self.available();
-ring_consume/src/lib.rs:    let run = self.available();
-ring_consume/src/lib.rs:    let run = self.available();
-ring_core/src/lib.rs:      ConsumerInner::Spsc( consumer ) => consumer.available(),
-ring_core/src/lib.rs:      ConsumerInner::Mpsc( consumer ) => consumer.available(),
-ring_mpsc/src/lib.rs:    self.available() == 0
+ring_barrier/src/lib.rs:        count <= self.available(from)
+ring_consume/src/lib.rs:        let run = self.available();
+ring_consume/src/lib.rs:        let run = self.available();
+ring_consume/src/lib.rs:        let run = self.available();
+ring_core/src/lib.rs:            ConsumerInner::Spsc(consumer) => consumer.available(),
+ring_core/src/lib.rs:            ConsumerInner::Mpsc(consumer) => consumer.available(),
+ring_mpsc/src/lib.rs:        self.available() == 0
 ```
 
 One hit is `Barrier::admits` calling its own method; the other six are

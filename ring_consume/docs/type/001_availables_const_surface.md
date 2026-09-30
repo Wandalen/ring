@@ -115,8 +115,8 @@ grep -B1 'pub struct Seq' ring_types/src/id.rs
 Live output:
 
 ```
-#[ derive( Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default ) ]
-pub struct Seq( pub u64 );
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+pub struct Seq(pub u64);
 ```
 
 ```

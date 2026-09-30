@@ -19,7 +19,7 @@ round-failures: 1
 detector: push_batch_within_spends_a_second_attempt_after_a_productive_first
 
 --- from
-    if moved == 0
+        if moved == 0
 --- to
-    if moved != 0   // PROBE ONLY — G12, was `==`
+        if moved != 0 /* PROBE ONLY — G12, was `==` */
 --- end

@@ -75,7 +75,7 @@ Live output:
 ```
      27 as u64
      15 as usize
-let end = start.advanced_by( len as u64 );
+let end = start.advanced_by(len as u64);
 /// just as long, and that one is not the waiting caller's bug at all. The
 ```
 
@@ -208,18 +208,18 @@ Live output:
 
 ```
   -- next, the sibling that was wrong --
-  /// Panics on overflow in a debug build and wraps to zero in a release
-  /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
-  /// silently invert every gate comparison in the family, which is why the
-  /// non-wrapping argument has to hold: at 10⁹ publications per second a
-  /// `u64` runs for roughly 584 years, well past any reachable workload.
+    /// Panics on overflow in a debug build and wraps to zero in a release
+    /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
+    /// silently invert every gate comparison in the family, which is why the
+    /// non-wrapping argument has to hold: at 10⁹ publications per second a
+    /// `u64` runs for roughly 584 years, well past any reachable workload.
   -- advanced_by, the one try_publish calls, which said nothing --
-  /// Overflow behaves exactly as [`Seq::next`] documents — debug panics,
-  /// release wraps to zero. The reachability argument does not carry over
-  /// unchanged: `next` needs 2⁶⁴ increments to reach the wrap, while this
-  /// takes `n` from the caller and reaches it in a single call from any
-  /// position. A caller deriving `n` from a batch length or a configured
-  /// count owns that bound; nothing here checks it.
+    /// Overflow behaves exactly as [`Seq::next`] documents — debug panics,
+    /// release wraps to zero. The reachability argument does not carry over
+    /// unchanged: `next` needs 2⁶⁴ increments to reach the wrap, while this
+    /// takes `n` from the caller and reaches it in a single call from any
+    /// position. A caller deriving `n` from a batch length or a configured
+    /// count owns that bound; nothing here checks it.
   -- and the word this finding was about --
     occurrences of the original claim: 0
 ```

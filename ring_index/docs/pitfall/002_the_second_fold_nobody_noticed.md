@@ -161,9 +161,9 @@ command grep -r 'stamps().len()' ring_mpsc/src/lib.rs ring_mpsc/tests/*.rs
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:/// assert_eq!( ring.stamps().len(), 4, "one stamp per slot, not one per lap" );
-ring_mpsc/tests/mpsc_test.rs:    assert_eq!( ring.stamps().len(), 16 );
-ring_mpsc/tests/mpsc_test.rs:    assert_eq!( ring.stamps().len(), 8 );
+ring_mpsc/src/lib.rs:/// assert_eq!(ring.stamps().len(), 4, "one stamp per slot, not one per lap");
+ring_mpsc/tests/mpsc_test.rs:        assert_eq!(ring.stamps().len(), 16);
+ring_mpsc/tests/mpsc_test.rs:        assert_eq!(ring.stamps().len(), 8);
 ```
 
 **Finding.** Three assertions, each comparing `stamps().len()` against a

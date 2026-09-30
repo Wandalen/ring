@@ -93,8 +93,8 @@ command grep -r '\.is_configuration(' ring_*/src | command grep -v '^ring_types/
 Live output:
 
 ```
-ring_gating/src/lib.rs:  /// assert!( too_wide.is_configuration(), "never retry this one" );
-ring_gating/src/lib.rs:  /// assert!( !RingError::Full.is_configuration(), "but do retry this one" );
+ring_gating/src/lib.rs:    /// assert!(too_wide.is_configuration(), "never retry this one");
+ring_gating/src/lib.rs:    /// assert!(!RingError::Full.is_configuration(), "but do retry this one");
 ```
 
 returns **two lines, both `///` doc examples** in `ring_gating` (`:278`, `:281`).

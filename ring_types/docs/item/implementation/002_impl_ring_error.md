@@ -83,9 +83,9 @@ Live output:
 
 ```
 ring_gating/src/lib.rs://! the second. `RingError::is_configuration` is the caller's test.
-ring_gating/src/lib.rs:  /// assert!( too_wide.is_configuration(), "never retry this one" );
-ring_gating/src/lib.rs:  /// assert!( !RingError::Full.is_configuration(), "but do retry this one" );
-ring_shutdown/src/lib.rs:  /// assert!( !RingError::Closed.is_transient() );
+ring_gating/src/lib.rs:    /// assert!(too_wide.is_configuration(), "never retry this one");
+ring_gating/src/lib.rs:    /// assert!(!RingError::Full.is_configuration(), "but do retry this one");
+ring_shutdown/src/lib.rs:    /// assert!(!RingError::Closed.is_transient());
 ```
 
 returns four lines, and all four are doc comments — three `///` examples and one

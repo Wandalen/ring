@@ -440,27 +440,23 @@ sed -n '/^fn overflow_policy_has_no_overwrite_variant/,/^}$/p' ring_types/tests/
 Live output:
 
 ```
-fn overflow_policy_has_no_overwrite_variant()
-{
-  assert_eq!( OverflowPolicy::ALL.len(), 3 );
-  for expected in [ OverflowPolicy::DropNewest, OverflowPolicy::DropOldest, OverflowPolicy::Fail ]
-  {
-    assert!( OverflowPolicy::ALL.contains( &expected ), "{expected:?} missing from ALL" );
-  }
-  for policy in OverflowPolicy::ALL
-  {
-    match policy
-    {
-      // Each arm is a policy that either drops a *nameable* item or refuses.
-      // No arm overwrites an unread one; a variant that did would have to be
-      // added here, which is where a reviewer would see it.
-      OverflowPolicy::DropNewest | OverflowPolicy::DropOldest | OverflowPolicy::Fail => {}
+fn overflow_policy_has_no_overwrite_variant() {
+    assert_eq!(OverflowPolicy::ALL.len(), 3);
+    for expected in [OverflowPolicy::DropNewest, OverflowPolicy::DropOldest, OverflowPolicy::Fail] {
+        assert!(OverflowPolicy::ALL.contains(&expected), "{expected:?} missing from ALL");
     }
-  }
+    for policy in OverflowPolicy::ALL {
+        match policy {
+            // Each arm is a policy that either drops a *nameable* item or refuses.
+            // No arm overwrites an unread one; a variant that did would have to be
+            // added here, which is where a reviewer would see it.
+            OverflowPolicy::DropNewest | OverflowPolicy::DropOldest | OverflowPolicy::Fail => {},
+        }
+    }
 }
 ```
 
 **Disposition:** applied — `overflow_policy_has_no_overwrite_variant` now runs
 a `contains` loop across `OverflowPolicy::ALL`, refusing both
 `[ DropNewest, DropNewest, Fail ]` and `[ DropOldest, DropOldest, Fail ]` by
-name, so a duplicated `ALL` entry can no longer pass the suite undetected. Now prints: `assert_eq!( OverflowPolicy::ALL.len(), 3 );`
+name, so a duplicated `ALL` entry can no longer pass the suite undetected. Now prints: `assert_eq!(OverflowPolicy::ALL.len(), 3);`

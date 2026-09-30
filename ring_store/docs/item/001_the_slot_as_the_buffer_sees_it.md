@@ -30,8 +30,8 @@ grep -n 'Slot::\|slot\.clear()' ring_store/src/lib.rs | grep -vE ':[[:space:]]*(
 Live output:
 
 ```
-      slot.clear();
-    self.slots.iter().all( Slot::is_empty )
+            slot.clear();
+        self.slots.iter().all(Slot::is_empty)
 ```
 
 Two lines. `clear` inside the loop that sweeps the buffer, `is_empty` folded over

@@ -71,20 +71,20 @@ struct Counting;
 // `fetch_add` calls touch only this file's own statics and never the
 // allocation itself.
 unsafe impl GlobalAlloc for Counting {
-  unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-    ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-    BYTES.fetch_add(layout.size(), Ordering::Relaxed);
-    // SAFETY: `layout` is passed through untouched, so the caller's own
-    // guarantee that it is non-zero-sized and well-formed still holds.
-    unsafe { std::alloc::System.alloc(layout) }
-  }
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
+        BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+        // SAFETY: `layout` is passed through untouched, so the caller's own
+        // guarantee that it is non-zero-sized and well-formed still holds.
+        unsafe { std::alloc::System.alloc(layout) }
+    }
 
-  unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
-    // SAFETY: `ptr` and `layout` are passed through untouched, so the
-    // caller's own guarantee that they describe a live allocation from this
-    // allocator still holds.
-    unsafe { std::alloc::System.dealloc(ptr, layout) }
-  }
+    unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
+        // SAFETY: `ptr` and `layout` are passed through untouched, so the
+        // caller's own guarantee that they describe a live allocation from this
+        // allocator still holds.
+        unsafe { std::alloc::System.dealloc(ptr, layout) }
+    }
 }
 
 #[global_allocator]
@@ -92,76 +92,72 @@ static ALLOCATOR: Counting = Counting;
 
 /// Allocations and bytes charged while `body` ran.
 fn measure<R>(body: impl FnOnce() -> R) -> (usize, usize, R) {
-  let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
-  let bytes_before = BYTES.load(Ordering::Relaxed);
-  let value = body();
-  let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
-  let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
-  (calls, bytes, value)
+    let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
+    let bytes_before = BYTES.load(Ordering::Relaxed);
+    let value = body();
+    let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
+    let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
+    (calls, bytes, value)
 }
 
 #[test]
 fn the_gating_fold_allocates_nothing_at_every_arity() {
-  // Built before the first measurement, so their own construction is never
-  // charged to the fold.
-  let none: [PaddedCursor; 0] = [];
-  let one = [PaddedCursor::new(Seq(7))];
-  let three = [
-    PaddedCursor::new(Seq(12)),
-    PaddedCursor::new(Seq(4)),
-    PaddedCursor::new(Seq(9)),
-  ];
+    // Built before the first measurement, so their own construction is never
+    // charged to the fold.
+    let none: [PaddedCursor; 0] = [];
+    let one = [PaddedCursor::new(Seq(7))];
+    let three = [PaddedCursor::new(Seq(12)), PaddedCursor::new(Seq(4)), PaddedCursor::new(Seq(9))];
 
-  // The control arm, first: if this reads zero the counter is not working and
-  // every assertion below is vacuous.
-  let (control_calls, control_bytes, buffer) = measure(|| {
-    let mut buffer = Vec::<Seq>::with_capacity(3);
-    buffer.push(Seq(1));
-    buffer
-  });
-  assert!(
-    control_calls >= 1,
-    "a control that must allocate reported {control_calls} calls — the counting \
+    // The control arm, first: if this reads zero the counter is not working and
+    // every assertion below is vacuous.
+    let (control_calls, control_bytes, buffer) = measure(|| {
+        let mut buffer = Vec::<Seq>::with_capacity(3);
+        buffer.push(Seq(1));
+        buffer
+    });
+    assert!(
+        control_calls >= 1,
+        "a control that must allocate reported {control_calls} calls — the counting \
      allocator is not installed, so a zero from the measured calls below would \
      mean nothing"
-  );
-  assert!(
-    control_bytes >= 3 * size_of::<Seq>(),
-    "the control allocated {control_bytes} bytes for a 3-element Vec< Seq >, \
+    );
+    assert!(
+        control_bytes >= 3 * size_of::<Seq>(),
+        "the control allocated {control_bytes} bytes for a 3-element Vec< Seq >, \
      which is less than the elements alone need"
-  );
-  drop(buffer);
+    );
+    drop(buffer);
 
-  // The empty case was already free before the `Vec` was removed — an empty
-  // `collect()` yields `Vec::new()`, which never reaches the allocator. It is
-  // measured anyway, because it is the one case that would have stayed green
-  // through the whole regression this file guards against.
-  let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&none));
-  assert_eq!(answer, None, "no cursors, no minimum");
-  assert_eq!((calls, bytes), (0, 0), "slowest over an empty slice");
+    // The empty case was already free before the `Vec` was removed — an empty
+    // `collect()` yields `Vec::new()`, which never reaches the allocator. It is
+    // measured anyway, because it is the one case that would have stayed green
+    // through the whole regression this file guards against.
+    let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&none));
+    assert_eq!(answer, None, "no cursors, no minimum");
+    assert_eq!((calls, bytes), (0, 0), "slowest over an empty slice");
 
-  let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&one));
-  assert_eq!(answer, Some(Seq(7)));
-  assert_eq!((calls, bytes), (0, 0), "slowest over one cursor");
+    let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&one));
+    assert_eq!(answer, Some(Seq(7)));
+    assert_eq!((calls, bytes), (0, 0), "slowest over one cursor");
 
-  let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&three));
-  assert_eq!(answer, Some(Seq(4)), "the minimum is in the middle");
-  assert_eq!(
-    (calls, bytes),
-    (0, 0),
-    "slowest over three cursors — the arity the removed Vec was sized by"
-  );
+    let (calls, bytes, answer) = measure(|| ring_cursor::slowest(&three));
+    assert_eq!(answer, Some(Seq(4)), "the minimum is in the middle");
+    assert_eq!(
+        (calls, bytes),
+        (0, 0),
+        "slowest over three cursors — the arity the removed Vec was sized by"
+    );
 
-  // A thousand reads, because the claim the documents make is per-call and a
-  // single zero is also what a hoisted, cached allocation would report.
-  let (calls, bytes, _) = measure(|| {
-    for _ in 0..1000 {
-      core::hint::black_box(ring_cursor::slowest(&three));
-    }
-  });
-  assert_eq!(
-    (calls, bytes),
-    (0, 0),
-    "a thousand gate reads — the shape the removed Vec charged a thousand times"
-  );
+    // A thousand reads, because the claim the documents make is per-call and a
+    // single zero is also what a hoisted, cached allocation would report.
+    let (calls, bytes, _) = measure(|| {
+        for _ in 0..1000 {
+            core::hint::black_box(ring_cursor::slowest(&three));
+        }
+    });
+    assert_eq!(
+        (calls, bytes),
+        (0, 0),
+        "a thousand gate reads — the shape the removed Vec charged a thousand times"
+    );
 }

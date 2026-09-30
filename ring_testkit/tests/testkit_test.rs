@@ -28,23 +28,29 @@
 
 use ring_config::RingConfig;
 use ring_core::Ring;
-use ring_testkit::{Anomaly, Outcome, Script, Step, audit_received, audit_received_unordered, leak};
+use ring_testkit::{
+    Anomaly,
+    Outcome,
+    Script,
+    Step,
+    audit_received,
+    audit_received_unordered,
+    leak,
+};
 use ring_types::OverflowPolicy;
 
 /// A ring of `slots`, refusing rather than dropping when full.
 fn failing_ring(slots: usize) -> Ring<u32> {
-  let config = RingConfig::new(slots)
-    .expect("a power of two")
-    .with_overflow(OverflowPolicy::Fail);
-  Ring::new(&config).expect("Fail is an accepted policy")
+    let config =
+        RingConfig::new(slots).expect("a power of two").with_overflow(OverflowPolicy::Fail);
+    Ring::new(&config).expect("Fail is an accepted policy")
 }
 
 /// A ring of `slots`, discarding the incoming record when full.
 fn dropping_ring(slots: usize) -> Ring<u32> {
-  let config = RingConfig::new(slots)
-    .expect("a power of two")
-    .with_overflow(OverflowPolicy::DropNewest);
-  Ring::new(&config).expect("DropNewest is an accepted policy")
+    let config =
+        RingConfig::new(slots).expect("a power of two").with_overflow(OverflowPolicy::DropNewest);
+    Ring::new(&config).expect("DropNewest is an accepted policy")
 }
 
 // ── the acceptance clauses ────────────────────────────────────────────────
@@ -57,18 +63,18 @@ fn dropping_ring(slots: usize) -> Ring<u32> {
 /// test shows is easy to have.
 #[test]
 fn one_script_run_twice_produces_equal_outcomes() {
-  let script = Script::new(4)
-    .then(Step::PushMany(6))
-    .then(Step::RecvMany(3))
-    .then(Step::StageMany(5))
-    .then(Step::Flush)
-    .then(Step::DrainAll);
+    let script = Script::new(4)
+        .then(Step::PushMany(6))
+        .then(Step::RecvMany(3))
+        .then(Step::StageMany(5))
+        .then(Step::Flush)
+        .then(Step::DrainAll);
 
-  let first = script.run(&mut failing_ring(4));
-  let again = script.run(&mut failing_ring(4));
+    let first = script.run(&mut failing_ring(4));
+    let again = script.run(&mut failing_ring(4));
 
-  assert_eq!(first, again, "the same script on equivalent rings");
-  assert_eq!(first.audit(), Ok(()));
+    assert_eq!(first, again, "the same script on equivalent rings");
+    assert_eq!(first.audit(), Ok(()));
 }
 
 /// **Clause 1, the part a single re-run cannot show.** Ten runs, all equal.
@@ -79,12 +85,12 @@ fn one_script_run_twice_produces_equal_outcomes() {
 /// claim; the exhaustive half is loom's.
 #[test]
 fn ten_runs_of_one_script_all_agree() {
-  let script = Script::new(3).then(Step::StageMany(3)).then(Step::Flush).then(Step::DrainAll);
+    let script = Script::new(3).then(Step::StageMany(3)).then(Step::Flush).then(Step::DrainAll);
 
-  let reference = script.run(&mut failing_ring(8));
-  for run in 1..=10 {
-    assert_eq!(script.run(&mut failing_ring(8)), reference, "run {run}");
-  }
+    let reference = script.run(&mut failing_ring(8));
+    for run in 1..=10 {
+        assert_eq!(script.run(&mut failing_ring(8)), reference, "run {run}");
+    }
 }
 
 /// **Clause 2 — the fixture decides something a count cannot.**
@@ -99,33 +105,33 @@ fn ten_runs_of_one_script_all_agree() {
 /// still held.
 #[test]
 fn neither_the_count_nor_the_delivered_records_sees_a_drop_alone() {
-  let script = Script::new(4).then(Step::PushMany(8)).then(Step::DrainAll);
+    let script = Script::new(4).then(Step::PushMany(8)).then(Step::DrainAll);
 
-  let refusing = script.run(&mut failing_ring(4));
-  let dropping = script.run(&mut dropping_ring(4));
+    let refusing = script.run(&mut failing_ring(4));
+    let dropping = script.run(&mut dropping_ring(4));
 
-  assert_eq!(refusing.received, dropping.received, "the delivered records are identical");
-  assert_eq!(refusing.received, [0, 1, 2, 3]);
+    assert_eq!(refusing.received, dropping.received, "the delivered records are identical");
+    assert_eq!(refusing.received, [0, 1, 2, 3]);
 
-  assert_eq!(refusing.accepted, 4);
-  assert_eq!(dropping.accepted, 8, "the dropping ring accepts strictly more");
-  assert_eq!(refusing.refused_full, 4);
-  assert_eq!(dropping.refused_full, 0, "and refuses nothing");
+    assert_eq!(refusing.accepted, 4);
+    assert_eq!(dropping.accepted, 8, "the dropping ring accepts strictly more");
+    assert_eq!(refusing.refused_full, 4);
+    assert_eq!(dropping.refused_full, 0, "and refuses nothing");
 
-  assert_eq!(refusing.vanished(), 0);
-  assert_eq!(dropping.vanished(), 4, "four records accepted and nowhere");
+    assert_eq!(refusing.vanished(), 0);
+    assert_eq!(dropping.vanished(), 4, "four records accepted and nowhere");
 
-  assert_eq!(refusing.audit(), Ok(()), "vanishing is not an accounting failure");
-  assert_eq!(dropping.audit(), Ok(()), "which is exactly why it needs its own reading");
+    assert_eq!(refusing.audit(), Ok(()), "vanishing is not an accounting failure");
+    assert_eq!(dropping.audit(), Ok(()), "which is exactly why it needs its own reading");
 }
 
 /// A ring that never fills has nothing to vanish.
 #[test]
 fn a_ring_with_room_vanishes_nothing_under_either_policy() {
-  let script = Script::new(2).then(Step::PushMany(4)).then(Step::DrainAll);
+    let script = Script::new(2).then(Step::PushMany(4)).then(Step::DrainAll);
 
-  assert_eq!(script.run(&mut failing_ring(8)).vanished(), 0);
-  assert_eq!(script.run(&mut dropping_ring(8)).vanished(), 0);
+    assert_eq!(script.run(&mut failing_ring(8)).vanished(), 0);
+    assert_eq!(script.run(&mut dropping_ring(8)).vanished(), 0);
 }
 
 // ── accounting ────────────────────────────────────────────────────────────
@@ -137,17 +143,17 @@ fn a_ring_with_room_vanishes_nothing_under_either_policy() {
 /// would show it.
 #[test]
 fn every_minted_record_is_accounted_for() {
-  let scripts = [
-    Script::new(4).then(Step::PushMany(10)),
-    Script::new(2).then(Step::StageMany(10)),
-    Script::new(6).then(Step::StageMany(8)).then(Step::Flush),
-    Script::new(4).then(Step::Close).then(Step::PushMany(3)).then(Step::Stage),
-  ];
+    let scripts = [
+        Script::new(4).then(Step::PushMany(10)),
+        Script::new(2).then(Step::StageMany(10)),
+        Script::new(6).then(Step::StageMany(8)).then(Step::Flush),
+        Script::new(4).then(Step::Close).then(Step::PushMany(3)).then(Step::Stage),
+    ];
 
-  for (index, script) in scripts.iter().enumerate() {
-    let outcome = script.run(&mut failing_ring(4));
-    assert_eq!(outcome.audit(), Ok(()), "script {index}: {outcome:?}");
-  }
+    for (index, script) in scripts.iter().enumerate() {
+        let outcome = script.run(&mut failing_ring(4));
+        assert_eq!(outcome.audit(), Ok(()), "script {index}: {outcome:?}");
+    }
 }
 
 /// A staging buffer smaller than the script refuses the surplus, and says so.
@@ -158,37 +164,37 @@ fn every_minted_record_is_accounted_for() {
 /// a staging refusal never reached the ring at all.
 #[test]
 fn a_full_staging_buffer_refuses_before_the_ring_is_reached() {
-  let script = Script::new(6).then(Step::StageMany(8)).then(Step::Flush).then(Step::DrainAll);
-  let outcome = script.run(&mut failing_ring(4));
+    let script = Script::new(6).then(Step::StageMany(8)).then(Step::Flush).then(Step::DrainAll);
+    let outcome = script.run(&mut failing_ring(4));
 
-  assert_eq!(outcome.refused_staging, 2, "eight offered to six slots");
-  assert_eq!(outcome.accepted, 4, "six flushed into four slots");
-  assert_eq!(outcome.refused_full, 2);
-  assert_eq!(outcome.staged_at_end, 0, "a flush empties the buffer either way");
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(outcome.refused_staging, 2, "eight offered to six slots");
+    assert_eq!(outcome.accepted, 4, "six flushed into four slots");
+    assert_eq!(outcome.refused_full, 2);
+    assert_eq!(outcome.staged_at_end, 0, "a flush empties the buffer either way");
+    assert_eq!(outcome.audit(), Ok(()));
 }
 
 /// Staging without flushing leaves the records staged, and counted there.
 #[test]
 fn records_staged_and_never_flushed_are_still_accounted_for() {
-  let script = Script::new(8).then(Step::StageMany(5));
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(8).then(Step::StageMany(5));
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.staged_at_end, 5);
-  assert_eq!(outcome.accepted, 0);
-  assert_eq!(outcome.received, [] as [u32; 0]);
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(outcome.staged_at_end, 5);
+    assert_eq!(outcome.accepted, 0);
+    assert_eq!(outcome.received, [] as [u32; 0]);
+    assert_eq!(outcome.audit(), Ok(()));
 }
 
 /// A staging buffer of zero slots refuses everything offered to it.
 #[test]
 fn a_zero_slot_staging_buffer_refuses_every_record() {
-  let script = Script::new(0).then(Step::StageMany(3)).then(Step::Flush);
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(0).then(Step::StageMany(3)).then(Step::Flush);
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.refused_staging, 3);
-  assert_eq!(outcome.accepted, 0, "a flush of an empty buffer offers nothing");
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(outcome.refused_staging, 3);
+    assert_eq!(outcome.accepted, 0, "a flush of an empty buffer offers nothing");
+    assert_eq!(outcome.audit(), Ok(()));
 }
 
 // ── shutdown ──────────────────────────────────────────────────────────────
@@ -196,28 +202,28 @@ fn a_zero_slot_staging_buffer_refuses_every_record() {
 /// A closed ring refuses pushes, and the refusal is not a full-ring refusal.
 #[test]
 fn a_closed_ring_refuses_with_a_reason_of_its_own() {
-  let script = Script::new(2).then(Step::Close).then(Step::PushMany(3));
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(2).then(Step::Close).then(Step::PushMany(3));
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.refused_closed, 3);
-  assert_eq!(outcome.refused_full, 0, "there was room; the ring was shut, not full");
-  assert!(outcome.closed_at_end);
+    assert_eq!(outcome.refused_closed, 3);
+    assert_eq!(outcome.refused_full, 0, "there was room; the ring was shut, not full");
+    assert!(outcome.closed_at_end);
 }
 
 /// Reopening admits publications again.
 #[test]
 fn reopening_admits_publications_again() {
-  let script = Script::new(2)
-    .then(Step::Close)
-    .then(Step::PushMany(2))
-    .then(Step::Reopen)
-    .then(Step::Push)
-    .then(Step::DrainAll);
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(2)
+        .then(Step::Close)
+        .then(Step::PushMany(2))
+        .then(Step::Reopen)
+        .then(Step::Push)
+        .then(Step::DrainAll);
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.refused_closed, 2);
-  assert_eq!(outcome.accepted, 1);
-  assert_eq!(outcome.received, [2], "the record minted after the reopen");
+    assert_eq!(outcome.refused_closed, 2);
+    assert_eq!(outcome.accepted, 1);
+    assert_eq!(outcome.received, [2], "the record minted after the reopen");
 }
 
 /// **`Reopen` on an already-open ring closes it first, and is still a no-op.**
@@ -229,10 +235,11 @@ fn reopening_admits_publications_again() {
 /// by a concurrent caller.
 #[test]
 fn reopening_an_open_ring_is_observably_a_no_op() {
-  let with_reopen = Script::new(2).then(Step::Reopen).then(Step::PushMany(2)).then(Step::DrainAll);
-  let without = Script::new(2).then(Step::PushMany(2)).then(Step::DrainAll);
+    let with_reopen =
+        Script::new(2).then(Step::Reopen).then(Step::PushMany(2)).then(Step::DrainAll);
+    let without = Script::new(2).then(Step::PushMany(2)).then(Step::DrainAll);
 
-  assert_eq!(with_reopen.run(&mut failing_ring(8)), without.run(&mut failing_ring(8)));
+    assert_eq!(with_reopen.run(&mut failing_ring(8)), without.run(&mut failing_ring(8)));
 }
 
 /// A flush into a closed ring is refused as closed, not as full.
@@ -243,42 +250,42 @@ fn reopening_an_open_ring_is_observably_a_no_op() {
 /// unambiguous: an eight-slot ring taking three records cannot be full.
 #[test]
 fn a_flush_into_a_closed_ring_is_refused_as_closed() {
-  let script = Script::new(4).then(Step::StageMany(3)).then(Step::Close).then(Step::Flush);
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(4).then(Step::StageMany(3)).then(Step::Close).then(Step::Flush);
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.refused_closed, 3);
-  assert_eq!(outcome.refused_full, 0, "there was room for all three");
-  assert_eq!(outcome.accepted, 0);
-  assert_eq!(outcome.staged_at_end, 0, "the buffer is emptied even when nothing lands");
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(outcome.refused_closed, 3);
+    assert_eq!(outcome.refused_full, 0, "there was room for all three");
+    assert_eq!(outcome.accepted, 0);
+    assert_eq!(outcome.staged_at_end, 0, "the buffer is emptied even when nothing lands");
+    assert_eq!(outcome.audit(), Ok(()));
 }
 
 /// `DrainAll` recovers everything and leaves the ring closed.
 #[test]
 fn drain_all_recovers_every_record_and_leaves_the_ring_closed() {
-  let script = Script::new(2).then(Step::PushMany(5)).then(Step::DrainAll);
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(2).then(Step::PushMany(5)).then(Step::DrainAll);
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.received, [0, 1, 2, 3, 4]);
-  assert_eq!(outcome.in_ring_at_end, 0);
-  assert!(outcome.closed_at_end);
+    assert_eq!(outcome.received, [0, 1, 2, 3, 4]);
+    assert_eq!(outcome.in_ring_at_end, 0);
+    assert!(outcome.closed_at_end);
 }
 
 /// Closing does not discard what is already in the ring.
 #[test]
 fn closing_leaves_published_records_where_they_are() {
-  let script = Script::new(2).then(Step::PushMany(3)).then(Step::Close);
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(2).then(Step::PushMany(3)).then(Step::Close);
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.in_ring_at_end, 3);
-  assert_eq!(outcome.received, [] as [u32; 0]);
+    assert_eq!(outcome.in_ring_at_end, 3);
+    assert_eq!(outcome.received, [] as [u32; 0]);
 
-  // The method that measures discarding, asserted in the one test whose name
-  // claims nothing was discarded. `vanished` subtracts `received + in_ring`
-  // from `accepted`, and every other test that reads it leaves `in_ring_at_end`
-  // at zero — where adding that term and subtracting it give the same answer.
-  // This is the only fixture in the suite where the two can disagree.
-  assert_eq!(outcome.vanished(), 0, "records held by a closed ring are not destroyed");
+    // The method that measures discarding, asserted in the one test whose name
+    // claims nothing was discarded. `vanished` subtracts `received + in_ring`
+    // from `accepted`, and every other test that reads it leaves `in_ring_at_end`
+    // at zero — where adding that term and subtracting it give the same answer.
+    // This is the only fixture in the suite where the two can disagree.
+    assert_eq!(outcome.vanished(), 0, "records held by a closed ring are not destroyed");
 }
 
 // ── the single-record steps ───────────────────────────────────────────────
@@ -286,13 +293,11 @@ fn closing_leaves_published_records_where_they_are() {
 /// `Push`/`Recv`/`Stage` are the one-record forms of their `Many` counterparts.
 #[test]
 fn the_single_record_steps_match_a_many_of_one() {
-  let singles = Script::new(4).then(Step::Push).then(Step::Stage).then(Step::Recv);
-  let manys = Script::new(4)
-    .then(Step::PushMany(1))
-    .then(Step::StageMany(1))
-    .then(Step::RecvMany(1));
+    let singles = Script::new(4).then(Step::Push).then(Step::Stage).then(Step::Recv);
+    let manys =
+        Script::new(4).then(Step::PushMany(1)).then(Step::StageMany(1)).then(Step::RecvMany(1));
 
-  assert_eq!(singles.run(&mut failing_ring(8)), manys.run(&mut failing_ring(8)));
+    assert_eq!(singles.run(&mut failing_ring(8)), manys.run(&mut failing_ring(8)));
 }
 
 /// A receive from an empty ring yields nothing and stops the step early.
@@ -301,13 +306,13 @@ fn the_single_record_steps_match_a_many_of_one() {
 /// first empty read rather than spinning, so the count is a ceiling.
 #[test]
 fn a_receive_step_stops_at_the_first_empty_read() {
-  let script = Script::new(2).then(Step::PushMany(3)).then(Step::RecvMany(10));
-  let outcome = script.run(&mut failing_ring(8));
+    let script = Script::new(2).then(Step::PushMany(3)).then(Step::RecvMany(10));
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.received, [0, 1, 2]);
+    assert_eq!(outcome.received, [0, 1, 2]);
 
-  let empty = Script::new(2).then(Step::Recv);
-  assert_eq!(empty.run(&mut failing_ring(8)).received, [] as [u32; 0]);
+    let empty = Script::new(2).then(Step::Recv);
+    assert_eq!(empty.run(&mut failing_ring(8)).received, [] as [u32; 0]);
 }
 
 // ── the script value itself ───────────────────────────────────────────────
@@ -315,37 +320,37 @@ fn a_receive_step_stops_at_the_first_empty_read() {
 /// A script reports the steps and the staging limit it was built with.
 #[test]
 fn a_script_reports_what_it_was_built_from() {
-  let script = Script::new(7).then(Step::Push).then(Step::Recv);
+    let script = Script::new(7).then(Step::Push).then(Step::Recv);
 
-  assert_eq!(script.steps(), [Step::Push, Step::Recv]);
-  assert_eq!(script.stage_limit(), 7);
+    assert_eq!(script.steps(), [Step::Push, Step::Recv]);
+    assert_eq!(script.stage_limit(), 7);
 
-  let empty = Script::new(0);
-  assert_eq!(empty.steps(), [] as [Step; 0]);
-  assert_eq!(empty.stage_limit(), 0);
+    let empty = Script::new(0);
+    assert_eq!(empty.steps(), [] as [Step; 0]);
+    assert_eq!(empty.stage_limit(), 0);
 }
 
 /// An empty script does nothing and says so.
 #[test]
 fn an_empty_script_produces_an_empty_outcome() {
-  let outcome = Script::new(4).run(&mut failing_ring(8));
+    let outcome = Script::new(4).run(&mut failing_ring(8));
 
-  assert_eq!(
-    outcome,
-    Outcome {
-      minted: 0,
-      accepted: 0,
-      refused_full: 0,
-      refused_closed: 0,
-      refused_staging: 0,
-      received: Vec::new(),
-      published: Vec::new(),
-      in_ring_at_end: 0,
-      staged_at_end: 0,
-      closed_at_end: false,
-    },
-  );
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(
+        outcome,
+        Outcome {
+            minted: 0,
+            accepted: 0,
+            refused_full: 0,
+            refused_closed: 0,
+            refused_staging: 0,
+            received: Vec::new(),
+            published: Vec::new(),
+            in_ring_at_end: 0,
+            staged_at_end: 0,
+            closed_at_end: false,
+        },
+    );
+    assert_eq!(outcome.audit(), Ok(()));
 }
 
 // ── the audit ─────────────────────────────────────────────────────────────
@@ -353,29 +358,25 @@ fn an_empty_script_produces_an_empty_outcome() {
 /// A clean list of consecutive records passes.
 #[test]
 fn an_ascending_list_of_minted_records_passes_the_audit() {
-  assert_eq!(audit_received(&[0, 1, 2], 3), Ok(()));
-  assert_eq!(
-    audit_received(&[0, 5, 9], 10),
-    Ok(()),
-    "gaps are legal — records may be dropped"
-  );
-  assert_eq!(audit_received(&[], 0), Ok(()));
-  assert_eq!(audit_received(&[7], 8), Ok(()));
+    assert_eq!(audit_received(&[0, 1, 2], 3), Ok(()));
+    assert_eq!(audit_received(&[0, 5, 9], 10), Ok(()), "gaps are legal — records may be dropped");
+    assert_eq!(audit_received(&[], 0), Ok(()));
+    assert_eq!(audit_received(&[7], 8), Ok(()));
 }
 
 /// A record that was never minted is named, with the bound it broke.
 #[test]
 fn a_record_that_was_never_minted_is_caught() {
-  assert_eq!(audit_received(&[0, 3], 3), Err(Anomaly::Unminted { value: 3, minted: 3 }));
-  assert_eq!(audit_received(&[9], 0), Err(Anomaly::Unminted { value: 9, minted: 0 }));
+    assert_eq!(audit_received(&[0, 3], 3), Err(Anomaly::Unminted { value: 3, minted: 3 }));
+    assert_eq!(audit_received(&[9], 0), Err(Anomaly::Unminted { value: 9, minted: 0 }));
 }
 
 /// A repeat and a reversal are the same anomaly, because they are the same
 /// broken comparison.
 #[test]
 fn a_duplicate_and_a_reversal_are_one_anomaly() {
-  assert_eq!(audit_received(&[1, 1], 4), Err(Anomaly::OutOfOrder { previous: 1, then: 1 }));
-  assert_eq!(audit_received(&[2, 1], 4), Err(Anomaly::OutOfOrder { previous: 2, then: 1 }));
+    assert_eq!(audit_received(&[1, 1], 4), Err(Anomaly::OutOfOrder { previous: 1, then: 1 }));
+    assert_eq!(audit_received(&[2, 1], 4), Err(Anomaly::OutOfOrder { previous: 2, then: 1 }));
 }
 
 /// An outcome whose counts do not add up is caught before its records are.
@@ -384,59 +385,59 @@ fn a_duplicate_and_a_reversal_are_one_anomaly() {
 /// would be the bug this check exists to find.
 #[test]
 fn an_outcome_that_lost_a_record_fails_the_audit() {
-  let outcome = Outcome {
-    minted: 5,
-    accepted: 2,
-    refused_full: 1,
-    refused_closed: 0,
-    refused_staging: 0,
-    received: vec![0, 1],
-    published: vec![0, 1],
-    in_ring_at_end: 0,
-    staged_at_end: 0,
-    closed_at_end: false,
-  };
+    let outcome = Outcome {
+        minted: 5,
+        accepted: 2,
+        refused_full: 1,
+        refused_closed: 0,
+        refused_staging: 0,
+        received: vec![0, 1],
+        published: vec![0, 1],
+        in_ring_at_end: 0,
+        staged_at_end: 0,
+        closed_at_end: false,
+    };
 
-  assert_eq!(outcome.audit(), Err(Anomaly::Unaccounted { minted: 5, placed: 3 }));
+    assert_eq!(outcome.audit(), Err(Anomaly::Unaccounted { minted: 5, placed: 3 }));
 }
 
 /// An outcome that adds up but delivered a record it never minted still fails.
 #[test]
 fn an_outcome_that_adds_up_is_still_checked_for_its_records() {
-  let outcome = Outcome {
-    minted: 2,
-    accepted: 2,
-    refused_full: 0,
-    refused_closed: 0,
-    refused_staging: 0,
-    received: vec![0, 4],
-    published: vec![0, 4],
-    in_ring_at_end: 0,
-    staged_at_end: 0,
-    closed_at_end: false,
-  };
+    let outcome = Outcome {
+        minted: 2,
+        accepted: 2,
+        refused_full: 0,
+        refused_closed: 0,
+        refused_staging: 0,
+        received: vec![0, 4],
+        published: vec![0, 4],
+        in_ring_at_end: 0,
+        staged_at_end: 0,
+        closed_at_end: false,
+    };
 
-  assert_eq!(outcome.audit(), Err(Anomaly::Unminted { value: 4, minted: 2 }));
+    assert_eq!(outcome.audit(), Err(Anomaly::Unminted { value: 4, minted: 2 }));
 }
 
 /// Every anomaly prints something a failure message can carry.
 #[test]
 fn every_anomaly_says_what_broke() {
-  let messages = [
-    Anomaly::Unaccounted { minted: 5, placed: 3 }.to_string(),
-    Anomaly::Unminted { value: 4, minted: 2 }.to_string(),
-    Anomaly::OutOfOrder { previous: 2, then: 1 }.to_string(),
-    Anomaly::Overdelivered { accepted: 3, out: 6 }.to_string(),
-  ];
+    let messages = [
+        Anomaly::Unaccounted { minted: 5, placed: 3 }.to_string(),
+        Anomaly::Unminted { value: 4, minted: 2 }.to_string(),
+        Anomaly::OutOfOrder { previous: 2, then: 1 }.to_string(),
+        Anomaly::Overdelivered { accepted: 3, out: 6 }.to_string(),
+    ];
 
-  assert!(messages[0].contains('5') && messages[0].contains('3'));
-  assert!(messages[1].contains('4') && messages[1].contains('2'));
-  assert!(messages[2].contains('2') && messages[2].contains('1'));
-  assert!(messages[3].contains('6') && messages[3].contains('3'));
+    assert!(messages[0].contains('5') && messages[0].contains('3'));
+    assert!(messages[1].contains('4') && messages[1].contains('2'));
+    assert!(messages[2].contains('2') && messages[2].contains('1'));
+    assert!(messages[3].contains('6') && messages[3].contains('3'));
 
-  // The trait is implemented, so a caller can `?` an anomaly out of a test.
-  let boxed: Box<dyn core::error::Error> = Box::new(Anomaly::OutOfOrder { previous: 2, then: 1 });
-  assert!(!boxed.to_string().is_empty());
+    // The trait is implemented, so a caller can `?` an anomaly out of a test.
+    let boxed: Box<dyn core::error::Error> = Box::new(Anomaly::OutOfOrder { previous: 2, then: 1 });
+    assert!(!boxed.to_string().is_empty());
 }
 
 // ── the loom bridge ───────────────────────────────────────────────────────
@@ -449,27 +450,27 @@ fn every_anomaly_says_what_broke() {
 /// helper nothing checks in the default configuration is a helper that rots.
 #[test]
 fn a_leaked_ring_gives_ends_that_outlive_their_scope() {
-  let ends: ring_core::Ends<'static, u32> = {
-    let ring = failing_ring(2);
-    leak(ring).ends()
-  };
+    let ends: ring_core::Ends<'static, u32> = {
+        let ring = failing_ring(2);
+        leak(ring).ends()
+    };
 
-  let mut ends = ends;
-  let (mut producer, mut consumer) = ends.split();
+    let mut ends = ends;
+    let (mut producer, mut consumer) = ends.split();
 
-  assert!(producer.try_push(1).is_ok());
-  assert_eq!(consumer.try_recv(), Some(1));
+    assert!(producer.try_push(1).is_ok());
+    assert_eq!(consumer.try_recv(), Some(1));
 }
 
 /// A script runs against a leaked ring exactly as against a borrowed one.
 #[test]
 fn a_script_runs_the_same_against_a_leaked_ring() {
-  let script = Script::new(2).then(Step::PushMany(3)).then(Step::DrainAll);
+    let script = Script::new(2).then(Step::PushMany(3)).then(Step::DrainAll);
 
-  let borrowed = script.run(&mut failing_ring(8));
-  let leaked = script.run(leak(failing_ring(8)));
+    let borrowed = script.run(&mut failing_ring(8));
+    let leaked = script.run(leak(failing_ring(8)));
 
-  assert_eq!(borrowed, leaked);
+    assert_eq!(borrowed, leaked);
 }
 
 /// **`leak_ends` gives both ends a lifetime that reaches a spawned thread.**
@@ -484,15 +485,15 @@ fn a_script_runs_the_same_against_a_leaked_ring() {
 /// `tests/exhaustive_test.rs`.
 #[test]
 fn leak_ends_produces_ends_that_can_be_moved_onto_spawned_threads() {
-  let (mut producer, mut consumer) = ring_testkit::leak_ends(failing_ring(2));
+    let (mut producer, mut consumer) = ring_testkit::leak_ends(failing_ring(2));
 
-  let producing = std::thread::spawn(move || {
-    assert!(producer.try_push(7).is_ok(), "an empty ring admits one");
-  });
-  producing.join().expect("the producer thread");
+    let producing = std::thread::spawn(move || {
+        assert!(producer.try_push(7).is_ok(), "an empty ring admits one");
+    });
+    producing.join().expect("the producer thread");
 
-  let draining = std::thread::spawn(move || consumer.try_recv());
-  assert_eq!(draining.join().expect("the drain thread"), Some(7));
+    let draining = std::thread::spawn(move || consumer.try_recv());
+    assert_eq!(draining.join().expect("the drain thread"), Some(7));
 }
 
 // ── the boundaries the findings named ─────────────────────────────────────
@@ -507,25 +508,25 @@ fn leak_ends_produces_ends_that_can_be_moved_onto_spawned_threads() {
 /// method. → `docs/data_structure/002` TK11.
 #[test]
 fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
-  let outcome = Outcome {
-    minted: 2,
-    accepted: 2,
-    refused_full: 0,
-    refused_closed: 0,
-    refused_staging: 0,
-    received: vec![0, 1],
-    published: vec![0, 1],
-    in_ring_at_end: 1,
-    staged_at_end: 0,
-    closed_at_end: false,
-  };
+    let outcome = Outcome {
+        minted: 2,
+        accepted: 2,
+        refused_full: 0,
+        refused_closed: 0,
+        refused_staging: 0,
+        received: vec![0, 1],
+        published: vec![0, 1],
+        in_ring_at_end: 1,
+        staged_at_end: 0,
+        closed_at_end: false,
+    };
 
-  assert_eq!(outcome.vanished(), 0, "the saturation reports the healthy value");
-  assert_eq!(
-    outcome.audit(),
-    Err(Anomaly::Overdelivered { accepted: 2, out: 3 }),
-    "and the audit reports the state the saturation hid",
-  );
+    assert_eq!(outcome.vanished(), 0, "the saturation reports the healthy value");
+    assert_eq!(
+        outcome.audit(),
+        Err(Anomaly::Overdelivered { accepted: 2, out: 3 }),
+        "and the audit reports the state the saturation hid",
+    );
 }
 
 /// The mistake `Script::run`'s contract warns about, reached by a real script.
@@ -539,20 +540,20 @@ fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
 /// caller beyond a mistake the contract already names.
 #[test]
 fn a_script_run_twice_on_one_ring_produces_an_outcome_that_fails_its_audit() {
-  let script = Script::new(2).then(Step::PushMany(3));
-  let mut ring = failing_ring(8);
+    let script = Script::new(2).then(Step::PushMany(3));
+    let mut ring = failing_ring(8);
 
-  let first = script.run(&mut ring);
-  assert_eq!(first.audit(), Ok(()), "one run over a fresh ring is coherent");
-  assert_eq!(first.in_ring_at_end, 3);
+    let first = script.run(&mut ring);
+    assert_eq!(first.audit(), Ok(()), "one run over a fresh ring is coherent");
+    assert_eq!(first.in_ring_at_end, 3);
 
-  let second = script.run(&mut ring);
-  assert_eq!(second.vanished(), 0, "the saturation reports the healthy value");
-  assert_eq!(
-    second.audit(),
-    Err(Anomaly::Overdelivered { accepted: 3, out: 6 }),
-    "the ring holds both runs, and only the audit says so",
-  );
+    let second = script.run(&mut ring);
+    assert_eq!(second.vanished(), 0, "the saturation reports the healthy value");
+    assert_eq!(
+        second.audit(),
+        Err(Anomaly::Overdelivered { accepted: 3, out: 6 }),
+        "the ring holds both runs, and only the audit says so",
+    );
 }
 
 /// Two producers interleaving pass the unordered audit and fail the ordered one.
@@ -563,35 +564,35 @@ fn a_script_run_twice_on_one_ring_produces_an_outcome_that_fails_its_audit() {
 /// concurrent case — reports it as an anomaly. → `docs/algorithm/002` TK3.
 #[test]
 fn interleaved_producers_pass_only_the_unordered_audit() {
-  let delivered = [0, 100, 1, 101, 2];
+    let delivered = [0, 100, 1, 101, 2];
 
-  assert_eq!(audit_received_unordered(&delivered, 200), Ok(()));
-  assert_eq!(
-    audit_received(&delivered, 200),
-    Err(Anomaly::OutOfOrder { previous: 100, then: 1 }),
-    "the ascent check reports a correct concurrent delivery as an anomaly",
-  );
+    assert_eq!(audit_received_unordered(&delivered, 200), Ok(()));
+    assert_eq!(
+        audit_received(&delivered, 200),
+        Err(Anomaly::OutOfOrder { previous: 100, then: 1 }),
+        "the ascent check reports a correct concurrent delivery as an anomaly",
+    );
 }
 
 /// Dropping the ascent check keeps the two failures a ring can actually produce.
 #[test]
 fn the_unordered_audit_keeps_the_two_failures_a_ring_can_produce() {
-  assert_eq!(
-    audit_received_unordered(&[5, 9, 5], 10),
-    Err(Anomaly::OutOfOrder { previous: 5, then: 5 }),
-    "a record delivered twice is still an anomaly",
-  );
-  assert_eq!(
-    audit_received_unordered(&[0, 12], 10),
-    Err(Anomaly::Unminted { value: 12, minted: 10 }),
-    "a record no producer could have minted is still an anomaly",
-  );
-  assert_eq!(audit_received_unordered(&[], 10), Ok(()));
-  assert_eq!(
-    audit_received_unordered(&[4, 3, 2, 1, 0], 5),
-    Ok(()),
-    "and descending is not one, which is the whole difference",
-  );
+    assert_eq!(
+        audit_received_unordered(&[5, 9, 5], 10),
+        Err(Anomaly::OutOfOrder { previous: 5, then: 5 }),
+        "a record delivered twice is still an anomaly",
+    );
+    assert_eq!(
+        audit_received_unordered(&[0, 12], 10),
+        Err(Anomaly::Unminted { value: 12, minted: 10 }),
+        "a record no producer could have minted is still an anomaly",
+    );
+    assert_eq!(audit_received_unordered(&[], 10), Ok(()));
+    assert_eq!(
+        audit_received_unordered(&[4, 3, 2, 1, 0], 5),
+        Ok(()),
+        "and descending is not one, which is the whole difference",
+    );
 }
 
 /// A `Many` count far above the ring's capacity is executed in full.
@@ -602,17 +603,17 @@ fn the_unordered_audit_keeps_the_two_failures_a_ring_can_produce() {
 /// receives all thousand offers. → `docs/data_structure/001` TK10.
 #[test]
 fn a_many_count_far_above_capacity_is_executed_in_full() {
-  let outcome = Script::new(0).then(Step::PushMany(1000)).run(&mut failing_ring(4));
+    let outcome = Script::new(0).then(Step::PushMany(1000)).run(&mut failing_ring(4));
 
-  assert_eq!(outcome.minted, 1000, "every record the count asked for was minted");
-  assert_eq!(outcome.accepted, 4);
-  assert_eq!(outcome.refused_full, 996, "996 offers a clamp would have skipped");
-  assert_eq!(outcome.audit(), Ok(()));
+    assert_eq!(outcome.minted, 1000, "every record the count asked for was minted");
+    assert_eq!(outcome.accepted, 4);
+    assert_eq!(outcome.refused_full, 996, "996 offers a clamp would have skipped");
+    assert_eq!(outcome.audit(), Ok(()));
 
-  // `RecvMany` is the one that stops early, and only because an empty read
-  // ends its loop — not because the count was checked against anything.
-  let drained = Script::new(0).then(Step::RecvMany(1000)).run(&mut failing_ring(4));
-  assert_eq!(drained.received, [] as [u32; 0]);
+    // `RecvMany` is the one that stops early, and only because an empty read
+    // ends its loop — not because the count was checked against anything.
+    let drained = Script::new(0).then(Step::RecvMany(1000)).run(&mut failing_ring(4));
+    assert_eq!(drained.received, [] as [u32; 0]);
 }
 
 /// A `Push` landing between a `Stage` and its `Flush` still audits clean —
@@ -653,18 +654,18 @@ fn a_many_count_far_above_capacity_is_executed_in_full() {
 /// full `Outcome`.
 #[test]
 fn a_push_staged_between_a_stage_and_its_flush_still_audits_clean() {
-  let script = Script::new(4)
+    let script = Script::new(4)
     .then(Step::Stage) // mints 0, stages it — not yet in the ring
     .then(Step::Push) // mints 1, pushes it to the ring immediately
     .then(Step::Flush) // pushes record 0 to the ring second
     .then(Step::DrainAll);
-  let outcome = script.run(&mut failing_ring(8));
+    let outcome = script.run(&mut failing_ring(8));
 
-  assert_eq!(outcome.received, [1, 0], "record 1 was pushed before record 0 was flushed");
-  assert_eq!(outcome.published, [1, 0], "push order, not mint order");
-  assert_eq!(
-    outcome.audit(),
-    Ok(()),
-    "a correct FIFO delivery must not be reported as out of order"
-  );
+    assert_eq!(outcome.received, [1, 0], "record 1 was pushed before record 0 was flushed");
+    assert_eq!(outcome.published, [1, 0], "push order, not mint order");
+    assert_eq!(
+        outcome.audit(),
+        Ok(()),
+        "a correct FIFO delivery must not be reported as out of order"
+    );
 }

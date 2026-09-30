@@ -223,12 +223,11 @@ command grep -m1 -A6 -F 'fn a_slot_is_default_for_a_payload_that_is_not()' ring_
 Live output:
 
 ```
-fn a_slot_is_default_for_a_payload_that_is_not()
-{
-  struct NotDefault( #[ allow( dead_code ) ] u32 );
+fn a_slot_is_default_for_a_payload_that_is_not() {
+    struct NotDefault(#[allow(dead_code)] u32);
 
-  let slot : TypedSlot< NotDefault > = TypedSlot::default();
-  assert!( slot.is_empty() );
+    let slot: TypedSlot<NotDefault> = TypedSlot::default();
+    assert!(slot.is_empty());
 }
 ```
 
@@ -273,7 +272,7 @@ compiling instead of narrowing the type in silence. That closes the asymmetry th
 finding's last sentence identifies — both shapes now fail loudly, one at its own
 definition and one at its consumer's test. Falsified by substituting the derive
 and re-running, which produced `the trait bound NotDefault: Default is not satisfied`.
-Now prints: `let slot : TypedSlot< NotDefault > = TypedSlot::default();`
+Now prints: `let slot: TypedSlot<NotDefault> = TypedSlot::default();`
 
 ---
 

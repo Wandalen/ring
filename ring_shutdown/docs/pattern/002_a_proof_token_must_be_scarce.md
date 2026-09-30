@@ -185,9 +185,9 @@ command grep -c 'returns the same token' src/lib.rs
 Live output:
 
 ```
-  /// Idempotent — closing an already-closed shutdown is not an error and
-  /// returns an equal but distinct token, constructed fresh on every call
-  /// rather than cached from the first close. That matters because teardown
+    /// Idempotent — closing an already-closed shutdown is not an error and
+    /// returns an equal but distinct token, constructed fresh on every call
+    /// rather than cached from the first close. That matters because teardown
 0
 ```
 

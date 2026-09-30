@@ -34,7 +34,7 @@ hold it.
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_mpsc
 awk '/^use /{u++} /^pub struct /{ps++} /^impl|^unsafe impl/{im++}
-     /^  pub (const )?fn /{pf++} /^  fn |^  unsafe fn /{xf++} /^pub const /{pc++}
+     /^    pub (const )?fn /{pf++} /^    fn |^    unsafe fn /{xf++} /^pub const /{pc++}
      END{ printf "use %d  struct %d  impl %d  pub fn %d  priv fn %d  const %d  total %d\n",
           u,ps,im,pf,xf,pc, 1+u+ps+im+pf+xf+pc }' src/lib.rs
 ```

@@ -121,10 +121,10 @@ grep -rn 'unsafe { &\(mut \)\?\*self\.slots\.at(' ring_*/src/*.rs | sed 's|^ring
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:    unsafe { &*self.slots.at( seq ).get() }
-ring_mpsc/src/lib.rs:    unsafe { &mut *self.slots.at( seq ).get() }
-ring_spsc/src/lib.rs:    unsafe { &*self.slots.at( seq ).get() }
-ring_spsc/src/lib.rs:    unsafe { &mut *self.slots.at( seq ).get() }
+ring_mpsc/src/lib.rs:        unsafe { &*self.slots.at(seq).get() }
+ring_mpsc/src/lib.rs:        unsafe { &mut *self.slots.at(seq).get() }
+ring_spsc/src/lib.rs:        unsafe { &*self.slots.at(seq).get() }
+ring_spsc/src/lib.rs:        unsafe { &mut *self.slots.at(seq).get() }
 ```
 
 Both consumers spell the same two functions identically, and both give
@@ -180,12 +180,12 @@ command grep -m1 -A5 -F '/// An ordinary shared borrow, as far as this crate is 
 Live output:
 
 ```
-  /// An ordinary shared borrow, as far as this crate is concerned. `ring_mpsc`
-  /// and `ring_spsc` read more into it: with `S = UnsafeCell< T >` both call
-  /// this under a claim guaranteeing no other caller holds the same `seq`, then
-  /// `unsafe { &mut *at( seq ).get() }` the result into a `&mut T` (-> BF5 in
-  /// `docs/integration/002_every_unsafe_block_in_the_family.md`). This function
-  /// grants nothing beyond the one shared borrow it returns; the exclusivity
+    /// An ordinary shared borrow, as far as this crate is concerned. `ring_mpsc`
+    /// and `ring_spsc` read more into it: with `S = UnsafeCell< T >` both call
+    /// this under a claim guaranteeing no other caller holds the same `seq`, then
+    /// `unsafe { &mut *at( seq ).get() }` the result into a `&mut T` (-> BF5 in
+    /// `docs/integration/002_every_unsafe_block_in_the_family.md`). This function
+    /// grants nothing beyond the one shared borrow it returns; the exclusivity
 ```
 
 **Disposition:** applied — added a paragraph to `at`'s doc comment in

@@ -53,7 +53,7 @@ that test rather than from prose:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-command grep -c '^  // [1-4] —' ring_claim/tests/claim_test.rs
+command grep -c '^    // [1-4] —' ring_claim/tests/claim_test.rs
 # `touch` first, deliberately. A warm cache re-emits no diagnostics at all, so a
 # build run without it reports zero warnings whether or not anything warns --
 # which is exactly how an earlier form of this recipe printed a zero it had

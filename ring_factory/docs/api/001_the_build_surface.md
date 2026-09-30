@@ -361,10 +361,10 @@ Live output:
 pub use ring_config::RingConfig;
 pub use ring_registry::Registry;
   -- what the surface test file actually imports --
-use ring_core::{ Backend, Ring };
-use ring_factory::{ BuildError, Factory, Registry, RingConfig };
+use ring_core::{Backend, Ring};
+use ring_factory::{BuildError, Factory, Registry, RingConfig};
 use ring_handle::Split;
-use ring_types::{ OverflowPolicy, RingError, WaitKind };
+use ring_types::{OverflowPolicy, RingError, WaitKind};
   -- and which of those crates are on the Contract --
 ring_factory ring_handle ring_tls ring_flush ring_types 
 ```

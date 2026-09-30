@@ -109,9 +109,9 @@ command grep -m1 -A2 -F '  /// A derived reading, and the one a factory branches
 Live output:
 
 ```
-  /// A derived reading, and the one a factory branches on: a single-producer
-  /// ring must not pay for a synchronisation it does not need, per
-  /// `docs/feature/172_multi_producer_claim.md`.
+    /// A derived reading, and the one a factory branches on: a single-producer
+    /// ring must not pay for a synchronisation it does not need, per
+    /// `docs/feature/172_multi_producer_claim.md`.
 ```
 
 **Disposition:** applied — `is_multi_producer`'s doc comment in `src/lib.rs`

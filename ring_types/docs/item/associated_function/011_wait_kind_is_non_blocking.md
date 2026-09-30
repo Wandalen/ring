@@ -120,7 +120,7 @@ command grep -rn '\.is_non_blocking(' ring_*/src | command grep -v '^ring_types/
 Live output:
 
 ```
-ring_config/src/lib.rs:    self.wait.is_non_blocking()
+ring_config/src/lib.rs:        self.wait.is_non_blocking()
 ```
 
 returns one line: `ring_config/src/lib.rs`.
@@ -156,10 +156,9 @@ command grep -E -A 6 "pub (const )?fn is_tick_safe" ring_config/src/lib.rs
 Live output:
 
 ```
-  pub const fn is_tick_safe( &self ) -> bool
-  {
-    self.wait.is_non_blocking()
-  }
+    pub const fn is_tick_safe(&self) -> bool {
+        self.wait.is_non_blocking()
+    }
 }
 ```
 

@@ -241,9 +241,9 @@ grep -vE "^[[:space:]]*//" ring_wait/src/lib.rs \
 Live output:
 
 ```
-        core::hint::spin_loop();
-      std::thread::yield_now();
-      std::thread::sleep( std::time::Duration::from_micros( 50 ) );
+                core::hint::spin_loop();
+            std::thread::yield_now();
+            std::thread::sleep(std::time::Duration::from_micros(50));
 ```
 
 These are correct lines in the crate that owns them — `ring_wait` is the
@@ -300,7 +300,7 @@ unused_macro_rules = "warn"
 # table is inherited workspace-wide, and a crate cannot both inherit it and add
 # its own. Only ring_atomic, ring_cursor and ring_publish read the cfg — see
 # ring_atomic's module documentation on the seam.
-unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(loom)'] }
 
 [workspace.lints.clippy]
 # Unsafe: one operation per block, each with its own `// SAFETY:`.

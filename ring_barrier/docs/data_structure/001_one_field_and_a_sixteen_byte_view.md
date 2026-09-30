@@ -128,14 +128,14 @@ grep -c "Ordering::" ring_cursor/src/lib.rs
 Live output:
 
 ```
-ring_barrier/src/lib.rs:#[ derive( Debug, Clone, Copy ) ]
-ring_cursor/src/lib.rs:#[ derive( Debug, Default ) ]
-ring_cursor/src/lib.rs:#[ derive( Debug ) ]
-/// published[ 0 ].store( Seq( 5 ), Ordering::Release );
-  ///   cursor.store( Seq( 10 + i as u64 ), Ordering::Release );
-  /// cursors[ 0 ].store( Seq( 4 ), Ordering::Release );
-  /// cursors[ 0 ].store( Seq( 3 ), Ordering::Release );
-  /// cursors[ 0 ].store( Seq( 6 ), Ordering::Release );
+ring_barrier/src/lib.rs:#[derive(Debug, Clone, Copy)]
+ring_cursor/src/lib.rs:#[derive(Debug, Default)]
+ring_cursor/src/lib.rs:#[derive(Debug)]
+/// published[0].store(Seq(5), Ordering::Release);
+    ///     cursor.store(Seq(10 + i as u64), Ordering::Release);
+    /// cursors[0].store(Seq(4), Ordering::Release);
+    /// cursors[0].store(Seq(3), Ordering::Release);
+    /// cursors[0].store(Seq(6), Ordering::Release);
 14
 ```
 
@@ -171,8 +171,8 @@ ring_mpsc
 ring_shutdown
 ring_spsc
 ring_tls
-ring_barrier/src/lib.rs:#[ derive( Debug, Clone, Copy ) ]
-ring_gating/src/lib.rs:#[ derive( Debug ) ]
+ring_barrier/src/lib.rs:#[derive(Debug, Clone, Copy)]
+ring_gating/src/lib.rs:#[derive(Debug)]
 ```
 
 ### APIs

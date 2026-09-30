@@ -28,7 +28,7 @@ Live output:
 
 ```
 path deps:                5
-named in the manifest:    ring_store ring_config ring_cursor ring_slot ring_types 
+named in the manifest:    ring_config ring_cursor ring_slot ring_store ring_types 
 ring_atomic as a dep:     0
 ring_atomic in src:       0
 reaches via ring_cursor:  1

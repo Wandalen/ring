@@ -46,10 +46,10 @@ Live output:
 
 ```
   -- the premise, and the heading it lives under --
-      /// # The `result_large_err` allow
-      /// wide, including on the `Ok` path. `register` is a setup-time call — once
+        /// # The `result_large_err` allow
+        /// wide, including on the `Ok` path. `register` is a setup-time call — once
   -- the three cost conclusions that rest on it --
-      /// per ring, never in a loop — so the width is paid where it does not matter.
+        /// per ring, never in a loop — so the width is paid where it does not matter.
     pitfall/001:the silent replace. It also performs two hashes for one decision on the path
   -- and which crates the family benchmarks --
     ring_bench ring_core ring_event ring_factory ring_flush ring_mpsc ring_slot ring_spsc ring_stats ring_tls ring_types 

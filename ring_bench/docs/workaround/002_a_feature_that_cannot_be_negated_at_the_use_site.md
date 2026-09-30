@@ -119,11 +119,11 @@ command grep -A4 'None. means unbounded' src/lib.rs
 Live output:
 
 ```
-  /// `None` means unbounded. `Some( 1 )` means the candidate can only be run
-  /// single-producer — and of the bounded ones, the door imposes the ceiling
-  /// rather than the data structure behind it for most of them: two of three
-  /// by default, three of four with the `crossbeam` feature on (the table
-  /// below is the six-candidate build):
+    /// `None` means unbounded. `Some( 1 )` means the candidate can only be run
+    /// single-producer — and of the bounded ones, the door imposes the ceiling
+    /// rather than the data structure behind it for most of them: two of three
+    /// by default, three of four with the `crossbeam` feature on (the table
+    /// below is the six-candidate build):
 ```
 
 **Disposition:** applied — the summary sentence now carries both arities (two

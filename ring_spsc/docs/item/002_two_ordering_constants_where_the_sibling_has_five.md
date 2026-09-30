@@ -18,8 +18,8 @@ printf 'GATING is imported, not declared:  '; grep -c 'use ring_cursor::.*GATING
 Live output:
 
 ```
-pub const OWN : Ordering = Ordering::Relaxed;
-pub const HANDOFF : Ordering = Ordering::Release;
+pub const OWN: Ordering = Ordering::Relaxed;
+pub const HANDOFF: Ordering = Ordering::Release;
 GATING is imported, not declared:  1
 ```
 
@@ -54,8 +54,8 @@ meaning.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-printf 'ring_mpsc doc-test asserts:  '; grep -c 'assert_eq!( ring_mpsc::' ring_mpsc/src/lib.rs
-printf 'ring_spsc doc-test asserts:  '; grep -c 'assert_eq!( ring_spsc::' ring_spsc/src/lib.rs
+printf 'ring_mpsc doc-test asserts:  '; grep -c 'assert_eq!(ring_mpsc::' ring_mpsc/src/lib.rs
+printf 'ring_spsc doc-test asserts:  '; grep -c 'assert_eq!(ring_spsc::' ring_spsc/src/lib.rs
 printf 'ring_spsc test:              '; grep -oE 'fn the_two_orderings[a-z_]*' ring_spsc/tests/spsc_test.rs
 ```
 

@@ -64,19 +64,19 @@ grep -rl 'loom' ring_*/Cargo.toml | sed 's|ring/||'
 Live output:
 
 ```
-ring_atomic/src/lib.rs:#[ cfg( loom ) ]
-ring_atomic/src/lib.rs:  #[ cfg( loom ) ]
-ring_atomic/src/lib.rs:  #[ cfg( loom ) ]
-ring_cursor/src/lib.rs:  #[ cfg( loom ) ]
-ring_cursor/src/lib.rs:  #[ cfg( loom ) ]
+ring_atomic/src/lib.rs:#[cfg(loom)]
+ring_atomic/src/lib.rs:    #[cfg(loom)]
+ring_atomic/src/lib.rs:    #[cfg(loom)]
+ring_cursor/src/lib.rs:    #[cfg(loom)]
+ring_cursor/src/lib.rs:    #[cfg(loom)]
 ring_testkit/src/lib.rs://! and it is already a `cfg(loom)` dev-dependency of `ring_atomic`,
-ring_mpsc/tests/mpsc_test.rs:#[ cfg( loom ) ]
-ring_publish/tests/handshake_test.rs:#[ cfg( loom ) ]
+ring_mpsc/tests/mpsc_test.rs:#[cfg(loom)]
+ring_publish/tests/handshake_test.rs:#[cfg(loom)]
 ring_publish/tests/publish_test.rs:// `#![ cfg( loom ) ]` its `exhaustive` module carries. `--cfg loom` swaps
 ring_spsc/tests/spsc_test.rs://! simply narrow enough that sampling it 100 000 times does not open it. The `#[ cfg( loom ) ] mod exhaustive` at the bottom
-ring_spsc/tests/spsc_test.rs:#[ cfg( loom ) ]
+ring_spsc/tests/spsc_test.rs:#[cfg(loom)]
 ring_testkit/tests/exhaustive_test.rs://! **The whole file is `cfg( loom )`.** Under `--cfg loom`, `ring_atomic`
-ring_testkit/tests/exhaustive_test.rs:#![ cfg( loom ) ]
+ring_testkit/tests/exhaustive_test.rs:#![cfg(loom)]
 ring_testkit/tests/testkit_test.rs:// The inverse of `exhaustive_test.rs`'s `#![ cfg( loom ) ]`. `--cfg loom` swaps
 ring_atomic/Cargo.toml
 ring_mpsc/Cargo.toml

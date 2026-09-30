@@ -10,8 +10,8 @@ publish = false
 
 [dependencies]
 ring_core = { path = "../ring_core" }
-ring_tls = { path = "../ring_tls" }
 ring_shutdown = { path = "../ring_shutdown" }
+ring_tls = { path = "../ring_tls" }
 
 # `ring_config` is not one of message 960's declared edges, and is a
 # dev-dependency rather than an added one: `Script::run` takes a ring the caller

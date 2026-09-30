@@ -156,7 +156,7 @@ reading is ever a lower bound that stays true. A caller draining until
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_core
-awk '/must_use/{m=1;next} /^  pub (const )?fn /{n=$0; sub(/^  pub (const )?fn /,"",n);
+awk '/must_use/{m=1;next} /^    pub (const )?fn /{n=$0; sub(/^    pub (const )?fn /,"",n);
      sub(/\(.*/,"",n); printf "%-16s must_use %s\n", n, (m?"yes":"no"); m=0}' src/lib.rs
 ```
 

@@ -21,22 +21,22 @@ use ring_types::{OverflowPolicy, RingError};
 /// Each policy produces its own resolution, and the mapping is total.
 #[test]
 fn each_policy_maps_to_its_own_resolution() {
-  assert_eq!(would_resolve(OverflowPolicy::DropNewest), Resolution::DroppedIncoming);
-  assert_eq!(would_resolve(OverflowPolicy::DropOldest), Resolution::EvictedOldest);
-  assert_eq!(would_resolve(OverflowPolicy::Fail), Resolution::Refused);
+    assert_eq!(would_resolve(OverflowPolicy::DropNewest), Resolution::DroppedIncoming);
+    assert_eq!(would_resolve(OverflowPolicy::DropOldest), Resolution::EvictedOldest);
+    assert_eq!(would_resolve(OverflowPolicy::Fail), Resolution::Refused);
 }
 
 /// The mapping is injective: no two policies collapse onto one resolution, so
 /// the resolution alone identifies what happened.
 #[test]
 fn distinct_policies_give_distinct_resolutions() {
-  let mut seen = Vec::new();
-  for policy in OverflowPolicy::ALL {
-    let resolution = would_resolve(policy);
-    assert!(!seen.contains(&resolution), "{policy:?} collided with an earlier policy");
-    seen.push(resolution);
-  }
-  assert_eq!(seen.len(), 3);
+    let mut seen = Vec::new();
+    for policy in OverflowPolicy::ALL {
+        let resolution = would_resolve(policy);
+        assert!(!seen.contains(&resolution), "{policy:?} collided with an earlier policy");
+        seen.push(resolution);
+    }
+    assert_eq!(seen.len(), 3);
 }
 
 /// The acceptance criterion, asserted structurally: exhaustively matching three
@@ -51,30 +51,30 @@ fn distinct_policies_give_distinct_resolutions() {
 /// rather than decorative.
 #[test]
 fn resolution_has_exactly_three_variants_and_no_overwrite() {
-  fn name(resolution: Resolution) -> &'static str {
-    match resolution {
-      Resolution::DroppedIncoming => "dropped_incoming",
-      Resolution::EvictedOldest => "evicted_oldest",
-      Resolution::Refused => "refused",
+    fn name(resolution: Resolution) -> &'static str {
+        match resolution {
+            Resolution::DroppedIncoming => "dropped_incoming",
+            Resolution::EvictedOldest => "evicted_oldest",
+            Resolution::Refused => "refused",
+        }
     }
-  }
 
-  assert_eq!(name(Resolution::DroppedIncoming), "dropped_incoming");
-  assert_eq!(name(Resolution::EvictedOldest), "evicted_oldest");
-  assert_eq!(name(Resolution::Refused), "refused");
+    assert_eq!(name(Resolution::DroppedIncoming), "dropped_incoming");
+    assert_eq!(name(Resolution::EvictedOldest), "evicted_oldest");
+    assert_eq!(name(Resolution::Refused), "refused");
 
-  assert_eq!(Resolution::ALL.len(), 3, "ALL has drifted from the enum");
-  for resolution in Resolution::ALL {
-    assert!(
-      !name(resolution).is_empty(),
-      "{resolution:?} is in ALL but the exhaustive helper does not name it"
-    );
-  }
-  let mut distinct = Vec::new();
-  for resolution in Resolution::ALL {
-    assert!(!distinct.contains(&resolution), "{resolution:?} appears twice in ALL");
-    distinct.push(resolution);
-  }
+    assert_eq!(Resolution::ALL.len(), 3, "ALL has drifted from the enum");
+    for resolution in Resolution::ALL {
+        assert!(
+            !name(resolution).is_empty(),
+            "{resolution:?} is in ALL but the exhaustive helper does not name it"
+        );
+    }
+    let mut distinct = Vec::new();
+    for resolution in Resolution::ALL {
+        assert!(!distinct.contains(&resolution), "{resolution:?} appears twice in ALL");
+        distinct.push(resolution);
+    }
 }
 
 /// No resolution both keeps the incoming item and destroys unread data without
@@ -82,52 +82,52 @@ fn resolution_has_exactly_three_variants_and_no_overwrite() {
 /// permitted, but only because it is *reported* as a loss.
 #[test]
 fn no_resolution_overwrites_unread_data_silently() {
-  let mut checked = 0;
-  for policy in OverflowPolicy::ALL {
-    let resolution = would_resolve(policy);
-    if resolution.accepted_incoming() {
-      checked += 1;
-      assert!(
-        resolution.lost_an_item(),
-        "{resolution:?} accepted an item into a full ring without reporting a loss"
-      );
+    let mut checked = 0;
+    for policy in OverflowPolicy::ALL {
+        let resolution = would_resolve(policy);
+        if resolution.accepted_incoming() {
+            checked += 1;
+            assert!(
+                resolution.lost_an_item(),
+                "{resolution:?} accepted an item into a full ring without reporting a loss"
+            );
+        }
     }
-  }
 
-  // **The antecedent is asserted, not assumed.** `accepted_incoming()` is true
-  // for `EvictedOldest` alone, which needs `OverflowPolicy::DropOldest` — a
-  // policy no default build accepts. Dropping it from `OverflowPolicy::ALL` on
-  // exactly those grounds is a plausible future edit, and it would leave this
-  // loop iterating over policies none of which enter the branch: the crate's
-  // central safety test, green, checking nothing. An implication whose
-  // antecedent never holds is satisfied by anything, so a test of one has to
-  // prove the antecedent held.
-  assert_eq!(
-    checked, 1,
-    "no policy in OverflowPolicy::ALL produces an accepting resolution — \
+    // **The antecedent is asserted, not assumed.** `accepted_incoming()` is true
+    // for `EvictedOldest` alone, which needs `OverflowPolicy::DropOldest` — a
+    // policy no default build accepts. Dropping it from `OverflowPolicy::ALL` on
+    // exactly those grounds is a plausible future edit, and it would leave this
+    // loop iterating over policies none of which enter the branch: the crate's
+    // central safety test, green, checking nothing. An implication whose
+    // antecedent never holds is satisfied by anything, so a test of one has to
+    // prove the antecedent held.
+    assert_eq!(
+        checked, 1,
+        "no policy in OverflowPolicy::ALL produces an accepting resolution — \
      this test proved nothing"
-  );
+    );
 }
 
 /// The two readings partition the three outcomes exactly, so a caller can
 /// branch on either without a fallthrough case.
 #[test]
 fn the_two_readings_partition_the_outcomes() {
-  assert!(Resolution::DroppedIncoming.lost_an_item());
-  assert!(Resolution::EvictedOldest.lost_an_item());
-  assert!(!Resolution::Refused.lost_an_item());
+    assert!(Resolution::DroppedIncoming.lost_an_item());
+    assert!(Resolution::EvictedOldest.lost_an_item());
+    assert!(!Resolution::Refused.lost_an_item());
 
-  assert!(!Resolution::DroppedIncoming.accepted_incoming());
-  assert!(Resolution::EvictedOldest.accepted_incoming());
-  assert!(!Resolution::Refused.accepted_incoming());
+    assert!(!Resolution::DroppedIncoming.accepted_incoming());
+    assert!(Resolution::EvictedOldest.accepted_incoming());
+    assert!(!Resolution::Refused.accepted_incoming());
 }
 
 /// A refusal loses nothing — the whole reason `Fail` exists is that the caller
 /// keeps the item and decides for itself.
 #[test]
 fn a_refusal_loses_nothing() {
-  assert!(!Resolution::Refused.lost_an_item());
-  assert!(!Resolution::Refused.accepted_incoming());
+    assert!(!Resolution::Refused.lost_an_item());
+    assert!(!Resolution::Refused.accepted_incoming());
 }
 
 /// `resolve` returns what `would_resolve` predicts, on the two policies that
@@ -135,52 +135,52 @@ fn a_refusal_loses_nothing() {
 /// drifting implementation.
 #[test]
 fn resolve_agrees_with_would_resolve() {
-  let stats = RingStats::new();
-  assert_eq!(
-    resolve(OverflowPolicy::DropNewest, &stats),
-    Ok(would_resolve(OverflowPolicy::DropNewest))
-  );
-  assert_eq!(
-    resolve(OverflowPolicy::DropOldest, &stats),
-    Ok(would_resolve(OverflowPolicy::DropOldest))
-  );
+    let stats = RingStats::new();
+    assert_eq!(
+        resolve(OverflowPolicy::DropNewest, &stats),
+        Ok(would_resolve(OverflowPolicy::DropNewest))
+    );
+    assert_eq!(
+        resolve(OverflowPolicy::DropOldest, &stats),
+        Ok(would_resolve(OverflowPolicy::DropOldest))
+    );
 }
 
 /// `Fail` is the one policy that hands the decision back, and it does so as
 /// `RingError::Full` rather than as a resolution the caller might ignore.
 #[test]
 fn fail_hands_the_decision_back_as_an_error() {
-  let stats = RingStats::new();
-  assert_eq!(resolve(OverflowPolicy::Fail, &stats), Err(RingError::Full));
-  assert_eq!(would_resolve(OverflowPolicy::Fail), Resolution::Refused);
+    let stats = RingStats::new();
+    assert_eq!(resolve(OverflowPolicy::Fail, &stats), Err(RingError::Full));
+    assert_eq!(would_resolve(OverflowPolicy::Fail), Resolution::Refused);
 }
 
 /// Exactly one counter moves per call, on every policy — so a stats read
 /// accounts for every full-ring event, not only the lossy ones.
 #[test]
 fn exactly_one_counter_moves_per_call() {
-  for policy in OverflowPolicy::ALL {
-    let stats = RingStats::new();
-    let _ = resolve(policy, &stats);
+    for policy in OverflowPolicy::ALL {
+        let stats = RingStats::new();
+        let _ = resolve(policy, &stats);
 
-    assert_eq!(stats.dropped(policy), 1, "{policy:?} did not count its own event");
-    assert_eq!(stats.dropped_total(), 1, "{policy:?} moved more than one counter");
-    assert_eq!(stats.published(), 0, "a full-ring event publishes nothing");
-    assert_eq!(stats.claimed(), 0);
-    assert_eq!(stats.consumed(), 0);
-  }
+        assert_eq!(stats.dropped(policy), 1, "{policy:?} did not count its own event");
+        assert_eq!(stats.dropped_total(), 1, "{policy:?} moved more than one counter");
+        assert_eq!(stats.published(), 0, "a full-ring event publishes nothing");
+        assert_eq!(stats.claimed(), 0);
+        assert_eq!(stats.consumed(), 0);
+    }
 }
 
 /// A refused publish is counted too. An uncounted refusal would make a
 /// saturated `Fail` ring indistinguishable from an idle one.
 #[test]
 fn a_refusal_is_counted_even_though_it_loses_nothing() {
-  let stats = RingStats::new();
-  for _ in 0..4 {
-    assert!(resolve(OverflowPolicy::Fail, &stats).is_err());
-  }
-  assert_eq!(stats.dropped(OverflowPolicy::Fail), 4);
-  assert_eq!(stats.dropped_total(), 4);
+    let stats = RingStats::new();
+    for _ in 0..4 {
+        assert!(resolve(OverflowPolicy::Fail, &stats).is_err());
+    }
+    assert_eq!(stats.dropped(OverflowPolicy::Fail), 4);
+    assert_eq!(stats.dropped_total(), 4);
 }
 
 /// `resolve` is not idempotent on its error path, and that is pinned rather than
@@ -195,44 +195,44 @@ fn a_refusal_is_counted_even_though_it_loses_nothing() {
 /// silently changes what every stats reader is counting.
 #[test]
 fn retrying_a_refusal_counts_the_same_arrival_twice() {
-  let stats = RingStats::new();
-  let one_arrival_at_a_full_ring = OverflowPolicy::Fail;
+    let stats = RingStats::new();
+    let one_arrival_at_a_full_ring = OverflowPolicy::Fail;
 
-  assert_eq!(resolve(one_arrival_at_a_full_ring, &stats), Err(RingError::Full));
-  assert_eq!(stats.dropped(OverflowPolicy::Fail), 1);
+    assert_eq!(resolve(one_arrival_at_a_full_ring, &stats), Err(RingError::Full));
+    assert_eq!(stats.dropped(OverflowPolicy::Fail), 1);
 
-  assert_eq!(resolve(one_arrival_at_a_full_ring, &stats), Err(RingError::Full));
-  assert_eq!(
-    stats.dropped(OverflowPolicy::Fail),
-    2,
-    "resolve became idempotent — every stats consumer's arithmetic just changed"
-  );
+    assert_eq!(resolve(one_arrival_at_a_full_ring, &stats), Err(RingError::Full));
+    assert_eq!(
+        stats.dropped(OverflowPolicy::Fail),
+        2,
+        "resolve became idempotent — every stats consumer's arithmetic just changed"
+    );
 
-  // `would_resolve` is the retry-safe half, and the reason the pairing exists:
-  // decide with it as often as you like, record with `resolve` once.
-  for _ in 0..8 {
-    assert_eq!(would_resolve(one_arrival_at_a_full_ring), Resolution::Refused);
-  }
-  assert_eq!(stats.dropped(OverflowPolicy::Fail), 2);
+    // `would_resolve` is the retry-safe half, and the reason the pairing exists:
+    // decide with it as often as you like, record with `resolve` once.
+    for _ in 0..8 {
+        assert_eq!(would_resolve(one_arrival_at_a_full_ring), Resolution::Refused);
+    }
+    assert_eq!(stats.dropped(OverflowPolicy::Fail), 2);
 }
 
 /// Counts accumulate across calls and stay separated by policy, so a mixed run
 /// reports which pressure it was actually under.
 #[test]
 fn counts_accumulate_and_stay_separated() {
-  let stats = RingStats::new();
-  for _ in 0..3 {
-    let _ = resolve(OverflowPolicy::DropNewest, &stats);
-  }
-  for _ in 0..2 {
-    let _ = resolve(OverflowPolicy::DropOldest, &stats);
-  }
-  let _ = resolve(OverflowPolicy::Fail, &stats);
+    let stats = RingStats::new();
+    for _ in 0..3 {
+        let _ = resolve(OverflowPolicy::DropNewest, &stats);
+    }
+    for _ in 0..2 {
+        let _ = resolve(OverflowPolicy::DropOldest, &stats);
+    }
+    let _ = resolve(OverflowPolicy::Fail, &stats);
 
-  assert_eq!(stats.dropped(OverflowPolicy::DropNewest), 3);
-  assert_eq!(stats.dropped(OverflowPolicy::DropOldest), 2);
-  assert_eq!(stats.dropped(OverflowPolicy::Fail), 1);
-  assert_eq!(stats.dropped_total(), 6);
+    assert_eq!(stats.dropped(OverflowPolicy::DropNewest), 3);
+    assert_eq!(stats.dropped(OverflowPolicy::DropOldest), 2);
+    assert_eq!(stats.dropped(OverflowPolicy::Fail), 1);
+    assert_eq!(stats.dropped_total(), 6);
 }
 
 /// `would_resolve` touches no counters — the property that makes it safe for a
@@ -240,45 +240,45 @@ fn counts_accumulate_and_stay_separated() {
 /// ring never experienced.
 #[test]
 fn would_resolve_touches_no_counters() {
-  let stats = RingStats::new();
-  for policy in OverflowPolicy::ALL {
-    let _ = would_resolve(policy);
-  }
-  assert_eq!(stats.dropped_total(), 0);
+    let stats = RingStats::new();
+    for policy in OverflowPolicy::ALL {
+        let _ = would_resolve(policy);
+    }
+    assert_eq!(stats.dropped_total(), 0);
 }
 
 /// The resolution is a plain value: `Copy`, comparable, hashable — so a caller
 /// can tabulate outcomes without cloning or borrowing.
 #[test]
 fn a_resolution_is_a_plain_comparable_value() {
-  let a = Resolution::EvictedOldest;
-  let b = a;
-  assert_eq!(a, b);
-  assert_ne!(a, Resolution::Refused);
+    let a = Resolution::EvictedOldest;
+    let b = a;
+    assert_eq!(a, b);
+    assert_ne!(a, Resolution::Refused);
 
-  let mut counts = std::collections::HashMap::new();
-  for policy in OverflowPolicy::ALL {
-    *counts.entry(would_resolve(policy)).or_insert(0) += 1;
-  }
-  assert_eq!(counts.len(), 3, "three policies must key three distinct buckets");
+    let mut counts = std::collections::HashMap::new();
+    for policy in OverflowPolicy::ALL {
+        *counts.entry(would_resolve(policy)).or_insert(0) += 1;
+    }
+    assert_eq!(counts.len(), 3, "three policies must key three distinct buckets");
 }
 
 /// The policy's own self-description agrees with what the handler does — the
 /// two crates cannot drift apart on which policies report failure.
 #[test]
 fn policy_self_description_agrees_with_the_handler() {
-  let stats = RingStats::new();
-  for policy in OverflowPolicy::ALL {
-    let outcome = resolve(policy, &stats);
-    assert_eq!(
-      outcome.is_err(),
-      policy.reports_failure(),
-      "{policy:?} disagrees with its own reports_failure()"
-    );
-    assert_eq!(
-      outcome.is_ok_and(Resolution::lost_an_item),
-      policy.drops_silently(),
-      "{policy:?} disagrees with its own drops_silently()"
-    );
-  }
+    let stats = RingStats::new();
+    for policy in OverflowPolicy::ALL {
+        let outcome = resolve(policy, &stats);
+        assert_eq!(
+            outcome.is_err(),
+            policy.reports_failure(),
+            "{policy:?} disagrees with its own reports_failure()"
+        );
+        assert_eq!(
+            outcome.is_ok_and(Resolution::lost_an_item),
+            policy.drops_silently(),
+            "{policy:?} disagrees with its own drops_silently()"
+        );
+    }
 }

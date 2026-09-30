@@ -18,8 +18,8 @@ ring_cursor = { path = "../ring_cursor" }
 #                 so reading a cursor at all needs the trait in scope. Reading
 #                 the derived values instead is what this crate exists because
 #                 you cannot do (docs/pitfall/001).
-ring_types = { path = "../ring_types" }
 ring_atomic = { path = "../ring_atomic" }
+ring_types = { path = "../ring_types" }
 
 [dev-dependencies]
 # `check_ends` takes a split ring's two ends, and building one needs a config.

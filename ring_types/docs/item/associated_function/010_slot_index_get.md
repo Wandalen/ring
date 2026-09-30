@@ -62,8 +62,8 @@ command grep -rn 'index\.get()' ring_*/src | command grep -v '^ring_types/' \
 Live output:
 
 ```
-ring_store/src/lib.rs:    &self.slots[ index.get() ]
-ring_store/src/lib.rs:    &mut self.slots[ index.get() ]
+ring_store/src/lib.rs:        &self.slots[index.get()]
+ring_store/src/lib.rs:        &mut self.slots[index.get()]
 ```
 
 returns exactly two lines, eleven apart, in one file.

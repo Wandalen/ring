@@ -141,13 +141,13 @@ grep -A6 '# Errors' src/lib.rs | head -7
 Live output:
 
 ```
-  /// # Errors
-  ///
-  /// [`RingError::Full`] when the buffer already holds `capacity()` items. The
-  /// refused item is not returned to the caller: `item` is moved into this
-  /// function, and on the refusal path it is bound, never read, and dropped
-  /// when the function returns — the same as any other value that goes out of
-  /// scope. Callers holding a `T` that owns a resource should check
+    /// # Errors
+    ///
+    /// [`RingError::Full`] when the buffer already holds `capacity()` items. The
+    /// refused item is not returned to the caller: `item` is moved into this
+    /// function, and on the refusal path it is bound, never read, and dropped
+    /// when the function returns — the same as any other value that goes out of
+    /// scope. Callers holding a `T` that owns a resource should check
 ```
 
 **Disposition:** applied — Reading 1 (`the documentation is wrong; fix the

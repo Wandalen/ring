@@ -89,7 +89,7 @@ command grep -r '\.is_transient(' ring_*/src | command grep -v '^ring_types/'
 Live output:
 
 ```
-ring_shutdown/src/lib.rs:  /// assert!( !RingError::Closed.is_transient() );
+ring_shutdown/src/lib.rs:    /// assert!(!RingError::Closed.is_transient());
 ```
 
 returns **one line, a `///` doc example** in `ring_shutdown` (`:128`). Filtering

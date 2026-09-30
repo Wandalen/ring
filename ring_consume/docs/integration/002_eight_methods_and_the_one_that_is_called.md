@@ -75,7 +75,7 @@ Live output:
   len            2
   is_empty       2
   cursor         4
-  frontier       10
+  frontier       11
   available      12
   admits         5
   wait_for       7

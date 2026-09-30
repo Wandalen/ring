@@ -218,8 +218,8 @@ grep -c '^pub const ' ring_wait/src/lib.rs
 Live output:
 
 ```
-pub const DEFAULT_SPINS : usize = 1024;
-      std::thread::sleep( std::time::Duration::from_micros( 50 ) );
+pub const DEFAULT_SPINS: usize = 1024;
+            std::thread::sleep(std::time::Duration::from_micros(50));
 2
 ```
 

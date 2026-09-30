@@ -90,16 +90,25 @@ fn two_wrapped_fields_land_on_different_lines() {
 /// have done anyway.
 #[test]
 fn two_unwrapped_fields_share_a_line() {
-  // A 64-aligned block: elements 0 and 1 sit at offsets 0 and 8, so they
-  // share line 0 by construction. Comparing adjacent fields of a plain
-  // struct would depend on where the allocator happened to place it —
-  // two addresses 8 apart can straddle a line boundary.
-  #[repr(align(64))]
-  struct Block([u64; 16]);
+  #[derive(Debug)]
+  struct Naive {
+    producer: u64,
+    consumer: u64,
+  }
 
-  let block = Block([0; 16]);
-  let a = core::ptr::from_ref(&block.0[0]) as usize;
-  let b = core::ptr::from_ref(&block.0[1]) as usize;
+  // Pin `pair` to the start of a cache line so the assertion measures
+  // adjacency, not allocator luck: a bare `Naive` on the stack can land
+  // with `producer` at the tail of one line and `consumer` in the next.
+  // The wrapper pads around the pair, never between its fields.
+  #[repr(align(64))]
+  struct Aligned(Naive);
+
+  let pair = Aligned(Naive {
+    producer: 0,
+    consumer: 0,
+  });
+  let a = core::ptr::from_ref(&pair.0.producer) as usize;
+  let b = core::ptr::from_ref(&pair.0.consumer) as usize;
   assert!(a.abs_diff(b) < CACHE_LINE);
   assert!(!on_distinct_lines(a, b), "the unpadded pair should share a line");
 }

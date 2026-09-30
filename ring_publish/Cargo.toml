@@ -1,6 +1,6 @@
 [package]
 name = "ring_publish"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,20 +9,20 @@ description = "Publication of claimed slots to consumers"
 publish = true
 
 [dependencies]
-ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_cursor = { workspace = true }
+ring_types = { workspace = true }
 
 # Tests only. `tests/handshake_test.rs` is feature 170's reached-test, which is
 # the whole four-operation handshake — so it needs the other three operations'
 # crates. None of them depends on this one, so the graph stays acyclic.
 [dev-dependencies]
-ring_barrier = { path = "../ring_barrier" }
-ring_claim = { path = "../ring_claim" }
-ring_consume = { path = "../ring_consume" }
-ring_gating = { path = "../ring_gating" }
+ring_barrier = { workspace = true }
+ring_claim = { workspace = true }
+ring_consume = { workspace = true }
+ring_gating = { workspace = true }
 
 [target.'cfg(loom)'.dev-dependencies]
-loom = "0.7"
+loom = { workspace = true }
 
 [lints]
 workspace = true

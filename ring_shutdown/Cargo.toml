@@ -1,6 +1,6 @@
 [package]
 name = "ring_shutdown"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,13 +9,13 @@ description = "Publisher stop, drain, and waiter join"
 publish = true
 
 [dependencies]
-ring_core = { path = "../ring_core", version = "0.1.0" }
-ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
-ring_wait = { path = "../ring_wait", version = "0.1.0" }
+ring_core = { workspace = true }
+ring_cursor = { workspace = true }
+ring_types = { workspace = true }
+ring_wait = { workspace = true }
 
 [dev-dependencies]
-ring_config = { path = "../ring_config" }
+ring_config = { workspace = true }
 
 [lints]
 workspace = true

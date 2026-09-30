@@ -37,10 +37,14 @@ the surrounding crate wins and this file gets fixed.
 - One library per crate, all in `src/lib.rs`. `lib.rs` opens with a `//!` block whose first
   line is the crate summary — the same sentence as `readme.md` line 3 and the manifest
   `description` — followed by `#![deny(missing_docs)]`.
-- Manifest: `edition`, `license`, `repository` from the workspace; `readme = "readme.md"`;
-  `description`; `publish`; `[lints] workspace = true`. Sibling dependencies as
-  `ring_x = { path = "../ring_x", version = "0.1.0" }` (the version is what `cargo publish`
-  keeps).
+- Manifest: `version`, `edition`, `license`, `repository` inherited (`.workspace = true`);
+  `readme = "readme.md"`, `description` and `publish` of its own; `[lints] workspace = true`.
+- Every dependency — sibling or external, normal or dev — is `name = { workspace = true }`
+  (plus `optional = true` where a feature enables it). Versions, paths, default features and
+  feature sets live once, in the root `[workspace.dependencies]`. `publish = false` crates are
+  not listed there, so a published crate cannot come to depend on one.
+- `./verb/publish_check` (`just publish-check`) packages and builds every publishable crate the
+  way crates.io would; it must pass before a release.
 - Workspace `members` are in dependency order, not alphabetical: every crate appears below
   everything it depends on.
 - Adding a crate touches a dozen places — use the `new-crate` checklist

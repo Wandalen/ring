@@ -1,6 +1,6 @@
 [package]
 name = "ring_tls"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,14 +9,14 @@ description = "Thread-local staging buffers ahead of a ring flush"
 publish = true
 
 [dependencies]
-ring_atomic = { path = "../ring_atomic", version = "0.1.0" }
-ring_batch = { path = "../ring_batch", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_atomic = { workspace = true }
+ring_batch = { workspace = true }
+ring_types = { workspace = true }
 
 [dev-dependencies]
-ring_event = { path = "../ring_event" }
-ring_slot = { path = "../ring_slot" }
-ring_store = { path = "../ring_store" }
+ring_event = { workspace = true }
+ring_slot = { workspace = true }
+ring_store = { workspace = true }
 
 [lints]
 workspace = true

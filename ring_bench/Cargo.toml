@@ -1,6 +1,6 @@
 [package]
 name = "ring_bench"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -16,12 +16,12 @@ publish = false
 crossbeam = ["ring_factory/crossbeam"]
 
 [dependencies]
-ring_factory = { path = "../ring_factory" }
-ring_flush = { path = "../ring_flush" }
-ring_mpsc = { path = "../ring_mpsc" }
-ring_spsc = { path = "../ring_spsc" }
-ring_stats = { path = "../ring_stats" }
-ring_tls = { path = "../ring_tls" }
+ring_factory = { workspace = true }
+ring_flush = { workspace = true }
+ring_mpsc = { workspace = true }
+ring_spsc = { workspace = true }
+ring_stats = { workspace = true }
+ring_tls = { workspace = true }
 # Message 960 did not assign these three. Each is needed to write a signature,
 # which is the same reason `ring_factory` had to add two — see that crate's
 # `docs/integration/001`. Third occurrence in the family, and the first where
@@ -41,9 +41,9 @@ ring_tls = { path = "../ring_tls" }
 #   ring_types — `RingStats::record_drop` takes an `OverflowPolicy`, so the
 #                per-run counters feature 185 supplies cannot be recorded
 #                without naming the policy vocabulary.
-ring_core = { path = "../ring_core" }
-ring_slot = { path = "../ring_slot" }
-ring_types = { path = "../ring_types" }
+ring_core = { workspace = true }
+ring_slot = { workspace = true }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

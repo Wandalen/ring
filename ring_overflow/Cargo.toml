@@ -1,6 +1,6 @@
 [package]
 name = "ring_overflow"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,8 +9,8 @@ description = "Full-ring overflow policies"
 publish = true
 
 [dependencies]
-ring_stats = { path = "../ring_stats", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_stats = { workspace = true }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

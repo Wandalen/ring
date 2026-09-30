@@ -25,7 +25,8 @@ error.
 
 ## Supported versions
 
-Nothing has been released yet. Fixes land on `master`.
+The crates are published on crates.io as `ring_*`. Only the latest release is supported; fixes
+land on `master` and ship in the next patch release.
 
 ## Dependencies
 

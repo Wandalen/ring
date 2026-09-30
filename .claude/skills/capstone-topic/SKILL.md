@@ -29,6 +29,9 @@ one the plan depends on against the tree before building on it. Known drift (202
   `ring_testkit`, `ring_trace`.
 - The trybuild case named as failing has been re-blessed.
 - Loom models run with `./verb/loom`; nothing ran them automatically before.
+- Metadata, versions and dependencies are inherited from the workspace, and
+  `./verb/publish_check` (every publishable crate, built from its package) passes. `0.1.0` of
+  most crates is already on crates.io, so the next publish needs a version bump.
 
 ## Define done as a check
 

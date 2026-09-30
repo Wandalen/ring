@@ -181,7 +181,7 @@ Live output:
 # and `ring_gating`'s over one set of cursors — see the test file's own header on
 # why a stand-in would assert nothing. The library itself never names it.
 [dev-dependencies]
-ring_gating = { path = "../ring_gating" }
+ring_gating = { workspace = true }
 
 [lints]
 workspace = true

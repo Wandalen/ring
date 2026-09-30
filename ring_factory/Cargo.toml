@@ -1,6 +1,6 @@
 [package]
 name = "ring_factory"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -16,17 +16,17 @@ publish = true
 crossbeam = ["ring_core/crossbeam"]
 
 [dependencies]
-ring_config = { path = "../ring_config", version = "0.1.0" }
-ring_core = { path = "../ring_core", version = "0.1.0" }
-ring_registry = { path = "../ring_registry", version = "0.1.0" }
+ring_config = { workspace = true }
+ring_core = { workspace = true }
+ring_registry = { workspace = true }
 # Message 960 did not assign these two, and both are needed to write the
 # signature: `ring_handle` owns `Split`, which is `build`'s return type, and
 # `ring_types` owns `RingError`, which `BuildError::Unsupported` carries.
 # `ring_handle` was reachable only transitively through `ring_registry`, which
 # is not enough to name a type. Recorded as requirement 1 of
 # `docs/integration/001` — a manifest bug, not a decision.
-ring_handle = { path = "../ring_handle", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_handle = { workspace = true }
+ring_types = { workspace = true }
 # Message 960 also assigned `ring_stats` and `ring_tls`; both are removed.
 # `RingConfig` has no field that would configure staging or counters, so there
 # was nothing for a build to do with either, and inventing surface to justify a

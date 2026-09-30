@@ -17,7 +17,7 @@ That is accurate and `ring_atomic` is not a dependency of this crate.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_spsc
-printf 'path deps:                '; grep -c 'path = "\.\./ring_' Cargo.toml
+printf 'path deps:                '; grep -cE '^ring_[a-z_]+ = \{ workspace = true' Cargo.toml
 printf 'named in the manifest:    '; grep -oE 'ring_[a-z]+ = ' Cargo.toml | tr -d ' =' | tr '\n' ' '; echo
 printf 'ring_atomic as a dep:     '; grep -cE '^ring_atomic = ' Cargo.toml
 printf 'ring_atomic in src:       '; grep -c 'ring_atomic' src/lib.rs

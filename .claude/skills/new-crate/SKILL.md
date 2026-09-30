@@ -12,12 +12,13 @@ and why can it not live in an existing one? Answer that in the PR before step 1.
 
 ## Code
 
-1. `ring_<name>/Cargo.toml` — copy `ring_config/Cargo.toml`: `version = "0.1.0"`,
-   `edition`/`license`/`repository` `.workspace = true`, `readme = "readme.md"`, the
-   one-line `description`, `publish`, sibling deps as `{ path = "../x", version = "0.1.0" }`,
-   and `[lints] workspace = true` (G6).
-2. Root `Cargo.toml` `members`: insert below every crate it depends on (dependency order, not
-   alphabetical). Update the "33-crate forest" comment.
+1. `ring_<name>/Cargo.toml` — copy `ring_config/Cargo.toml`: `version`/`edition`/`license`/
+   `repository` `.workspace = true`, `readme = "readme.md"`, the one-line `description`,
+   `publish`, every dependency as `{ workspace = true }`, and `[lints] workspace = true` (G6).
+2. Root `Cargo.toml`: in `members`, insert below every crate it depends on (dependency order,
+   not alphabetical) and update the "33-crate forest" comment. If `publish = true`, add
+   `ring_<name> = { path = "ring_<name>", version = "0.1.0" }` to `[workspace.dependencies]`
+   (current workspace version). A new external dependency goes there too.
 3. `src/lib.rs`: `//!` summary line (same sentence as `description`), rationale, then
    `#![deny(missing_docs)]`. At least one line starting with `pub ` (G2). No "skeleton"
    wording anywhere (G2). No `unsafe` — the allowlist is a separate decision.
@@ -50,5 +51,5 @@ and why can it not live in an existing one? Answer that in the PR before step 1.
 
 ## Check
 
-`./verb/test level::3`, then `./verb/gate stage::<S>` for the stage it joined, then the full
+`./verb/test level::3` and `./verb/publish_check`, then `./verb/gate stage::<S>` for the stage it joined, then the full
 `./verb/test level::5` in the background. Compare against `master` (`verify` skill).

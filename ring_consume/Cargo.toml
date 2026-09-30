@@ -1,6 +1,6 @@
 [package]
 name = "ring_consume"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,10 +9,10 @@ description = "Single-consumer available-range computation and commit"
 publish = true
 
 [dependencies]
-ring_barrier = { path = "../ring_barrier", version = "0.1.0" }
-ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
-ring_seqno = { path = "../ring_seqno", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_barrier = { workspace = true }
+ring_cursor = { workspace = true }
+ring_seqno = { workspace = true }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

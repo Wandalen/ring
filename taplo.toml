@@ -17,5 +17,6 @@ keys = [
     "build-dependencies",
     "target.*.dependencies",
     "target.*.dev-dependencies",
+    "workspace.dependencies",
 ]
 formatting = { reorder_keys = true }

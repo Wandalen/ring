@@ -1,6 +1,6 @@
 [package]
 name = "ring_debug"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,8 +9,8 @@ description = "Runtime invariant checks over a live ring"
 publish = false
 
 [dependencies]
-ring_core = { path = "../ring_core" }
-ring_cursor = { path = "../ring_cursor" }
+ring_core = { workspace = true }
+ring_cursor = { workspace = true }
 # Beyond the two edges the initial design assigned this crate, and both are
 # forced rather than convenient — see docs/integration/001.
 #   ring_types  — `Seq` and `Capacity` appear in every public signature here.
@@ -18,12 +18,12 @@ ring_cursor = { path = "../ring_cursor" }
 #                 so reading a cursor at all needs the trait in scope. Reading
 #                 the derived values instead is what this crate exists because
 #                 you cannot do (docs/pitfall/001).
-ring_atomic = { path = "../ring_atomic" }
-ring_types = { path = "../ring_types" }
+ring_atomic = { workspace = true }
+ring_types = { workspace = true }
 
 [dev-dependencies]
 # `check_ends` takes a split ring's two ends, and building one needs a config.
-ring_config = { path = "../ring_config" }
+ring_config = { workspace = true }
 
 [lints]
 workspace = true

@@ -1,6 +1,6 @@
 [package]
 name = "ring_event"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,11 +9,11 @@ description = "Slot translators that fill a claimed slot"
 publish = true
 
 [dependencies]
-ring_slot = { path = "../ring_slot", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_slot = { workspace = true }
+ring_types = { workspace = true }
 
 [dev-dependencies]
-ring_store = { path = "../ring_store" }
+ring_store = { workspace = true }
 
 [lints]
 workspace = true

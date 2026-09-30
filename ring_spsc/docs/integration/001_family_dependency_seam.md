@@ -229,8 +229,8 @@ entirely above this crate.
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 for c in ring_spsc ring_mpsc; do
-  printf '%-11s %s deps: ' "$c" "$( grep -c 'path = \"\.\./ring_' $c/Cargo.toml )"
-  grep -oE 'ring_[a-z]+ = \{ path' $c/Cargo.toml | sed 's/ = { path//' | tr '\n' ' '; echo
+  printf '%-11s %s deps: ' "$c" "$( grep -cE '^ring_[a-z_]+ = \{ workspace = true' $c/Cargo.toml )"
+  grep -oE 'ring_[a-z]+ = \{ workspace' $c/Cargo.toml | sed 's/ = { workspace//' | tr '\n' ' '; echo
 done
 ```
 

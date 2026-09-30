@@ -1,6 +1,6 @@
 [package]
 name = "ring_wait"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
@@ -9,8 +9,8 @@ description = "Wait strategies for space and data availability"
 publish = true
 
 [dependencies]
-ring_cursor = { path = "../ring_cursor", version = "0.1.0" }
-ring_types = { path = "../ring_types", version = "0.1.0" }
+ring_cursor = { workspace = true }
+ring_types = { workspace = true }
 
 [lints]
 workspace = true

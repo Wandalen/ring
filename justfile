@@ -161,6 +161,10 @@ mutant-survey crate:
 bench *args:
     cargo run -p ring_bench --all-features --example comparison {{ args }}
 
+# Dry-run `cargo publish` for every publishable crate (or one), building each from its package.
+publish-check crate=here:
+    cargo publish --dry-run --allow-dirty {{ if crate == "" { "--workspace" } else { "-p " + crate } }}
+
 # Remove build artefacts, the loom and gate target dirs, and scratch logs.
 clean:
     cargo clean

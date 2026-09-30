@@ -8,6 +8,7 @@ Short version. Code rules: [`CODESTYLE.md`](CODESTYLE.md). How the family fits t
 ```sh
 git clone https://github.com/Wandalen/ring    # the directory MUST be named `ring`
 cd ring
+git config blame.ignoreRevsFile .git-blame-ignore-revs   # blame skips reformatting commits
 ./verb/setup check::1                           # what is missing
 ./verb/setup                                    # install it
 ./verb/test level::1                            # first build + tests

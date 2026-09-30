@@ -1,0 +1,6 @@
+# Whole-tree reformatting commits, skipped by `git blame` (GitHub reads this file itself;
+# locally: `git config blame.ignoreRevsFile .git-blame-ignore-revs`). Full hashes as they
+# are on `master` — a squashed or rebased merge changes them.
+
+# style(workspace): apply rustfmt and taplo formatting
+ff99241fe00ace3dc47d1feb7ddfcd22f9464716

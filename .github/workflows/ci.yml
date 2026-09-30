@@ -1,4 +1,4 @@
-# Fast verification — every push and PR.
+# Fast verification — master pushes and PRs.
 #
 # Mirrors `verb/test` levels 1-3 (nextest, doctests, clippy) plus
 # `cargo doc` and the repo's own nightly-rustfmt check (`verb/fmt check::1`).
@@ -9,7 +9,12 @@ name: CI
 
 on:
   push:
+    branches: [master]
   pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always
@@ -17,15 +22,14 @@ env:
 
 jobs:
   test:
-    name: build + nextest + doctests
+    name: nextest + doctests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
-      - name: build workspace
-        run: cargo build --workspace --all-features
       - name: nextest (verb/test level 1)
         run: cargo nextest run --workspace --all-features
       - name: doctests (verb/test level 2)
@@ -34,9 +38,10 @@ jobs:
   clippy:
     name: clippy -D warnings
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
@@ -46,9 +51,10 @@ jobs:
   doc:
     name: cargo doc --no-deps
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: Swatinem/rust-cache@v2
       - name: rustdoc, warnings denied
         run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --all-features
@@ -56,9 +62,10 @@ jobs:
   fmt:
     name: nightly rustfmt --check
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@nightly-2026-09-29
         with:
           components: rustfmt
       - name: fmt check (verb/fmt check::1)

@@ -1,8 +1,8 @@
-# Full family gate suite — slow, non-blocking.
+# Full family gate suite — slow, honest signal.
 #
 # Runs `bench_harness/gate/run_all.sh --family ring` (g1-g22) in full, exactly
-# as `verb/gate` does locally. Informational only (`continue-on-error: true`):
-# a red Gates badge means "go read the gate output", never "merge blocked".
+# as `verb/gate` does locally. Failures go red: the workflow never runs on
+# PRs, so nothing is blocked — but the Gates badge must mean something.
 # Fast per-push verification lives in `ci.yml`.
 #
 # Schedule: `master` pushes + nightly + manual dispatch — never on every PR,
@@ -26,13 +26,11 @@ jobs:
     name: run_all.sh --family ring
     runs-on: ubuntu-latest
     timeout-minutes: 180
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: taiki-e/install-action@nextest
+      - uses: taiki-e/install-action@cargo-tarpaulin
       - uses: Swatinem/rust-cache@v2
-      - name: install cargo-tarpaulin (g1 coverage)
-        run: cargo install cargo-tarpaulin --locked
       - name: full gate suite (verb/gate)
         run: bash bench_harness/gate/run_all.sh --family ring

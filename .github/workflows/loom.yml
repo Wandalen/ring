@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.98.0
       - uses: Swatinem/rust-cache@v2
       - name: loom models (see ring_spsc / ring_mpsc / ring_publish readmes)
-        run: RUSTFLAGS="--cfg loom" cargo test --workspace --all-features
+        run: RUSTFLAGS="--cfg loom" cargo test --workspace --all-features --tests

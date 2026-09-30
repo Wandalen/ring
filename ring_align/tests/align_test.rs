@@ -96,12 +96,19 @@ fn two_unwrapped_fields_share_a_line() {
     consumer: u64,
   }
 
-  let pair = Naive {
+  // Pin `pair` to the start of a cache line so the assertion measures
+  // adjacency, not allocator luck: a bare `Naive` on the stack can land
+  // with `producer` at the tail of one line and `consumer` in the next.
+  // The wrapper pads around the pair, never between its fields.
+  #[repr(align(64))]
+  struct Aligned(Naive);
+
+  let pair = Aligned(Naive {
     producer: 0,
     consumer: 0,
-  };
-  let a = core::ptr::from_ref(&pair.producer) as usize;
-  let b = core::ptr::from_ref(&pair.consumer) as usize;
+  });
+  let a = core::ptr::from_ref(&pair.0.producer) as usize;
+  let b = core::ptr::from_ref(&pair.0.consumer) as usize;
   assert!(a.abs_diff(b) < CACHE_LINE);
   assert!(!on_distinct_lines(a, b), "the unpadded pair should share a line");
 }

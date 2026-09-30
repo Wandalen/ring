@@ -16,6 +16,9 @@ a measured benchmark.*
 ![Unsafe](https://img.shields.io/badge/unsafe-forbidden-brightgreen)
 ![Crates](https://img.shields.io/badge/crates-34-blue)
 ![Concurrency](https://img.shields.io/badge/concurrency-loom--checked-blueviolet)
+[![CI](https://github.com/Wandalen/ring/actions/workflows/ci.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/ci.yml)
+[![Gates](https://github.com/Wandalen/ring/actions/workflows/gates.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/gates.yml)
+[![Loom](https://github.com/Wandalen/ring/actions/workflows/loom.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/loom.yml)
 
 The concurrency write-path family: 33 `ring_*` mechanism crates plus
 `bench_harness`, its family-neutral stage-gate and workload oracle. All 34

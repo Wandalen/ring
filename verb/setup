@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+#@ purpose: Install the toolchains and cargo tools the verbs and gates call. Idempotent.
+#@          check::1 lists what is missing without installing anything.
+#@ tags: verb, setup
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+_check=0
+_dry_run=0
+for _arg in "$@"; do
+  case "$_arg" in
+    check::1) _check=1 ;;
+    dry::1)   _dry_run=1 ;;
+    *)
+      echo "verb/setup: unrecognized parameter '$_arg' — expected check::1 or dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+# cargo subcommand → crate that provides it, and who calls it.
+#   nextest   verb/test level::1+, test_only, G12, G19
+#   udeps     verb/test level::4 (nightly)
+#   audit     verb/test level::4
+#   tarpaulin G1 (verb/test level::5)
+#   mutants   bench_harness/gate/mutant_survey.sh, keeps G13 fresh
+_tools=( nextest:cargo-nextest udeps:cargo-udeps audit:cargo-audit tarpaulin:cargo-tarpaulin mutants:cargo-mutants )
+# Plain executables the gates shell out to.
+_bins=( python3 jq perl bc sha256sum )
+
+_missing=()
+rustup run nightly rustfmt --version >/dev/null 2>&1 || _missing+=( "toolchain:nightly" )
+for _t in "${_tools[@]}"; do
+  cargo "${_t%%:*}" --version >/dev/null 2>&1 || _missing+=( "cargo:${_t#*:}" )
+done
+for _b in "${_bins[@]}"; do
+  command -v "$_b" >/dev/null 2>&1 || _missing+=( "bin:$_b" )
+done
+
+if (( _check )); then
+  if (( ${#_missing[@]} == 0 )); then
+    echo "verb/setup: nothing missing"
+    exit 0
+  fi
+  printf 'missing %s\n' "${_missing[@]}"
+  exit 1
+fi
+
+_cmds=()
+if [[ " ${_missing[*]} " == *" toolchain:nightly "* ]]; then
+  _cmds+=( "rustup toolchain install nightly --profile minimal --component rustfmt" )
+fi
+_crates=()
+for _m in "${_missing[@]}"; do
+  [[ "$_m" == cargo:* ]] && _crates+=( "${_m#cargo:}" )
+done
+if (( ${#_crates[@]} > 0 )); then
+  if cargo binstall -V >/dev/null 2>&1; then
+    _cmds+=( "cargo binstall -y --locked ${_crates[*]}" )
+  else
+    _cmds+=( "cargo install --locked ${_crates[*]}" )
+  fi
+fi
+
+if (( _dry_run )); then
+  printf '%s\n' "${_cmds[@]}"
+  for _m in "${_missing[@]}"; do
+    [[ "$_m" == bin:* ]] && echo "# install ${_m#bin:} with your system package manager"
+  done
+  exit 0
+fi
+
+for _c in "${_cmds[@]}"; do
+  echo "+ $_c"
+  eval "$_c"
+done
+
+for _m in "${_missing[@]}"; do
+  [[ "$_m" == bin:* ]] && echo "verb/setup: install ${_m#bin:} with your system package manager" >&2
+done
+exit 0

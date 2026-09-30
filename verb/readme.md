@@ -32,8 +32,10 @@ No `verb.rulebook.md` exists in this repo to govern these, same as `codename_spa
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first — incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh` — the family's own G1-G21 corpus/quality suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
 | `bench` | Run `ring_bench`'s comparison example — the family's benchmark harness |
-| `clean` | Remove `target/` and gate scratch logs |
+| `loom` | Run every `loom` model (`RUSTFLAGS="--cfg loom"`, own `target-loom/`). `crate::<name>` narrows. Not part of `test` |
+| `clean` | Remove `target/`, `target-loom/` and gate scratch logs |
 | `verify` | Full pre-push gate — alias for `test level::5` |
+| `setup` | Install the nightly toolchain and cargo tools the verbs and gates call. `check::1` lists what is missing |
 | `verbs` | List all verbs with their purpose line |
 | `package_info` | Family manifest info as flat JSON — no single crate here is "the" package (34 peer members), so this describes the family the workspace root declares |
 | `_crate_dispatch` | Shared implementation behind every per-crate `verb/{test,test_only,lint,build}` wrapper. Not a verb — takes a verb name and crate name as its first two args, never invoked directly |

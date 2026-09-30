@@ -129,3 +129,12 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | Directory | Responsibility |
 |-----------|-----------------|
 | [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...) — not a crate, no `Cargo.toml` |
+| [`.agents/skills/`](.agents/skills) | Checklists for coding agents, one `SKILL.md` each — see [`agents.md`](agents.md) |
+
+## Contributing
+
+| File | Responsibility |
+|------|-----------------|
+| [`architecture.md`](architecture.md) | How a record moves through the family, the code map, the invariants a change must keep |
+| [`codestyle.md`](codestyle.md) | Conventions the code already follows, including the doc corpus the gates grade |
+| [`agents.md`](agents.md) | Rules for coding agents, and how to hook one up |

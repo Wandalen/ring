@@ -9,7 +9,7 @@ alternative to a mutex-guarded queue and `crossbeam-queue::ArrayQueue` for
 many-producer/single-consumer, hard-latency-budget workloads.
 
 - **Repo:** [`Wandalen/ring`](https://github.com/Wandalen/ring), branch `master`
-- **Start here:** [`../../readme.md`](../../readme.md) — architecture, the
+- **Start here:** [`../../README.md`](../../README.md) — architecture, the
   11-tier dependency graph, and the "Why in-house, not off-the-shelf"
   section covering what was measured and why
 

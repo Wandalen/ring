@@ -74,20 +74,46 @@ finding; note that the suite is unchanged, because the repair was structural.
 succeeded. `u64 as usize` is legal, intentional-looking, and warning-free; that
 is what a cast *is* in Rust. `clippy::cast_possible_truncation` would have
 flagged it, and it lives in the `pedantic` group, which the workspace does not
-enable — the whole clippy table is still one line:
+enable — the clippy table names individual lints, and not this one:
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
 sed -n '/\[workspace.lints.clippy\]/,/^\[[a-z]/p' Cargo.toml
-# [workspace.lints.clippy]
-# undocumented_unsafe_blocks = "deny"
 ```
 
 Live output:
 
 ```
 [workspace.lints.clippy]
+# Unsafe: one operation per block, each with its own `// SAFETY:`.
 undocumented_unsafe_blocks = "deny"
+multiple_unsafe_ops_per_block = "deny"
+unnecessary_safety_comment = "warn"
+unnecessary_safety_doc = "warn"
+cast_ptr_alignment = "warn"
+ptr_as_ptr = "warn"
+ptr_cast_constness = "warn"
+mem_forget = "warn"
+# Concurrency: locks are what this family exists to avoid; refcount bumps stay visible.
+mutex_atomic = "warn"
+mutex_integer = "warn"
+rc_mutex = "warn"
+clone_on_ref_ptr = "warn"
+# Determinism: hash iteration order would leak into the delivery order.
+iter_over_hash_type = "warn"
+# Sequence and index arithmetic.
+cast_sign_loss = "warn"
+precedence_bits = "warn"
+# Hygiene.
+dbg_macro = "warn"
+exit = "warn"
+infinite_loop = "warn"
+large_stack_frames = "warn"
+todo = "warn"
+unimplemented = "warn"
+unused_result_ok = "warn"
+
+[workspace.lints.rustdoc]
 ```
 
 **4. Reviewing the diff that introduced it.** Nothing to see. Written on a

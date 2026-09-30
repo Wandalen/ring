@@ -5,6 +5,9 @@ do-protocol verb scripts for the `ring` repository — one Cargo workspace, 34 m
 (twelve independent workspaces, fanned out via `each_workspace`), every verb here
 reaches the whole family directly — no fan-out step exists or is needed.
 
+The root [`justfile`](../justfile) mirrors every verb here as a `just` recipe, with no dependency
+on these scripts, so the repo can move to `just` and retire them (`just --list`).
+
 This is the repo root's `verb/`. Every one of the 34 crates also has its own `verb/`
 (`test`, `test_only`, `lint`, `build` — see e.g. [`../ring_spsc/verb/readme.md`](../ring_spsc/verb/readme.md)),
 for iterating on one crate without touching the other 33. Those are thin wrappers —
@@ -28,12 +31,14 @@ No `verb.rulebook.md` exists in this repo to govern these, same as `codename_spa
 | `test_only` | Filtered nextest run — `filter::<substring>`, `crate::<name>`. Ordinary verification during development |
 | `lint` | Clippy, warnings as errors. `crate::<name>` narrows to one package |
 | `build` | Compile the workspace. `crate::<name>` narrows to one package |
-| `fmt` | Apply this repo's adopted rustfmt style workspace-wide (`+nightly`, `rustfmt.toml`). `check::1` verifies without writing |
+| `fmt` | Format Rust (nightly rustfmt, `rustfmt.toml`) and TOML (taplo, `taplo.toml`) workspace-wide. `check::1` verifies without writing |
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first — incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh` — the family's own G1-G21 corpus/quality suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
 | `bench` | Run `ring_bench`'s comparison example — the family's benchmark harness |
-| `clean` | Remove `target/` and gate scratch logs |
+| `loom` | Run every `loom` model (`RUSTFLAGS="--cfg loom"`, own `target-loom/`). `crate::<name>` narrows. Not part of `test` |
+| `clean` | Remove `target/`, `target-loom/` and gate scratch logs |
 | `verify` | Full pre-push gate — alias for `test level::5` |
+| `setup` | Install the nightly toolchain and cargo tools the verbs and gates call. `check::1` lists what is missing |
 | `verbs` | List all verbs with their purpose line |
 | `package_info` | Family manifest info as flat JSON — no single crate here is "the" package (34 peer members), so this describes the family the workspace root declares |
 | `_crate_dispatch` | Shared implementation behind every per-crate `verb/{test,test_only,lint,build}` wrapper. Not a verb — takes a verb name and crate name as its first two args, never invoked directly |

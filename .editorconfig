@@ -1,0 +1,27 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+[*.{rs,toml}]
+indent_size = 4
+max_line_length = 100
+
+[justfile]
+indent_size = 4
+
+# ~200 corpus files carry trailing spaces; trimming on save churns unrelated lines.
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off
+
+# Gate fixtures and trybuild inputs are byte-exact on purpose.
+[{bench_harness/gate/declared/**,**/tests/ui/**}]
+trim_trailing_whitespace = false
+insert_final_newline = unset
+indent_size = unset

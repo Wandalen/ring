@@ -191,7 +191,7 @@ as part of the pattern: *an owner makes duplication visible, not impossible*.
 |------|--------------|
 | `ring_types/src/error.rs:1-10` | The family's other instance of the pattern, stated by its own author |
 | `ring_types/src/lib.rs:3-8` | Why tier 0 is universally reachable — the property that makes that instance hold |
-| [`../../../readme.md`](../../../readme.md) | The 33-crate decomposition both instances range over |
+| [`../../../README.md`](../../../README.md) | The 33-crate decomposition both instances range over |
 
 ### Tests
 

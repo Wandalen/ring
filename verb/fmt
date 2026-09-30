@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-#@ purpose: Apply this repo's adopted rustfmt style (rustfmt.toml) across the
-#@          whole workspace. check::1 verifies without writing (CI-safe);
-#@          default applies in place. Must run under +nightly — rustfmt.toml's
-#@          unstable_features (group_imports, imports_layout) silently no-op
-#@          on stable.
+#@ purpose: Format the workspace: Rust with nightly rustfmt (rustfmt.toml), TOML with
+#@          taplo (taplo.toml). check::1 verifies without writing (CI-safe). Nightly is
+#@          required — rustfmt.toml's unstable options silently no-op on stable.
 #@ tags: verb, fmt
 set -euo pipefail
 
@@ -22,12 +20,17 @@ for _arg in "$@"; do
   esac
 done
 
-_cmd=( cargo +nightly fmt --all )
-(( _check )) && _cmd+=( -- --check )
+_rust=( cargo +nightly fmt --all )
+_toml=( taplo fmt )
+if (( _check )); then
+  _rust+=( -- --check )
+  _toml+=( --check )
+fi
 
 if (( _dry_run )); then
-  printf '%s\n' "${_cmd[*]}"
+  printf '%s\n' "${_rust[*]}" "RUST_LOG=error ${_toml[*]}"
   exit 0
 fi
 
-exec "${_cmd[@]}"
+"${_rust[@]}"
+RUST_LOG=error "${_toml[@]}"

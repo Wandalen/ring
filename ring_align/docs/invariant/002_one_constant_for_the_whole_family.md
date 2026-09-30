@@ -331,7 +331,7 @@ unenforced rather than as a design flaw.
 | File | Relationship |
 |------|--------------|
 | [`bench_harness/gate/declared/ring/unsafe_allowlist.txt`](../../../bench_harness/gate/declared/ring/unsafe_allowlist.txt) | The same principle applied to a different permission: "a permission nobody exercises is a bound looser than the code actually is" |
-| [`../../../readme.md`](../../../readme.md) | The family this invariant ranges over |
+| [`../../../README.md`](../../../README.md) | The family this invariant ranges over |
 
 ### Tests
 

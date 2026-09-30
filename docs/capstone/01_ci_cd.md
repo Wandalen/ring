@@ -20,7 +20,7 @@ remembers to run it locally. A regression can sit unnoticed indefinitely.
     their own rather than blocking every quick push)
   - `trybuild` UI tests
   - `cargo doc --no-deps` (already passes clean today — keep it that way)
-- Real status badges on the root [`../../readme.md`](../../readme.md). It
+- Real status badges on the root [`../../README.md`](../../README.md). It
   currently ships four static/aspirational badges (Rust edition, "unsafe
   forbidden", crate count, "loom-checked") — replace them with ones backed
   by an actual workflow run, so a green badge means something.

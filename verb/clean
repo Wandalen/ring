@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Remove build artifacts (target/) and gate scratch logs.
+#@ purpose: Remove build artifacts (target/, target-loom/) and gate scratch logs.
 #@ tags: verb, clean
 set -euo pipefail
 
@@ -18,9 +18,11 @@ done
 
 if (( _dry_run )); then
   printf 'cargo clean\n'
+  printf 'rm -rf target-loom\n'
   printf 'rm -f ./-[0-9][0-9][0-9][0-9]_*.log\n'
   exit 0
 fi
 
 cargo clean
+rm -rf target-loom
 rm -f ./-[0-9][0-9][0-9][0-9]_*.log

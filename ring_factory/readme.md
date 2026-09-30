@@ -8,7 +8,7 @@ One of the 33 `ring_*` crates that make up this family's concurrency
 write-path — a 33-crate dependency forest rooted at `ring_types`, acyclic
 by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
 member list; the family as a whole is described in
-[`../readme.md`](../readme.md).
+[`../README.md`](../README.md).
 
 Originally scoped for five dependency edges. Two of them — `ring_stats` and
 `ring_tls` — are gone: `RingConfig` has no field that would configure counters

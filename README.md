@@ -129,3 +129,14 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | Directory | Responsibility |
 |-----------|-----------------|
 | [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...) — not a crate, no `Cargo.toml` |
+| [`justfile`](justfile) | The same tasks as `just` recipes (`just --list`), for the planned move off `verb/` |
+
+## Contributing
+
+| File | Responsibility |
+|------|-----------------|
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Setup, day-to-day verbs, workflow, what a PR needs |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | How a record moves through the family, the code map, the invariants a change must keep |
+| [`CODESTYLE.md`](CODESTYLE.md) | Conventions the code already follows, including the doc corpus the gates grade |
+| [`SECURITY.md`](SECURITY.md) | Reporting a vulnerability |
+| [`AGENTS.md`](AGENTS.md) | Rules for AI coding agents; [`CLAUDE.md`](CLAUDE.md) adds Claude Code specifics |

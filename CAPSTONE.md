@@ -9,7 +9,7 @@ alternative to a mutex-guarded queue and `crossbeam-queue::ArrayQueue` for
 many-producer/single-consumer, hard-latency-budget workloads.
 
 - **Repo:** [`Wandalen/ring`](https://github.com/Wandalen/ring), branch `master`
-- **Start here:** [`readme.md`](readme.md) — architecture, the 11-tier
+- **Start here:** [`README.md`](README.md) — architecture, the 11-tier
   dependency graph, and the build-vs-buy rationale
 
 This is a real codebase, not a toy: unsafe is `deny`-by-default with a
@@ -30,7 +30,7 @@ can fail, not a claim that sounds true.
 2. As of 2026-09-29 (the day of extraction), the working tree still had a
    large post-extraction fixup sitting uncommitted (every crate's
    `Cargo.toml`/`src/lib.rs`, a rescoped gate-family declaration, a new
-   `license` file). That's very likely resolved by the time you read this —
+   `LICENSE` file). That's very likely resolved by the time you read this —
    just run `git status`/`git log` yourself rather than assuming either
    state.
 
@@ -49,7 +49,7 @@ all of it only ever runs when a human remembers to run it locally.
 **Deliverables:** a GitHub Actions workflow that runs on every push/PR:
 build + test (stable, and ideally the MSRV once Topic 4 picks one), the
 existing `bench_harness/gate/` suite, `loom` tests, `trybuild` UI tests, and
-`cargo doc --no-deps`. Real status badges on `readme.md` (it currently has
+`cargo doc --no-deps`. Real status badges on `README.md` (it currently has
 four static/aspirational badges — replace them with ones backed by an
 actual workflow run). Don't reach for `cargo fmt` — this project uses its
 own codestyle; a CI style check should call whatever local convention
@@ -87,7 +87,7 @@ true` set (see `ring_core/Cargo.toml`) — this family is *meant* to ship,
 but nothing verifies it actually can, and there's no release process.
 
 **Deliverables:** `cargo publish --dry-run` passing for all 34 crates in
-dependency order (the `readme.md` mermaid graph gives you that order
+dependency order (the `README.md` mermaid graph gives you that order
 already); an audit of per-crate metadata gaps (`keywords`, `categories`,
 `documentation`) for crates.io discoverability; a documented MSRV policy
 tested in CI; `cargo-semver-checks` wired in so a 0.1.x → 0.1.(x+1) bump

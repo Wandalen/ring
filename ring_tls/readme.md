@@ -9,7 +9,7 @@ Depends on [`ring_types`](../ring_types/readme.md) and
 up this family's concurrency write-path — a 33-crate dependency forest rooted
 at `ring_types`, acyclic by construction. Build order follows
 [`../Cargo.toml`](../Cargo.toml)'s member list; the family as a whole is
-described in [`../readme.md`](../readme.md). This crate was `bump_log` before
+described in [`../README.md`](../README.md). This crate was `bump_log` before
 the family adopted a single prefix.
 
 It carries no *consumer*-side family prefix for the original reason: no

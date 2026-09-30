@@ -9,7 +9,7 @@ contexts — right now that's almost entirely unexplored beyond those three.
 
 ## Likely infeasible, and that's fine — document it
 
-The root [`../../readme.md`](../../readme.md) itself flags two crates as
+The root [`../../README.md`](../../README.md) itself flags two crates as
 probably needing `std` no matter what: `ring_wait` (parking/wait strategies
 typically need `std::thread`) and `ring_tls` (thread-locals). A documented
 **negative** verdict — "audited, and here's specifically why this crate

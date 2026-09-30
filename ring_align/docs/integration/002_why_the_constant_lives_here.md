@@ -173,7 +173,7 @@ observed.
 |------|--------------|
 | `ring_cursor/readme.md` | The stated payoff of the separation |
 | `ring_cursor/src/lib.rs:69` | The single re-export, and the gap a second one would have closed |
-| [`../../../readme.md`](../../../readme.md) | The 33-crate decomposition this placement is one instance of |
+| [`../../../README.md`](../../../README.md) | The 33-crate decomposition this placement is one instance of |
 
 ### Tests
 

@@ -1,9 +1,22 @@
 target/
 Cargo.lock
 dist/
-.claude/
 -*
 *.log
+
+# Per-developer AI agent state. The shared part — `.claude/settings.json`,
+# `.claude/skills/`, `.claude/hooks/` — is tracked (see CONTRIBUTING.md).
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/worktrees/
+
+# Editor state: the repository assumes no particular IDE.
+/.idea/
+/.vscode/
+/.zed/
+/.fleet/
+/.helix/
+*.iml
 
 # Out-of-tree build directories. `target/` above is a trailing-slash pattern,
 # so it matches that exact name and nothing else — a run that isolates itself

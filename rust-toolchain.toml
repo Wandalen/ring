@@ -1,0 +1,8 @@
+# Development toolchain, not the MSRV. Pinned because trybuild's recorded
+# stderr (`ring_handle/tests/ui/*.stderr`) is compiler-specific; `rust-src` is
+# listed for the same reason — with it rustc quotes std source in those notes.
+# `verb/fmt` and `verb/test level::4` also need a nightly (`+nightly`).
+[toolchain]
+channel = "1.98.1"
+components = [ "clippy", "rustfmt", "rust-src", "rust-analyzer" ]
+profile = "minimal"

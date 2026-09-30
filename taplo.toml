@@ -1,0 +1,21 @@
+include = ["**/*.toml"]
+exclude = ["target/**", "target-*/**"]
+
+[formatting]
+indent_string = "    "
+column_width = 100
+align_entries = false
+reorder_keys = false
+
+# Dependencies sort alphabetically within each comment-separated group.
+# `[workspace] members` is an array and keeps its dependency order.
+[[rule]]
+include = ["**/Cargo.toml"]
+keys = [
+    "dependencies",
+    "dev-dependencies",
+    "build-dependencies",
+    "target.*.dependencies",
+    "target.*.dev-dependencies",
+]
+formatting = { reorder_keys = true }

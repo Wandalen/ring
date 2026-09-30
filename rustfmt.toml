@@ -1,15 +1,32 @@
-# No rustfmt option matches this codebase's own-line braces (nightly-only
-# `brace_style`, verified inert on stable 1.9.0) or its delimiter spacing
-# (`Vec< T >`, `fn foo( x : i32 )` — no option exists, stable or nightly).
-# `cargo fmt` will still rewrite both regardless of this file.
-tab_spaces = 2
-hard_tabs = false
-newline_style = "Unix"
-max_width = 130
-
-# Nightly-only: warn-and-noop under plain `cargo fmt` (stable), take effect
-# only under `cargo +nightly fmt`. Already matches this codebase's
-# hand-applied import style (see ring_factory/src/lib.rs).
+# Nightly rustfmt only (`./verb/fmt`): stable silently ignores the unstable options.
 unstable_features = true
+
+edition = "2024"
+style_edition = "2024"
+newline_style = "Unix"
+max_width = 100
+use_small_heuristics = "Max"
+
 group_imports = "StdExternalCrate"
+imports_granularity = "Module"
 imports_layout = "HorizontalVertical"
+
+use_field_init_shorthand = true
+reorder_impl_items = true
+use_try_shorthand = true
+match_block_trailing_comma = true
+
+# Comment bodies are never rewrapped: that would break links and hand-laid doc tables.
+wrap_comments = false
+comment_width = 100
+normalize_comments = true
+normalize_doc_attributes = true
+format_code_in_doc_comments = true
+format_macro_matchers = true
+hex_literal_case = "Upper"
+
+format_generated_files = false
+# Code that cannot fit in 100 columns is an error. Comments and strings are exempt:
+# ~85 doc-table rows are wider, and rustfmt cannot rewrap them.
+error_on_line_overflow = true
+error_on_unformatted = false

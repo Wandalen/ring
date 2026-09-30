@@ -278,7 +278,7 @@ crate's reach would run first.
 | `ring_align/Cargo.toml` | The declaration measured above |
 | `ring_cursor/Cargo.toml` | The one inbound edge |
 | `ring_align/task/unverified/101_implement_ring_align.md` | Where the `ring_types` claim originates |
-| [`../../../readme.md`](../../../readme.md) | The 33-crate family the edge count is measured against |
+| [`../../../README.md`](../../../README.md) | The 33-crate family the edge count is measured against |
 
 ### Tests
 

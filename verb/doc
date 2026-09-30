@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Rebuild rustdoc from a clean slate. Always rm -rf target/doc first —
+#@ purpose: Rebuild rustdoc from a clean slate. Always removes the doc output dir first —
 #@          incremental `cargo doc` silently skips re-checking unchanged crates, which
 #@          hides broken intra-doc links there (see reference_cargo_doc_incremental_hides_errors).
 #@ tags: verb, doc
@@ -18,11 +18,15 @@ for _arg in "$@"; do
   esac
 done
 
+# Not `target/doc`: CARGO_TARGET_DIR or a `build.target-dir` in cargo config moves it.
+_target="$(cargo metadata --no-deps --format-version 1 \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["target_directory"])')"
+
 if (( _dry_run )); then
-  printf 'rm -rf target/doc\n'
+  printf 'rm -rf %s/doc\n' "$_target"
   printf 'RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --keep-going\n'
   exit 0
 fi
 
-rm -rf target/doc
+rm -rf "$_target/doc"
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --all-features --keep-going

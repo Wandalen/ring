@@ -8,7 +8,7 @@ One of the 33 `ring_*` crates that make up this family's concurrency
 write-path — a 33-crate dependency forest rooted at `ring_types`, acyclic
 by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
 member list; the family as a whole is described in
-[`../readme.md`](../readme.md).
+[`../README.md`](../README.md).
 
 Implemented. Behaviour is asserted by
 [`tests/trace_test.rs`](tests/trace_test.rs) and read by hand against

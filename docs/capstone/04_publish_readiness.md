@@ -9,7 +9,7 @@ there's no release process at all.
 
 ## The five crates that matter most here
 
-Per the root [`../../readme.md`](../../readme.md), only 5 of the 33
+Per the root [`../../README.md`](../../README.md), only 5 of the 33
 `ring_*` crates are meant to be depended on from outside the family:
 `ring_types`, `ring_handle`, `ring_tls`, `ring_flush`, `ring_factory`. These
 are where a metadata gap or an accidental breaking change actually costs

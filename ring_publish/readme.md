@@ -8,7 +8,7 @@ One of the 33 `ring_*` crates that make up this family's concurrency
 write-path — a 33-crate dependency forest rooted at `ring_types`, acyclic
 by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
 member list; the family as a whole is described in
-[`../readme.md`](../readme.md).
+[`../README.md`](../README.md).
 
 Implemented, delivering the publish half of the four-operation handshake — a producer advances the
 published cursor only when it has *finished writing* the range it claimed, and

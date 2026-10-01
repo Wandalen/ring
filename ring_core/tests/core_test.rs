@@ -470,6 +470,48 @@ fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
   }
 }
 
+/// A batch push into a full `Fail` ring destroys no record on any backend.
+///
+/// The payload counts its own drops, so a record the call swallows shows up as
+/// a drop while the ring, the iterator and the call's result are all still
+/// alive. The result is held in a named binding rather than `let _`, which
+/// would drop a handed-back record on the spot and count it as lost.
+#[test]
+fn a_refused_batch_push_drops_no_record_on_every_backend() {
+  use std::sync::Arc;
+  use std::sync::atomic::{AtomicUsize, Ordering};
+
+  #[derive(Debug)]
+  struct Tracked(Arc<AtomicUsize>);
+  impl Drop for Tracked {
+    fn drop(&mut self) {
+      self.0.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+
+  // Every backend is measured before anything is asserted, so a failure names
+  // all of them rather than stopping at the first.
+  let destroyed: Vec<(Backend, usize)> = every_backend()
+    .into_iter()
+    .map(|backend| {
+      let drops = Arc::new(AtomicUsize::new(0));
+      let mut ring: Ring<Tracked> = ring_on(backend, 4, OverflowPolicy::Fail).unwrap();
+      let mut ends = ring.ends();
+      let (mut producer, _consumer) = ends.split();
+
+      let mut records = (0..6).map(|_| Tracked(Arc::clone(&drops)));
+      let _outcome = producer.try_push_batch(&mut records);
+
+      (backend, drops.load(Ordering::SeqCst))
+    })
+    .collect();
+
+  assert!(
+    destroyed.iter().all(|(_, drops)| *drops == 0),
+    "a refused record was destroyed, per backend: {destroyed:?}"
+  );
+}
+
 /// An empty iterator is accepted as zero rather than treated as an error.
 #[test]
 fn an_empty_batch_push_is_a_no_op() {

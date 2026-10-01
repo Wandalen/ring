@@ -519,7 +519,7 @@ fn drain_up_to_stops_at_the_limit() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..5)), 5, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..5)), Ok(5), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 3), 3);
@@ -533,7 +533,7 @@ fn drain_up_to_stops_when_the_ring_empties_first() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..2)), 2, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..2)), Ok(2), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 10), 2);
@@ -546,7 +546,7 @@ fn drain_up_to_zero_touches_nothing() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..3)), 3, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..3)), Ok(3), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 0), 0);

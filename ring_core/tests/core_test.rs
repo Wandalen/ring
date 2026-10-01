@@ -440,14 +440,14 @@ fn crossbeam_honours_drop_oldest_by_evicting() {
 // Batch shapes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// A partial batch push reports its count and leaves the iterator positioned.
+/// A partial batch push reports its count and hands back the refused record.
 ///
 /// The iterator's position is the part worth pinning. The refused record was
-/// already taken from the iterator when the push failed, so a caller resuming
-/// from it resumes *after* the refusal, not at it. That is a real edge, and a
-/// caller who assumes otherwise silently drops one record per refusal.
+/// already taken from the iterator when the push failed, so the iterator
+/// resumes *after* it. The record comes back in the `Err`, so the two together
+/// are everything that was not published, in order.
 #[test]
-fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
+fn a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record() {
   const CAPACITY: usize = 2;
 
   for backend in every_backend() {
@@ -456,16 +456,15 @@ fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
     let (mut producer, _consumer) = ends.split();
 
     let mut records = 0..5_u32;
-    let accepted = producer.try_push_batch(&mut records);
-
     assert_eq!(
-      accepted, CAPACITY,
-      "{backend:?} accepted a different count than it had room for"
+      producer.try_push_batch(&mut records),
+      Err((CAPACITY, 2)),
+      "{backend:?}: two went in, then record 2 was refused and handed back"
     );
     assert_eq!(
       records.next(),
       Some(3),
-      "{backend:?}: record 2 was taken from the iterator by the refusal, so 3 is next"
+      "{backend:?}: the iterator resumes after the refused record"
     );
   }
 }
@@ -521,7 +520,7 @@ fn an_empty_batch_push_is_a_no_op() {
     let (mut producer, consumer) = ends.split();
 
     let mut nothing = core::iter::empty();
-    assert_eq!(producer.try_push_batch(&mut nothing), 0);
+    assert_eq!(producer.try_push_batch(&mut nothing), Ok(0));
     assert!(consumer.is_empty(), "{backend:?} published something from an empty iterator");
   }
 }

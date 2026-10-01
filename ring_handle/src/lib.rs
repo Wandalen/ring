@@ -128,7 +128,8 @@ impl<T: Send> Producer<'_, T> {
   /// Partial acceptance is the normal case; the iterator is left positioned at
   /// the first record that did not fit.
   pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
-    self.inner.try_push_batch(records)
+    let (Ok(accepted) | Err((accepted, _))) = self.inner.try_push_batch(records);
+    accepted
   }
 
   /// How much room there is, as a lower bound.

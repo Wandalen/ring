@@ -335,7 +335,7 @@ pub fn push_batch_within<T: Send>(
   let mut total = 0;
   let mut attempt = 0;
   while attempt < budget.attempts() {
-    let moved = producer.try_push_batch(records);
+    let (Ok(moved) | Err((moved, _))) = producer.try_push_batch(records);
     total += moved;
     if moved == 0 {
       break;
@@ -403,7 +403,7 @@ pub fn recv_within<T: Send>(consumer: &mut Consumer<'_, T>, budget: Budget) -> O
 /// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
 /// let mut ends = ring.ends();
 /// let ( mut producer, mut consumer ) = ends.split();
-/// producer.try_push_batch( &mut ( 0..5 ) );
+/// producer.try_push_batch( &mut ( 0..5 ) ).unwrap();
 ///
 /// let mut out = Vec::new();
 /// assert_eq!( drain_up_to( &mut consumer, &mut out, 3 ), 3 );

@@ -224,7 +224,7 @@ impl<'a> Stopped<'a> {
   /// let mut ends = ring.ends();
   /// let ( mut producer, mut consumer ) = ends.split();
   ///
-  /// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() );
+  /// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() ).unwrap();
   ///
   /// let shutdown = Shutdown::new();
   /// let stopped = shutdown.close();
@@ -278,7 +278,7 @@ impl<'a> Stopped<'a> {
   /// let mut ends = ring.ends();
   /// let ( mut producer, mut consumer ) = ends.split();
   ///
-  /// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() );
+  /// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() ).unwrap();
   ///
   /// let shutdown = Shutdown::new();
   /// let stopped = shutdown.close();
@@ -449,7 +449,8 @@ impl<'a, T: Send> Guarded<'a, T> {
     if self.shutdown.is_closed() {
       return 0;
     }
-    self.producer.try_push_batch(records)
+    let (Ok(accepted) | Err((accepted, _))) = self.producer.try_push_batch(records);
+    accepted
   }
 
   /// Room in the ring, binding at SPSC and advisory elsewhere, per
@@ -659,7 +660,7 @@ pub fn for_space_or_close(pair: &CursorPair, shutdown: &Shutdown, kind: WaitKind
 /// let mut ends = ring.ends();
 /// let ( mut producer, mut consumer ) = ends.split();
 ///
-/// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() );
+/// producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() ).unwrap();
 ///
 /// let shutdown = Shutdown::new();
 /// assert_eq!( reset( &shutdown, &mut consumer ), 3 );

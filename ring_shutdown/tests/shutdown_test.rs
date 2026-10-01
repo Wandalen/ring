@@ -77,7 +77,7 @@ fn the_three_operations_hand_back_a_ring_fit_for_the_next_run() {
   {
     let mut ends = used.ends();
     let (mut producer, mut consumer) = ends.split();
-    assert_eq!(producer.try_push_batch(&mut [10, 11, 12].into_iter()), 3);
+    assert_eq!(producer.try_push_batch(&mut [10, 11, 12].into_iter()), Ok(3));
 
     let shutdown = Shutdown::new();
     let mut guarded = shutdown.guard(producer);
@@ -102,7 +102,11 @@ fn the_three_operations_hand_back_a_ring_fit_for_the_next_run() {
   for (ring, out) in [(&mut used, &mut from_used), (&mut fresh, &mut from_fresh)] {
     let mut ends = ring.ends();
     let (mut producer, mut consumer) = ends.split();
-    assert_eq!(producer.try_push_batch(&mut script.into_iter()), 4, "a full capacity again");
+    assert_eq!(
+      producer.try_push_batch(&mut script.into_iter()),
+      Ok(4),
+      "a full capacity again"
+    );
     assert!(producer.is_full(), "and exactly full, not more");
     assert_eq!(consumer.try_recv_batch(out), 4, "the drain took the whole script");
   }
@@ -294,10 +298,10 @@ fn drain_all_loops_until_the_ring_is_actually_empty() {
   let (mut producer, mut consumer) = ends.split();
 
   // Fill, half-drain, refill. The tail now wraps.
-  assert_eq!(producer.try_push_batch(&mut [1, 2, 3, 4].into_iter()), 4);
+  assert_eq!(producer.try_push_batch(&mut [1, 2, 3, 4].into_iter()), Ok(4));
   assert_eq!(consumer.try_recv(), Some(1));
   assert_eq!(consumer.try_recv(), Some(2));
-  assert_eq!(producer.try_push_batch(&mut [5, 6].into_iter()), 2);
+  assert_eq!(producer.try_push_batch(&mut [5, 6].into_iter()), Ok(2));
 
   let shutdown = Shutdown::new();
   let stopped = shutdown.close();
@@ -319,7 +323,7 @@ fn discard_all_empties_the_ring_and_counts_what_it_dropped() {
   let mut ring = ring(4);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut [1, 2, 3].into_iter()), 3);
+  assert_eq!(producer.try_push_batch(&mut [1, 2, 3].into_iter()), Ok(3));
 
   let shutdown = Shutdown::new();
   let stopped = shutdown.close();
@@ -335,7 +339,7 @@ fn reset_discards_and_leaves_the_ring_open() {
   let mut ring = ring(4);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut [1, 2].into_iter()), 2);
+  assert_eq!(producer.try_push_batch(&mut [1, 2].into_iter()), Ok(2));
 
   let shutdown = Shutdown::new();
   let _ = shutdown.close();
@@ -416,7 +420,7 @@ fn a_bounded_drain_separates_finishing_from_running_out() {
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
 
-  assert_eq!(producer.try_push_batch(&mut [1, 2, 3].into_iter()), 3);
+  assert_eq!(producer.try_push_batch(&mut [1, 2, 3].into_iter()), Ok(3));
 
   let shutdown = Shutdown::new();
   let stopped = shutdown.close();

@@ -244,6 +244,8 @@ fn a_full_drop_newest_ring_reports_success_and_keeps_nothing() {
 ///
 /// This matters because a caller resuming from the same iterator after a
 /// close must find every record still there, or the close silently ate one.
+/// That is why a close answers `Ok( 0 )` rather than handing a record back.
+/// It never took one.
 #[test]
 fn a_closed_batch_push_consumes_nothing() {
   let mut ring = ring(8);
@@ -254,12 +256,12 @@ fn a_closed_batch_push_consumes_nothing() {
   let mut guarded = shutdown.guard(producer);
 
   let mut open_records = [1, 2, 3].into_iter();
-  assert_eq!(guarded.try_push_batch(&mut open_records), 3);
+  assert_eq!(guarded.try_push_batch(&mut open_records), Ok(3));
 
   let _ = shutdown.close();
 
   let mut closed_records = [4, 5, 6].into_iter();
-  assert_eq!(guarded.try_push_batch(&mut closed_records), 0);
+  assert_eq!(guarded.try_push_batch(&mut closed_records), Ok(0));
   assert_eq!(closed_records.collect::<Vec<_>>(), [4, 5, 6], "nothing was taken");
 }
 
@@ -475,17 +477,15 @@ fn closing_through_the_guards_own_accessor_stops_the_guard() {
   assert!(shutdown.is_closed(), "and it is the same flag, not a copy");
 }
 
-/// A refusing ring loses the record that hit the wall, and the batch count
-/// does not say so.
+/// A refusing ring hands back the record that hit the wall, so a full ring
+/// during shutdown loses nothing.
 ///
-/// `try_push_batch` moves each record into `try_push` and breaks on the first
-/// error, so the refused record is consumed from the iterator and dropped
-/// inside the call. The caller sees `0` accepted and an iterator that has
-/// already given up one more than that. The loss is real and this test
-/// measures it. It belongs to `ring_core::Producer::try_push_batch` rather
-/// than to the guard, which only forwards.
+/// The refused record was already taken from the iterator when the push
+/// failed, so it comes back in the `Err` beside the count, and the iterator
+/// resumes after it. The two together are everything that was not published,
+/// in order.
 #[test]
-fn a_batch_into_a_full_refusing_ring_destroys_the_record_that_was_refused() {
+fn a_batch_into_a_full_refusing_ring_hands_back_the_record_that_was_refused() {
   let mut ring = refusing_ring(2);
   let mut ends = ring.ends();
   let (producer, mut consumer) = ends.split();
@@ -494,16 +494,16 @@ fn a_batch_into_a_full_refusing_ring_destroys_the_record_that_was_refused() {
   let mut guarded = shutdown.guard(producer);
 
   let mut filling = [1, 2].into_iter();
-  assert_eq!(guarded.try_push_batch(&mut filling), 2);
+  assert_eq!(guarded.try_push_batch(&mut filling), Ok(2));
   assert!(guarded.is_blocked(), "the ring is full and the policy is Fail");
 
   let mut overflowing = [3, 4, 5].into_iter();
-  assert_eq!(guarded.try_push_batch(&mut overflowing), 0, "nothing was accepted");
   assert_eq!(
-    overflowing.collect::<Vec<_>>(),
-    [4, 5],
-    "record 3 is neither in the ring nor in the iterator — it was destroyed",
+    guarded.try_push_batch(&mut overflowing),
+    Err((0, 3)),
+    "nothing was accepted, and record 3 came back"
   );
+  assert_eq!(overflowing.collect::<Vec<_>>(), [4, 5], "the iterator resumes after it");
 
   let mut recovered = Vec::new();
   shutdown.close().drain_all(&mut consumer, &mut recovered);
@@ -512,8 +512,8 @@ fn a_batch_into_a_full_refusing_ring_destroys_the_record_that_was_refused() {
 
 /// Under the default policy the batch count is not a count of what is stored.
 ///
-/// `DropNewest` makes every push report `Ok`, so the loop never breaks and the
-/// returned number is the length of the iterator rather than the number of
+/// `DropNewest` makes every push report `Ok`, so nothing is ever refused and
+/// the returned number is the length of the iterator rather than the number of
 /// records the ring kept. A caller treating it as an accept-count over-reports
 /// by exactly the overflow. Here that is three claimed, one stored.
 #[test]
@@ -529,7 +529,7 @@ fn a_batch_into_a_full_drop_newest_ring_counts_records_it_did_not_keep() {
   assert!(!guarded.is_blocked());
 
   let mut overflowing = [2, 3, 4].into_iter();
-  assert_eq!(guarded.try_push_batch(&mut overflowing), 3, "three reported accepted");
+  assert_eq!(guarded.try_push_batch(&mut overflowing), Ok(3), "three reported accepted");
   assert_eq!(overflowing.count(), 0, "and the whole iterator was consumed");
 
   let mut recovered = Vec::new();

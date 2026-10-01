@@ -438,19 +438,28 @@ impl<'a, T: Send> Guarded<'a, T> {
     self.producer.try_push(record).map_err(Refusal::Full)
   }
 
-  /// Publish from `records` until one is refused, and return the count
-  /// [`Producer::try_push_batch`] returns.
+  /// Publish from `records` until one is refused, and hand back the one that
+  /// was.
   ///
-  /// Checks the flag once, before the first read. A closed ring accepts nothing,
-  /// so this returns `0` without consuming from the iterator, and a close during
-  /// the batch does not stop it. Past that check this is
-  /// `Producer::try_push_batch`, and its pitfall applies unchanged.
-  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
+  /// Checks the flag once, before the first read. A closed ring accepts
+  /// nothing, so this returns `Ok( 0 )` without consuming from the iterator:
+  /// there is no record to hand back, and every record offered after the close
+  /// is still the caller's. A close during the batch does not stop it. Past
+  /// that check this is [`Producer::try_push_batch`], and its pitfall applies
+  /// unchanged.
+  ///
+  /// # Errors
+  ///
+  /// `( n, record )` when `n` records went in and then the ring refused
+  /// `record` for want of room, as [`Producer::try_push_batch`] documents. The
+  /// iterator resumes after `record`, so a full ring during shutdown loses
+  /// nothing. Like [`Guarded::try_push`]'s `Full`, this is unreachable under
+  /// `OverflowPolicy::DropNewest`.
+  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> Result<usize, (usize, T)> {
     if self.shutdown.is_closed() {
-      return 0;
+      return Ok(0);
     }
-    let (Ok(accepted) | Err((accepted, _))) = self.producer.try_push_batch(records);
-    accepted
+    self.producer.try_push_batch(records)
   }
 
   /// Room in the ring, binding at SPSC and advisory elsewhere, per

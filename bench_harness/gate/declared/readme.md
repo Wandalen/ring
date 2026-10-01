@@ -76,6 +76,12 @@ under `ring/` at all:
 |------|-----------------|---------|
 | `pinned_allowlist.txt` | Files permitted to reach libm by either route, each still required to do so | `g10_pinned_math.sh` |
 
+And one optional list `ring/` does declare:
+
+| File | Responsibility | Read by |
+|------|-----------------|---------|
+| `internal_consumers.txt` | Crates outside the family that may name any of its crates — in-tree tools that measure the internals, each with a reason | `g5_export_surface.sh` |
+
 And four directories, all under `ring/` — the only family this repository
 declares:
 

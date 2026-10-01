@@ -59,6 +59,23 @@ fi
 mapfile -t members < <( family_members )
 [ ${#members[@]} -gt 0 ] || fail "family '$GATE_FAMILY' declares no members"
 
+# Crates outside the family that may name any member: in-tree tools that measure the family's
+# internals and build with it, so a refactor breaks them in the same change rather than
+# downstream. `crate_name  reason`, like exempt.txt. A separate list rather than a wider
+# export surface, which is the family's contract with real consumers. Counted in the pass line.
+declare -A internal=()
+consumers="$DECL/internal_consumers.txt"
+if [ -f "$consumers" ]; then
+  while read -r line; do
+    name="${line%%[[:space:]]*}"
+    reason="${line#"$name"}"
+    reason="${reason#"${reason%%[![:space:]]*}"}"
+    [ -n "$reason" ] || fail "internal consumer without a reason: $name"
+    crate_dir "$name" >/dev/null || fail "internal consumer declared but absent from disk: $name"
+    internal["$name"]=1
+  done < <( decl_lines "$consumers" )
+fi
+
 # The dependency names to look for: every family member, as an alternation.
 #
 # Disclosed, not fixed: this alternation matches against the dependency KEY —
@@ -95,6 +112,7 @@ while read -r manifest; do
   # what leaves the family, not what moves inside it.
   owner="$( basename "$( dirname "$manifest" )" )"
   printf '%s\n' "${members[@]}" | grep -qx -- "$owner" && continue
+  [ -z "${internal[$owner]:-}" ] || continue
   # Fix(g5_workspace_dependencies_read_as_edges): a `[workspace.dependencies]`
   # table names every family crate a member may inherit, and the scan read each
   # row as the root manifest depending on it — 24 violations the moment the
@@ -129,7 +147,8 @@ fi
 # export crate still has its dependency half graded — that half is a whole-repo
 # scan and is stage-independent — but reporting only "confined to N crates"
 # would read as though the substance check had run and passed.
+n_int=${#internal[@]}
 if [ ${#graded[@]} -eq 0 ]; then
-  pass "external dependencies confined to the ${#allowed[@]} declared crates; no export crate in this stage, so substance is graded by the stage that owns one"
+  pass "external dependencies confined to the ${#allowed[@]} declared crates; no export crate in this stage, so substance is graded by the stage that owns one; $n_int internal consumer(s) skipped"
 fi
-pass "external dependencies confined to the ${#allowed[@]} declared crates, ${#graded[@]} of which export a non-empty surface"
+pass "external dependencies confined to the ${#allowed[@]} declared crates, ${#graded[@]} of which export a non-empty surface; $n_int internal consumer(s) skipped"

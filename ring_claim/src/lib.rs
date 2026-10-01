@@ -412,13 +412,18 @@ impl<'a> Claimer<'a> {
     // The gate is the loop condition, and is therefore re-read on every
     // iteration: on a failed exchange another producer moved the cursor, so
     // the headroom computed against the old value is stale and granting on it
-    // would overlap that producer's range.
+    // would overlap that producer's range. The exchange is weak — a spurious
+    // failure folds into the same retry, which re-reads the gate against the
+    // returned value anyway — and the hint paces the retry before the re-read.
     let mut current = self.claimed();
     while count <= self.consumers.headroom(current) {
       let next = current.advanced_by(count as u64);
-      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+      match self.cursor.compare_exchange_weak(current, next, CLAIM_SUCCESS, GATING) {
         Ok(_) => return Ok(Claim::new(current, count)),
-        Err(actual) => current = actual,
+        Err(actual) => {
+          core::hint::spin_loop();
+          current = actual;
+        }
       }
     }
 
@@ -464,9 +469,12 @@ impl<'a> Claimer<'a> {
     let mut current = self.claimed();
     while let granted @ 1.. = max.min(self.consumers.headroom(current)) {
       let next = current.advanced_by(granted as u64);
-      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+      match self.cursor.compare_exchange_weak(current, next, CLAIM_SUCCESS, GATING) {
         Ok(_) => return Ok(Claim::new(current, granted)),
-        Err(actual) => current = actual,
+        Err(actual) => {
+          core::hint::spin_loop();
+          current = actual;
+        }
       }
     }
 

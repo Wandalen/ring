@@ -9,17 +9,21 @@
 
 ### The Loop
 
-Both functions are the same five lines. `claim` (`src/lib.rs:404-411`):
+Both functions are the same five lines. `claim` (`src/lib.rs:416-429`):
 
 ```rust
 let mut current = self.claimed();
 while count <= self.consumers.headroom( current )
 {
   let next = current.advanced_by( count as u64 );
-  match self.cursor.compare_exchange( current, next, CLAIM_SUCCESS, GATING )
+  match self.cursor.compare_exchange_weak( current, next, CLAIM_SUCCESS, GATING )
   {
     Ok( _ ) => return Ok( Claim::new( current, count ) ),
-    Err( actual ) => current = actual,
+    Err( actual ) =>
+    {
+      core::hint::spin_loop( );
+      current = actual;
+    }
   }
 }
 ```
@@ -30,12 +34,16 @@ Four things happen per iteration, and the order is the algorithm:
 |------|-------|----------|
 | 1 | `headroom( current )` | the gate, against the value about to be exchanged |
 | 2 | `current.advanced_by( … )` | the target, derived from that same value |
-| 3 | `compare_exchange( current, next, … )` | grant, conditional on `current` still being the cursor |
-| 4 | `current = actual` | adopt what was actually there and go back to step 1 |
+| 3 | `compare_exchange_weak( current, next, … )` | grant, conditional on `current` still being the cursor — weak, so a spurious failure is indistinguishable from a lost race and folds into the same retry |
+| 4 | `spin_loop(); current = actual` | pace the retry, adopt what was actually there and go back to step 1 |
 
 Step 4 is what makes step 1 correct on the second pass: `actual` is another
-producer's grant, so the headroom computed against the old `current` describes
-a ring that no longer exists.
+producer's grant — or, with the weak exchange, a spurious report carrying the
+unchanged value — so the headroom computed against the old `current` describes
+a ring that may no longer exist, and the re-read in step 1 is what decides.
+Weakness buys cheaper retries on LL/SC hardware (aarch64's `lld/sc` pair may
+fail without a write having raced); on a compare-and-swap machine such as
+x86-64 the two forms compile identically.
 
 ### CL7 — The Gate Is the Loop Condition, and That Placement Is the Correctness Argument
 

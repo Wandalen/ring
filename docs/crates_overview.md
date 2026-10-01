@@ -48,11 +48,11 @@ assert_eq!( *p.get(), 7 );
 use ring_atomic::{ AtomicSeq, SeqCell };
 use core::sync::atomic::Ordering;
 let c = AtomicSeq::new( Seq( 4 ) );
-c.fetch_add( 3, Ordering::AcqRel );
+let claimed = c.fetch_add( 3, Ordering::AcqRel ); // must_use: this is the claim
 ```
 
 ### `ring_config` — construction params as data. Deps: `ring_types`.
-`RingConfig::new(capacity).with_wait().with_overflow().with_producers().with_batch()` — all validation here, so legal configs are enumerable and a future manifest language maps 1:1. `ring_factory`/`ring_core` only consume it.
+`RingConfig::new(capacity).with_wait(WaitKind).with_overflow(OverflowPolicy).with_producers(n).with_batch(n)` — all validation here, so legal configs are enumerable and a future manifest language maps 1:1. `ring_factory`/`ring_core` only consume it.
 > Granny: the order form for a new post office: "I want 1024 boxes, 4 senders, if full then say No, don't sleep while waiting". Checked once here, so nobody can order "3.5 boxes".
 ```rust
 let cfg = RingConfig::new( 1024 ).unwrap()
@@ -64,18 +64,20 @@ let cfg = RingConfig::new( 1024 ).unwrap()
 ## 1. Math / storage
 
 ### `ring_seqno` — sequence arithmetic. Deps: `ring_types`.
-5 fns, no types/state: `laps_between`, `may_claim(prod,cons,cap)` (exclusive at exactly 1 lap — the classic off-by-one), `free_slots`, `pending`, `distance`. Everything `ring_gating`/`ring_barrier` compute builds on this.
+5 fns, no types/state: `laps_between`, `may_claim(prod,cons,cap)` (exclusive at exactly 1 lap — the classic off-by-one), `free_slots`, `pending`, `slowest(&[Seq])`. `ring_gating`'s bound builds on this; `ring_barrier` reads the same numbers through `ring_cursor`'s shared `slowest` fold.
 > Granny: ticket math. "If I am at ticket 12 and mailman is at 4 with 8 boxes, am I a full lap ahead?" Answer decides if you may reserve. Gets the edge exactly right — at precisely one lap you must stop.
 ```rust
+let cap = Capacity::new( 4 ).unwrap();
 assert!( ring_seqno::may_claim( Seq( 3 ), Seq( 0 ), cap ) );
-assert!( !ring_seqno::may_claim( Seq( 4 ), Seq( 0 ), cap ) );
+assert!( !ring_seqno::may_claim( Seq( 4 ), Seq( 0 ), cap ) ); // exactly 1 lap: refused
 ```
 
 ### `ring_index` — `seq → slot`. Deps: `ring_types`.
-`of(seq,cap) = (seq as usize) & mask`, `aliases(a,b,cap)` (same slot = whole laps apart). 17-line crate; claim is “this fold is the only one” — verified by auditing all callers.
+3 fns, no state: `of(seq,cap) = (seq as usize) & mask` (the one definition every path goes through), `aliases(a,b,cap)` (same slot = whole laps apart), `run(start,count,cap)` (the folded sequence).
 > Granny: "ticket 13 goes into which box?" With 8 boxes: ticket mod 8. Ticket 5 and ticket 13 share a box at different times — that is normal reuse, not a bug.
 ```rust
-assert_eq!( ring_index::of( Seq( 8 ), cap ), SlotIndex( 0 ) );
+let cap = Capacity::new( 8 ).unwrap();
+assert_eq!( ring_index::of( Seq( 8 ), cap ), SlotIndex( 0 ) ); // one lap on
 ```
 
 ### `ring_slot` — payload views. Deps: `ring_types`.
@@ -118,11 +120,11 @@ assert_eq!(
 ```
 
 ### `ring_gating` — producer side bound. Deps: `ring_types,ring_cursor,ring_seqno`.
-`GatingSet::new(cap,n)` owns N consumer cursors; `headroom(prod)->Result<usize>` = `cap - (prod-min)`, `may_advance`, `slowest()`. Empty set = ungated (not consumer-at-zero, else first lap deadlocks). One stalled consumer stops all — correct, worth detecting.
+`GatingSet::new(cap,n)` owns N consumer cursors; `headroom(prod)->usize` = `cap - (prod-min)`, `admits(prod,n)`, `check(prod,n)->Result`, `limit()->Option<Seq>`, `slowest()`. Empty set = ungated (not consumer-at-zero, else first lap deadlocks). One stalled consumer stops all — correct, worth detecting.
 > Granny: "may I hand out more tickets?" Look at the slowest mailman. If he is one full wall behind you, stop — the next box you would give away is the one he is still reading. If nobody reads at all (empty set), you never stop.
 ```rust
 let g = GatingSet::new( cap, 2 );
-g.headroom( producer_seq ).unwrap();
+let room = g.headroom( producer_seq ); // usize, not a Result
 ```
 
 ### `ring_barrier` — consumer side bound. Deps: `ring_types,ring_cursor,ring_wait`.
@@ -151,7 +153,7 @@ p.try_publish( Seq::ZERO, 3 ).unwrap();
 ```
 
 ### `ring_consume` — what may be read + ack. Deps: `ring_types,ring_cursor,ring_barrier,ring_seqno`.
-`Available{start,len}` (`Copy`, `start/end/len/sequences/is_empty`), `Consumer::available()->Available` + `commit(up_to)` (monotonic + clamped to available — over-commit frees unread slots, under-commit re-reads). Split (not RAII guard) so partial commit + borrowed-slot window is explicit.
+`Available{start,len}` (`Copy`, `start/end/len/sequences/is_empty`), `Consumer::available()->Available` + `commit(through)->Result<Seq>` (monotonic + clamped to available — over-commit frees unread slots, under-commit re-reads). Split (not RAII guard) so partial commit + borrowed-slot window is explicit.
 > Granny: steps 3 and 4 in words. 3: "what pile is ready starting from where I stopped?" 4: "done with these, you may reuse the boxes". Never say done for what you did not read, never go backwards.
 ```rust
 let r = Available::new( Seq( 2 ), 3 );
@@ -166,14 +168,14 @@ assert!( Resolution::DroppedIncoming.lost_an_item() );
 ```
 
 ### `ring_batch` — one fence for N items. Deps: `ring_types,ring_seqno,ring_atomic,ring_index`.
-`BatchClaim{start,count}` + `claim(n,cell,Ordering)->BatchClaim` — exactly 1×`fetch_add` whatever N (asserted via `CountingSeq`); contiguous (preserves TLS buffer order). Below ~8 items nothing to amortise; batch-of-1 == single cost. Range only, no storage.
+`BatchClaim{start,count}` + `claim(cursor,n,Ordering)->BatchClaim` (plus `claim_gated` and `drain_order`) — exactly 1×`fetch_add` whatever N (asserted via `CountingSeq`); contiguous (preserves TLS buffer order). Below ~8 items nothing to amortise; batch-of-1 == single cost. Range only, no storage.
 > Granny: instead of queuing 64 times for 64 tickets, take 64 consecutive tickets with one ask at the counter. Cheaper, and your home pile stays in order when it lands.
 ```rust
 let b = BatchClaim::new( Seq( 10 ), 3 );
 ```
 
-### `ring_event` — unify write path across slot shapes. Deps: `ring_types,ring_slot,ring_store`.
-`Fill<S>::fill(self,slot)`, `Peek<S>` (GAT — `Typed` returns `&T`, `Bytes` returns `&[u8]` without copy), `publish_into/drain_from` written once generically. Declared but not yet called by `ring_core` (calls `TypedSlot::set/take` directly) — adoption gap is explicit.
+### `ring_event` — unify write path across slot shapes. Deps: `ring_types,ring_slot`.
+`Fill<S>::fill(self,slot)`, `Peek` (GAT `Out<'_>` — `TypedSlot` yields `&T`, `BytesSlot` yields `&[u8]`, without copy), `publish_into/drain_from` written once generically. Declared but not yet called by `ring_core` (calls `TypedSlot::set/take` directly) — adoption gap is explicit.
 > Granny: "how does a letter get into any kind of box the same way?" One instruction that works for both parcel-boxes and byte-boxes, so the two paths cannot drift apart. Reading borrows without photocopying.
 ```rust
 7u32.fill( &mut slot ).unwrap();
@@ -187,7 +189,7 @@ let b = BatchClaim::new( Seq( 10 ), 3 );
 ```rust
 let mut r : Ring< TypedSlot< u8 > > = Ring::new( cap );
 let ( mut p, mut c ) = r.split();
-p.try_push( 1 ).unwrap();
+p.push_with( |slot| slot.set( 1 ) ).unwrap();
 c.drain();
 ```
 
@@ -213,16 +215,17 @@ c.try_recv();
 
 ## 4. Composition / ops — public contract
 
-### `ring_handle` — shareable ends. Deps: `ring_core,ring_config,ring_types`. Contract crate.
+### `ring_handle` — shareable ends. Deps: `ring_core`. Contract crate.
 Adds 4 narrowings over `ring_core`: ring taken by value (no double-split), no `try_clone` (no 2nd producer at compile time), bounded `Drain` iterator (live-producer drain terminates), no `Deref/inner` (backend unreachable). `&mut self` receivers make “exactly one producer” a borrow-checker property. No `is_closed` (would need `ring_wait` ⇒ parks on tick path — refused).
 > Granny: the two keys to the post office, cut once. You cannot copy the sender key here, cannot open the back door to the machinery, and "empty everything" stops after what was there when you started (so it ends even if new mail keeps coming).
 ```rust
 let mut s = Split::new( ring );
-let ( mut p, mut c ) = s.ends().split();
+let mut e = s.ends(); // the pair borrows from `Ends`, so the caller holds it
+let ( mut p, mut c ) = e.split();
 p.try_push( 1 ).unwrap();
 ```
 
-### `ring_tls` — thread-local staging. Deps: `ring_types,ring_atomic,ring_batch,ring_store,ring_event,ring_slot`. Contract crate. Ex-`bump_log`.
+### `ring_tls` — thread-local staging. Deps: `ring_types,ring_atomic,ring_batch`. Contract crate. Ex-`bump_log`.
 `TlsBuffer<T>::with_capacity(limit)` (`Vec` reserved once to refusal bound), `push()->Err` when full, `len/is_empty`, `flush_into(cell,Ordering)->Flush` (1×`fetch_add` for N via `ring_batch`, asserts 0 atomics while accumulating via `CountingSeq`). Never publishes itself — needs `ring_flush` trigger.
 > Granny: each sender has a notepad at home. Scribble 64 notes with no talking to anyone (zero shared counters), then bring the whole pile to the post office in one trip (one counter bump). The notepad never walks to the post office by itself.
 ```rust
@@ -231,17 +234,17 @@ b.push( 1 ).unwrap();
 b.flush_into( &cursor, Ordering::AcqRel );
 ```
 
-### `ring_flush` — when staging lands. Deps: `ring_tls,ring_core,ring_types,ring_config`. Contract crate, decision not thing.
+### `ring_flush` — when staging lands. Deps: `ring_tls,ring_core,ring_types`. Contract crate, decision not thing.
 `FlushPolicy::OnFull/OnBarrier/OnBatch(n)` (only `OnBatch` owns its param; counter == `buffer.len()` so no extra state), `Flusher::new(buf,producer,policy)` (by value ⇒ 1 policy/buffer, `ZeroBatch` rejected), `append/drive/drive_at_barrier`, opt-in `FlushLog`. 3 obligations (all caller’s): drive it (no thread/timer/`Drop`), announce barriers truthfully, retry rejected final drain (else silent loss).
 > Granny: "when do I carry the notepad to the post office?" When it is full (`OnFull`), when the boss shouts "barrier!" (`OnBarrier`), or every N notes (`OnBatch(8)`). Nobody carries it for you — you must drive, tell the truth about barriers, and retry the last carry if refused or notes vanish.
 ```rust
-let f = Flusher::new( buf, producer, FlushPolicy::OnBatch( 8 ) );
+let mut f = Flusher::new( buf, producer, FlushPolicy::OnBatch( 8 ) ).unwrap();
 f.append( x );
 f.drive();
 ```
 
 ### `ring_factory` — the door (verb). Deps: `ring_config,ring_core,ring_registry,ring_handle,ring_types`. Contract crate.
-`Factory.build::<T>(cfg)->Result<Split<T>,BuildError>`, `build_named(cfg,registry,name)`, `build_crossbeam`. Returns owner `Split`, not handle pair (pair borrows `Split` ⇒ self-referential if returned together). Re-exports `RingConfig,Registry` so contract consumers name nothing else. Only path to `SPSC/MPSC/registry`.
+`Factory.build::<T>(cfg)->Result<Split<T>,BuildError>`, `build_named(cfg,name,registry)->Result<(),BuildError>` (registers into the registry, hands nothing back), `build_crossbeam`. Returns owner `Split`, not handle pair (pair borrows `Split` ⇒ self-referential if returned together). Re-exports `RingConfig,Registry` so contract consumers name nothing else. Only path to `SPSC/MPSC/registry`.
 > Granny: the front desk. You hand in the order form, you get back the whole post office in a box. Then you open it into two keys (sender + mailman). There is deliberately only one front desk so nobody builds a crooked post office around the back.
 ```rust
 let mut s = Factory.build::< u32 >( RingConfig::new( 8 ).unwrap() ).unwrap();
@@ -249,7 +252,7 @@ let ( mut p, mut c ) = s.ends().split();
 p.try_push( 7 ).unwrap();
 ```
 
-### `ring_registry` — named rings. Deps: `ring_handle,ring_config,ring_core`.
+### `ring_registry` — named rings. Deps: `ring_handle`.
 `Registry::new()`, `register(name,Split)->Result` (owns; refusal hands ring back — avoids `HashMap::insert` silently dropping live ring + unread records), `get_mut/remove/contains/len/names`. One `T` per registry (no downcast), no `get` (`&Split` permits nothing).
 > Granny: a phone book "events → that post office". Registering a taken name does not bulldoze the old post office (with unread mail!) — it says no and gives your box back. Borrowing is always mutable because read-only keys are useless.
 ```rust
@@ -257,7 +260,7 @@ registry.register( "events", Split::new( ring ) ).unwrap();
 registry.get_mut( "events" );
 ```
 
-### `ring_shutdown` — liveness. Deps: `ring_cursor,ring_wait,ring_core,ring_types,ring_config`.
+### `ring_shutdown` — liveness. Deps: `ring_cursor,ring_wait,ring_core,ring_types`.
 Family’s only `closed: AtomicBool`. `Shutdown::close()->Stopped`, `Stopped::drain_all/reopen`, `Guarded` producer (only push that checks flag — raw `Producer` can still publish into closed ring: advisory, documented pitfall). Typing enforces `close→drain` order (drain is method on `Stopped`; open-ring drain would never terminate).
 > Granny: the OPEN/CLOSED sign. Closing gives you a special token; only with that token can you say "sweep everything left and finish". The sign is advisory — a sender who ignores it can still drop mail in, unless you gave them the guarded sender that checks the sign first.
 ```rust
@@ -266,12 +269,12 @@ let stopped = s.close();
 stopped.reopen();
 ```
 
-### `ring_poll` — tick-safe helpers. Deps: `ring_core,ring_config,ring_types` (never `ring_wait`, not even transitively — enforced by test).
-`Budget::once()/new(n)` (attempts not time; `0→1`), `Progress`, `try_push/try_recv/drain_up_to` bounded helpers + `tick` accumulator, `PARKING_CRATES=[barrier,shutdown,wait]`. Non-parking ≠ bounded latency (`Budget(1M)` never deadlocks but drops frame — default `once()`).
+### `ring_poll` — tick-safe helpers. Deps: `ring_core` (never `ring_wait`, not even transitively — enforced by test).
+`Budget::once()/new(n)` (attempts not time; `0→1`), `Progress`, free fns `push_within/push_batch_within/recv_within/drain_up_to` + `Tick` accumulator, `PARKING_CRATES=[barrier,shutdown,wait]`. Non-parking ≠ bounded latency (`Budget(1M)` never deadlocks but drops frame — default `once()`).
 > Granny: for a game loop with 16ms per frame: "try once, never nap here". A budget is a number of peeks, not milliseconds. Big budget still returns, just late — so default is one peek. The crate also keeps the list of who is allowed to nap, and tests that this list never leaks in here.
 ```rust
 let b = Budget::once();
-poll::try_push_with_budget( &mut p, v, b );
+ring_poll::push_within( &mut p, v, b ); // Ok(()) or the record handed back
 ```
 
 ## 5. Observe / test / measure
@@ -286,21 +289,22 @@ stats.claimed();
 ```
 
 ### `ring_trace` — op log. Deps: `ring_types`.
-`TraceOp::Claim/Publish/Consume/Commit/Drop::name()`, `ALL=[5]`, `Trace::record(op,seq)`. Optional, off by default — post-mortem ordering disputes, not hot path.
+`TraceOp::Claim/Publish/Consume/Commit/Drop::name()`, `ALL=[5]`, `Trace::record(op,seq,count)`. Optional, off by default — post-mortem ordering disputes, not hot path.
 > Granny: the CCTV notebook: "at ticket 12: reserved, published, read, freed, thrown". Off unless you ask — you replay it after an argument about who did what when.
 ```rust
-trace.record( TraceOp::Claim, Seq( 1 ) );
+let trace = Trace::disabled();
+trace.record( TraceOp::Claim, Seq( 1 ), 1 );
 ```
 
-### `ring_debug` — invariants. Deps: `ring_core,ring_cursor,ring_atomic,ring_types,ring_config`.
-`check(&CursorPair)` (consumer-ahead, producer>1 lap-ahead), `Watch` (adds backwards-move over ≥2 obs), `check_ends(&Split)` (two public readings disagree). Never called on claim path. Catches the silent case: violated ring reads as healthy (`free=cap,pending=0,may_claim=true`).
+### `ring_debug` — invariants. Deps: `ring_core,ring_cursor,ring_types,ring_atomic`.
+`check(&CursorPair)` (consumer-ahead, producer>1 lap-ahead), `Watch` (adds backwards-move over ≥2 obs), `check_ends(capacity,&producer,&consumer)` (two public readings disagree). Never called on claim path. Catches the silent case: violated ring reads as healthy (`free=cap,pending=0,may_claim=true`).
 > Granny: the health inspector who never works during rush hour. Call him in tests: "is the mailman ahead of senders? Did anyone go backwards? Do two dials disagree?" Broken rings look perfectly healthy to normal dials, so you need him.
 ```rust
 assert!( ring_debug::check( &pair ).is_ok() );
 ```
 
 ### `ring_testkit` — deterministic scripts. Deps: `ring_core,ring_tls,ring_shutdown` (+dev `ring_config,ring_types`).
-`Script::new(staging_cap).then(Step::Push/PushMany/Recv/RecvMany/Stage/StageMany/Flush/Close/Reopen/DrainAll).run(&mut Ring)->Outcome{received,dropped,…}` (no timing ⇒ runs compare equal; `audit()` checks conservation). Exists for the `DropNewest-Ok-but-destroyed` measurement (same counts, different records vs `Fail`).
+`Script::new(staging_cap).then(Step::Push/PushMany/Recv/RecvMany/Stage/StageMany/Flush/Close/Reopen/DrainAll).run(&mut Ring)->Outcome{received,accepted,refused_full,refused_closed,published,…}` (no timing ⇒ runs compare equal; `audit()` checks conservation). Exists for the `DropNewest-Ok-but-destroyed` measurement (same counts, different records vs `Fail`).
 > Granny: a recipe card: "push 8, read 3, close, sweep". Run the same card on two post offices and compare the bags letter-for-letter — no stopwatch involved, so equal cards mean equal results. Catches sneaky "said OK but threw the letter away" behaviour.
 ```rust
 Script::new( 0 )
@@ -309,9 +313,9 @@ Script::new( 0 )
   .run( &mut ring );
 ```
 
-### `ring_bench` — the number. Deps: `ring_factory,ring_tls,ring_flush,ring_stats,ring_spsc,ring_mpsc` (+`ring_core/slot/config` transitively).
-`Workload::new(cfg).with_records_per_producer(n)`, `Comparison::run(w)->{mutex,ring,staged}`, `fastest()->Option` (filters `is_lossless` first — fastest refuser must not win), `Outcome{offered/reported/received/dropped}`. Times write only; drain afterwards for accounting. Never asserts ranking (flaky on shared box).
-> Granny: the race track. Same pile of letters race on three bikes: plain locked box (mutex), post office (ring), notepad-then-post-office (TLS+flush). Only the write is timed; counting happens after. A bike that throws letters away is disqualified even if fastest.
+### `ring_bench` — the number. Deps: `ring_factory,ring_tls,ring_flush,ring_stats,ring_spsc,ring_mpsc` (+`ring_core,ring_slot,ring_types`, direct).
+`Workload::new(cfg).with_records_per_producer(n)`, `Comparison::run(w)` runs every `Candidate` (`MutexQueue`, `ContractRing`, `TlsOverRing`, `DirectSpsc`, `DirectMpsc`), `fastest()->Option` (filters `is_lossless` first — fastest refuser must not win), `Outcome{offered/reported/received/dropped}`. Times write only; drain afterwards for accounting. Never asserts ranking (flaky on shared box).
+> Granny: the race track. The same pile of letters races on five bikes: plain locked box (mutex queue), the post office reached the official way (factory + handle), notepad-then-post-office (TLS+flush), and the two rings driven directly downstairs (SPSC, MPSC). Only the write is timed; counting happens after. A bike that throws letters away is disqualified even if fastest.
 ```rust
 let c = Comparison::run(
   Workload::new( cfg ).with_records_per_producer( 256 ).unwrap()
@@ -320,9 +324,9 @@ c.fastest();
 ```
 
 ### `bench_harness` — neutral grader. 0 deps (must never gain `ring_*` — grader must run before graded builds).
-`Workload` (seeded items), `Accumulator/Write` (fold semantics), `ByteParity/Parity` (table agreement + first divergence), `gate/declared/<family>/gates.txt` + `gate/run_all.sh --family <name>` (ring:14 gates, orbital:11). `ring_bench` grades write-path candidates; this grades families. Lives here because ring was first target, not only target.
+`Workload` (seeded items), `Accumulator/Write` (fold semantics), `ByteParity/Parity` (table agreement + first divergence), `gate/declared/<family>/gates.txt` + `gate/run_all.sh --family <name>` (the `ring` family currently declares 14 gates). `ring_bench` grades write-path candidates; this grades families. Lives here because ring was first target, not only target.
 > Granny: the exam board, independent of any school so it can examine empty classrooms on day one. Hands out the same seeded homework to everyone, then checks byte-for-byte if final tables match and points at the first difference. Run `gate/run_all.sh --family ring` for the current score, don't trust a number copied here.
 ```rust
-let w = Workload::seeded( 42, 1000 );
-ByteParity::check( &a, &b );
+let w = Workload::new( 42, 4, 1000, 8, PayloadArchetype::Uniform );
+let parity = ByteParity::new( Accumulator::Set ).compare( &a, &b );
 ```

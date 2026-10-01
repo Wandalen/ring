@@ -19,6 +19,7 @@ ring_shutdown = { workspace = true }
 # and doc examples need to build a ring to drive.
 [dev-dependencies]
 ring_config = { workspace = true }
+ring_factory = { workspace = true }
 # `RingConfig::with_overflow` takes an `OverflowPolicy`, which `ring_config`
 # does not re-export — so a test that varies the policy has to name the crate
 # the vocabulary lives in.

@@ -8,7 +8,7 @@ use std::hint::spin_loop;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use harness::candidates::{Candidate, Mpsc, MutexDeque, Record, Rtrb, Run, Rx, Spsc, Tx, Wide};
+use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Record, Rtrb, Run, Rx, Spsc, SyncChannel, Tx, Wide};
 use harness::driver::{self, Mode, Shape};
 use harness::latency::{self, Load, Stamped};
 use harness::topology;
@@ -43,6 +43,18 @@ fn mpsc_passes_validation_in_every_mode_and_producer_count() {
 }
 
 #[test]
+fn sync_channel_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<SyncChannel>(1);
+  every_mode::<SyncChannel>(3);
+}
+
+#[test]
+fn arrayqueue_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<CrossbeamQueue>(1);
+  every_mode::<CrossbeamQueue>(3);
+}
+
+#[test]
 fn mutex_passes_validation_in_every_mode_and_producer_count() {
   every_mode::<MutexDeque>(1);
   every_mode::<MutexDeque>(3);
@@ -54,6 +66,14 @@ fn wide_records_arrive_whole_through_every_candidate() {
   driver::run::<Spsc<Wide<8>>>(&shape);
   driver::run::<Rtrb<Wide<32>>>(&shape);
   driver::run::<Mpsc<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<SyncChannel<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<CrossbeamQueue<Wide<8>>>(&Shape {
     producers: 2,
     ..shape.clone()
   });
@@ -85,6 +105,8 @@ fn ping_pong_echoes_through_every_candidate() {
   assert!(latency::ping_pong::<Spsc>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Rtrb>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Mpsc>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<SyncChannel>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<CrossbeamQueue>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<MutexDeque>(4, 1_000) > 0.0);
 }
 
@@ -107,6 +129,8 @@ fn an_open_loop_records_every_record_after_the_warm_up() {
     assert!(!latency::open_loop::<Rtrb<Stamped>>(&steady).histogram.is_empty());
     let shared = load(3, 200_000.0, burst);
     assert!(!latency::open_loop::<Mpsc<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<SyncChannel<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<CrossbeamQueue<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<MutexDeque<Stamped>>(&shared).histogram.is_empty());
   }
 }

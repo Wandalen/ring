@@ -14,6 +14,7 @@ publish = false
 [dev-dependencies]
 core_affinity = { workspace = true }
 criterion = { workspace = true }
+crossbeam-queue = { workspace = true }
 hdrhistogram = { workspace = true }
 ring_mpsc = { workspace = true }
 ring_slot = { workspace = true }

@@ -3,7 +3,8 @@
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::mpsc::{Receiver, SyncSender};
+use std::sync::{Arc, Mutex, MutexGuard};
 
 use ring_slot::TypedSlot;
 use ring_types::Capacity;
@@ -353,6 +354,111 @@ impl<R: Record> Rx<R> for RtrbRx<R> {
     let (first, second) = chunk.as_slices();
     first.iter().chain(second).for_each(|&record| sink(record));
     chunk.commit_all();
+
+    n
+  }
+}
+
+/// `std::sync::mpsc::sync_channel` — `try_send`; `try_recv`. The standard library's bounded
+/// channel, the crossbeam-channel algorithm since 1.67, and the first thing a user reaches for.
+#[derive(Debug)]
+pub struct SyncChannel<R = u64>(Option<(SyncSender<R>, Receiver<R>)>);
+
+impl<R: Record> Candidate for SyncChannel<R> {
+  type Record = R;
+
+  const NAME: &'static str = "sync_channel";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Some(std::sync::mpsc::sync_channel(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let (tx, rx) = self.0.take().expect("split once");
+
+    run.run(vec![SyncTx(tx); producers], SyncRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct SyncTx<R>(SyncSender<R>);
+
+impl<R: Record> Tx<R> for SyncTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_send(record).is_ok()
+  }
+}
+
+struct SyncRx<R>(Receiver<R>);
+
+impl<R: Record> Rx<R> for SyncRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.try_recv().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.try_recv() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `crossbeam_queue::ArrayQueue` — `push`; `pop`. A bounded MPMC array queue with a stamp per
+/// slot: the layout P6 proposes, and `ring_core`'s interim `crossbeam` backend. Already a
+/// workspace dependency.
+#[derive(Debug)]
+pub struct CrossbeamQueue<R = u64>(Arc<crossbeam_queue::ArrayQueue<R>>);
+
+impl<R: Record> Candidate for CrossbeamQueue<R> {
+  type Record = R;
+
+  const NAME: &'static str = "arrayqueue";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Arc::new(crossbeam_queue::ArrayQueue::new(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    run.run(vec![CrossbeamTx(self.0.clone()); producers], CrossbeamRx(self.0.clone()))
+  }
+}
+
+#[derive(Clone)]
+struct CrossbeamTx<R>(Arc<crossbeam_queue::ArrayQueue<R>>);
+
+impl<R: Record> Tx<R> for CrossbeamTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct CrossbeamRx<R>(Arc<crossbeam_queue::ArrayQueue<R>>);
+
+impl<R: Record> Rx<R> for CrossbeamRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
 
     n
   }

@@ -7,7 +7,7 @@ mod harness;
 use std::time::Duration;
 
 use harness::bench::cores;
-use harness::candidates::{Candidate, Mpsc, MutexDeque, Rtrb, Spsc};
+use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Rtrb, Spsc, SyncChannel};
 use harness::latency::{self, Load, Stamped};
 use harness::output;
 use serde_json::Value;
@@ -76,6 +76,8 @@ fn main() {
   ping::<Spsc>(&settings, &mut rows, runs, round_trips);
   ping::<Rtrb>(&settings, &mut rows, runs, round_trips);
   ping::<Mpsc>(&settings, &mut rows, runs, round_trips);
+  ping::<SyncChannel>(&settings, &mut rows, runs, round_trips);
+  ping::<CrossbeamQueue>(&settings, &mut rows, runs, round_trips);
   ping::<MutexDeque>(&settings, &mut rows, runs, round_trips);
 
   let spare = cores().saturating_sub(1).max(1);
@@ -117,6 +119,8 @@ fn every_candidate(settings: &Settings, rows: &mut Vec<Value>, test: &str, load:
   offer::<Spsc<Stamped>>(settings, rows, test, load);
   offer::<Rtrb<Stamped>>(settings, rows, test, load);
   offer::<Mpsc<Stamped>>(settings, rows, test, load);
+  offer::<SyncChannel<Stamped>>(settings, rows, test, load);
+  offer::<CrossbeamQueue<Stamped>>(settings, rows, test, load);
   offer::<MutexDeque<Stamped>>(settings, rows, test, load);
 }
 

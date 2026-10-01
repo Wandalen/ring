@@ -6,7 +6,7 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, cores, function, producer_sweep};
-use harness::candidates::{Candidate, Mpsc, MutexDeque};
+use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, SyncChannel};
 use harness::driver::{Mode, Shape};
 
 /// Records per run, over all producers.
@@ -18,6 +18,8 @@ fn producers(c: &mut Criterion) {
   for producers in producer_sweep() {
     let shape = Shape::new(1024, producers, RECORDS, Mode::PUSH1_POPN);
     contended::<Mpsc>(&mut group, &shape, producers);
+    contended::<SyncChannel>(&mut group, &shape, producers);
+    contended::<CrossbeamQueue>(&mut group, &shape, producers);
     contended::<MutexDeque>(&mut group, &shape, producers);
   }
   group.finish();
@@ -30,6 +32,8 @@ fn capacity(c: &mut Criterion) {
   for capacity in [64, 16384] {
     let shape = Shape::new(capacity, producers, RECORDS, Mode::PUSH1_POPN);
     contended::<Mpsc>(&mut group, &shape, capacity);
+    contended::<SyncChannel>(&mut group, &shape, capacity);
+    contended::<CrossbeamQueue>(&mut group, &shape, capacity);
     contended::<MutexDeque>(&mut group, &shape, capacity);
   }
   group.finish();
@@ -47,6 +51,8 @@ fn oversubscribed(c: &mut Criterion) {
     ..Shape::new(1024, producers, RECORDS / 4, Mode::PUSH1_POPN)
   };
   contended::<Mpsc>(&mut group, &shape, producers);
+  contended::<SyncChannel>(&mut group, &shape, producers);
+  contended::<CrossbeamQueue>(&mut group, &shape, producers);
   contended::<MutexDeque>(&mut group, &shape, producers);
   group.finish();
 }

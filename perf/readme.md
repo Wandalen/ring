@@ -22,12 +22,14 @@ Not a family crate: bench, example and test targets only, no `src/`. Exempted fr
 
 ## Candidates
 
-| Name    | Queue                    | API measured                                               | Producers |
-|---------|--------------------------|------------------------------------------------------------|-----------|
-| `spsc`  | `ring_spsc`              | `try_push`; `drain_up_to`, read through `TypedSlot::get`   | 1         |
-| `mpsc`  | `ring_mpsc`              | `push` from copies of one producer; `drain_up_to`          | any       |
-| `rtrb`  | `rtrb` 0.4               | `push`, `push_partial_slice`; `pop`, `read_chunk`          | 1         |
-| `mutex` | `Mutex<VecDeque<T>>`     | one lock per push, per pop, or per batch                   | any       |
+| Name           | Queue                        | API measured                                              | Producers |
+|----------------|------------------------------|-----------------------------------------------------------|-----------|
+| `spsc`         | `ring_spsc`                  | `try_push`; `drain_up_to`, read through `TypedSlot::get`  | 1         |
+| `mpsc`         | `ring_mpsc`                  | `push` from copies of one producer; `drain_up_to`         | any       |
+| `rtrb`         | `rtrb` 0.4                   | `push`, `push_partial_slice`; `pop`, `read_chunk`         | 1         |
+| `sync_channel` | `std::sync::mpsc::sync_channel` | `try_send`; `try_recv` — the standard library's bounded channel, crossbeam-channel's algorithm since 1.67, what a user reaches for first | any |
+| `arrayqueue`   | `crossbeam_queue::ArrayQueue` | `push`; `pop` — a bounded MPMC array queue with a stamp per slot: the layout P6 proposes, and `ring_core`'s interim `crossbeam` backend | any |
+| `mutex`        | `Mutex<VecDeque<T>>`         | one lock per push, per pop, or per batch                  | any       |
 
 Every queue gets the same power-of-two capacity and record type.
 

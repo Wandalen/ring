@@ -5,7 +5,7 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::ThreadedGroup;
-use harness::candidates::{Candidate, Mpsc, MutexDeque, Rtrb, Spsc};
+use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Rtrb, Spsc, SyncChannel};
 use harness::driver::{Mode, Shape};
 
 /// Records per run.
@@ -17,6 +17,8 @@ fn batch(c: &mut Criterion) {
     sized::<Spsc>(&mut group, size);
     sized::<Rtrb>(&mut group, size);
     sized::<Mpsc>(&mut group, size);
+    sized::<SyncChannel>(&mut group, size);
+    sized::<CrossbeamQueue>(&mut group, size);
     sized::<MutexDeque>(&mut group, size);
   }
   group.finish();

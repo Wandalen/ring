@@ -4,7 +4,7 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, function};
-use harness::candidates::{Candidate, MutexDeque, Rtrb, Spsc, Wide};
+use harness::candidates::{Candidate, CrossbeamQueue, MutexDeque, Rtrb, Spsc, SyncChannel, Wide};
 use harness::driver::{Mode, Shape};
 use harness::topology;
 
@@ -19,6 +19,8 @@ fn capacity(c: &mut Criterion) {
     every_mode::<Spsc>(&mut group, capacity);
     every_mode::<Rtrb>(&mut group, capacity);
     every_mode::<MutexDeque>(&mut group, capacity);
+    every_mode::<SyncChannel>(&mut group, capacity);
+    every_mode::<CrossbeamQueue>(&mut group, capacity);
   }
   group.finish();
 }
@@ -38,6 +40,12 @@ fn payload(c: &mut Criterion) {
   sized::<Rtrb<u64>>(&mut group);
   sized::<Rtrb<Wide<8>>>(&mut group);
   sized::<Rtrb<Wide<32>>>(&mut group);
+  sized::<SyncChannel<u64>>(&mut group);
+  sized::<SyncChannel<Wide<8>>>(&mut group);
+  sized::<SyncChannel<Wide<32>>>(&mut group);
+  sized::<CrossbeamQueue<u64>>(&mut group);
+  sized::<CrossbeamQueue<Wide<8>>>(&mut group);
+  sized::<CrossbeamQueue<Wide<32>>>(&mut group);
   sized::<MutexDeque<u64>>(&mut group);
   sized::<MutexDeque<Wide<8>>>(&mut group);
   sized::<MutexDeque<Wide<32>>>(&mut group);
@@ -73,6 +81,8 @@ fn pinned(c: &mut Criterion) {
     };
     group.bench::<Spsc>(&function::<Spsc>(shape.mode), &shape, placement);
     group.bench::<Rtrb>(&function::<Rtrb>(shape.mode), &shape, placement);
+    group.bench::<SyncChannel>(&function::<SyncChannel>(shape.mode), &shape, placement);
+    group.bench::<CrossbeamQueue>(&function::<CrossbeamQueue>(shape.mode), &shape, placement);
     group.bench::<MutexDeque>(&function::<MutexDeque>(shape.mode), &shape, placement);
   }
   group.finish();

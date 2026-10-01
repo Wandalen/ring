@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use criterion::measurement::WallTime;
 use criterion::{BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use harness::candidates::{Candidate, Mpsc, MutexDeque, Rtrb, Run, Rx, Spsc, Tx};
+use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Rtrb, Run, Rx, Spsc, SyncChannel, Tx};
 use harness::driver::{Mode, fill, pop};
 
 const CAPACITIES: [usize; 3] = [64, 1024, 16384];
@@ -18,7 +18,7 @@ const CAPACITY: usize = 1024;
 /// Run `$visitor` on a fresh single-producer queue of every candidate.
 macro_rules! every_candidate {
   ($group:expr, $visitor:ident) => {
-    every_candidate!(@ $group, $visitor, Spsc, Rtrb, Mpsc, MutexDeque)
+    every_candidate!(@ $group, $visitor, Spsc, Rtrb, Mpsc, SyncChannel, CrossbeamQueue, MutexDeque)
   };
   (@ $group:expr, $visitor:ident, $($candidate:ident),*) => {
     $(
@@ -125,6 +125,8 @@ fn fill_drain(c: &mut Criterion) {
     fill_drain_on::<Spsc>(&mut group, capacity);
     fill_drain_on::<Rtrb>(&mut group, capacity);
     fill_drain_on::<Mpsc>(&mut group, capacity);
+    fill_drain_on::<SyncChannel>(&mut group, capacity);
+    fill_drain_on::<CrossbeamQueue>(&mut group, capacity);
     fill_drain_on::<MutexDeque>(&mut group, capacity);
   }
   group.finish();

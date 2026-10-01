@@ -214,7 +214,7 @@ cd "$(git rev-parse --show-toplevel)"
 # benchmark harnesses anywhere in the family
 ls -d ring_*/benches 2>/dev/null || echo '(no crate has a benches/ directory)'
 # and the family's dev-dependency on a benchmark framework
-grep -rl 'criterion\|divan' --include=Cargo.toml */ || echo '(no benchmark framework)'
+grep -rl 'criterion\|divan' --include=Cargo.toml ring_*/ || echo '(no benchmark framework)'
 ```
 
 Live output:
@@ -225,7 +225,8 @@ Live output:
 ```
 
 There is no `benches/` directory in any of the 33 crates and no benchmark
-framework in any manifest. The figures were produced by a probe program written
+framework in any of their manifests; `perf/`, outside the family, has criterion
+and does not time `ring_wait`. The figures were produced by a probe program written
 into a scratch crate, run once, and transcribed — which the Module Index states
 plainly at the head of its findings table: verified *"by a command whose output is
 quoted in its instance, or by a probe program in a scratch crate."*

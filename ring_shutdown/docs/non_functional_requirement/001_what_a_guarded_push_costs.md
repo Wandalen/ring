@@ -136,7 +136,7 @@ disposition pass over `ring_shutdown/docs/`.
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
-command find . -maxdepth 2 -type d -name benches | wc -l
+command find ring_* -maxdepth 1 -type d -name benches | wc -l
 command grep -rl 'criterion' ring_*/Cargo.toml 2>/dev/null | wc -l
 ```
 
@@ -149,7 +149,8 @@ Live output:
 
 Now prints: 0 and 0 — no benchmark harness and no `criterion` dependency
 anywhere in the family, confirming the gap this finding names has no
-existing machinery to route a fix through.
+existing machinery to route a fix through. `perf/`, the workspace's criterion
+suite, sits outside the family and does not time the guard.
 
 ### SD34 — The Pre-Flight Accessor Costs More and Promises Less Than Just Pushing
 

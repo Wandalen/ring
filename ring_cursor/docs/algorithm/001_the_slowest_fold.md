@@ -206,7 +206,7 @@ printf '    Vec< Seq > left in the fold: %s\n' \
 printf '    calls left from this crate into ring_seqno: %s\n' \
   "$( command grep -c 'ring_seqno::' ring_cursor/src/lib.rs )"
 echo '  -- and whether the release profile enables cross-crate inlining --'
-command grep -c 'lto' Cargo.toml | sed 's|^|    lto mentions in the root manifest: |'
+sed -n '/^\[profile\.release\]/,/^\[/p' Cargo.toml | command grep -c 'lto' | sed 's|^|    lto keys in [profile.release]: |'
 ```
 
 Live output:
@@ -217,11 +217,12 @@ Live output:
     Vec< Seq > left in the fold: 0
     calls left from this crate into ring_seqno: 3
   -- and whether the release profile enables cross-crate inlining --
-    lto mentions in the root manifest: 0
+    lto keys in [profile.release]: 0
 ```
 
-**Nothing configures LTO, and the fold no longer needs it to.** Elision would
-have had to survive a cross-crate call the profile does not ask the linker to
+**Nothing configures LTO for release, and the fold no longer needs it to.** The
+root manifest's one `lto` key is `[profile.bench]`'s, for the `perf` suite. Elision
+would have had to survive a cross-crate call the profile does not ask the linker to
 inline; the rewrite removed the call rather than the uncertainty about it.
 
 The direct instrument — a counting global allocator in a test binary, installing

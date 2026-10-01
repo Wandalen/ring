@@ -190,11 +190,13 @@ done | wc -l
 Live output:
 
 ```
-crates mentioning ring_spsc at all:  22
+crates mentioning ring_spsc at all:  23
 of those, reaching it in code:       2
 ```
 
-Twenty-two crates name this one somewhere; twenty do so only in prose. The
+Twenty-three crates name this one somewhere: twenty-two family crates, twenty of
+them only in prose, and `perf/`, the benchmark suite outside the family, which
+reaches it in code but sits outside the second scan's `ring_*` universe. The
 hardcoded four happened to contain both real consumers, so the answer was
 correct and the method was not — **a scan whose universe is a list written from
 memory measures the memory, not the codebase**, and reports the same number

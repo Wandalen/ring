@@ -4,6 +4,67 @@
 
 Dependency rule: `Cargo.toml` member list is in dependency order — acyclic by inspection. Only 5 crates are public contract: `ring_types`, `ring_handle`, `ring_tls`, `ring_flush`, `ring_factory`. Rest are internal composition.
 
+## Quick reference
+
+Dependency tree, by tier (build order — `Cargo.toml`'s member list matches
+this exactly):
+
+```mermaid
+graph TD
+    T0["Tier 0 — ring_types · ring_align"]
+    T1["Tier 1 — ring_atomic · ring_config · ring_index · ring_seqno · ring_slot · ring_stats · ring_trace"]
+    T2["Tier 2 — ring_batch · ring_store · ring_cursor · ring_overflow"]
+    T3["Tier 3 — ring_event · ring_gating · ring_spsc · ring_wait"]
+    T4["Tier 4 — ring_barrier · ring_claim · ring_tls"]
+    T5["Tier 5 — ring_consume · ring_mpsc"]
+    T6["Tier 6 — ring_core · ring_publish"]
+    T7["Tier 7 — ring_debug · ring_flush · ring_handle · ring_poll · ring_shutdown"]
+    T8["Tier 8 — ring_registry · ring_testkit"]
+    T9["Tier 9 — ring_factory"]
+    T10["Tier 10 — ring_bench"]
+    T0 --> T1 --> T2 --> T3 --> T4 --> T5 --> T6 --> T7 --> T8 --> T9 --> T10
+```
+
+`★` marks the 5 crates meant to be depended on from outside the family —
+everything else is internal composition.
+
+| Crate | Tier | Direct deps | Purpose |
+|---|---|---|---|
+| `ring_types` ★ | 0 | — | Shared ids, errors, policy enums — the family's vocabulary |
+| `ring_align` | 0 | — | Cache-line padding to prevent false-sharing |
+| `ring_atomic` | 1 | types | Atomic sequence ops with explicit memory orderings |
+| `ring_config` | 1 | types | Validated ring construction parameters |
+| `ring_index` | 1 | types | Maps a sequence number to its slot |
+| `ring_seqno` | 1 | types | Sequence arithmetic (laps, distance, may-claim) |
+| `ring_slot` | 1 | types | Typed and raw-byte slot payload views |
+| `ring_stats` | 1 | types | Claim/publish/drop counters, observability only |
+| `ring_trace` | 1 | types | Optional, off-by-default operation log |
+| `ring_batch` | 2 | types, seqno, atomic, index | Claims N items with a single atomic fence |
+| `ring_store` | 2 | types, slot, index | The slot array itself — no synchronization |
+| `ring_cursor` | 2 | types, seqno, atomic, align | Cache-padded producer/consumer position cursors |
+| `ring_overflow` | 2 | types, stats | What happens when the ring is full |
+| `ring_event` | 3 | types, slot, store | Uniform fill/peek across slot shapes |
+| `ring_gating` | 3 | types, cursor, seqno | Producer-side bound: may I claim more? |
+| `ring_spsc` | 3 | store, config, cursor, slot, types | Single-producer single-consumer ring |
+| `ring_wait` | 3 | types, cursor | Wait strategies: none / spin / yield / park |
+| `ring_barrier` | 4 | types, cursor, wait | Consumer-side bound: what's ready to read? |
+| `ring_claim` | 4 | types, cursor, gating | Reserves a sequence range, never blocks |
+| `ring_tls` ★ | 4 | types, atomic, batch, store, event, slot | Thread-local staging ahead of a ring flush |
+| `ring_consume` | 5 | types, cursor, barrier, seqno | What may be read, plus commit/ack |
+| `ring_mpsc` | 5 | atomic, store, claim, config, cursor, gating, slot, types | Multi-producer single-consumer ring |
+| `ring_core` | 6 | config, mpsc, overflow, slot, spsc, types (+opt crossbeam-queue) | Composition point over SPSC/MPSC/crossbeam |
+| `ring_publish` | 6 | types, cursor | Makes claimed slots visible, in order |
+| `ring_debug` | 7 | core, cursor, atomic, types, config | Runtime invariant checks over a live ring |
+| `ring_flush` ★ | 7 | tls, core, types, config | Policy deciding when staging reaches the ring |
+| `ring_handle` ★ | 7 | core, config, types | Shareable, narrowed producer/consumer ends |
+| `ring_poll` | 7 | core, config, types | Non-blocking, tick-safe helpers |
+| `ring_shutdown` | 7 | cursor, wait, core, types, config | Close, drain, reopen |
+| `ring_registry` | 8 | handle, config, core | Named-ring registry |
+| `ring_testkit` | 8 | core, tls, shutdown | Deterministic scripted test fixtures |
+| `ring_factory` ★ | 9 | config, core, registry, handle, types | The construction entry point — start here |
+| `ring_bench` | 10 | factory, tls, flush, stats, spsc, mpsc | Comparative write-path benchmark |
+| `bench_harness` | — | none (must never gain `ring_*`) | Family-neutral stage-gate grader |
+
 ## Big picture in plain words (for granny)
 
 Imagine a post office with a wall of 8 numbered boxes that get reused forever.

@@ -2,24 +2,23 @@
 #
 # Real: stop at the first attempt that moves nothing, because a second attempt
 # against an unchanged ring can only find the same answer. Inverted: stop at the
-# first attempt that moves something. That returns the identical count, since
-# single-threaded there is never more than one productive attempt anyway.
+# first attempt that moves something.
 #
-# The published total cannot see this. The consumer's length cannot see it. What
-# separates the two is one more refusal, and a refusal costs a record. See S7.
-# The detector runs a budget of three where the real loop spends two attempts
-# and the inverted one spends a single attempt, and reads the iterator, where
-# that difference is the only place it shows.
+# Against an ordinary iterator the two return the identical count, since
+# single-threaded the first attempt takes everything the ring has room for, so
+# the published total cannot see this and neither can the consumer's length.
+# The detector's source yields one burst per attempt (see S7), so on a budget of
+# three the real loop publishes three bursts and the inverted one publishes one.
 
 id: S8
 crate: ring_poll
 file: src/lib.rs
-round: 2026-08-30
+round: 2026-10-01
 round-failures: 1
-detector: push_batch_within_spends_a_second_attempt_after_a_productive_first
+detector: push_batch_within_spends_its_whole_budget_while_attempts_keep_moving_records
 
 --- from
-    if moved == 0
+    if moved == 0 {
 --- to
-    if moved != 0   // PROBE ONLY — G12, was `==`
+    if moved != 0 {   // PROBE ONLY — G12, was `==`
 --- end

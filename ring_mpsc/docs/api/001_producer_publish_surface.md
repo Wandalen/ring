@@ -50,6 +50,10 @@ Signatures are the real ones, from `src/lib.rs`:
 | *(write)* | `Reserved: DerefMut< Target = S >` | Not a method — the guard *is* the slot. `*reserved = …` or `reserved.set( v )` writes in place | Fully parallel; no synchronization at all |
 | *(publish)* | `impl Drop for Reserved` | Not a method either. Publication is the guard's destructor: one `Release` store of the sequence into the slot's stamp | One `Release` store |
 | `push` | `&self, T -> Result< Seq, RingError >` | The fused convenience form, for `TypedSlot< T >` only | Claim + move + drop |
+| `claim_batch` | `&self, max -> Result< ReservedBatch< '_, S >, RingError >` | Up to `max` contiguous sequences — whatever headroom allows — for one gate check and one exchange. The guard reaches its slots by offset and publishes the whole grant when it drops | One CAS loop per grant, contended |
+| *(batch write)* | `ReservedBatch::slot_mut( offset ) -> Option< &mut S >` | The grant's slots by offset — the same unsynchronized in-place write as `Reserved`, range-checked | Fully parallel; no synchronization at all |
+| *(batch publish)* | `impl Drop for ReservedBatch` | One `Release` stamp store per sequence of the grant, in issue order — every sequence, written or not; an unwritten offset publishes an empty record | k `Release` stores |
+| `push_batch` | `&self, &mut Vec< T > -> Result< usize, RingError >` | The batched fused convenience: drains exactly the granted prefix, publishes it, returns the count; `Full` leaves the vec untouched | One grant + k moves + drop |
 | `free_capacity` | `&self -> usize` | Room a claim may consume — **advisory** | One gating scan |
 | `claimed` | `&self -> Seq` | The claim cursor's current value | One relaxed load |
 

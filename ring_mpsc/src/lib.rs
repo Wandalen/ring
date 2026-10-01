@@ -199,7 +199,7 @@ use core::sync::atomic::Ordering;
 // this crate touches need it: the unpadded stamps and the padded consumer
 // cursor.
 use ring_atomic::{AtomicSeq, SeqCell};
-use ring_claim::Claimer;
+use ring_claim::{Claim, Claimer};
 use ring_config::RingConfig;
 use ring_cursor::{GATING, PaddedCursor};
 use ring_gating::GatingSet;
@@ -759,6 +759,55 @@ impl<'a, S> Producer<'a, S> {
     })
   }
 
+  /// Reserve up to `max` sequences with one gate check and one exchange.
+  ///
+  /// The batched form of [`claim`]: the claimer grants `1..=max` contiguous
+  /// sequences — whatever headroom the gate allows at the value the exchange
+  /// runs against — and the whole grant costs one read of the consumer cursor
+  /// and one compare-exchange, no matter how many sequences it covers. A
+  /// producer that writes records in groups amortises the contended step over
+  /// the group instead of paying it per record.
+  ///
+  /// The grant is *adaptive*: a ring with three slots free answers a
+  /// `claim_batch( 64 )` with three sequences, so a producer under pressure
+  /// keeps making progress at whatever width the ring allows rather than
+  /// spinning until the full width appears.
+  ///
+  /// The returned [`ReservedBatch`] reaches its slots by offset and publishes
+  /// the whole grant when dropped — including any offset that was never
+  /// written, which publishes an empty slot exactly as a dropped [`Reserved`]
+  /// does. **A held guard parks the consumer behind its whole range**: the
+  /// drain stops at the first unpublished sequence of the claim, so hold the
+  /// guard for one group of writes, not for longer.
+  ///
+  /// [`claim`]: Self::claim
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::Full`] when nothing is granted — the ring is full, or `max`
+  /// is zero. Nothing advances.
+  ///
+  /// ```
+  /// use ring_mpsc::Ring;
+  /// use ring_slot::TypedSlot;
+  /// use ring_types::{ Capacity, RingError, Seq };
+  ///
+  /// let mut ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 4 ).unwrap() );
+  /// let mut ends = ring.ends();
+  /// let ( producer, _consumer ) = ends.split();
+  ///
+  /// let batch = producer.claim_batch( 3 ).unwrap();
+  /// assert_eq!( batch.len(), 3 );
+  /// assert_eq!( batch.sequence( 0 ), Some( Seq::ZERO ) );
+  /// assert_eq!( producer.claim_batch( 0 ).err(), Some( RingError::Full ) );
+  /// drop( batch );
+  /// ```
+  pub fn claim_batch(&self, max: usize) -> Result<ReservedBatch<'a, S>, RingError> {
+    let claim = self.claimer.claim_up_to(max)?;
+
+    Ok(ReservedBatch { ring: self.ring, claim })
+  }
+
   /// Room a claim may consume — **advisory**.
   ///
   /// A caller reading this and then claiming performs two operations with a
@@ -893,6 +942,54 @@ impl<'a, T> Producer<'a, TypedSlot<T>> {
 
     Ok(seq)
   }
+
+  /// Claim, write and publish as many of `records` as the ring has room for.
+  ///
+  /// The batched convenience over [`claim_batch`](Producer::claim_batch): one
+  /// gate check and one exchange for the whole group, the granted prefix
+  /// drained from `records` and written into the slots, the grant published
+  /// when the guard drops. Returns how many records went in; the rest stay in
+  /// `records`, in order, for the next attempt. An empty `records` returns
+  /// `Ok( 0 )` without touching the ring.
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::Full`] when nothing was granted — `records` is left
+  /// untouched, exactly as [`push`] leaves the value with its caller.
+  ///
+  /// [`push`]: Self::push
+  ///
+  /// ```
+  /// use ring_mpsc::Ring;
+  /// use ring_slot::TypedSlot;
+  /// use ring_types::Capacity;
+  ///
+  /// let mut ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 4 ).unwrap() );
+  /// let mut ends = ring.ends();
+  /// let ( producer, mut consumer ) = ends.split();
+  ///
+  /// let mut records = vec![ 1, 2, 3 ];
+  /// assert_eq!( producer.push_batch( &mut records ).unwrap(), 3 );
+  /// assert!( records.is_empty() );
+  ///
+  /// let mut drained = consumer.drain();
+  /// assert_eq!( drained.len(), 3 );
+  /// assert_eq!( drained.get_mut( 2 ).and_then( TypedSlot::take ), Some( 3 ) );
+  /// ```
+  pub fn push_batch(&self, records: &mut Vec<T>) -> Result<usize, RingError> {
+    if records.is_empty() {
+      return Ok(0);
+    }
+
+    let mut guard = self.claim_batch(records.len())?;
+    let granted = guard.len();
+    for (offset, value) in records.drain(..granted).enumerate() {
+      guard.slot_mut(offset).expect("offset within the granted range").set(value);
+    }
+    drop(guard);
+
+    Ok(granted)
+  }
 }
 
 /// A claimed, not-yet-published slot.
@@ -957,6 +1054,135 @@ impl<S> Drop for Reserved<'_, S> {
   /// Publish, with the one `Release` store the whole protocol turns on.
   fn drop(&mut self) {
     self.ring.stamp(self.seq).store(self.seq, PUBLISH);
+  }
+}
+
+/// A claimed, not-yet-published range of slots.
+///
+/// The batched form of [`Reserved`]: one compare-exchange grants the whole
+/// contiguous range, [`slot_mut`](Self::slot_mut) reaches each slot by
+/// offset, and the drop publishes every sequence of the grant. Where
+/// [`Reserved`] exists to make one publish impossible to skip, this guard
+/// exists to make *k* publishes impossible to skip — a range whose publish
+/// could be partially skipped would wedge the ring at its first unwritten
+/// sequence, exactly as a single skipped publish would.
+///
+/// **A guard dropped without writing every offset publishes an empty slot
+/// per unwritten offset, not a torn one** — the same defined outcome
+/// [`Reserved`] documents, one slot at a time. The consumer reads each slot
+/// on its own and sees an empty payload where nothing was written.
+///
+/// **A held guard parks the consumer behind its whole range.** The drain
+/// stops at the first unpublished sequence, which while this guard is alive
+/// is its first one. The guard is a write group, not a long-lived
+/// reservation: claim, write, drop.
+#[derive(Debug)]
+pub struct ReservedBatch<'a, S> {
+  ring: &'a Ring<S>,
+  claim: Claim,
+}
+
+impl<S> ReservedBatch<'_, S> {
+  /// How many sequences the grant covers.
+  ///
+  /// ```
+  /// use ring_mpsc::Ring;
+  /// use ring_slot::TypedSlot;
+  /// use ring_types::Capacity;
+  ///
+  /// let mut ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 4 ).unwrap() );
+  /// let mut ends = ring.ends();
+  /// let ( producer, _consumer ) = ends.split();
+  ///
+  /// assert_eq!( producer.claim_batch( 2 ).unwrap().len(), 2 );
+  /// ```
+  #[must_use]
+  pub const fn len(&self) -> usize {
+    self.claim.len()
+  }
+
+  /// Whether the grant covers nothing — never true: a claim that would grant
+  /// nothing is refused as `Full` rather than handed out empty.
+  #[must_use]
+  pub const fn is_empty(&self) -> bool {
+    self.claim.is_empty()
+  }
+
+  /// The first sequence of the grant.
+  #[must_use]
+  pub const fn start(&self) -> Seq {
+    self.claim.start()
+  }
+
+  /// The sequence at `offset` within the grant, or `None` past its end.
+  ///
+  /// ```
+  /// use ring_mpsc::Ring;
+  /// use ring_slot::TypedSlot;
+  /// use ring_types::{ Capacity, Seq };
+  ///
+  /// let mut ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 4 ).unwrap() );
+  /// let mut ends = ring.ends();
+  /// let ( producer, _consumer ) = ends.split();
+  ///
+  /// let batch = producer.claim_batch( 2 ).unwrap();
+  /// assert_eq!( batch.sequence( 0 ), Some( Seq::ZERO ) );
+  /// assert_eq!( batch.sequence( 1 ), Some( Seq( 1 ) ) );
+  /// assert_eq!( batch.sequence( 2 ), None );
+  /// ```
+  #[must_use]
+  pub fn sequence(&self, offset: usize) -> Option<Seq> {
+    (offset < self.claim.len()).then(|| self.claim.start().advanced_by(offset as u64))
+  }
+
+  /// The slot at `offset`, for writing — [`Reserved`]'s `DerefMut`, by
+  /// offset.
+  ///
+  /// `None` when `offset` is past the grant's end, which the caller can check
+  /// with [`len`](Self::len) rather than catch.
+  ///
+  /// ```
+  /// use ring_mpsc::Ring;
+  /// use ring_slot::TypedSlot;
+  /// use ring_types::Capacity;
+  ///
+  /// let mut ring : Ring< TypedSlot< u8 > > = Ring::new( Capacity::new( 4 ).unwrap() );
+  /// let mut ends = ring.ends();
+  /// let ( producer, mut consumer ) = ends.split();
+  ///
+  /// let mut batch = producer.claim_batch( 2 ).unwrap();
+  /// batch.slot_mut( 0 ).expect( "within the grant" ).set( 7 );
+  /// drop( batch );
+  ///
+  /// let mut drained = consumer.drain();
+  /// assert_eq!( drained.len(), 2 );
+  /// assert_eq!( drained.get_mut( 0 ).and_then( TypedSlot::take ), Some( 7 ) );
+  /// ```
+  pub fn slot_mut(&mut self, offset: usize) -> Option<&mut S> {
+    let seq = self.sequence(offset)?;
+    let ring = self.ring;
+
+    // SAFETY: the compare-exchange that granted `self.claim` gave this guard
+    // sole ownership of every sequence in it — no other producer can win the
+    // same range while the grant stands, the consumer cannot reach any of the
+    // sequences before their stamps are stored by the drop, and the next
+    // lap's claim of any sequence in the range is gated behind the consumer's
+    // commit of this one. `Reserved`'s safety argument, per sequence of the
+    // range.
+    Some(unsafe { ring.slot_mut(seq) })
+  }
+}
+
+impl<S> Drop for ReservedBatch<'_, S> {
+  /// Publish the whole grant, one `Release` store per sequence, in issue
+  /// order. Every sequence gets its stamp whether it was written or not — a
+  /// range that stopped publishing at its first unwritten sequence would
+  /// wedge the drain behind it forever, which is the exact failure the guard
+  /// shape exists to make impossible.
+  fn drop(&mut self) {
+    for seq in self.claim.sequences() {
+      self.ring.stamp(seq).store(seq, PUBLISH);
+    }
   }
 }
 

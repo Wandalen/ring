@@ -108,7 +108,7 @@ printf 'family crates carrying docs/item: %s of %s\n' \
 Live output:
 
 ```
-declarations in src/lib.rs:       50
+declarations in src/lib.rs:       59
 instances in docs/item:           2
 family crates carrying docs/item: 33 of 33
 ```

@@ -103,7 +103,7 @@ type that owns no ring — but it does mean the message is doing all the work, a
 a message is only read when the warning fires. A `let _ = claimer.claim( 4 );`
 silences it.
 
-### CL22 — The Family Built the Guard Twice, in the Two Crates That Have a Ring
+### CL22 — The Family Built the Guard Three Times, in the Two Crates That Have a Ring
 
 ```sh
 cd "$(git rev-parse --show-toplevel)"
@@ -115,36 +115,41 @@ command grep -r -A3 '^impl.*Drop for' ring_*/src/*.rs
 Live output:
 
 ```
-ring_mpsc/src/lib.rs:impl< S > Drop for Reserved< '_, S >
-ring_mpsc/src/lib.rs-{
+ring_mpsc/src/lib.rs:impl<S> Drop for Reserved<'_, S> {
 ring_mpsc/src/lib.rs-  /// Publish, with the one `Release` store the whole protocol turns on.
-ring_mpsc/src/lib.rs-  fn drop( &mut self )
+ring_mpsc/src/lib.rs-  fn drop(&mut self) {
+ring_mpsc/src/lib.rs-    self.ring.stamp(self.seq).store(self.seq, PUBLISH);
 --
-ring_mpsc/src/lib.rs:impl< S > Drop for Batch< '_, S >
-ring_mpsc/src/lib.rs-{
+ring_mpsc/src/lib.rs:impl<S> Drop for ReservedBatch<'_, S> {
+ring_mpsc/src/lib.rs-  /// Publish the whole grant, one `Release` store per sequence, in issue
+ring_mpsc/src/lib.rs-  /// order. Every sequence gets its stamp whether it was written or not — a
+ring_mpsc/src/lib.rs-  /// range that stopped publishing at its first unwritten sequence would
+--
+ring_mpsc/src/lib.rs:impl<S> Drop for Batch<'_, S> {
 ring_mpsc/src/lib.rs-  /// Commit, releasing the slots for reuse.
 ring_mpsc/src/lib.rs-  ///
+ring_mpsc/src/lib.rs-  /// The `Release` here pairs with the [`ring_cursor::GATING`] load inside
 --
-ring_spsc/src/lib.rs:impl< S > Drop for Reservation< '_, S >
-ring_spsc/src/lib.rs-{
+ring_spsc/src/lib.rs:impl<S> Drop for Reservation<'_, S> {
 ring_spsc/src/lib.rs-  /// Publish, with the one release store that is the producer path's entire
 ring_spsc/src/lib.rs-  /// synchronization.
+ring_spsc/src/lib.rs-  fn drop(&mut self) {
 --
-ring_spsc/src/lib.rs:impl< S > Drop for Batch< '_, S >
-ring_spsc/src/lib.rs-{
+ring_spsc/src/lib.rs:impl<S> Drop for Batch<'_, S> {
 ring_spsc/src/lib.rs-  /// Commit, with the one release store that is the consumer path's entire
 ring_spsc/src/lib.rs-  /// synchronization — one store for the whole batch, which is why the surface
 ```
 
-Four `Drop` impls exist in the 33 crates. All four are in `ring_mpsc` and
-`ring_spsc`, and all four are on borrow-carrying guard types:
+Five `Drop` impls exist in the 33 crates. All five are in `ring_mpsc` and
+`ring_spsc`, and all five are on borrow-carrying guard types:
 
 | Crate | Type | What dropping does |
 |-------|------|--------------------|
-| `ring_mpsc` | `Reserved< '_, S >` | publishes — "the one `Release` store the whole protocol turns on" |
-| `ring_mpsc` | `Batch< '_, S >` | commits, releasing the slots for reuse |
-| `ring_spsc` | `Reservation< '_, S >` | publishes |
-| `ring_spsc` | `Batch< '_, S >` | commits |
+| `ring_mpsc` | `Reserved<'_, S>` | publishes — "the one `Release` store the whole protocol turns on" |
+| `ring_mpsc` | `ReservedBatch<'_, S>` | publishes the whole grant — one `Release` store per claimed sequence, in issue order |
+| `ring_mpsc` | `Batch<'_, S>` | commits, releasing the slots for reuse |
+| `ring_spsc` | `Reservation<'_, S>` | publishes |
+| `ring_spsc` | `Batch<'_, S>` | commits |
 
 Zero of them are in a Tier 5 primitive. The doc comment on
 `ring_spsc::Producer::claim` argues for the shape explicitly, and names the

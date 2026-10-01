@@ -13,6 +13,7 @@
 |----|------|---------|--------|
 | 001 | [Claim-Then-Publish Slot Acquisition](001_claim_then_publish.md) | One compare-exchange buys a privately-owned slot, so the ~500 ns payload write never serializes against another producer | 🔄 |
 | 002 | [Batch Drain by Single Cursor Swap](002_batch_drain_by_cursor_swap.md) | The consumer claims a whole published run in one atomic and walks it in sequence order — stopping at the first unpublished slot, not at the claim cursor | 🔄 |
+| 003 | [Batched Claim-and-Publish](003_batched_claim_and_publish.md) | One gate check and one exchange buy k contiguous slots, amortising the contended step over the group; the drop publishes every sequence of the grant | 🔄 |
 
 
 ### Regenerate
@@ -22,9 +23,9 @@ cd "$(git rev-parse --show-toplevel)"/ring_mpsc/docs/algorithm
 printf 'instances:                '; ls [0-9][0-9][0-9]_*.md | wc -l
 printf 'finding headings inside:  '; grep -hoE '^### MP[0-9]+ ' [0-9][0-9][0-9]_*.md | wc -l
 printf 'rows in the table below:  '; grep -coE '^\| MP[0-9]+ ' readme.md
-# instances:                2
-# finding headings inside:  4
-# rows in the table below:  4
+# instances:                3
+# finding headings inside:  5
+# rows in the table below:  5
 ```
 ### Findings Recorded Here
 
@@ -34,3 +35,4 @@ printf 'rows in the table below:  '; grep -coE '^\| MP[0-9]+ ' readme.md
 | MP2 | `Reserved` | **latent hazard** | Dropping a `Reserved` guard without calling `set` publishes whatever the slot already held, and one test pins that behaviour as intended. |
 | MP3 | `drain` | n/a — observation | A published sequence behind an unpublished one is not drained, which makes one slow producer stall every later record. |
 | MP4 | `drain_up_to` | n/a — observation | A `max` exceeding capacity is clamped, so a caller cannot walk into the next lap by asking for too much. |
+| MP53 | `claim_batch` / `ReservedBatch` | n/a — observation | The batched grant is a write group, not a reservation: a held guard parks the consumer behind its whole range, and the drop publishes every sequence of the grant whether written or not. |

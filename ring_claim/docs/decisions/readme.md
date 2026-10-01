@@ -176,7 +176,7 @@ ring_spsc/src/lib.rs:impl< S > Drop for Batch< '_, S >
 | CL19 | `ring_claim` | n/a — doc gap | The rejected `fetch_add` design does *not* hand out overlapping ranges between producers; the add is atomic, so every producer gets a distinct start, and the only symptom is a grant that runs past the gate into slots a consumer has not released |
 | CL20 | `ring_batch` | **latent hazard** | `ring_batch::claim_gated` is the rejected design line for line — guard, gate, `fetch_add` — public and uncalled, and its documentation carried no producer-count restriction until a `# One producer only` section was added; the argument for why the shape is wrong still lives two tiers up, so that section has to carry the pointer back |
 | CL21 | `ring_claim` | n/a — unenforced | Ten of the family's twelve messaged `must_use` annotations have no runtime mechanism behind them; `Claim`'s and `ring_atomic`'s name the same permanent consequence — a range stranded, every consumer stalled — and neither can carry a destructor; `let _ = …` silences the lint and nothing else happens, ever |
-| CL22 | family | n/a — observation | All four `Drop` impls in the family are in `ring_mpsc` and `ring_spsc`, on borrow-carrying guard types, and none is in a Tier 5 primitive; `ring_spsc`'s `Producer::claim` argues for the guard shape by naming "a bare `claim`/`publish` pair" — which is this crate |
+| CL22 | family | n/a — observation | All five `Drop` impls in the family are in `ring_mpsc` and `ring_spsc`, on borrow-carrying guard types, and none is in a Tier 5 primitive; `ring_spsc`'s `Producer::claim` argues for the guard shape by naming "a bare `claim`/`publish` pair" — which is this crate |
 
 Supporting observations recorded alongside those findings, carrying no ID of their own:
 

@@ -22,14 +22,10 @@ no reason is reported as `exemption without a reason` and does not reach, becaus
 an omission wearing an exemption's clothes is the failure this file could
 otherwise launder.
 
-**It currently holds zero entries**, and the `ring` family has never had one —
-every crate here has always been declared in `ring/crates.txt` rather than
-excused from it.
-
-Zero is the reading both gates now print, and neither prints it vacuously. G18
-ends `… each claimed exactly once across N famil(ies), 0 exempted`, so the crate
-count in that line is the whole tree rather than the tree minus a subtraction
-nobody re-checked.
+**It holds one entry, `perf`**, the benchmark suite — not a family crate. Every
+family crate is declared in `ring/crates.txt` rather than excused from it.
+`perf` has bench, example and test targets only and no `src/`, so G22 reads it
+as unimplemented; a `pub` item under `src/` would expire the entry.
 
 G22 is the one that had to be taught what zero means, because an empty list is
 where a negative check stops checking. Every test it makes is a negative — an

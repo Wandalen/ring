@@ -47,6 +47,10 @@ members = [
   "ring_debug",
   "ring_testkit",
   "ring_bench",
+
+  # The benchmark suite (perf/readme.md). Outside the family: exempted from G18, allowed past G5
+  # by bench_harness/gate/declared/ring/internal_consumers.txt.
+  "perf",
 ]
 
 [workspace.package]
@@ -90,9 +94,21 @@ ring_tls = { path = "ring_tls", version = "0.1.0" }
 ring_types = { path = "ring_types", version = "0.1.0" }
 ring_wait = { path = "ring_wait", version = "0.1.0" }
 
+core_affinity = "0.8"
+criterion = { version = "0.8", default-features = false, features = [ "cargo_bench_support", "html_reports", "plotters" ] }
 crossbeam-queue = { version = "0.3", default-features = false, features = [ "alloc" ] }
+hdrhistogram = { version = "7.5", default-features = false }
 loom = "0.7"
+rtrb = "0.4"
+serde_json = "1.0"
 trybuild = "1.0"
+
+# `cargo bench` only; `release` keeps cargo's defaults. Fat LTO so the family's non-generic,
+# un-`#[inline]` helpers inline across crates the way the comparison crates' do.
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+debug = "line-tables-only"
 
 [workspace.lints.rust]
 rust_2018_idioms = { level = "warn", priority = -1 }

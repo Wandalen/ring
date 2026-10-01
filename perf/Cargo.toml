@@ -1,0 +1,47 @@
+[package]
+name = "perf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Benchmark suite — the ring family against off-the-shelf queues, under one driver"
+publish = false
+
+# Bench, example and test targets only, so every dependency is a dev-dependency. There is no
+# `src/` on purpose: G22 reads a `pub` item there as the end of this crate's exemption
+# (`bench_harness/gate/declared/exempt.txt`).
+[dev-dependencies]
+core_affinity = { workspace = true }
+criterion = { workspace = true }
+hdrhistogram = { workspace = true }
+ring_mpsc = { workspace = true }
+ring_slot = { workspace = true }
+ring_spsc = { workspace = true }
+ring_types = { workspace = true }
+rtrb = { workspace = true }
+serde_json = { workspace = true }
+
+[[bench]]
+name = "micro"
+harness = false
+
+[[bench]]
+name = "spsc"
+harness = false
+
+[[bench]]
+name = "mpsc"
+harness = false
+
+[[bench]]
+name = "batch"
+harness = false
+
+# Its own `main`, not criterion's: it reports percentiles per record.
+[[bench]]
+name = "latency"
+harness = false
+
+[lints]
+workspace = true

@@ -23,7 +23,8 @@ a measured benchmark.*
 The concurrency write-path family: 33 `ring_*` mechanism crates plus
 `bench_harness`, its family-neutral stage-gate and workload oracle. All 34
 are for-keeps, non-demo crates, and together they form this repository's own
-Cargo workspace ([`Cargo.toml`](Cargo.toml)). The family was extracted into
+Cargo workspace ([`Cargo.toml`](Cargo.toml)), with [`perf/`](perf/readme.md), the
+benchmark suite, beside them. The family was extracted into
 this standalone repository on 2026-09-29, after an earlier internal
 reorganization had already consolidated it into a single top-level directory
 so its dependency graph was no longer nested inside an unrelated crate set.
@@ -126,6 +127,7 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | [`ring_debug/`](ring_debug/readme.md) | Runtime invariant checks over a live ring |
 | [`ring_testkit/`](ring_testkit/readme.md) | Determinism-test fixtures driving scripted claim and drain sequences |
 | [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements — mutex, ring, and thread-local staging |
+| [`perf/`](perf/readme.md) | Benchmark suite — the ring family against off-the-shelf queues, under one driver; not a family crate |
 
 ## Tooling
 

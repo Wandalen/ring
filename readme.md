@@ -28,6 +28,26 @@ this standalone repository on 2026-09-29, after an earlier internal
 reorganization had already consolidated it into a single top-level directory
 so its dependency graph was no longer nested inside an unrelated crate set.
 
+## Quickstart
+
+`ring_factory` is the family's entry point — the other 32 crates are reached
+through it, not imported directly:
+
+```rust
+use ring_factory::{ Factory, RingConfig };
+
+let cfg = RingConfig::new( 8 )?;
+let mut ring = Factory.build::< u32 >( cfg )?;
+let ( mut producer, mut consumer ) = ring.ends().split();
+
+producer.try_push( 7 )?;
+assert_eq!( consumer.drain().next(), Some( 7 ) );
+```
+
+See [`ring_factory/readme.md`](ring_factory/readme.md) for construction
+options and [`ring_handle/readme.md`](ring_handle/readme.md) for what the
+producer/consumer split does and doesn't allow.
+
 ## Architecture
 
 The dependency graph is rooted at `ring_types` and `ring_align` — the only
@@ -128,6 +148,11 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements — mutex, ring, and thread-local staging |
 
 ## Tooling
+
+```sh
+verb/test                        # full suite, all 34 crates — final verification
+verb/test_only crate::ring_spsc  # filtered to one crate — ordinary development
+```
 
 | Directory | Responsibility |
 |-----------|-----------------|

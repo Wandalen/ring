@@ -23,6 +23,22 @@
 //! memory, it passes every single-threaded test (where the write completes
 //! before anything can read), and it fails only under load.
 //!
+//! ## Lifecycle: a sequence from claim to commit
+//!
+//! | State | Holds when | Entered by | Cursor moved | Owes |
+//! |---|---|---|---|---|
+//! | Unclaimed | `seq >= claimed` | | | |
+//! | Claimed, unwritten | `published <= seq < claimed` | `ring_claim`'s `Claimer::claim` | claimed | a write |
+//! | Claimed, written | `published <= seq < claimed` | the producer's own write into the slot | none | a publish of exactly the claimed range, see [`Publisher::publish`]'s `# Panics` |
+//! | Published | `position <= seq < published` | [`Publisher::publish`] | published | a commit, which frees the slot |
+//! | Committed | `seq < position` | `ring_consume`'s `Consumer::commit` | the consumer's position | |
+//!
+//! The write moves no cursor, so nothing outside the producer can tell the
+//! second state from the third, and nothing needs to. The published cursor is
+//! the one boundary between written and possibly unwritten, and its `Release`
+//! orders the write before it. [`Publisher::is_published`] answers `false` for
+//! the first three states alike, which is the guarantee a consumer relies on.
+//!
 //! ## Why publication is refused rather than reordered
 //!
 //! [`Publisher::try_publish`] advances only when the published cursor is
@@ -49,6 +65,10 @@
 //! has already started and cannot abandon. That producer is not blocked on
 //! anything itself. A `WaitKind` here would offer a `Park` that can only ever hurt, and
 //! a budget whose exhaustion has no correct handling.
+//!
+//! `Yield` is not offered either. The expected wait is one slot write, and a
+//! yield adds a scheduler round trip to it. Whether that holds is a revisit
+//! trigger in `docs/decisions/001_publish_takes_a_bare_start_and_len.md`.
 
 #![deny(missing_docs)]
 
@@ -99,6 +119,20 @@ impl Publisher {
 
   /// The published cursor, for a consumer's barrier to be built over.
   ///
+  /// # Pitfall: the handed-out cursor can be written
+  ///
+  /// **Trap.** Treating the returned reference as read-only.
+  ///
+  /// **Failure.** [`PaddedCursor`] implements [`SeqCell`], so `store` and
+  /// `fetch_add` compile on it. A `store` moves the frontier anywhere, including
+  /// backwards, which un-publishes slots a consumer may already be reading. This
+  /// crate moves the cursor only through [`Self::try_publish`], from the exact
+  /// current frontier, and cannot stop a holder of this reference from doing
+  /// otherwise.
+  ///
+  /// **Mitigation.** Only read it, through [`SeqCell::load`]. This crate has no
+  /// read-only cursor type to hand out instead.
+  ///
   /// ```
   /// use core::sync::atomic::Ordering;
   /// use ring_cursor::SeqCell;
@@ -133,10 +167,18 @@ impl Publisher {
   ///
   /// # Errors
   ///
-  /// The current published position, when it is not `start`. That means some
-  /// earlier claim has not been published yet. Deliberately not a `RingError`,
-  /// because this is `compare_exchange`'s "try again" rather than a failure.
-  /// The returned value is what to try against next.
+  /// The current published position, when it is not `start`. Deliberately not a
+  /// `RingError`, because this is `compare_exchange`'s "not now" rather than a
+  /// failure, and returning the position spares the caller a second load that
+  /// could already be stale.
+  ///
+  /// The caller cannot retry against the returned value. A producer publishes
+  /// only the range it claimed, so `start` stays fixed. What the value tells the
+  /// caller is which side of the frontier it is on. Below `start`, an earlier
+  /// claim is still unpublished, and a retry succeeds once that producer
+  /// publishes. Above `start`, the frontier has already passed the range, so it
+  /// was published before or never belonged to this caller. The frontier only
+  /// moves forward, so no retry succeeds.
   ///
   /// ```
   /// use ring_publish::Publisher;
@@ -185,10 +227,10 @@ impl Publisher {
   /// module documentation's termination argument says a predecessor "cannot
   /// abandon" a slot write it has already started. That describes correct
   /// producers, not a property the types enforce.
-  /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
-  /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
-  /// that. Of the two deadlocks this is the reachable one, and the only
-  /// defence against it is that every producer publishes what it claims.
+  /// `ring_claim::Claim` has no destructor, and most ways of abandoning one draw
+  /// no warning, as `Claim`'s pitfall lists. Of the two deadlocks this is the
+  /// reachable one, and the only defence against it is that every producer
+  /// publishes what it claims.
   pub fn publish(&self, start: Seq, len: usize) -> Seq {
     loop {
       if let Ok(end) = self.try_publish(start, len) {
@@ -202,6 +244,12 @@ impl Publisher {
   ///
   /// The handshake feature is graded on this consumer-facing question. A slot
   /// claimed but not published must answer `false`.
+  ///
+  /// Each call is one `Acquire` load of the frontier, so a caller asking about
+  /// several sequences may get each answer from a different frontier. Read
+  /// [`Self::published`] once and compare against it instead. A consumer reads
+  /// through `ring_consume`'s `Consumer::available`, which reads the frontier
+  /// once for a whole run.
   ///
   /// ```
   /// use ring_publish::Publisher;

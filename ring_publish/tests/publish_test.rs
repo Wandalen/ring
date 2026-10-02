@@ -80,9 +80,8 @@ fn try_publish_advances_from_the_exact_frontier() {
 
 #[test]
 fn try_publish_refuses_a_start_past_the_frontier_and_reports_where_it_is() {
-  // The multi-producer case: B finished before A. The error value matters. It
-  // is what B retries against, so a version returning
-  // `RingError` or `()` would force B to re-read separately and race again.
+  // In the multi-producer case B finished before A. The error value matters,
+  // for the reason `Publisher::try_publish`'s `# Errors` section gives.
   let publisher = Publisher::new();
 
   assert_eq!(publisher.try_publish(Seq(4), 4), Err(Seq::ZERO));

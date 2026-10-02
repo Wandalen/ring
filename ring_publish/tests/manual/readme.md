@@ -62,9 +62,7 @@ only coverage this crate has of its central requirement.
 ## P2. Only compare-exchange advances the published cursor
 
 This is the structural form of the invariant that `try_publish`'s contract
-rests on. A publication that can be *assigned* rather than exchanged can move
-backwards, and a published cursor moving backwards un-publishes slots a
-consumer may already be reading.
+rests on. `Publisher::cursor`'s pitfall says what an assignment would do.
 
 ```bash
 grep -vE "^[[:space:]]*//" ring_publish/src/lib.rs \
@@ -90,8 +88,8 @@ failure). No inline `Ordering::` at any call site. Nobody looking for why the
 ring races will find an ordering chosen at the point of use.
 
 The asymmetry in that last line is the point. A failed exchange published
-nothing, so it needs no release. But it did read the cursor, and the value it
-returns is what the caller retries against.
+nothing, so it needs no release. But it did read the cursor, and it hands that
+value to the caller, which decides from it whether to wait.
 
 P1's mutation 1 is the behavioural form of this reading. This one is free.
 

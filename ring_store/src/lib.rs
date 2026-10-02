@@ -1,7 +1,6 @@
 //! Power-of-two slot storage array.
 //!
-//! Tier 2 of the 33 crates that implement the ring family's concurrency write path.
-//! Depends on `ring_types`, `ring_slot` and `ring_index`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The ring-buffer-storage feature defines this crate by what it
 //! *refuses* to hold: "the buffer itself, and nothing else — a fixed allocation

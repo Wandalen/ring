@@ -1,7 +1,6 @@
 //! Sequence-to-slot index mapping for power-of-two capacities.
 //!
-//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! This is the half of the sequence-to-slot-index and power-of-two-capacity feature
 //! that folds. Given a [`ring_types::Seq`] and a [`ring_types::Capacity`], the fold produces

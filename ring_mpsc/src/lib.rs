@@ -1,8 +1,6 @@
 //! Multi-producer single-consumer ring API.
 //!
-//! One of the ring family's 33 crates. It implements the concurrency write-path.
-//! Depends on `ring_atomic`, `ring_store`, `ring_claim`, `ring_config`,
-//! `ring_cursor`, `ring_gating`, `ring_slot`, `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Many producer threads claim a slot and publish into it concurrently, and one
 //! consumer thread drains published slots in total order. This is the

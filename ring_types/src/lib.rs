@@ -1,8 +1,8 @@
 //! Shared ids, errors, and policy enums for the ring family, with no ring logic.
 //!
-//! Tier 0 of the ring family's 33 crates, which implement the concurrency write-path.
+//! Part of the ring family's concurrency write path.
 //! Most of the family depends on this one; this one depends on nothing, not
-//! even an error crate. That is what lets tier 0 compile in isolation and what
+//! even an error crate. That is what lets it compile in isolation and what
 //! makes the family's dependency forest acyclic by construction.
 //!
 //! The "no ring logic" in the description is a rule, not a summary. This

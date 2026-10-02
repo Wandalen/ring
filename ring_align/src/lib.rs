@@ -1,7 +1,6 @@
 //! Cache-line padding constants and alignment wrappers.
 //!
-//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The padded-cursor feature states the problem this crate exists to solve. A
 //! producer cursor and a consumer cursor that share a cache line make every

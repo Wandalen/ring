@@ -1,7 +1,6 @@
 //! Non-blocking progress helpers.
 //!
-//! One of the 33 crates of the ring family, which implements the concurrency write-path.
-//! Depends on `ring_core`.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What this crate is for
 //!

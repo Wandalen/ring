@@ -1,7 +1,6 @@
 //! Batch claim objects spanning a contiguous sequence range.
 //!
-//! Tier 2 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_seqno`, `ring_atomic` and `ring_index`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The batch feature states the claim this crate has to make true: "the memory
 //! fences that make the handshake correct are paid per operation, not per item,

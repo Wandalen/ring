@@ -1,7 +1,6 @@
 //! Producer and consumer handles.
 //!
-//! One of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_core`.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What this crate adds
 //!

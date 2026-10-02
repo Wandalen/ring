@@ -1,7 +1,6 @@
 //! Optional sequence-operation trace log.
 //!
-//! Tier 2 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Claims the ring-stats feature. Its acceptance criterion is a pair of
 //! numbers: `ring_trace` "records one entry per sequence operation when

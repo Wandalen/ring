@@ -1,6 +1,6 @@
 //! Named ring registry.
 //!
-//! One of the 33 crates of the ring family, which implements the concurrency write-path.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What it is
 //!

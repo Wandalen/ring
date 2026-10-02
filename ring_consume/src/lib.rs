@@ -1,7 +1,6 @@
 //! Single-consumer available-range computation and commit.
 //!
-//! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_cursor`, `ring_barrier`, `ring_seqno`.
+//! Part of the ring family's concurrency write path.
 //!
 //! This crate holds the consumer's two operations in the claim/publish
 //! handshake. One says what may be read, the other reports that it has been

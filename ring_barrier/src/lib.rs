@@ -1,7 +1,6 @@
 //! Consumer barrier over the minimum of dependent cursors.
 //!
-//! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_cursor`, `ring_wait`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The sequence barrier has two halves, and this is the consumer's.
 //! `ring_gating` asks *how far may the producer advance*; this crate asks *how

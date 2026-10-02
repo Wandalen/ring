@@ -1,7 +1,6 @@
 //! Atomic sequence cells with explicit memory orderings.
 //!
-//! Tier 2 of the ring family's 33 crates, the concurrency write-path implementation.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Every cursor in the family is a sequence in a shared cell, and every read or
 //! write of one is an ordering decision. Spreading those decisions across the
@@ -39,7 +38,7 @@
 //!
 //! Under `--cfg loom` the two atomics below come from `loom` instead of `core`.
 //! This is the family's only such switch, and it is here for the same reason
-//! the orderings are. This crate is the one place in 33 crates where a
+//! the orderings are. This crate is the one place in the family where a
 //! *sequence* atomic is created. Every cursor, gating set, claim and barrier
 //! reaches its atomic through [`AtomicSeq`], so the `loom` switch here reaches
 //! all of them, and no other crate needs to know the switch exists. The

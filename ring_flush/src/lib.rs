@@ -1,7 +1,6 @@
 //! Flush policies deciding when thread-local staging reaches the ring.
 //!
-//! One of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_tls`, `ring_core`.
+//! Part of the ring family's concurrency write path.
 //!
 //! One of the five crates on the family's export Contract, and the only one
 //! that is a *decision* rather than a thing a consumer holds. `ring_factory`

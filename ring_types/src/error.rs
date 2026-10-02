@@ -8,7 +8,7 @@
 //! declare their own.
 //!
 //! No `error_tools`, `thiserror` or `anyhow`. `ring_types` deliberately has no
-//! dependencies at all, so that the family's tier 0 compiles in isolation.
+//! dependencies at all, so that the bottom of the family compiles in isolation.
 
 use core::fmt;
 

@@ -1,6 +1,6 @@
 //! Composed ring over an SPSC, MPSC, or crossbeam backend behind one API.
 //!
-//! One of the ring family's 33 crates, which implement the concurrency write-path. This is the
+//! Part of the ring family's concurrency write path. This is the
 //! **composition point**. The crossbeam backend belongs here, behind a cargo
 //! feature, alongside the selection between [`ring_spsc`] and [`ring_mpsc`]
 //! (-> `docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md`).

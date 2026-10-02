@@ -1,6 +1,6 @@
 //! Runtime invariant checks over a live ring.
 //!
-//! One of the ring family's 33 crates, which together implement the concurrency write-path.
+//! Part of the ring family's concurrency write path.
 //!
 //! # Why this crate exists
 //!

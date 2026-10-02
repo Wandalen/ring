@@ -1,7 +1,6 @@
 //! Wait strategies for space and data availability.
 //!
-//! Tier 4 of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_types` and `ring_cursor`.
+//! Part of the ring family's concurrency write path.
 //!
 //! `ring_types::WaitKind` holds the four discriminants; this crate holds the
 //! four handlers. That split is why `ring_types` can say "no ring logic" and

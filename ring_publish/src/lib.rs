@@ -1,7 +1,6 @@
 //! Publication of claimed slots to consumers.
 //!
-//! Tier 5 of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_cursor`.
+//! Part of the ring family's concurrency write path.
 //!
 //! `ring_seqno` was added to this crate's manifest before the implementation
 //! existed and is not among them. Publishing is a cursor

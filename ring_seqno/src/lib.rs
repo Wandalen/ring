@@ -1,7 +1,6 @@
 //! Sequence numbers and their comparison across laps.
 //!
-//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The crate's whole subject is a single distinction that is easy to lose:
 //! **the sequence does not wrap, the slot index does**.

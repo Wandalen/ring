@@ -1,7 +1,6 @@
 //! Producer and consumer sequence cursors, cache-line separated.
 //!
-//! Tier 3 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_seqno`, `ring_atomic`, `ring_align`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The padded-cursor feature states the whole subject. A producer cursor and a
 //! consumer cursor that land on one cache line make every write by either

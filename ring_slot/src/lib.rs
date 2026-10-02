@@ -1,7 +1,6 @@
 //! Slot payload views: typed and raw bytes.
 //!
-//! Tier 1 of the ring family's 33 crates, the concurrency write-path implementation.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The typed-slot-and-bytes-slot feature asks for two slot shapes over one
 //! ring: a typed slot for traffic whose shape is known at compile time, and

@@ -1,6 +1,6 @@
 //! Determinism-test fixtures driving scripted claim and drain sequences.
 //!
-//! One of the ring family's 33 crates, which implement the concurrency write-path.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What it is
 //!

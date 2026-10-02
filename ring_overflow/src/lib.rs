@@ -1,7 +1,6 @@
 //! Full-ring overflow policies.
 //!
-//! Tier 1 of the 33 crates that implement the ring family's concurrency write path.
-//! Depends on `ring_types` and `ring_stats`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The overflow-policy feature splits into an enum and a set of handlers. The
 //! enum lives in `ring_types` and the handlers live here. This crate is the

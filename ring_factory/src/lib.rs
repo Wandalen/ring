@@ -1,6 +1,6 @@
 //! Ring construction from configuration.
 //!
-//! One of the ring family's 33 crates, which implement the concurrency write-path.
+//! Part of the ring family's concurrency write path.
 //!
 //! One of the five crates on the family's export Contract, and the only one
 //! that is a *verb*. `ring_handle` and `ring_tls` are things a consumer holds,

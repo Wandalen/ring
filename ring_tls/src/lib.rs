@@ -1,7 +1,6 @@
 //! Per-thread, bump-allocated, zero-lock append log.
 //!
-//! Tier 2 of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_atomic` and `ring_batch`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Every thread owns its own buffer and appends to it with no atomics and no
 //! mutexes; a single consolidation step later moves each thread's buffer into

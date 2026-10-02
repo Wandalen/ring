@@ -1,8 +1,6 @@
 //! Slot translators that fill a claimed slot.
 //!
-//! Tier 2 of the 33 crates of the ring family, which implements the concurrency
-//! write-path.
-//! Depends on `ring_types` and `ring_slot`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The typed-and-bytes-slot feature asks for something stronger than two slot
 //! shapes that both work: "`TypedSlot<T>` and `BytesSlot` both round-trip

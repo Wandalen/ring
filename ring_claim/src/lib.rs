@@ -1,7 +1,6 @@
 //! Sequence-range claiming without waiting.
 //!
-//! Tier 5 of the 33 crates that implement the ring family's concurrency write path.
-//! Depends on `ring_types`, `ring_cursor`, `ring_gating`.
+//! Part of the ring family's concurrency write path.
 //!
 //! `ring_seqno` was added to this crate's manifest before the implementation
 //! existed and is not among them. Every piece of sequence arithmetic claiming

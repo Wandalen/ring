@@ -1,7 +1,6 @@
 //! Publisher stop, drain, and waiter join.
 //!
-//! One of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_cursor`, `ring_wait`, `ring_core`, `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The family's shutdown feature asks for three operations: close, drain-all,
 //! and reset. None of them is hard alone. The hard part is that **drain-all

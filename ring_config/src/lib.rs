@@ -1,7 +1,6 @@
 //! Ring construction parameters.
 //!
-//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The config-and-factory feature asks for everything that varies between rings
 //! collected into one value, so that a ring's shape is *data* rather than a
@@ -12,8 +11,8 @@
 //!
 //! This crate holds the record and its validation. `ring_factory` turns one
 //! into a ring. That is the other half of the same feature, kept separate
-//! because a configuration must be constructible and inspectable at tier 1,
-//! long before anything at tier 11 exists to consume it.
+//! because a configuration must be constructible and inspectable near the bottom
+//! of the dependency graph, long before the crates that consume it exist.
 
 #![deny(missing_docs)]
 

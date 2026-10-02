@@ -1,7 +1,6 @@
 //! Ring counters.
 //!
-//! Tier 1 of the ring family's 33 crates, the concurrency write-path implementation.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The ring-stats feature asks for counters cheap enough to leave on
 //! permanently, because they are the only thing that distinguishes a ring under

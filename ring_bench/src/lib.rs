@@ -1,10 +1,9 @@
 //! Comparative write-path measurements: mutex, ring, and thread-local staging.
 //!
-//! One of the 33 crates in the ring family's concurrency write-path
-//! implementation. This is the last of them, and the only one whose output is
-//! a *number* rather than a type. The requirement asks for one workload run
-//! against every candidate write path, and says that "the comparison is the
-//! deliverable".
+//! Part of the ring family's concurrency write path, and the only crate in it
+//! whose output is a *number* rather than a type. The requirement asks for one
+//! workload run against every candidate write path, and says that "the
+//! comparison is the deliverable".
 //!
 //! ```
 //! use ring_bench::{ Comparison, Workload };

@@ -1,7 +1,6 @@
 //! Producer gating so it never laps the slowest consumer.
 //!
-//! Tier 4 of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_types`, `ring_cursor`, `ring_seqno`.
+//! Part of the ring family's concurrency write path.
 //!
 //! The sequence barrier has two halves. This crate is the producer's half.
 //! Given a set of consumer cursors, it answers how far a producer may advance

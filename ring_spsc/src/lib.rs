@@ -1,8 +1,6 @@
 //! Single-producer single-consumer ring API.
 //!
-//! One of the ring family's 33 crates, which together implement the concurrency write-path.
-//! Depends on `ring_store`, `ring_config`, `ring_cursor`, `ring_slot`,
-//! `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What single-producer buys, stated as a dependency list
 //!

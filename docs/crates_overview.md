@@ -11,42 +11,46 @@ The dependency tree by tier is in the root [readme](../readme.md#architecture).
 `★` marks the crates meant to be depended on from outside the family.
 Everything else is internal composition.
 
-| Crate | Purpose |
-|---|---|
-| `ring_types` ★ | Shared ids, errors, and policy enums that form the family's vocabulary |
-| `ring_align` | Cache-line padding to prevent false-sharing |
-| `ring_atomic` | Atomic sequence ops with explicit memory orderings |
-| `ring_config` | Validated ring construction parameters |
-| `ring_index` | Maps a sequence number to its slot |
-| `ring_seqno` | Sequence arithmetic (laps, distance, may-claim) |
-| `ring_slot` | Typed and raw-byte slot payload views |
-| `ring_stats` | Claim/publish/drop counters, observability only |
-| `ring_trace` | Optional, off-by-default operation log |
-| `ring_batch` | Claims N items with a single atomic fence |
-| `ring_store` | The slot array itself, with no synchronization |
-| `ring_cursor` | Cache-padded producer/consumer position cursors |
-| `ring_overflow` | What happens when the ring is full |
-| `ring_event` | Uniform fill/peek across slot shapes |
-| `ring_gating` | Producer-side bound: may I claim more? |
-| `ring_spsc` | Single-producer single-consumer ring |
-| `ring_wait` | Wait strategies: none / spin / yield / park |
-| `ring_barrier` | Consumer-side bound: what's ready to read? |
-| `ring_claim` | Reserves a sequence range, never blocks |
-| `ring_tls` ★ | Thread-local staging ahead of a ring flush |
-| `ring_consume` | What may be read, plus commit/ack |
-| `ring_mpsc` | Multi-producer single-consumer ring |
-| `ring_core` | Composition point over SPSC/MPSC/crossbeam |
-| `ring_publish` | Makes claimed slots visible, in order |
-| `ring_debug` | Runtime invariant checks over a live ring |
-| `ring_flush` ★ | Policy deciding when staging reaches the ring |
-| `ring_handle` ★ | Shareable, narrowed producer/consumer ends |
-| `ring_poll` | Non-blocking, tick-safe helpers |
-| `ring_shutdown` | Close, drain, reopen |
-| `ring_registry` | Named-ring registry |
-| `ring_testkit` | Deterministic scripted test fixtures |
-| `ring_factory` ★ | The construction entry point; start here |
-| `ring_bench` | Comparative write-path benchmark |
-| `bench_harness` | Family-neutral stage-gate grader |
+`Direct deps` lists each crate's `[dependencies]`, with test-only edges marked
+`+dev`. `Tier` is one more than the highest tier among those, dev-dependencies
+included, the same rule as the root diagram. Both come from the crate manifests.
+
+| Crate | Tier | Direct deps | Purpose |
+|---|---|---|---|
+| `ring_types` ★ | 0 | none | Shared ids, errors, and policy enums that form the family's vocabulary |
+| `ring_align` | 0 | none | Cache-line padding to prevent false-sharing |
+| `ring_atomic` | 1 | types | Atomic sequence ops with explicit memory orderings |
+| `ring_config` | 1 | types | Validated ring construction parameters |
+| `ring_index` | 1 | types | Maps a sequence number to its slot |
+| `ring_seqno` | 1 | types | Sequence arithmetic (laps, distance, may-claim) |
+| `ring_slot` | 1 | types | Typed and raw-byte slot payload views |
+| `ring_stats` | 1 | types | Claim/publish/drop counters, observability only |
+| `ring_trace` | 1 | types | Optional, off-by-default operation log |
+| `ring_batch` | 2 | atomic, index, seqno, types | Claims N items with a single atomic fence |
+| `ring_store` | 2 | index, slot, types | The slot array itself, with no synchronization |
+| `ring_cursor` | 2 | align, atomic, seqno, types | Cache-padded producer/consumer position cursors |
+| `ring_overflow` | 2 | stats, types | What happens when the ring is full |
+| `ring_event` | 3 | slot, types (+dev store) | Uniform fill/peek across slot shapes |
+| `ring_gating` | 3 | cursor, seqno, types | Producer-side bound: may I claim more? |
+| `ring_spsc` | 3 | config, cursor, slot, store, types | Single-producer single-consumer ring |
+| `ring_wait` | 3 | cursor, types | Wait strategies: none / spin / yield / park |
+| `ring_barrier` | 4 | cursor, types, wait (+dev gating) | Consumer-side bound: what's ready to read? |
+| `ring_claim` | 4 | cursor, gating, types | Reserves a sequence range, never blocks |
+| `ring_tls` ★ | 4 | atomic, batch, types (+dev event, slot, store) | Thread-local staging ahead of a ring flush |
+| `ring_consume` | 5 | barrier, cursor, seqno, types | What may be read, plus commit/ack |
+| `ring_mpsc` | 5 | atomic, claim, config, cursor, gating, slot, store, types | Multi-producer single-consumer ring |
+| `ring_core` | 6 | config, mpsc, overflow, slot, spsc, types (+opt crossbeam-queue) | Composition point over SPSC/MPSC/crossbeam |
+| `ring_publish` | 6 | cursor, types (+dev barrier, claim, consume, gating) | Makes claimed slots visible, in order |
+| `ring_debug` | 7 | atomic, core, cursor, types (+dev config) | Runtime invariant checks over a live ring |
+| `ring_flush` ★ | 7 | core, tls, types (+dev config) | Policy deciding when staging reaches the ring |
+| `ring_handle` ★ | 7 | core (+dev config, types) | Shareable, narrowed producer/consumer ends |
+| `ring_poll` | 7 | core (+dev config, types) | Non-blocking, tick-safe helpers |
+| `ring_shutdown` | 7 | core, cursor, types, wait (+dev config) | Close, drain, reopen |
+| `ring_registry` | 8 | handle (+dev config, core) | Named-ring registry |
+| `ring_testkit` | 8 | core, shutdown, tls (+dev config, types) | Deterministic scripted test fixtures |
+| `ring_factory` ★ | 9 | config, core, handle, registry, types | The construction entry point; start here |
+| `ring_bench` | 10 | core, factory, flush, mpsc, slot, spsc, stats, tls, types | Comparative write-path benchmark |
+| `bench_harness` | n/a | none (must never gain `ring_*`) | Family-neutral stage-gate grader |
 
 ## Big picture in plain words (for granny)
 

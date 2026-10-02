@@ -1,6 +1,6 @@
 # `Flusher::drain_final` takes `&mut self`, so once-only is a convention and a refused drain is retried by calling again
 
-Status: Accepted
+Status: Deferred
 
 ## Context
 
@@ -31,7 +31,9 @@ pub fn drain_final(&mut self) -> FlushOutcome
 Once-only holds by name and documentation. A `Rejected` is retried by calling `drain_final` again. After a final
 drain the flusher is an ordinary flusher.
 
-The reasons, in order of weight:
+This is the default in force, not a ruling against C. It stays because it is the reversible option. A consuming
+signature can later be relaxed back to `&mut self` without breaking a caller, while the reverse breaks every teardown
+site. What weighs against C today:
 
 - The consuming signature that keeps the retry path (C below) puts a `match` at every teardown site, so the common
   case pays for the rare one.

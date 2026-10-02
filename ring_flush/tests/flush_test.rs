@@ -755,10 +755,11 @@ fn a_refused_final_drain_keeps_the_records() {
 /// normally. `drain_final` is a forced flush with a distinguishing cause, not a
 /// terminal operation.
 ///
-/// `docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md` accepts this
-/// behaviour. The consuming signature that decision weighed and rejected would
-/// make an append after the final drain unrepresentable; if it is ever taken,
-/// this test is the thing that has to change, which is the point of having it.
+/// `docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md` records this
+/// as the default in force, not a ruling. The consuming signature it leaves
+/// open would make an append after the final drain unrepresentable; if it is
+/// ever taken, this test is the thing that has to change, which is the point of
+/// having it.
 #[test]
 fn a_driver_still_works_after_a_final_drain() {
   let mut r = ring(16);

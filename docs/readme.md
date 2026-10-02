@@ -17,7 +17,8 @@ instead of restating it.
 - Behaviour a caller programs against goes in the item's rustdoc, with `# Errors`, `# Panics` and
   `# Safety` where they apply.
 - An invariant, an algorithm choice, a lifecycle rule or a trap goes in the same rustdoc, under
-  one of four headings kept from the per-crate doc corpus this repository used to carry.
+  one of four headings kept from the per-crate doc corpus this repository used to carry. The
+  heading takes the level the surrounding documentation uses.
   - `# Invariant: <what holds>` states the invariant, then what it deliberately excludes under
     **Excluded.**, then the test or assertion that checks it under **Enforced by.**
   - `# Algorithm: <what it computes>` gives the procedure where the code does not make it
@@ -30,5 +31,7 @@ instead of restating it.
   `docs/decisions/` as an ADR.
 
 These sections name items as intra-doc links, such as ``[`Guarded::try_push_batch`]``, so a
-rename fails CI's `cargo doc` run, which denies warnings. They never quote line numbers, counts or
-command output, because the next refactor makes those wrong without anything failing.
+rename fails CI's `cargo doc` run, which denies warnings. Tests, and items in crates the crate
+does not depend on, are named in backticks, and nothing checks them. The sections never quote line
+numbers, counts or command output, because the next refactor makes those wrong without anything
+failing.

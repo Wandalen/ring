@@ -101,6 +101,24 @@ pub const GATING: Ordering = Ordering::Acquire;
 /// nothing readable on the other. A fold that picked either would be
 /// wrong for one of them.
 ///
+/// # Invariant: the minimum is a lower bound, not a snapshot
+///
+/// The fold loads one cursor at a time, and a cursor can advance between the
+/// first load and the last. The answer can be a position no single instant
+/// ever showed, and by the time it returns no cursor may sit there. It is still
+/// correct for both callers, because cursors only advance. A stale minimum is
+/// at or behind the true slowest cursor, never ahead of it, so a caller bounded
+/// by it can be held back too far but never let through too early.
+///
+/// **Excluded.** A coherent snapshot of every cursor. That needs all of them
+/// read under one lock, which is what this family is built to avoid.
+///
+/// **Enforced by.** `ring_gating`'s
+/// `a_gate_read_concurrently_with_a_consumer_never_over_reports_room` and
+/// `ring_barrier`'s `a_barrier_never_reports_a_frontier_a_dependency_has_not_reached`
+/// race one cursor against the fold. No test moves the minimum from one cursor
+/// to another mid-fold.
+///
 /// ```
 /// use core::sync::atomic::Ordering;
 /// use ring_cursor::{ PaddedCursor, SeqCell };
@@ -124,6 +142,20 @@ pub fn slowest(cursors: &[PaddedCursor]) -> Option<Seq> {
 /// `size_of` and `align_of` are both [`ring_align::CACHE_LINE`], which is what
 /// makes two of them in one struct land on different lines rather than merely
 /// at different addresses.
+///
+/// # Lifecycle: construct, share by reference, drop
+///
+/// A cursor has no closed, poisoned or exhausted state, and dropping it
+/// releases nothing. It derives neither `Clone`, `Copy` nor `PartialEq`.
+/// A copy would split one position into two, and deriving `Clone` would not
+/// compile, because [`ring_atomic::AtomicSeq`] is not `Clone`. An equality
+/// would read two cursors one after the other and compare a state that may
+/// never have existed.
+///
+/// Two things a run needs are not here. Telling readers to stop is
+/// `ring_shutdown`'s separate flag, because no cursor value means "no more".
+/// Nothing here resets a cursor either. `ring_shutdown::reset` reuses a ring
+/// without rewinding its cursors.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
@@ -215,6 +247,29 @@ impl SeqCell for PaddedCursor {
 /// two cursors is unanswerable without it: how many slots are free, how many
 /// items are pending, whether a claim is safe. A caller supplying it per
 /// call could supply a different one each time.
+///
+/// # Invariant: a reading errs only toward the safe side for the end taking it
+///
+/// Each reading loads both cursors itself, so two readings in a row can see
+/// two different states. For the end that takes the reading, the difference
+/// only runs one way. The producer cursor moves only when the producer
+/// publishes, and the consumer can only advance its own cursor, which adds
+/// room. So on the producer's thread a reading can understate the free room
+/// but never overstate it, and `may_claim()` returning `true` cannot be
+/// followed by `free_slots()` returning `0` unless that thread published in
+/// between. The consumer's thread gets the mirror image. There
+/// [`pending`](Self::pending) can understate what is readable but never
+/// overstate it.
+///
+/// **Excluded.** A second producer on the same pair.
+/// [`producer`](Self::producer) hands the cursor out by shared reference, so
+/// nothing stops another thread from advancing it, and then a reading can
+/// overstate the room. Several producers need `ring_claim`'s compare-exchange
+/// claim instead.
+///
+/// **Enforced by.** The single-producer contract, not a test.
+/// `may_claim_and_free_slots_never_disagree` fixes a state and then reads it,
+/// so it checks the arithmetic and not agreement across a concurrent update.
 ///
 /// ```
 /// use ring_atomic::SeqCell;
@@ -373,6 +428,18 @@ impl CursorPair {
   /// questions. "How much room" is a batch-sizing input and "may I" is a branch,
   /// and a caller that only needs the branch should not have to know that zero
   /// is the boundary.
+  ///
+  /// # Invariant: `may_claim()` equals `free_slots() > 0`
+  ///
+  /// The two share no code. Each calls its own `ring_seqno` function, and each
+  /// compares the distance `d` between the cursors against the capacity in its
+  /// own way, `d < capacity` here and a subtraction that saturates at zero in
+  /// [`free_slots`]. They agree because that subtraction is zero exactly when
+  /// `d >= capacity`. The equality is an argument rather than a shared
+  /// expression, so an edit to either side can break it.
+  ///
+  /// **Enforced by.** `may_claim_and_free_slots_never_disagree`, over every
+  /// distance from an empty ring to well past a full lap.
   ///
   /// [`free_slots`]: Self::free_slots
   ///

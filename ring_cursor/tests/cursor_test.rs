@@ -281,6 +281,9 @@ fn the_pair_reads_both_cursors_for_every_reading() {
   // a consumer at zero and the wrong one for every other consumer. Moving only
   // the consumer must change all three readings.
   let pair = CursorPair::new(cap(8));
+  // Exactly one lap ahead, so `may_claim` is false here and flips once the
+  // consumer moves. A smaller value leaves it true on both sides and fails the
+  // third assertion on correct code.
   pair.producer().store(Seq(8), Ordering::Release);
 
   let (free, pending, claimable) = (pair.free_slots(), pair.pending(), pair.may_claim());

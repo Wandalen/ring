@@ -32,8 +32,8 @@ STEPS_3=( "${STEPS_2[@]}" 'cargo clippy --all-targets --all-features -- -D warni
 STEPS_4=( "${STEPS_3[@]}" 'cargo +nightly udeps --all-targets --all-features' '( if [ -f Cargo.lock ]; then cargo +nightly audit; else echo "no Cargo.lock — skipping audit"; fi )' )
 # CLAUDE.md's own Level 5 inserts `will .test dry:0` here. That is a self-check specific to the
 # `will` tool, with no equivalent in this repo. In its place runs this family's own maximal check,
-# the full corpus/quality gate suite (G1-G21, see bench_harness/gate/readme.md). It goes through
-# verb/gate itself rather than re-deriving the invocation here.
+# the gates bench_harness/gate/declared/ring/gates.txt declares (see bench_harness/gate/readme.md).
+# It goes through verb/gate itself rather than re-deriving the invocation here.
 STEPS_5=( "${STEPS_4[@]}" './verb/gate' )
 
 case "$_level" in

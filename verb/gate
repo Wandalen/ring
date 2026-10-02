@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#@ purpose: Dispatch to bench_harness's own corpus/quality gate suite (G1-G21).
-#@          family::<name> (default ring), gate::<name> (repeatable, e.g. gate::g15),
+#@ purpose: Dispatch to bench_harness's gate suite, the gates the family's gates.txt declares.
+#@          family::<name> (default ring), gate::<name> (repeatable, e.g. gate::g3),
 #@          stage::<name> (e.g. stage::S4). No params runs every declared gate.
 #@ tags: verb, gate
 set -euo pipefail

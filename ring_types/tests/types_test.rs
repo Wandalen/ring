@@ -1,19 +1,19 @@
-//! Tests for `ring_types` — the ring family's shared vocabulary.
+//! Tests for `ring_types`, the ring family's shared vocabulary.
 //!
 //! Claims three features, or the parts of them this crate owns:
 //!
-//! - `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md` — the
+//! - `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`: the
 //!   never-wrapping `Seq`, the derived `SlotIndex`, and the power-of-two
 //!   `Capacity`. The mapping between them is `ring_index`'s half; the types and
 //!   the capacity constraint are this crate's.
-//! - `docs/feature/173_wait_kind_and_strategies.md` — the four `WaitKind`
+//! - `docs/feature/173_wait_kind_and_strategies.md`: the four `WaitKind`
 //!   discriminants. The handlers are `ring_wait`'s half.
-//! - `docs/feature/174_overflow_policy_enum_and_handlers.md` — the three
+//! - `docs/feature/174_overflow_policy_enum_and_handlers.md`: the three
 //!   `OverflowPolicy` discriminants, and specifically the *absence* of an
 //!   overwrite-unread variant. The handlers are `ring_overflow`'s half.
 //!
-//! The split between discriminant and handler is ruled by
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5.
+//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5 rules the
+//! split between discriminant and handler.
 
 use ring_types::{Capacity, OverflowPolicy, RingError, Seq, SlotIndex, WaitKind};
 
@@ -39,14 +39,14 @@ fn seq_advances() {
   assert_eq!(Seq(3).next(), Seq(3).advanced_by(1));
 }
 
-/// Feature 167's central claim: the sequence never wraps. Asserted at the one
-/// place it could — a `u64` counting publications does not reach its ceiling in
-/// any reachable workload, and the type deliberately offers no wrapping op.
+/// Feature 167's central claim is that the sequence never wraps. Asserted at the
+/// one place it could be. A `u64` counting publications does not reach its ceiling
+/// in any reachable workload, and the type deliberately offers no wrapping op.
 #[test]
 fn seq_does_not_wrap_within_any_reachable_workload() {
-  // At one publication per nanosecond — far beyond any real ring — a u64
+  // At one publication per nanosecond, far beyond any real ring, a u64
   // exhausts after this many years. The assertion is on the arithmetic, not on
-  // a run: it is what licenses plain `<` comparison everywhere in the family.
+  // a run. It is what licenses plain `<` comparison everywhere in the family.
   let per_second: u64 = 1_000_000_000;
   let seconds_per_year: u64 = 31_557_600;
   let years = u64::MAX / per_second / seconds_per_year;
@@ -88,7 +88,7 @@ fn capacity_accepts_powers_of_two() {
     let cap = Capacity::new(slots).expect("power of two must be accepted");
     assert_eq!(cap.get(), slots);
     assert_eq!(cap.mask(), slots - 1);
-    // The mask property the whole feature rests on: masking is modulo.
+    // Masking is modulo, the mask property the whole feature rests on.
     assert_eq!((slots * 3 + 1) & cap.mask(), (slots * 3 + 1) % slots);
     slots *= 2;
   }
@@ -131,7 +131,7 @@ fn wait_kind_has_exactly_four_variants() {
   for expected in [WaitKind::Spin, WaitKind::Yield, WaitKind::Park, WaitKind::None] {
     assert!(WaitKind::ALL.contains(&expected), "{expected:?} missing from ALL");
   }
-  // Exhaustive match: a new variant breaks compilation here rather than
+  // Exhaustive match, so a new variant breaks compilation here rather than
   // silently passing the length check via a replaced entry.
   for kind in WaitKind::ALL {
     match kind {
@@ -149,7 +149,7 @@ fn exactly_one_wait_kind_is_non_blocking() {
 }
 
 /// The default is the lowest-latency strategy, so a ring built without an
-/// explicit choice behaves as the substrate's fast path rather than parking.
+/// explicit choice takes the fast path rather than parking.
 #[test]
 fn wait_kind_defaults_to_spin() {
   assert_eq!(WaitKind::default(), WaitKind::Spin);
@@ -157,27 +157,27 @@ fn wait_kind_defaults_to_spin() {
 
 // ---- OverflowPolicy -------------------------------------------------------
 
-/// Feature 174's load-bearing negative: there is no variant that overwrites
+/// Feature 174's key negative claim is that no variant overwrites
 /// unread data. Asserted by enumerating the whole set and matching
-/// exhaustively — the only way to state an absence in Rust.
+/// exhaustively, the only way to state an absence in Rust.
 ///
 /// The per-variant `contains` loop closes T6 of
 /// `docs/non_functional_requirement/002_the_enum_sets_are_closed_and_asserted.md`,
 /// which stood recorded as **Not met** with its own fix named as three
 /// transposed lines. The exhaustive `match` below catches the enum *growing*
 /// past this array; until this loop, nothing caught the array *decaying* while
-/// the enum stood still — both prior checks pass for any three-element array,
+/// the enum stood still. Both prior checks pass for any three-element array,
 /// because the length is 3 whatever it holds and the `match` is exhaustive over
 /// the enum rather than over the roster.
 ///
 /// Measured before adding it, by rewriting `ALL` two ways and running
 /// `ring_types`, `ring_stats` and `ring_overflow` against each. Dropping
-/// `DropOldest` failed one `ring_types` doctest — `OverflowPolicy::ALL`'s own
+/// `DropOldest` failed one `ring_types` doctest, because `OverflowPolicy::ALL`'s own
 /// doctest asserts `contains( &DropOldest )`. Dropping `DropNewest` passed this
 /// crate **entirely**: 19/19 unit tests and 20/20 doctests green, with the
 /// `#[ default ]` policy gone from the roster. Both were caught downstream, by
 /// `ring_stats` (4 failures) and `ring_overflow` (5), which is the wrong place
-/// for it — `ALL` is declared here, so it is validated here.
+/// for it. `ALL` is declared here, so it is validated here.
 #[test]
 fn overflow_policy_has_no_overwrite_variant() {
   assert_eq!(OverflowPolicy::ALL.len(), 3);
@@ -230,7 +230,7 @@ fn errors_split_configuration_from_traffic() {
       requested: 9,
       capacity: 8,
     },
-    // Configuration rather than traffic: the policy will still be unsupported
+    // This is configuration rather than traffic. The policy will still be unsupported
     // on the next call, so the caller must change the config, not retry.
     RingError::PolicyUnsupported,
   ];
@@ -251,7 +251,7 @@ fn errors_split_configuration_from_traffic() {
 }
 
 /// Exactly the two conditions a peer's progress clears are transient; `Closed`
-/// notably is not, because nothing a peer does reopens a ring.
+/// is not, because nothing a peer does reopens a ring.
 #[test]
 fn only_full_and_empty_are_transient() {
   assert!(RingError::Full.is_transient());
@@ -265,16 +265,16 @@ fn only_full_and_empty_are_transient() {
 ///
 /// **The roster below is maintained by hand, and nothing here can tell you it
 /// is short.** `RingError` is `#[ non_exhaustive ]`, so a `match` written in
-/// this file — a separate crate — needs a wildcard arm and cannot be made to
-/// fail the build when a variant is added. What actually catches an omission is
-/// gate G1's 100% line-coverage threshold: an unrostered variant leaves its
+/// this file, which is a separate crate, needs a wildcard arm and cannot be made
+/// to fail the build when a variant is added. What catches an omission is
+/// gate G1's 100% line-coverage threshold. An unrostered variant leaves its
 /// `Display` arm unexecuted, and the gate names the file and the fraction.
 ///
 /// That is not hypothetical. `PolicyUnsupported` was added to
 /// `ring_types` while implementing `ring_core`, this list was not updated, and
 /// G1 reported `ring_types/src/error.rs 16/17` on the next run. Detection took
-/// one gate run rather than a compiler error — slower, but not silent, which is
-/// the property that matters.
+/// one gate run rather than a compiler error. That is slower, but not silent,
+/// which is the property that matters.
 #[test]
 fn every_error_displays_distinctly() {
   let all = [
@@ -311,8 +311,8 @@ fn every_error_displays_distinctly() {
   assert!(batch.contains('9') && batch.contains('8'));
 }
 
-/// `RingError` is usable as a `std::error::Error`, so a consumer behind the
-/// export surface can box it alongside its own errors.
+/// `RingError` is usable as a `std::error::Error`, so a consumer
+/// of the exported crates can box it alongside its own errors.
 #[test]
 fn error_implements_the_error_trait() {
   fn accepts<E: core::error::Error>(_: E) {}

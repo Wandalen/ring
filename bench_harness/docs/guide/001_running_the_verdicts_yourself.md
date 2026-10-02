@@ -1,4 +1,4 @@
-# Guide: Running the Verdicts Yourself
+# Guide: running the verdicts yourself
 
 ### Scope
 
@@ -13,7 +13,7 @@ Every command below is run from the repository root:
 cd "$(git rev-parse --show-toplevel)"
 ```
 
-### 1. The Seven Gates — the machine verdict
+### 1. The seven gates, the machine verdict
 
 This is the whole family in one command. It grades all 33 crates.
 
@@ -21,9 +21,9 @@ This is the whole family in one command. It grades all 33 crates.
 bash bench_harness/gate/run_all.sh --family ring
 ```
 
-Expect `7/7 gates reached`. `--family ring` is required rather than optional: a
-bare `run_all.sh` grades whichever family `declared/family.txt` names, and that
-is now `orbital`. Omitting it silently grades a different family and reports
+Expect `7/7 gates reached`. `--family ring` is required. A bare `run_all.sh`
+grades whichever family `declared/family.txt` names, and that is now
+`orbital`. Omitting it silently grades a different family and reports
 `11/11`, which looks like a better answer to the question you asked.
 
 What each gate asks:
@@ -51,14 +51,14 @@ bash bench_harness/gate/run_all.sh --stage S8
 
 The stage names come from [`gate/declared/ring/stages.txt`](../../gate/declared/ring/stages.txt).
 
-**Do not call a gate script with positional arguments.** They take none — scope
+**Do not call a gate script with positional arguments.** They take none. Scope
 arrives through the `GATE_CRATES` / `GATE_FEATURES` / `GATE_STAGE` environment
 variables that `run_all.sh` sets. Writing `bash gate/g1_coverage.sh ring_bench S8`
 does not fail; the arguments are ignored and the script silently grades the
 entire family. That mistake was made during this effort and produced a
 correct-looking 1650-line result for what was supposed to be a 298-line check.
 
-### 2. The Full Suite
+### 2. The full suite
 
 ```bash
 verb/test
@@ -77,7 +77,7 @@ RUSTFLAGS="-D warnings" cargo nextest run --all-features \
 This takes minutes across 33 crates. Launch it detached rather than watching a
 tool call time out.
 
-### 3. The Comparison — what the effort was for
+### 3. The comparison the effort was for
 
 Gates prove the family is built. This prints what it measured.
 
@@ -87,7 +87,7 @@ cargo run -p ring_bench --all-features --example comparison
 
 Four sections. Real output from a run on 2026-08-28:
 
-**A — 4096 slots, 256 records.** Everything fits, so everything is eligible.
+**A. 4096 slots, 256 records.** Everything fits, so everything is eligible.
 
 ```
 candidate          offered  reported  received  dropped   silent     write ns
@@ -104,7 +104,7 @@ The mutex baseline is **15.5x** `direct_spsc` here (499485 / 32280). That
 order-of-magnitude gap is the one durable timing result; see section D for why
 nothing finer than it is asserted anywhere.
 
-**B — 256 records into 16 slots.** Everything loses, in three different ways.
+**B. 256 records into 16 slots.** Everything loses, in three different ways.
 
 ```
 mutex_queue            256        16        16      240        0       205483
@@ -118,13 +118,13 @@ fastest lossless: none — every candidate dropped records
 
 Read the `silent` column. `contract_ring` and `off_the_shelf` **report 256
 successes and keep 16**. Their write API returned `Ok` 240 times for records
-that no longer exist. `tls_over_ring` is worse in a different direction: it
+that no longer exist. `tls_over_ring` is worse in a different direction. It
 keeps *nothing*, because a rejected first flush leaves records staged and every
 later append fails against the full stage. And it is the fastest column entry
-on the page, at 9640 ns — which is exactly why `fastest lossless` filters on
+on the page, at 9640 ns. That is exactly why `fastest lossless` filters on
 losslessness before it compares times.
 
-**C — four producers.** Four of six candidates cannot be reached at all.
+**C. Four producers.** Four of six candidates cannot be reached at all.
 
 ```
 mutex_queue           1024      1024      1024        0        0       773168
@@ -135,10 +135,10 @@ refused: direct_spsc admits 1 producer(s), asked for 4
 refused: off_the_shelf admits 1 producer(s), asked for 4
 ```
 
-Two of those four refusals are the *door*, not the structure — `contract_ring`
-and `off_the_shelf` sit on genuinely multi-producer queues.
+Two of those four refusals come from the *door*, not the structure.
+`contract_ring` and `off_the_shelf` sit on multi-producer queues.
 
-**D — the same workload, ten times.**
+**D. The same workload, ten times.**
 
 ```
 distinct winners across 10 identical runs : 2 ["direct_spsc", "off_the_shelf"]
@@ -152,14 +152,14 @@ a ratio of **5.6x**. The stability reading is not itself stable, which is a
 stronger argument for [`ring_bench/docs/decisions/002`](../../../ring_bench/docs/decisions/002_no_test_asserts_an_ordering.md)
 than any single run of it.
 
-Drop `--all-features` to see the comparison with five rows instead of six —
+Drop `--all-features` to see the comparison with five rows instead of six.
 `crossbeam` is opt-in, so `off_the_shelf` is compiled out entirely:
 
 ```bash
 cargo run -p ring_bench --example comparison
 ```
 
-### 4. Coverage, Two Ways
+### 4. Coverage, two ways
 
 The gate's answer:
 
@@ -176,11 +176,11 @@ cargo tarpaulin --all-features --skip-clean --out Stdout 2>/dev/null \
 
 **G1 recomputes the percentage rather than reading tarpaulin's.** Tarpaulin's
 summary figure is workspace-wide, so it is meaningless for a scoped stage; the
-gate sums the per-file breakdown for the crates in scope. Note also what is
-*not* in scope: `examples/` is not under `src/`, so the demo you just ran
-contributes nothing to the coverage figure.
+gate sums the per-file breakdown for the crates in scope. `examples/` is *not*
+in scope, because it is not under `src/`. So the demo you just ran contributes
+nothing to the coverage figure.
 
-### 5. The Manual Records
+### 5. The manual records
 
 Every crate carries one. `ring_bench`'s is the longest and the most useful:
 
@@ -189,7 +189,7 @@ sed -n '1,80p' ring_bench/tests/manual/readme.md
 ```
 
 Five prediction-first stages, of which **three predictions were wrong**. Stage
-B5 is the one to read — it is the subject of [`003`](003_what_the_gates_do_not_prove.md).
+B5 is the one to read. It is the subject of [`003`](003_what_the_gates_do_not_prove.md).
 
 ### Sources
 
@@ -204,7 +204,7 @@ B5 is the one to read — it is the subject of [`003`](003_what_the_gates_do_not
 
 | File | Relationship |
 |------|--------------|
-| [../invariant/001_gate_non_vacuity.md](../invariant/001_gate_non_vacuity.md) | Why §1's gates reported 0/6 before they reported 6/6 — and how G12, which cannot be baselined that way, was proved able to fail instead |
+| [../invariant/001_gate_non_vacuity.md](../invariant/001_gate_non_vacuity.md) | Why §1's gates reported 0/6 before they reported 6/6, and how G12, which cannot be baselined that way, was proved able to fail instead |
 
 ### Acceptance
 

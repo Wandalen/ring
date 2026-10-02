@@ -1,19 +1,19 @@
 //! Producer gating so it never laps the slowest consumer.
 //!
-//! Tier 4 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 4 of the ring family's 33 crates, which together implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_seqno`.
 //!
 //! `docs/feature/178_sequence_barrier_and_gating_set.md` names the two halves.
-//! This crate is the producer's: given a set of consumer cursors, how far may a
-//! producer advance without landing on a slot one of them has not finished
-//! with. `ring_barrier` is the consumer's, and reads the same minimum from the
-//! other side.
+//! This crate is the producer's half. Given a set of consumer cursors, it answers
+//! how far a producer may advance without landing on a slot one of them has not
+//! finished with. `ring_barrier` is the consumer's half, and reads the same
+//! minimum from the other side.
 //!
 //! ## Why the slowest consumer, and only the slowest
 //!
 //! A ring has one copy of each slot. A producer that laps *any* consumer
 //! overwrites data that consumer has not read, so the bound is the minimum
-//! across the whole gating set — not the average, not the median, and not the
+//! across the whole gating set. It is not the average, the median, or the
 //! consumer that happens to be asking. One stalled consumer stops the producer
 //! for everyone, which is the correct behaviour and the reason a stalled
 //! consumer is a problem worth detecting rather than routing around.
@@ -21,18 +21,18 @@
 //! ## The empty set is not a consumer at zero
 //!
 //! `ring_cursor::slowest` returns `None` for an empty set rather than `Seq::ZERO`,
-//! and this crate carries that distinction through: a ring nobody is reading
+//! and this crate carries that distinction through. A ring nobody is reading
 //! has no data anyone can lose, so [`GatingSet::headroom`] returns a full
 //! capacity rather than zero. Collapsing the two would deadlock every ungated
-//! ring at the first lap — the producer would gate against a consumer that does
+//! ring at the first lap. The producer would gate against a consumer that does
 //! not exist and wait forever for it to move.
 //!
 //! ## Full versus BatchTooLarge
 //!
 //! [`GatingSet::check`] distinguishes them, and the distinction is the whole
-//! reason it returns a `Result` rather than a `bool`. `Full` is back-pressure:
-//! the caller should retry, because a consumer will move. `BatchTooLarge` is a
-//! configuration error: a claim wider than the ring can never fit no matter who
+//! reason it returns a `Result` rather than a `bool`. `Full` is back-pressure.
+//! The caller should retry, because a consumer will move. `BatchTooLarge` is a
+//! configuration error. A claim wider than the ring can never fit no matter who
 //! moves, and a retry loop that could not tell them apart would spin forever on
 //! the second. `RingError::is_configuration` is the caller's test.
 
@@ -45,7 +45,7 @@ use ring_types::{Capacity, RingError, Seq};
 /// positions in.
 ///
 /// Owns its cursors rather than borrowing them, so that the set and the
-/// cursors cannot get out of sync — a set holding references to cursors that
+/// cursors cannot get out of sync. A set holding references to cursors that
 /// outlive it, or fewer cursors than it was built for, is a bound that reads
 /// correctly and gates nothing.
 ///
@@ -75,8 +75,8 @@ impl GatingSet {
   /// A set of `consumers` cursors, all at zero, gating a ring of `capacity`
   /// slots.
   ///
-  /// `consumers` of zero is legal and means ungated — see the module
-  /// documentation for why that is not the same as one consumer at zero.
+  /// `consumers` of zero is legal and means ungated. The module documentation
+  /// explains why that is not the same as one consumer at zero.
   ///
   /// ```
   /// use ring_gating::GatingSet;
@@ -119,7 +119,7 @@ impl GatingSet {
 
   /// One consumer's cursor, for that consumer to advance.
   ///
-  /// The `&self` receiver does not make the return value read-only: a
+  /// The `&self` receiver does not make the return value read-only. A
   /// `PaddedCursor` wraps an atomic, so `&PaddedCursor` is enough to store
   /// through it. Membership is fixed once the set is constructed; a cursor's
   /// stored position is not.
@@ -164,11 +164,11 @@ impl GatingSet {
   /// The position of the slowest consumer, or `None` when the set is empty.
   ///
   /// The fold itself is [`ring_cursor::slowest`], shared with `ring_barrier`,
-  /// which asks the opposite question of the same kind of slice. Every cursor is
-  /// read there at [`ring_cursor::GATING`], which is the family's one statement
-  /// of the ordering a gating read uses, for the reason argued there: the caller
+  /// which asks the opposite question of the same kind of slice. That function
+  /// reads every cursor at [`ring_cursor::GATING`], the family's one statement
+  /// of the ordering a gating read uses, for the reason argued there. The caller
   /// is about to overwrite a slot on the answer, and a `Relaxed` load would let
-  /// it act on a barrier the consumer has already moved past — or, worse, one it
+  /// it act on a barrier the consumer has already moved past, or, worse, one it
   /// has not yet reached.
   ///
   /// ```
@@ -235,11 +235,11 @@ impl GatingSet {
   ///
   /// # Errors
   ///
-  /// [`RingError::BatchTooLarge`] when `count` exceeds the ring's capacity —
-  /// a configuration error that no consumer's progress can fix, so a retry
+  /// [`RingError::BatchTooLarge`] when `count` exceeds the ring's capacity.
+  /// That is a configuration error no consumer's progress can fix, so a retry
   /// loop must stop rather than spin. [`RingError::Full`] when the claim would
-  /// fit in an empty ring but does not fit now — back-pressure, so a retry
-  /// loop should keep going.
+  /// fit in an empty ring but does not fit now. That is back-pressure, so a
+  /// retry loop should keep going.
   ///
   /// # Not a step in a claim
   ///
@@ -249,9 +249,9 @@ impl GatingSet {
   /// A claim needs *is there room at the value I am about to exchange
   /// against*, re-evaluated on every retry against the sequence the failed
   /// compare-exchange returned. Substituting this call in would hoist the
-  /// gate out of the retry and restore exactly the check-then-act window
+  /// gate out of the retry and restore the check-then-act window
   /// `ring_claim`'s module doc rejects. Correct callers are the ones that
-  /// want an answer rather than a claim — a diagnostic, an admission test, a
+  /// want an answer rather than a claim: a diagnostic, an admission test, a
   /// caller deciding whether to attempt anything at all.
   ///
   /// ```
@@ -282,12 +282,12 @@ impl GatingSet {
 
   /// The sequence a producer must not reach or pass.
   ///
-  /// One lap beyond the slowest consumer: the producer may occupy every slot
+  /// One lap beyond the slowest consumer. The producer may occupy every slot
   /// up to but not including this. `None` for an ungated ring, which has no
   /// such limit.
   ///
   /// Exposed separately from [`headroom`] because a diagnostic wants the
-  /// absolute position — "blocked at sequence 128" localises a stall, while
+  /// absolute position. "Blocked at sequence 128" localises a stall, while
   /// "0 slots free" does not.
   ///
   /// [`headroom`]: Self::headroom

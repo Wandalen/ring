@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Full pre-push gate — alias for `test level::5` (nextest, doctests, clippy,
+#@ purpose: Full pre-push gate, an alias for `test level::5` (nextest, doctests, clippy,
 #@          udeps, audit, and the family's own corpus/quality gate suite).
 #@ tags: verb, verify
 set -euo pipefail

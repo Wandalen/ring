@@ -38,7 +38,7 @@ for _arg in "$@"; do
 done
 
 # run_all.sh's own usage examples fix this order: `--family ring --stage S4`, and
-# separately `--stage S1 g1 g3` — stage comes before gate names, not after.
+# separately `--stage S1 g1 g3`. Stage comes before gate names, not after.
 _cmd=( bash gate/run_all.sh --family "$_family" )
 [[ -n "$_stage" ]] && _cmd+=( --stage "$_stage" )
 (( ${#_gates[@]} > 0 )) && _cmd+=( "${_gates[@]}" )

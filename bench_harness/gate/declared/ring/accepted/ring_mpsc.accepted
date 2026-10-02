@@ -3,7 +3,7 @@
 # `Producer::on_distinct_lines` is the only one of the three that computes the
 # comparison itself, because its two cursors are not fields of a shared parent:
 # one lives in the ring's gating set, the other in the claimer. Its own doc says
-# so, and says why it checks at all — a sibling change that dropped the padding
+# so, and says why it checks at all. A sibling change that dropped the padding
 # would cost this crate a contended line on its hottest path and break nothing
 # that compiles.
 #

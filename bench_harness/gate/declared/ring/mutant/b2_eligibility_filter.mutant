@@ -1,17 +1,17 @@
-# B2 — the filter that keeps a path which dropped records from being called
+# B2. The filter that keeps a path which dropped records from being called
 # fastest.
 #
-# `ring_bench`'s one load-bearing rule. Remove it and the harness recommends
-# whichever candidate discarded the workload quickest, while the number it
-# prints still looks entirely reasonable — the failure is a wrong recommendation
-# rather than a wrong-looking one, which is why it needs a probe rather than a
-# reading.
+# The one rule `ring_bench`'s recommendation depends on. Remove it and the
+# harness recommends whichever candidate discarded the workload quickest, while
+# the number it prints still looks entirely reasonable. The failure is a wrong
+# recommendation rather than a wrong-looking one, which is why it needs a probe
+# rather than a reading.
 #
 # The round predicted two failures and got six: five behavioural plus the
 # `Comparison::fastest` doctest. Four of the five are tests written for other
 # purposes that happen to pin `fastest()` on a lossy workload along the way, so
 # the rule is defended in depth mostly by accident. The real detector is an
-# assertion shape, not a test name — the same lesson F1 produced independently.
+# assertion shape, not a test name. F1 taught the same lesson independently.
 #
 # The count below is nextest's own, so it excludes the doctest that also failed.
 

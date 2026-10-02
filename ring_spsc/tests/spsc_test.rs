@@ -1,4 +1,4 @@
-//! `ring_spsc` — one producer, one consumer, one array between them.
+//! `ring_spsc`: one producer, one consumer, one array between them.
 //!
 //! This file carries the reached-test for `docs/feature/171_spsc_ring_api.md`,
 //! stated in `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`
@@ -17,17 +17,17 @@
 //! - A ring whose consumer computes its bound from a stale cursor delivers
 //!   correct payloads in correct order and silently stops short.
 //! - A ring that lets the producer lap the consumer delivers correct payloads
-//!   in order with the right *count* — and some of them twice, with the
+//!   in order with the right *count*, but some of them twice and the
 //!   overwritten ones gone.
 //!
-//! The fourth clause is structural rather than behavioural: no test run can
-//! demonstrate the absence of a lock, so it is asserted at the source in
-//! `tests/manual/readme.md`'s S2 and by the crate's own dependency list — no
+//! The fourth clause is structural, not behavioural. No test run can
+//! demonstrate the absence of a lock, so `tests/manual/readme.md`'s S2 asserts
+//! it at the source, as does the crate's own dependency list: no
 //! `std::sync::Mutex`, no `RwLock`, and no compare-exchange on either path.
 //!
 //! ## What the doc examples do not cover
 //!
-//! Every method has a doc example, and the doc tests run — but each uses a
+//! Every method has a doc example, and the doc tests run. But each uses a
 //! capacity of 1 to 8 and pushes a handful of items, so none of them ever
 //! wraps the ring more than once, fills it, or crosses a thread boundary under
 //! real contention. Wrap, saturation and contention are where a ring's
@@ -36,17 +36,17 @@
 //! ## What an ordinary run cannot cover either
 //!
 //! The reached-test exchanges 100 000 items on a real machine, and it passes
-//! against a ring whose publish used `Relaxed` where it should use `Release` —
-//! measured, not assumed (→ `tests/manual/readme.md` S9). Scale is not
-//! coverage.
+//! against a ring whose publish used `Relaxed` where it should use `Release`.
+//! That was measured, not assumed (→ `tests/manual/readme.md` S9). Scale is
+//! not coverage.
 //!
-//! Note the reason is *not* that the host is strongly ordered. It is aarch64
-//! (Neoverse-N1), weakly ordered — `rustc -vV | grep host`. The window is
-//! simply narrow enough that sampling it 100 000 times does not open it. The `#[ cfg( loom ) ] mod exhaustive` at the bottom
-//! of this file runs a deliberately tiny case — one push, one drain — against a
-//! memory model weaker than any real hardware, and checks *every* interleaving
-//! of it. Neither subsumes the other: one has scale without coverage, the other
-//! coverage without scale.
+//! The reason is *not* a strongly ordered host. It is aarch64 (Neoverse-N1),
+//! weakly ordered, per `rustc -vV | grep host`. The window is narrow enough
+//! that sampling it 100 000 times does not open it. The `#[ cfg( loom ) ] mod exhaustive`
+//! at the bottom of this file runs a deliberately tiny case, one push and one
+//! drain, against a memory model weaker than any real hardware, and checks
+//! *every* interleaving of it. Neither subsumes the other. One has scale
+//! without coverage, the other coverage without scale.
 //!
 //! ```text
 //! RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test
@@ -55,7 +55,7 @@
 // ── the handshake at a scale loom cannot enumerate ─────────────────────────
 //
 // Gated `not( loom )` because loom's atomics panic when touched outside a
-// `loom::model`, and every test below constructs a `Ring` — whose cursors are
+// `loom::model`, and every test below constructs a `Ring`, whose cursors are
 // those atomics under `--cfg loom`. The two halves of this file are therefore
 // never compiled together, which is also why neither can quietly stand in for
 // the other.
@@ -74,14 +74,14 @@ mod threaded {
 
   // ── the reached-test ───────────────────────────────────────────────────────
 
-  /// `docs/feature/171_spsc_ring_api.md` — the claiming test.
+  /// The claiming test for `docs/feature/171_spsc_ring_api.md`.
   ///
   /// 100 000 records of eight bytes each, produced on one thread and drained on
   /// another, checked for all three behavioural clauses at once.
   ///
   /// Each record's payload is derived from its own index, so byte-parity is
   /// checked against a value the consumer computes independently rather than
-  /// against a copy the producer handed over — a shared `Vec` of expected
+  /// against a copy the producer handed over. A shared `Vec` of expected
   /// payloads would pass just as readily if both ends agreed on the wrong thing.
   #[test]
   fn one_producer_and_one_consumer_exchange_one_hundred_thousand_items() {
@@ -122,7 +122,7 @@ mod threaded {
       // empty", not "I have 100 000 records."** The difference is what a broken
       // ring looks like when this test runs: a consumer waiting for a count it
       // will never reach hangs, and a hang in CI reads as a slow machine rather
-      // than as a defect. Measured — a mutation committing one sequence past
+      // than as a defect. Measured: a mutation committing one sequence past
       // what it read made this loop spin forever under the count-based form, and
       // fail in 30ms with a readable count mismatch under this one.
       while (received.len() as u64) < ITEMS {
@@ -161,7 +161,7 @@ mod threaded {
     // Zero loss, and nothing extra.
     assert_eq!(received.len() as u64, ITEMS, "count");
 
-    // Byte-parity and order, together — position `index` must hold exactly the
+    // Byte-parity and order, together. Position `index` must hold exactly the
     // payload of `index`, so a reordering and a corruption both fail here.
     for (index, actual) in received.iter().enumerate() {
       assert_eq!(*actual, payload(index as u64), "record {index}");
@@ -170,12 +170,12 @@ mod threaded {
 
   // ── the invariant the unsafe rests on ──────────────────────────────────────
 
-  /// Decision 123 ruling 4 — the shape asserted, not only described.
+  /// Decision 123 ruling 4, with the shape asserted and not only described.
   ///
   /// The soundness argument in `Ring::slot_mut` says "the caller must be the
   /// producer end", and it is worth nothing if a second producer is
-  /// constructible. Three properties make that unrepresentable, and all three are
-  /// negative — which is why they need a test: nothing in the code says them.
+  /// constructible. Three properties make that unrepresentable. All three are
+  /// negative, so nothing in the code says them, and that is why they need a test.
   #[test]
   fn both_ends_are_send_and_neither_is_sync() {
     fn assert_send<T: Send>() {}
@@ -184,12 +184,12 @@ mod threaded {
     assert_send::<Consumer<'_, TypedSlot<u32>>>();
     assert_send::<Ring<TypedSlot<u32>>>();
 
-    // The negative half — `!Sync`, `!Clone`, no second split, no batch outliving
-    // its commit — is asserted by four `compile_fail` doc tests in the crate's
-    // module documentation, under "What the type system refuses". They live there
-    // rather than here because rustdoc collects doc tests from the library target
-    // only: the same blocks written in this file are never compiled, and would be
-    // four checks that silently check nothing.
+    // Four `compile_fail` doc tests in the crate's module documentation, under
+    // "What the type system refuses", assert the negative half: `!Sync`, `!Clone`,
+    // no second split, no batch outliving its commit. They live there, not here,
+    // because rustdoc collects doc tests from the library target only. The same
+    // blocks written in this file are never compiled, and would be four checks
+    // that silently check nothing.
   }
 
   // ── construction ───────────────────────────────────────────────────────────
@@ -235,7 +235,7 @@ mod threaded {
   #[test]
   fn debug_reports_positions_and_never_reads_a_slot() {
     // Formatting the slots would read every one of them, including any the
-    // producer is writing — so the `Debug` impl deliberately does not. This
+    // producer is writing, so the `Debug` impl deliberately does not. This
     // asserts the shape of the output, which is the only observable difference.
     let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(4));
     let (mut producer, _consumer) = ring.split();
@@ -251,11 +251,11 @@ mod threaded {
     assert!(!rendered.contains('7'), "a payload leaked into Debug: {rendered}");
   }
 
-  // ── the producer's surface ─────────────────────────────────────────────────
+  // ── the producer's API ─────────────────────────────────────────────────────
 
   #[test]
   fn free_capacity_is_actionable_rather_than_advisory() {
-    // The SPSC-specific contract from `docs/api/001_producer_surface.md`: with
+    // The SPSC-specific contract from `docs/api/001_producer_surface.md`. With
     // one producer nothing can take the reported space between the check and the
     // push, so a reported `n` guarantees exactly `n` successes and then a
     // failure. On a multi-producer ring the same call is a hint, which is the
@@ -306,8 +306,8 @@ mod threaded {
 
   #[test]
   fn a_failed_push_returns_the_record_rather_than_swallowing_it() {
-    // A caller applying backpressure has nothing to retry with if the record is
-    // consumed by the failure — which is why `try_push` returns `Result< (), T >`
+    // A caller applying backpressure has nothing to retry with if the failure
+    // consumes the record. That is why `try_push` returns `Result< (), T >`
     // rather than `Result< (), RingError >`.
     let mut ring: Ring<TypedSlot<String>> = Ring::new(cap(1));
     let (mut producer, _consumer) = ring.split();
@@ -321,8 +321,8 @@ mod threaded {
 
   #[test]
   fn push_with_does_not_call_the_writer_when_the_ring_is_full() {
-    // Otherwise a caller whose closure has a side effect — consuming from an
-    // upstream queue, say — loses a record on every rejected push.
+    // Otherwise a caller whose closure has a side effect, such as consuming from
+    // an upstream queue, loses a record on every rejected push.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(1));
     let (mut producer, _consumer) = ring.split();
 
@@ -347,9 +347,9 @@ mod threaded {
 
   #[test]
   fn a_reservation_publishes_on_drop_even_unwritten() {
-    // Deliberate rather than incidental: publishing an empty slot is recoverable
-    // — the consumer sees a record it can recognise as empty — whereas *not*
-    // publishing wedges the ring for good. The `must_use` message is what warns
+    // Deliberate, not incidental. Publishing an empty slot is recoverable, since
+    // the consumer sees a record it can recognise as empty, whereas *not*
+    // publishing stalls the ring for good. The `must_use` message is what warns
     // about the accident.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
     let (mut producer, consumer) = ring.split();
@@ -397,7 +397,7 @@ mod threaded {
     assert_eq!(producer.position(), Seq(LAPS * CAPACITY as u64));
   }
 
-  // ── the consumer's surface ─────────────────────────────────────────────────
+  // ── the consumer's API ─────────────────────────────────────────────────────
 
   #[test]
   fn draining_an_empty_ring_yields_an_empty_batch_and_moves_nothing() {
@@ -458,20 +458,20 @@ mod threaded {
 
   /// Fix(weak_len_assert_sweep_1633):
   /// Root Cause: the assertion checked only `.len() == 2`, never which two
-  /// values the over-large `drain_up_to( 100 )` request actually yielded.
+  /// values the over-large `drain_up_to( 100 )` request yielded.
   /// Why Not Caught: a wrong `max.min( available )` clamp that read the wrong
   /// bound (e.g. capacity instead of what was actually published) could still
   /// coincidentally report a batch of length 2 while starting at the wrong
   /// offset or reading stale slots.
   /// Fix Applied: read each slot via `get(offset).and_then(TypedSlot::get)
-  /// .copied()` — the same non-consuming idiom this file's own
-  /// `get_and_iter_agree_at_every_offset` test uses a few lines below — and
+  /// .copied()`, the same non-consuming idiom this file's own
+  /// `get_and_iter_agree_at_every_offset` test uses a few lines below, and
   /// assert the exact values `[1, 2]`, in order, in addition to the length.
   /// Prevention: prefer content/order assertions over bare length checks for
   /// any collection-returning API, especially one whose whole contract (as
-  /// this test's own name states) is about *what* is yielded, not merely
+  /// this test's own name states) is about *what* is yielded, not only
   /// how much.
-  /// Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn` — a
+  /// Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn`, so a
   /// plain `grep "pub fn"` sweep for its API silently misses it.
   #[test]
   fn drain_up_to_more_than_available_yields_what_there_is() {
@@ -547,11 +547,11 @@ mod threaded {
   ///
   /// `get` returns `&S`, and `TypedSlot::take` needs `&mut S`, so before
   /// `get_mut` existed there was no path from a drained batch to an owned `T` at
-  /// all — only to a borrow of one. `ring_mpsc`'s batch had the counterpart from
+  /// all, only to a borrow of one. `ring_mpsc`'s batch had the counterpart from
   /// the start; this crate's did not, and nothing noticed until `ring_core`'s
-  /// uniform surface needed to return `Option< T >` rather than `Option< &T >`.
+  /// uniform API needed to return `Option< T >` rather than `Option< &T >`.
   ///
-  /// The wrap is deliberate: taking through `get_mut` must address the same slot
+  /// The wrap is deliberate. Taking through `get_mut` must address the same slot
   /// `get` would, and an off-by-one in either direction is invisible on a batch
   /// that does not fold across the array's end.
   #[test]
@@ -592,7 +592,7 @@ mod threaded {
 
   #[test]
   fn available_and_is_empty_agree_at_every_point_of_a_lap() {
-    // The exhaustive form: `is_empty` is a compare and `available` is a
+    // The exhaustive form. `is_empty` is a compare and `available` is a
     // subtraction, so they are two computations that must never disagree.
     const CAPACITY: usize = 4;
 
@@ -622,8 +622,8 @@ mod threaded {
   #[test]
   fn a_ring_smaller_than_the_traffic_still_loses_nothing() {
     // Capacity 2 against 20 000 items forces the producer to block on the
-    // consumer on almost every push — the case where a mis-ordered publish or a
-    // premature commit shows up as an overwrite rather than as a hang.
+    // consumer on almost every push. That is the case where a mis-ordered publish
+    // or a premature commit shows up as an overwrite rather than as a hang.
     const ITEMS: u32 = 20_000;
 
     let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(2));
@@ -640,8 +640,8 @@ mod threaded {
 
       let mut received: Vec<u32> = Vec::with_capacity(ITEMS as usize);
 
-      // Same producer-finished exit as the reached-test, and for the same reason:
-      // a count-based loop turns "lost a record" into a hang.
+      // Same producer-finished exit as the reached-test, and for the same reason.
+      // A count-based loop turns "lost a record" into a hang.
       while (received.len() as u32) < ITEMS {
         let producer_done = producing.is_finished();
         let batch = consumer.drain();
@@ -672,12 +672,12 @@ mod threaded {
 
   #[test]
   fn a_departed_producer_leaves_the_published_tail_drainable() {
-    // `docs/lifecycle/002_producer_consumer_pairing.md`'s cleanup requirement 3:
-    // one end going away does not invalidate the other, and neither case panics.
+    // `docs/lifecycle/002_producer_consumer_pairing.md`'s cleanup requirement 3
+    // says one end going away does not invalidate the other, and neither case panics.
     //
-    // "Going away" is modelled as the end being moved onto a thread that then
-    // finishes — the actual Q3 → Q4 transition — rather than as a `drop` call.
-    // Neither end has a `Drop` impl, deliberately: requirement 3 rules that
+    // This models "going away" as the end being moved onto a thread that then
+    // finishes, which is the actual Q3 → Q4 transition, not as a `drop` call.
+    // Neither end has a `Drop` impl, by design. Requirement 3 rules that
     // detecting counterpart death belongs to feature 184 at `ring_shutdown`, not
     // to a destructor, so a `drop( producer )` here would be a no-op dressed up
     // as an event.
@@ -708,7 +708,7 @@ mod threaded {
     // Prevention: prefer content/order assertions over bare length checks,
     // especially across a thread-boundary handoff where reordering is the
     // realistic failure mode.
-    // Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn` — a
+    // Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn`, so a
     // plain `grep "pub fn"` sweep for its API silently misses it.
     let values: Vec<u8> = (0..batch.len())
       .filter_map(|offset| batch.get(offset).and_then(TypedSlot::get).copied())
@@ -721,10 +721,10 @@ mod threaded {
 
   #[test]
   fn a_departed_consumer_leaves_the_producer_reporting_full_forever() {
-    // The other half of the same requirement — and it is `Full`, not `Closed`. A
-    // ring that guessed at counterpart death here would be reporting a condition
-    // it cannot actually observe: a consumer that has stopped for a millisecond
-    // and one that has stopped for good look identical from this end.
+    // The other half of the same requirement, and the producer reports `Full`,
+    // not `Closed`. A ring that guessed at counterpart death here would be
+    // reporting a condition it cannot observe. A consumer that has stopped for a
+    // millisecond and one that has stopped for good look identical from this end.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(2));
     let (mut producer, consumer) = ring.split();
 
@@ -743,7 +743,7 @@ mod threaded {
 
   #[test]
   fn a_second_pair_may_be_split_once_the_first_is_gone() {
-    // The complement of the `compile_fail` cases: `&mut self` forbids two live
+    // The complement of the `compile_fail` cases. `&mut self` forbids two live
     // pairs, and permits a sequential one. A ring that could only ever be split
     // once would be unusable from `ring_factory`'s recycling path.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
@@ -761,9 +761,9 @@ mod threaded {
       // .and_then(TypedSlot::get).copied()` idiom and assert it is exactly
       // the pushed value `1`.
       // Prevention: prefer content assertions over bare length checks even
-      // for single-element batches — length alone never proves identity.
-      // Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn`
-      // — a plain `grep "pub fn"` sweep for its API silently misses it.
+      // for single-element batches. Length alone never proves identity.
+      // Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn`,
+      // so a plain `grep "pub fn"` sweep for its API silently misses it.
       let batch = consumer.drain();
       assert_eq!(batch.len(), 1);
       assert_eq!(batch.get(0).and_then(TypedSlot::get).copied(), Some(1));
@@ -796,12 +796,12 @@ mod threaded {
   #[test]
   fn every_record_written_is_dropped_exactly_once() {
     // `lifecycle/001`'s Cleanup 1 and 2. Neither a leak nor a double free shows
-    // up in any other test in this file: a ring that forgot its records would
+    // up in any other test in this file. A ring that forgot its records would
     // pass all twenty-five, and so would one that dropped them twice on a
     // platform tolerant enough not to abort. The count is the only witness.
     //
     // Two laps, not one. A single lap would not exercise the overwrite, which is
-    // where the interesting failure is — `TypedSlot::set` replacing an occupied
+    // where the interesting failure is. `TypedSlot::set` replacing an occupied
     // slot must drop what it replaces, and a ring that leaks there leaks once per
     // wrap for as long as it runs.
     const TAG: usize = 0;
@@ -818,7 +818,7 @@ mod threaded {
         assert_eq!(consumer.drain().len(), 4);
       }
 
-      // Four of the eight are gone already — the second lap's `set` calls
+      // Four of the eight are gone already. The second lap's `set` calls
       // replaced the first lap's records, and replacement is a drop.
       assert_eq!(
         DROPPED[TAG].load(Ordering::Relaxed),
@@ -837,19 +837,19 @@ mod threaded {
 
   #[test]
   fn the_ends_going_out_of_scope_in_either_order_releases_the_storage_once() {
-    // `lifecycle/001`'s Cleanup 2 and `lifecycle/002`'s Cleanup 4: end drop order
-    // is unspecified, so both orders must be correct rather than one being
-    // correct and the other merely untried.
+    // `lifecycle/001`'s Cleanup 2 and `lifecycle/002`'s Cleanup 4 say end drop
+    // order is unspecified, so both orders must be correct, not one correct and
+    // the other untried.
     //
     // An earlier form of this test called `drop( consumer ); drop( producer );`
-    // and clippy's `drop_non_drop` rejected it — correctly, and with a point
+    // and clippy's `drop_non_drop` rejected it, correctly and with a point
     // worth keeping. **Neither end has a destructor.** Both are a shared
     // reference plus a zero-sized marker, so "dropping" one is not an event at
     // all; the earlier form asserted an ordering between two things that do not
-    // happen. The order is established here by binding order instead — locals
-    // drop in reverse declaration order — which is the only mechanism that
-    // actually orders them, and the count is what shows the storage is released
-    // once regardless.
+    // happen. Here binding order sets the order instead, because locals drop
+    // in reverse declaration order. That is the only mechanism that orders
+    // them, and the count is what shows the storage is released once
+    // regardless.
     const TAG: usize = 1;
     assert_eq!(DROPPED[TAG].load(Ordering::Relaxed), 0, "a fresh counter");
 
@@ -886,7 +886,7 @@ mod threaded {
 
   #[test]
   fn every_public_type_is_debuggable() {
-    // Not decoration: a test that fails in CI prints these, and a type without
+    // Not decoration. A test that fails in CI prints these, and a type without
     // `Debug` forces the next reader to add one before they can diagnose
     // anything.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
@@ -909,10 +909,10 @@ mod threaded {
 
 /// The exhaustive half of this file's verification.
 ///
-/// `loom` swaps `ring_atomic`'s `AtomicSeq` for an instrumented one (see that
-/// crate's module documentation on the seam) and re-runs the closure once per
-/// distinct interleaving, so an assertion inside it is an assertion about all
-/// of them rather than about the one the scheduler happened to pick.
+/// `loom` swaps `ring_atomic`'s `AtomicSeq` for an instrumented one (see the
+/// `loom` section of that crate's module documentation) and re-runs the closure
+/// once per distinct interleaving, so an assertion inside it is an assertion
+/// about all of them rather than about the one the scheduler happened to pick.
 ///
 /// This is what `docs/state_machine/001_slot_state_without_holes.md`'s
 /// invariant 3, `docs/type/001_producer_cursor.md`'s V6, and
@@ -922,19 +922,19 @@ mod threaded {
 ///
 /// # The payload cannot be the slot, and finding that out was the point
 ///
-/// The obvious model — push a byte into a `TypedSlot`, drain it, assert the
-/// byte arrived — **is vacuous, and it was written and measured before this
-/// one replaced it.** With `HANDOFF` mutated from `Release` to `Relaxed`, that
-/// version passed. Loom instruments its own atomics and nothing else; a slot
-/// payload lives in plain memory behind the ring's `UnsafeCell`, so loom does
-/// not model the write at all and cannot report it as unobserved. A model that
-/// cannot fail is not a weaker check than a real one — it is not a check.
+/// The obvious model pushes a byte into a `TypedSlot`, drains it, and asserts
+/// the byte arrived. **It is vacuous, and it was written and measured before
+/// this one replaced it.** With `HANDOFF` mutated from `Release` to `Relaxed`,
+/// that version passed. Loom instruments its own atomics and nothing else. A
+/// slot payload lives in plain memory behind the ring's `UnsafeCell`, so loom
+/// does not model the write at all and cannot report it as unobserved. A model
+/// that cannot fail is not a check.
 ///
 /// So the payload here is a separate loom `AtomicUsize`, stored *before* the
 /// publish and loaded *after* the drain, exactly as
 /// `ring_publish/tests/handshake_test.rs` does. The ring still supplies the
-/// happens-before edge under test — the edge is this crate's own cursor pair —
-/// but the thing whose visibility is asserted is something loom can see.
+/// happens-before edge under test, and that edge is this crate's own cursor
+/// pair. But the value whose visibility the test asserts is one loom can see.
 #[cfg(loom)]
 mod exhaustive {
   use loom::sync::Arc;
@@ -952,7 +952,7 @@ mod exhaustive {
   ///
   /// `split` takes `&mut self` and loom has no scoped threads, so the borrow
   /// has to outlive both threads. Leaking one small ring per execution is the
-  /// least contrived way to get that: the ring is two `TypedSlot< u8 >` and a
+  /// least contrived way to get that. The ring is two `TypedSlot< u8 >` and a
   /// `CursorPair`, and loom's own per-execution bookkeeping dwarfs it.
   fn leaked_ring(capacity: usize) -> &'static mut Ring<TypedSlot<u8>> {
     let capacity = Capacity::new(capacity).expect("a power of two");
@@ -1017,7 +1017,7 @@ mod exhaustive {
 
       let draining = loom::thread::spawn(move || {
         // Two drains, so the consumer's own cursor is read back after it has
-        // advanced — a commit that stored the wrong sequence would show up as
+        // advanced. A commit that stored the wrong sequence would show up as
         // a total past two rather than as a single oversized batch.
         let first = consumer.drain().len();
         let second = consumer.drain().len();
@@ -1040,61 +1040,61 @@ mod exhaustive {
   /// # Root Cause
   ///
   /// `Producer::claim` (`src/lib.rs`) performs two independent, unfenced
-  /// `Relaxed` loads of the producer cursor — one inside `is_full`'s
+  /// `Relaxed` loads of the producer cursor: one inside `is_full`'s
   /// `occupancy()` call, and a separate second read afterward to compute
   /// `seq`. Nothing between them forces the second read to see no more than
-  /// the first validated against. Given the one precondition violation
-  /// `docs/invariant/001` already documents as unenforceable ("Silent"): two
-  /// racing bit-copies of one `Producer`, racer A's `is_full` sees the
-  /// producer cursor at 0 (not full), racer B's entire claim-and-publish then
+  /// the first validated against. Take the one precondition violation
+  /// `docs/invariant/001` already documents as unenforceable ("Silent"), two
+  /// racing bit-copies of one `Producer`. Racer A's `is_full` sees the
+  /// producer cursor at 0 (not full). Racer B's entire claim-and-publish then
   /// lands (cursor now 1), and only *then* does A's own re-read execute,
   /// observing B's already-published 1 and computing its own `seq` from it.
-  /// A's publish then drives the cursor to 2 against a capacity of 1 — D2,
-  /// reached through nothing but this crate's own public API.
+  /// A's publish then drives the cursor to 2 against a capacity of 1. That is
+  /// D2, reached through nothing but this crate's own public API.
   ///
   /// # Why Not Caught
   ///
   /// `ring_debug/docs/invariant/002` DB35 reasoned D2 is "unreachable from
-  /// any live `ring_core::Ring` a test can build" — a claim scoped to
-  /// `ring_core`'s composition, never actually tested against `ring_spsc`'s
-  /// own direct API. An `std::thread` stress test tried that direct question
-  /// first — 2 to 128 racing bit-copies of one `Producer`, hammering
+  /// any live `ring_core::Ring` a test can build". That claim was scoped to
+  /// `ring_core`'s composition and never tested against `ring_spsc`'s own
+  /// direct API. An `std::thread` stress test tried that direct question
+  /// first, with 2 to 128 racing bit-copies of one `Producer` hammering
   /// `try_push` for up to ~11.6 million combined attempts against a starved
-  /// consumer — and never reproduced D2. That was evidence but not proof: an
-  /// absent OS-scheduling interleaving in one run is not the same as an
-  /// impossible one, which is exactly the gap probabilistic racing leaves
+  /// consumer, and never reproduced D2. That was evidence but not proof. An
+  /// interleaving the OS scheduler did not produce in one run is not an
+  /// impossible one, and that is the gap probabilistic racing leaves
   /// open. `loom`'s exhaustive search closes that gap and proves the
-  /// stronger claim (unreachability) false — it finds the interleaving above
-  /// on the very first run, deterministically, on every run since.
+  /// stronger claim (unreachability) false. It finds the interleaving above
+  /// on the very first run, deterministically, and on every run since.
   ///
   /// # Fix Applied
   ///
   /// `Producer::free_capacity` changed from the unguarded
   /// `self.ring.capacity().get() - self.occupancy() as usize` to
-  /// `self.ring.capacity().get().saturating_sub( self.occupancy() as usize )`
-  /// — see the `Fix(free_capacity_underflow_on_a_precondition_violation)`
+  /// `self.ring.capacity().get().saturating_sub( self.occupancy() as usize )`.
+  /// See the `Fix(free_capacity_underflow_on_a_precondition_violation)`
   /// comment on that method, a few dozen lines above in this same file.
   ///
   /// # Prevention
   ///
-  /// This crate cannot prevent the precondition violation itself —
-  /// enforcement is structural, above this crate, per `docs/invariant/001`.
-  /// What this test asserts is what the crate *can* still guarantee once D2
-  /// is reached anyway: that `free_capacity` degrades to a safe, sane answer
-  /// rather than panicking (`-D warnings` dev builds) or wrapping to a
+  /// This crate cannot prevent the precondition violation itself.
+  /// Enforcement is structural, above this crate, per `docs/invariant/001`.
+  /// This test asserts what the crate *can* still guarantee once D2 is
+  /// reached anyway, namely that `free_capacity` degrades to a safe, sane
+  /// answer rather than panicking (`-D warnings` dev builds) or wrapping to a
   /// near-`usize::MAX` value a caller could mistake for real headroom
   /// (release builds, since the workspace sets no `overflow-checks`
-  /// anywhere). Running under `loom` means every future change is re-checked
-  /// against every interleaving of this exact shape, not merely sampled the
-  /// way the discarded `std::thread` stress test was.
+  /// anywhere). Running under `loom` re-checks every future change against
+  /// every interleaving of this exact shape, instead of sampling it the way
+  /// the discarded `std::thread` stress test did.
   ///
   /// # Pitfall
   ///
   /// A probabilistic stress test that fails to reproduce a race is evidence
-  /// bounded by its own sample size, never proof of impossibility — treating
+  /// bounded by its own sample size, never proof of impossibility. Treating
   /// "millions of attempts found nothing" as "unreachable" would have left
-  /// this exact bug undiscovered, exactly as `ring_debug`'s own DB35
-  /// reasoning left it. Where a crate already carries `loom` infrastructure
+  /// this exact bug undiscovered, as `ring_debug`'s own DB35 reasoning
+  /// left it. Where a crate already carries `loom` infrastructure
   /// for its ordering claims, a reachability question about a *documented*
   /// precondition violation belongs there too, not only in an OS-thread
   /// stress test that can only ever report what it happened to observe.
@@ -1107,8 +1107,8 @@ mod exhaustive {
       // SAFETY: a deliberate, contained violation of `docs/invariant/001`'s
       // single-producer precondition, made only to ask `loom` whether the
       // violation's documented consequence (D2 lapping) is reachable through
-      // this crate's own API, and to check `free_capacity`'s behaviour if so —
-      // not a claim that this bit-copy is sound for any other purpose. Both
+      // this crate's own API, and to check `free_capacity`'s behaviour if so.
+      // It does not claim this bit-copy is sound for any other purpose. Both
       // copies share one `&'static Ring`, which outlives both racer threads.
       let p1 = producer;
       let p2 = unsafe { std::ptr::read(&p1) };
@@ -1126,10 +1126,10 @@ mod exhaustive {
       let p1_after = first.join().expect("the first racer");
       second.join().expect("the second racer");
 
-      // Whichever position the racers land on — 1 (the safe outcome) or past
-      // it (D2, which loom does reach for this interleaving) — `free_capacity`
-      // must answer with a small, sane number a caller could act on safely,
-      // never panic and never wrap past the ring's true capacity.
+      // The racers land on 1 (the safe outcome) or past it (D2, which loom
+      // does reach for this interleaving). Either way, `free_capacity` must
+      // answer with a small, sane number a caller could act on safely, never
+      // panic and never wrap past the ring's true capacity.
       let reported = p1_after.free_capacity();
       assert!(
         reported <= 1,

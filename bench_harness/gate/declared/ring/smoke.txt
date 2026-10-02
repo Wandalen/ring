@@ -1,1 +1,1 @@
-# Smoke binaries G7 diffs. Ring declares none — see gates.txt.
+# Smoke binaries G7 diffs. Ring declares none. See gates.txt.

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Family manifest info as deterministic flat JSON. Meta verb — no dry::1.
+#@ purpose: Family manifest info as deterministic flat JSON. Meta verb with no dry::1.
 #@          No single crate here is "the" package (34 peer members, no privileged
 #@          one), so this reports the family the workspace root describes instead.
 #@ tags: verb, package_info

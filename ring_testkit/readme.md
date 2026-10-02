@@ -5,13 +5,12 @@ Determinism-test fixtures driving scripted claim and drain sequences.
 Depends on [`ring_core`](../ring_core/readme.md), [`ring_tls`](../ring_tls/readme.md), [`ring_shutdown`](../ring_shutdown/readme.md).
 
 One of the 33 `ring_*` crates that make up this family's concurrency
-write-path — a 33-crate dependency forest rooted at `ring_types`, acyclic
-by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
-member list; the family as a whole is described in
-[`../readme.md`](../readme.md).
+write-path. The 33 crates form a dependency forest rooted at `ring_types`,
+acyclic by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
+member list. [`../readme.md`](../readme.md) describes the family as a whole.
 
-Three dependency edges, and — unusually for this family — **all three are
-used**. `ring_core` is the ring being driven, `ring_tls` is the staging
+The crate has three dependency edges and, unusually for this family, **all
+three are used**. `ring_core` is the ring being driven, `ring_tls` is the staging
 buffer, `ring_shutdown` is the guard that makes `Step::Close` mean something.
 → [`docs/integration/001`](docs/integration/001_the_three_edges_and_the_one_that_is_missing.md).
 
@@ -36,13 +35,13 @@ assert_eq!( outcome.received, vec![ 0, 1, 2, 3 ] );
 assert!( outcome.audit().is_ok() );
 ```
 
-`Script::new`'s argument is the **staging** capacity, not the ring's — the ring
-is the caller's, built however they like and passed to `run`. That split is why
+`Script::new`'s argument is the **staging** capacity, not the ring's. The caller
+builds the ring however they like and passes it to `run`. That split is why
 `ring_config` is a dev-dependency here rather than a real edge.
 
 | Step | Effect |
 |---|---|
-| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
 | `Push` / `PushMany` | Mint a record and publish it through the shutdown guard |
 | `Recv` / `RecvMany` | Take from the consumer end |
 | `Stage` / `StageMany` | Mint into the `TlsBuffer` instead of the ring |
@@ -62,33 +61,33 @@ Fail:       accepted=4 refused_full=4 received=[0, 1, 2, 3] vanished=0
 DropNewest: accepted=8 refused_full=0 received=[0, 1, 2, 3] vanished=4
 ```
 
-The records are **identical** — so `received`, the reading a careful person
+The records are **identical**. So `received`, the reading a careful person
 reaches for first, says the two rings did the same thing. The counts differ, but
 they read as *one ring took twice the work*, not as *one ring destroyed half of
-it*. `Outcome::vanished` is accepted less delivered less still-held: the only
-reading that sees the destruction, and a method rather than a sentence because of
-this run. → [`docs/pitfall/001`](docs/pitfall/001_neither_the_count_nor_the_list_alone.md).
+it*. `Outcome::vanished` is accepted less delivered less still-held. It is the
+only reading that sees the destruction, and this run is why it is a method rather
+than a sentence. → [`docs/pitfall/001`](docs/pitfall/001_neither_the_count_nor_the_list_alone.md).
 
 ## What the implementation settled
 
 | Question | Answer |
 |---|---|
-| Does the crate contain a model checker? | No — `loom` already is one, and four crates in the family use it. This crate contributes the **bridge**: `leak_ends`, plus `audit_received` for inside the closure |
-| Where does the loom model live? | `tests/`, not `src/` — `cfg`-removed lines in `src/` count as *uncovered*, so a model there would put a permanent hole in the crate's coverage |
+| Does the crate contain a model checker? | No. `loom` already is one, and four crates in the family use it. This crate contributes the **bridge**: `leak_ends`, plus `audit_received` for inside the closure |
+| Where does the loom model live? | `tests/`, not `src/`. `cfg`-removed lines in `src/` count as *uncovered*, so a model there would put a permanent hole in the crate's coverage |
 | Does `audit` fail on a vanished record? | No, deliberately. A destroyed record is *accounted for*; whether destruction is acceptable is the caller's policy question, and `vanished` is how they ask it |
-| Is `vanished` a field? | A method — an eleventh field would be a second copy of a number three other fields already determine, free to disagree with them |
-| Does `Step::Reopen` skip the close when already open? | No. An `is_closed()` guard would make the no-op cheaper and the concurrent hazard worse — the gap between check and close is another window |
+| Is `vanished` a field? | A method. An eleventh field would be a second copy of a number three other fields already determine, free to disagree with them |
+| Does `Step::Reopen` skip the close when already open? | No. An `is_closed()` guard would make the no-op cheaper and the concurrent hazard worse, because the gap between check and close is another window |
 
 ## What it does not establish
 
-Ten equal single-threaded runs prove the *fixture* adds no variability — no
+Ten equal single-threaded runs prove the *fixture* adds no variability: no
 iteration order, no address, no hash seed. They prove nothing about concurrency,
 because a script with one producer and one consumer has no interleaving to get
 wrong.
 
 That is the whole reason for `tests/exhaustive_test.rs`, which explores every
 interleaving of a two-slot ring under `loom`. It passes in 0.02s, which is fast
-enough to be suspicious — so
+enough to be suspicious. So
 [`tests/manual/readme.md`](tests/manual/readme.md) M2 deliberately inverts an
 assertion and confirms loom finds the interleaving that violates it. Without that
 negative control the 0.02s would be evidence of nothing.
@@ -98,8 +97,8 @@ negative control the 0.02s would be evidence of nothing.
 
 | File | Responsibility |
 |------|-----------------|
-| `docs/` | The measurement, the accounting law, and open trade-offs — see [docs/readme.md](docs/readme.md) |
+| `docs/` | The measurement, the accounting law, and open trade-offs. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | `Script`, `Step`, `Outcome`, `Anomaly`, `audit_received`, `audit_received_unordered`, `leak`, `leak_ends` |
-| `tests/testkit_test.rs` | 33 tests — the scripted half |
-| `tests/exhaustive_test.rs` | 3 loom models — the exhaustive half, behind `--cfg loom` |
+| `tests/testkit_test.rs` | 33 tests forming the scripted half |
+| `tests/exhaustive_test.rs` | 3 loom models forming the exhaustive half, behind `--cfg loom` |
 | `tests/manual/readme.md` | Manual plan and dated run record |

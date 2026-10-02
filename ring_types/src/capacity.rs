@@ -57,8 +57,8 @@ impl Capacity {
     self.0
   }
 
-  /// The bitmask that folds a sequence into a slot index — always
-  /// `capacity - 1`, and always valid because the constructor rejected every
+  /// The bitmask that folds a sequence into a slot index, always
+  /// `capacity - 1`. It is always valid because the constructor rejected every
   /// value for which it would not be.
   ///
   /// ```

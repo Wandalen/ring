@@ -1,13 +1,13 @@
 //! Sequence numbers and their comparison across laps.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
 //! The crate's whole subject is a single distinction that
 //! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md` makes and
 //! that is easy to lose: **the sequence does not wrap, the slot index does**.
 //! A ring holds `capacity` slots, so two publications `capacity` apart land on
-//! the same slot — but their [`ring_types::Seq`] values differ by exactly
+//! the same slot, but their [`ring_types::Seq`] values differ by exactly
 //! `capacity`, and that difference is what a gate reads to decide whether the
 //! older one has been consumed yet. Fold the sequence and the information is
 //! gone; the gate can no longer tell "one lap behind" from "caught up".
@@ -17,7 +17,7 @@
 //! that no function can accidentally do both.
 //!
 //! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 6 rules the
-//! wording: this crate was described as owning "wrapping arithmetic", which
+//! wording. This crate was described as owning "wrapping arithmetic", which
 //! read as a contradiction of feature 167's "never wraps". What wraps is the
 //! index derived downstream, not the sequence handled here.
 
@@ -31,7 +31,7 @@ use ring_types::{Capacity, Seq};
 /// full lap ahead of the slowest consumer. `laps_between` is the reading that
 /// decides it.
 ///
-/// Takes `( earlier, later, .. )` — the opposite order from [`may_claim`],
+/// Takes `( earlier, later, .. )`, the opposite order from [`may_claim`],
 /// [`free_slots`] and [`pending`], which all take the later (producer)
 /// position first. A swapped call still compiles and still returns a
 /// plausible-looking `0` rather than an error (see `api/002` SQ8).
@@ -55,7 +55,7 @@ pub fn laps_between(earlier: Seq, later: Seq, capacity: Capacity) -> u64 {
 ///
 /// True exactly while the producer is strictly less than one lap ahead. At
 /// exactly one lap the next claim would land on the consumer's current slot,
-/// so the boundary is exclusive — the off-by-one that
+/// so the boundary is exclusive, which guards against the off-by-one that
 /// `docs/feature/178_sequence_barrier_and_gating_set.md` calls a lap bug.
 ///
 /// ```
@@ -113,8 +113,8 @@ pub fn pending(producer: Seq, consumer: Seq) -> u64 {
 ///
 /// A producer is bounded by its slowest consumer, so the minimum is the only
 /// reading that matters. Returning `None` rather than `Seq::ZERO` for an empty
-/// set keeps "no consumers" distinguishable from "a consumer at the start" —
-/// the two call for opposite decisions, since an ungated ring may publish
+/// set keeps "no consumers" distinguishable from "a consumer at the start".
+/// The two call for opposite decisions, since an ungated ring may publish
 /// freely.
 ///
 /// ```

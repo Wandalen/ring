@@ -1,13 +1,14 @@
 # acceptance
 
-The binary reached-test each of the 22 graded features is measured against — what
-must be observably true for the feature to count as delivered, and which test claims it.
+The binary reached-test each of the 22 graded features is measured against. Each one
+states what must be observably true for the feature to count as delivered, and which test
+claims it.
 
-Filed here rather than beside each feature's own definition, because those definitions
-share one section schema across hundreds of instances, and adding an acceptance section
-there would re-schema all of them to serve a handful. Gate `g3_features.sh` is what reads
-a feature citation out of a `ring_*` test and decides whether the feature is claimed, so
-the criteria live beside it.
+These criteria are filed here rather than beside each feature's own definition. Those
+definitions share one section schema across hundreds of instances, and adding an
+acceptance section there would re-schema all of them to serve a handful. Gate
+`g3_features.sh` reads a feature citation out of a `ring_*` test and decides whether the
+feature is claimed, so the criteria live beside it.
 
 | File | Responsibility |
 |------|-----------------|

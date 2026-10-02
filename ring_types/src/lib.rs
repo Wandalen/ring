@@ -1,8 +1,8 @@
-//! Shared ids, errors, and policy enums for the ring family — no ring logic.
+//! Shared ids, errors, and policy enums for the ring family, with no ring logic.
 //!
-//! Tier 0 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 0 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Every other crate in the family depends on this one; this one depends on
-//! nothing, including no error crate — that is what lets tier 0 compile in
+//! nothing, not even an error crate. That is what lets tier 0 compile in
 //! isolation and what makes the family's dependency forest acyclic by
 //! construction.
 //!
@@ -14,10 +14,10 @@
 //!
 //! | Module | Responsibility |
 //! |--------|----------------|
-//! | `id` | [`Seq`] and [`SlotIndex`] — the never-wrapping position and the wrapping one |
-//! | `capacity` | [`Capacity`] — a slot count validated to a power of two |
-//! | `policy` | [`WaitKind`] and [`OverflowPolicy`] — the two configuration enums |
-//! | `error` | [`RingError`] — the one error type the family returns |
+//! | `id` | [`Seq`], the never-wrapping position, and [`SlotIndex`], the wrapping one |
+//! | `capacity` | [`Capacity`], a slot count validated to a power of two |
+//! | `policy` | [`WaitKind`] and [`OverflowPolicy`], the two configuration enums |
+//! | `error` | [`RingError`], the one error type the family returns |
 //!
 //! Features delivered here: `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
 //! (the vocabulary half), `docs/feature/173_wait_kind_and_strategies.md` and
@@ -26,10 +26,10 @@
 #![no_std]
 #![deny(missing_docs)]
 
-// Core-only, and now says so. Rationale at `ring_overflow/src/lib.rs`'s own
-// attribute — the property is transitive, so it is asserted in all three of this
+// Core-only, and now says so. The rationale is at `ring_overflow/src/lib.rs`'s own
+// attribute. The property is transitive, so it is asserted in all three of this
 // crate, `ring_stats`, and `ring_overflow` or in none of them. This is the one
-// that matters most: 33 crates depend on it, so a `use std::` here would be a
+// that matters most, since 33 crates depend on it. A `use std::` here would be a
 // `std` dependency for the entire family.
 
 mod capacity;

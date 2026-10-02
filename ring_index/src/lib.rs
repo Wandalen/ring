@@ -1,22 +1,22 @@
 //! Sequence-to-slot index mapping for power-of-two capacities.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
 //! This is the half of `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
-//! that folds: given a [`ring_types::Seq`] and a [`ring_types::Capacity`], produce
+//! that folds. Given a [`ring_types::Seq`] and a [`ring_types::Capacity`], the fold produces
 //! the [`ring_types::SlotIndex`] it addresses. The feature's whole reason for
 //! constraining capacity to a power of two is that this fold is then a bitmask
-//! rather than a division — an integer `%` costs on the order of 20–40 cycles on
+//! rather than a division. An integer `%` costs on the order of 20–40 cycles on
 //! current x86, and it sits on every operation that touches a slot. The claim
 //! path is not one of them: `ring_claim`, `ring_publish`, `ring_consume`, and
 //! `ring_cursor` work in sequence space end to end and never fold.
 //!
 //! The "20–40 cycles" figure above is asserted for x86, not measured in this
-//! repository: on this crate's own build host the fold costs roughly 0.9
+//! repository. On this crate's own build host the fold costs roughly 0.9
 //! cycles against a runtime-divisor `%`'s 6.1–6.2, a 7x ratio rather than the
 //! 22–44x the x86 figure implies. A same-literal benchmark (`seq % 1024`
-//! beside `seq & 1023`) would also mislead: the family's capacity is never a
+//! beside `seq & 1023`) would also mislead, because the family's capacity is never a
 //! compile-time literal at a real fold site, so the runtime-divisor figure is
 //! the one that applies, not the free constant-divisor one.
 //!
@@ -49,13 +49,13 @@ pub fn of(seq: Seq, capacity: Capacity) -> SlotIndex {
   SlotIndex((seq.0 as usize) & capacity.mask())
 }
 
-/// Whether two sequences address the same slot — true exactly when they are a
-/// whole number of laps apart.
+/// Whether two sequences address the same slot, which is true exactly when they
+/// are a whole number of laps apart.
 ///
-/// Aliasing is the ring's defining behaviour rather than a defect: a fixed
+/// Aliasing is the ring's defining behaviour rather than a defect. A fixed
 /// number of slots reused forever is what the structure *is*. What keeps it
-/// from being observable is the gate — `ring_seqno`'s `may_claim`, and the
-/// barrier built on it — which refuses a claim that would land on a slot a
+/// from being observable is the gate, meaning `ring_seqno`'s `may_claim` and the
+/// barrier built on it. The gate refuses a claim that would land on a slot a
 /// consumer has not yet passed. This function reports the aliasing so a gate
 /// can be tested against it; it does not prevent anything itself.
 ///
@@ -77,28 +77,28 @@ pub fn aliases(a: Seq, b: Seq, capacity: Capacity) -> bool {
 /// addresses, in order.
 ///
 /// A batch claim is contiguous in sequence space, so its slots wrap at most
-/// once — which is what preserves a staged buffer's relative order when it
+/// once. That is what preserves a staged buffer's relative order when it
 /// lands, per `docs/feature/177_batch_claim_and_batch_drain.md`.
 ///
 /// That guarantee belongs to the caller's batch claim, not to this function:
 /// `run` neither clamps nor deduplicates, so a `count` larger than `capacity`
 /// returns repeated slots rather than stopping at one wrap.
 ///
-/// `run` also allocates once per call — exactly sized with no growth slack,
-/// but an allocation regardless. That disqualifies it from the family's
-/// lock-free claim and consume paths at any speed; `of` and `aliases`
-/// measure zero allocations over 10,000 calls each and are what those paths
-/// use instead.
+/// `run` also allocates once per call. The allocation is exactly sized, with
+/// no growth slack, but it is an allocation regardless. That disqualifies `run`
+/// from the family's lock-free claim and consume paths at any speed; `of` and
+/// `aliases` measure zero allocations over 10,000 calls each and are what those
+/// paths use instead.
 ///
-/// At the sizes a real batch claim uses — `ring_config`'s default batch is 1,
-/// and the family's own doctests run 2 to 8 — the returned `Vec`'s 24-byte
-/// header outweighs its payload: one slot costs 24 bytes of bookkeeping to
+/// Real batch claims are small: `ring_config`'s default batch is 1, and the
+/// family's own doctests run 2 to 8. At those sizes the returned `Vec`'s 24-byte
+/// header outweighs its payload. One slot costs 24 bytes of bookkeeping to
 /// carry 8 bytes of data.
 ///
 /// # Panics
 ///
 /// In a debug build, if `start.0 + ( count - 1 ) as u64` overflows `u64` for
-/// `count > 0` — the last step `run` actually takes, reachable in one step
+/// `count > 0`. That addition is the last step `run` takes, reachable in one step
 /// from `ring_mpsc::UNSTAMPED`, the family's `Seq( u64::MAX )` sentinel,
 /// rather than only after `2^64` publications. In a release build the
 /// addition wraps instead of panicking, which silently produces a slot index

@@ -2,11 +2,11 @@
 #
 # Real: stop at the first attempt that moves nothing, because a second attempt
 # against an unchanged ring can only find the same answer. Inverted: stop at the
-# first attempt that moves something — which returns the identical count, since
+# first attempt that moves something. That returns the identical count, since
 # single-threaded there is never more than one productive attempt anyway.
 #
 # The published total cannot see this. The consumer's length cannot see it. What
-# separates the two is one more refusal, and a refusal costs a record — see S7.
+# separates the two is one more refusal, and a refusal costs a record. See S7.
 # The detector runs a budget of three where the real loop spends two attempts
 # and the inverted one spends a single attempt, and reads the iterator, where
 # that difference is the only place it shows.

@@ -1,16 +1,16 @@
 # Survivors of `mutant_survey.sh ring_bench` that are decisions rather than gaps.
 #
-# Every entry here is a mutation the suite genuinely does not catch and
-# deliberately will not. Recording that is not a way of lowering the bar — it is
-# what stops the next sweep from re-presenting three settled rulings as three
-# fresh findings, which is how a survey stops being read.
+# Every entry here is a mutation the suite does not catch and deliberately will
+# not. Recording that does not lower the bar. It stops the next sweep from
+# re-presenting three settled rulings as three fresh findings, which is how a
+# survey stops being read.
 #
 # All three come from one rule, stated at the top of `tests/bench_test.rs`:
 # **this suite never asserts on a clock.** An assertion about wall-clock
 # ordering is flaky on any machine with other processes on it, and a flaky test
 # inside a benchmark harness discredits precisely the measurement the harness
-# exists to produce. What is asserted instead is record accounting — offered,
-# reported, received, dropped — which is deterministic.
+# exists to produce. The suite asserts record accounting instead: offered,
+# reported, received, dropped. That accounting is deterministic.
 #
 # The price of that rule is exactly these three mutations, and the survey of
 # 2026-08-29 is what turned the price from an estimate into a measurement:
@@ -21,15 +21,14 @@
 #
 # `run_mutex_queue`'s batch trigger can flip from `==` to `!=`, which makes the
 # candidate commit one record at a time instead of in batches. Every count
-# survives it exactly — same records offered, reported, received and dropped, on
-# both the roomy and the cramped fixture — because batching changes how long the
-# work takes and nothing else. Only a clock separates the two.
+# survives it exactly. The same records are offered, reported, received and
+# dropped, on both the roomy and the cramped fixture, because batching changes
+# how long the work takes and nothing else. Only a clock separates the two.
 #
-# The cost is real and worth stating plainly: a candidate could silently stop
-# batching, and the comparison would still read as valid while measuring
-# something other than what it names. The alternative is a flaky assertion
-# inside a benchmark harness, which is worse. If that trade is ever revisited,
-# this file is where the revisit starts.
+# The cost is real. A candidate could silently stop batching, and the comparison
+# would still read as valid while measuring something other than what it names.
+# The alternative is a flaky assertion inside a benchmark harness, which is
+# worse. If that trade is ever revisited, this file is where the revisit starts.
 #
 # NOT accepted, and deliberately absent from this list: the closing partial-batch
 # count at `src/lib.rs:1056`, which the same survey found and which *was*

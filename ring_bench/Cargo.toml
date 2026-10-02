@@ -12,7 +12,7 @@ publish = false
 # Forwards to `ring_factory`'s crossbeam door, which gates the off-the-shelf
 # candidate. Feature 186 names that candidate; feature 187 makes it optional.
 # The comparison therefore has five candidates by default and six with this on,
-# which `Candidate::ALL` reflects rather than hides.
+# and `Candidate::ALL` reflects the difference.
 crossbeam = [ "ring_factory/crossbeam" ]
 
 [dependencies]
@@ -22,25 +22,25 @@ ring_flush = { workspace = true }
 ring_stats = { workspace = true }
 ring_spsc = { workspace = true }
 ring_mpsc = { workspace = true }
-# Message 960 did not assign these three. Each is needed to write a signature,
-# which is the same reason `ring_factory` had to add two — see that crate's
-# `docs/integration/001`. Third occurrence in the family, and the first where
-# the missing name is on the export Contract's own argument list:
+# Message 960 did not assign these three. Each is needed to write a signature.
+# `ring_factory` had to add two for the same reason; see that crate's
+# `docs/integration/001`. This is the third occurrence in the family, and the
+# first where the missing name is on the export Contract's own argument list:
 #
-#   ring_core  — `ring_flush::Flusher::new` takes a `ring_core::Producer` and
-#                `ring_flush` re-exports neither it nor a way to build one, so
-#                the staging candidate cannot be constructed without this line.
-#                Recorded as this crate's `docs/integration/001` requirement 1;
-#                it is a Contract defect, not a preference.
-#   ring_slot  — `ring_spsc::Ring< S >` and `ring_mpsc::Ring< S >` are generic
-#                over `Slot`, and `TypedSlot< T >` is the only implementor this
-#                benchmark exercises (the other, `BytesSlot< N >`, round-trips
-#                through no path measured here — see ring_event's own
-#                non_functional_requirement/001 § EV34). The two direct
-#                candidates cannot name their own ring type without it.
-#   ring_types — `RingStats::record_drop` takes an `OverflowPolicy`, so the
-#                per-run counters feature 185 supplies cannot be recorded
-#                without naming the policy vocabulary.
+#   ring_core:  `ring_flush::Flusher::new` takes a `ring_core::Producer` and
+#               `ring_flush` re-exports neither it nor a way to build one, so
+#               the staging candidate cannot be constructed without this line.
+#               Recorded as this crate's `docs/integration/001` requirement 1;
+#               it is a Contract defect, not a preference.
+#   ring_slot:  `ring_spsc::Ring< S >` and `ring_mpsc::Ring< S >` are generic
+#               over `Slot`, and `TypedSlot< T >` is the only implementor this
+#               benchmark exercises. The other, `BytesSlot< N >`, round-trips
+#               through no path measured here; see ring_event's own
+#               non_functional_requirement/001 § EV34. The two direct
+#               candidates cannot name their own ring type without it.
+#   ring_types: `RingStats::record_drop` takes an `OverflowPolicy`, so the
+#               per-run counters feature 185 supplies cannot be recorded
+#               without naming the policy vocabulary.
 ring_core = { workspace = true }
 ring_slot = { workspace = true }
 ring_types = { workspace = true }

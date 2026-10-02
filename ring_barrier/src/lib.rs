@@ -1,6 +1,6 @@
 //! Consumer barrier over the minimum of dependent cursors.
 //!
-//! Tier 5 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_wait`.
 //!
 //! `docs/feature/178_sequence_barrier_and_gating_set.md` names two halves, and
@@ -10,15 +10,15 @@
 //!
 //! ## Why this is not `ring_gating` with the sign flipped
 //!
-//! A gating answer is bounded by the ring's capacity: the producer may run one
+//! A gating answer is bounded by the ring's capacity. The producer may run one
 //! full lap ahead of the slowest consumer and no further, because at that point
 //! the next slot it would claim is the one that consumer is reading. Capacity
 //! is in the answer.
 //!
 //! A barrier answer has no capacity in it at all. A consumer may read up to
-//! whatever its dependencies have finished — the producer's published sequence,
-//! or an upstream consumer's position in a chain — and the number of slots the
-//! ring happens to have does not enter into it. Sharing one function between
+//! whatever its dependencies have finished: the producer's published sequence,
+//! or an upstream consumer's position in a chain. The number of slots the ring
+//! happens to have does not enter into it. Sharing one function between
 //! the two would mean one of the callers passing a capacity it does not have,
 //! or receiving a bound that has been clamped for a reason that does not apply
 //! to it.
@@ -29,8 +29,8 @@
 //! ## Why the dependencies are a bare slice
 //!
 //! A [`Barrier`] borrows `&[PaddedCursor]`, not a `ring_gating::GatingSet`.
-//! A `GatingSet` is a producer-side aggregate — it owns consumer cursors and
-//! carries the capacity that bounds the producer — and a barrier's dependencies
+//! A `GatingSet` is a producer-side aggregate. It owns consumer cursors and
+//! carries the capacity that bounds the producer, and a barrier's dependencies
 //! are neither owned by it nor related to capacity. They are wherever they
 //! happen to live: `ring_publish::Publisher::cursor` for a consumer reading
 //! behind a producer, `GatingSet::cursors` for a consumer chained behind other
@@ -38,19 +38,19 @@
 //!
 //! Taking the aggregate instead would have meant a publisher's cursor could
 //! never be depended on at all, since there is no way to move an existing
-//! cursor into a set that owns its own. That is not a hypothetical: it is what
+//! cursor into a set that owns its own. That is not a hypothetical. It is what
 //! made the four-operation handshake in `ring_publish/tests/handshake_test.rs`
 //! unwireable until this signature changed.
 //!
 //! ## Why the empty set has no frontier
 //!
 //! [`Barrier::frontier`] returns `None` for a barrier with no dependencies, and
-//! [`Barrier::available`] then returns zero — the opposite of `ring_gating`,
-//! where an empty set means *unbounded*. The asymmetry is not an inconsistency:
-//! a producer with nobody reading behind it can write freely, while a consumer
+//! [`Barrier::available`] then returns zero. That is the opposite of `ring_gating`,
+//! where an empty set means *unbounded*. The asymmetry is not an inconsistency.
+//! A producer with nobody reading behind it can write freely, while a consumer
 //! with nothing published in front of it has nothing to read. In both cases the
 //! empty set means "no constraint from dependencies", and in both cases that
-//! resolves to the value a dependency-free participant actually has available.
+//! resolves to the value a dependency-free participant has available.
 
 #![deny(missing_docs)]
 
@@ -59,9 +59,9 @@ use ring_types::{RingError, Seq, WaitKind};
 
 /// How far a consumer may read, given what it depends on.
 ///
-/// Borrows its dependencies rather than owning them: the cursors belong to
-/// whoever advances them — a publisher, an upstream consumer — and a barrier
-/// that owned copies would be reading positions nobody was writing.
+/// Borrows its dependencies rather than owning them. The cursors belong to
+/// whoever advances them, such as a publisher or an upstream consumer, and a
+/// barrier that owned copies would be reading positions nobody was writing.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
@@ -85,7 +85,7 @@ impl<'a> Barrier<'a> {
   /// A barrier over every cursor in `dependencies`.
   ///
   /// A slice, so that the one cursor a single-producer consumer waits on needs
-  /// no aggregate to be wrapped in — `core::slice::from_ref` is the whole of it.
+  /// no aggregate to be wrapped in. `core::slice::from_ref` is the whole of it.
   ///
   /// ```
   /// use ring_barrier::Barrier;
@@ -161,7 +161,7 @@ impl<'a> Barrier<'a> {
   /// The furthest sequence every dependency has reached, or `None` when there
   /// are no dependencies.
   ///
-  /// The minimum, for the same reason `ring_gating` takes a minimum: a consumer
+  /// It takes the minimum for the same reason `ring_gating` does. A consumer
   /// that read past *any* dependency would be reading a slot that dependency
   /// has not finished producing or forwarding. One lagging dependency holds the
   /// whole barrier, which is the point of having one.
@@ -186,7 +186,7 @@ impl<'a> Barrier<'a> {
 
   /// How many sequences a consumer at `from` may read right now.
   ///
-  /// Zero when the barrier has no dependencies — see the module documentation
+  /// Zero when the barrier has no dependencies. See the module documentation
   /// for why that is not the same answer `ring_gating` gives an empty set.
   ///
   /// ```
@@ -233,10 +233,10 @@ impl<'a> Barrier<'a> {
   /// report the frontier.
   ///
   /// The returned sequence is the frontier as re-read immediately after the
-  /// wait succeeded, not the frontier at the exact instant it succeeded — a
+  /// wait succeeded, not the frontier at the exact instant it succeeded. A
   /// dependency may have advanced between the two reads, so the value is
   /// only guaranteed to be at least as far as what was checked. It is also
-  /// not `from + count` — a consumer that waited for one item and found six
+  /// not `from + count`. A consumer that waited for one item and found six
   /// should drain six, and returning the requested count instead would
   /// throw away the batch that waiting just discovered.
   ///
@@ -248,12 +248,12 @@ impl<'a> Barrier<'a> {
   /// An empty barrier (no dependencies) also returns this error for
   /// `count == 0`, even though [`Barrier::admits`] answers `true` for a
   /// zero-length request regardless of dependencies. `admits` only has to
-  /// return a bool; this method additionally has to report a frontier, and an
+  /// return a bool. This method also has to report a frontier, and an
   /// empty barrier has none to report. Falling back to `from` in that one case
-  /// would not be a generalization of what non-empty barriers do — a
-  /// non-empty barrier reports its true frontier at `count == 0` too, never
-  /// `from` — so it would read as consistent while actually being a different,
-  /// fabricated rule. [`RingError::Empty`] is the honest answer.
+  /// would not generalize what non-empty barriers do, because a non-empty
+  /// barrier reports its true frontier at `count == 0` too, never `from`. The
+  /// fallback would read as consistent while being a different, fabricated
+  /// rule. [`RingError::Empty`] is the honest answer.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;

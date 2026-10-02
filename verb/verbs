@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: List all verbs with their purpose line. Meta verb — no dry::1.
+#@ purpose: List all verbs with their purpose line. Meta verb with no dry::1.
 #@ tags: verb, verbs
 set -euo pipefail
 

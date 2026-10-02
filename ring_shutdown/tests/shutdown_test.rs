@@ -1,4 +1,4 @@
-//! `ring_shutdown` — close, drain-all, and reset.
+//! `ring_shutdown` tests for close, drain-all, and reset.
 //!
 //! # What this file is arranged around
 //!
@@ -8,20 +8,20 @@
 //! draining strands records, draining without closing may never finish, and
 //! resetting without either hands the next run a dirty ring. So the reached-test
 //! ([`the_three_operations_hand_back_a_ring_fit_for_the_next_run`]) exercises
-//! the sequence rather than the three parts, and asserts the property the
-//! feature actually promises — that the ring afterwards is indistinguishable
-//! from a fresh one.
+//! the sequence rather than the three parts. It asserts the property the
+//! feature promises, that the ring afterwards is indistinguishable from a
+//! fresh one.
 //!
 //! # What is deliberately not here
 //!
 //! **No multi-threaded close race.** The flag is one `AtomicBool` with
 //! `Release`/`Acquire`, and a test that spawns two threads and observes "it
-//! worked" observes nothing: the interleaving that would break a weaker
-//! ordering is not the one a test schedules. What is testable is that close is
-//! idempotent and that a closed ring refuses, both of which are here.
+//! worked" observes nothing. The interleaving that would break a weaker
+//! ordering is not the one a test schedules. The testable parts, that close is
+//! idempotent and that a closed ring refuses, are both here.
 //!
-//! **No test that an unguarded producer is stopped.** It is not — that is this
-//! crate's central limitation, not an oversight, and
+//! **No test that an unguarded producer is stopped.** It is not stopped. That
+//! is this crate's central limitation, not an oversight, and
 //! [`an_unguarded_producer_publishes_straight_through_a_close`] asserts the
 //! limitation rather than papering over it.
 
@@ -29,7 +29,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -50,7 +50,7 @@ fn ring(slots: usize) -> Ring<u32> {
 /// A ring of `slots` capacity that refuses rather than dropping.
 ///
 /// The default overflow policy is `DropNewest`, under which a full ring
-/// reports `Ok` and discards the record — so [`Refusal::Full`] is unreachable
+/// reports `Ok` and discards the record, so [`Refusal::Full`] is unreachable
 /// there. Every test below that is *about* the `Full` arm uses this instead,
 /// and [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] covers
 /// the default's own behaviour rather than leaving it untested.
@@ -64,10 +64,10 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
 /// Feature 184's reached-test: close stops publication, drain recovers what
 /// was published, and reset leaves a ring the next run cannot tell from new.
 ///
-/// The last clause is the one that carries the feature's stated purpose
-/// ("dirty tests"), so it is asserted against a *reference* ring built fresh
-/// rather than against a remembered constant — a reset ring and a new ring are
-/// driven through the same script and must agree at every step.
+/// The last clause carries the feature's stated purpose ("dirty tests"), so
+/// the test asserts it against a *reference* ring built fresh rather than
+/// against a remembered constant. The test drives a reset ring and a new ring
+/// through the same script, and they must agree at every step.
 #[test]
 fn the_three_operations_hand_back_a_ring_fit_for_the_next_run() {
   let mut used = ring(4);
@@ -138,8 +138,8 @@ fn close_is_idempotent_and_admit_reports_it() {
 
 /// `Closed` is not transient, which is what distinguishes it from `Full`.
 ///
-/// Asserted here rather than left to `ring_types` because it is *this* crate's
-/// contract that gives the distinction teeth: a producer that retries on
+/// Asserted here rather than left to `ring_types` because *this* crate's
+/// contract is what makes the distinction matter. A producer that retries on
 /// transient errors and stops on the rest behaves correctly only if `Closed`
 /// falls on the right side.
 #[test]
@@ -184,7 +184,7 @@ fn a_guarded_producer_refuses_a_closed_ring_and_returns_the_record() {
 
 /// A full ring refuses with `Full`, which is the arm a caller retries on.
 ///
-/// Under `OverflowPolicy::Fail` only — see
+/// Under `OverflowPolicy::Fail` only. See
 /// [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] for what the
 /// *default* policy does instead, which is the one that surprises people.
 #[test]
@@ -208,13 +208,13 @@ fn a_full_guarded_producer_refuses_with_the_transient_arm() {
 }
 
 /// Under the default policy a full guarded push reports success and loses the
-/// record — `is_blocked` is true and `try_push` still returns `Ok`.
+/// record, with `is_blocked` true and `try_push` still returning `Ok`.
 ///
 /// This is not a defect in the guard. `OverflowPolicy::DropNewest` is
 /// `RingConfig`'s default and its whole contract is to discard rather than
-/// refuse, so [`Refusal::Full`] is genuinely unreachable there. The trap is
-/// that the *close* refusal and the *full* non-refusal look nothing alike:
-/// closing a ring makes pushes visibly fail, filling one does not.
+/// refuse, so [`Refusal::Full`] is unreachable there. The trap is that the
+/// *close* refusal and the *full* non-refusal look nothing alike. Closing a
+/// ring makes pushes visibly fail; filling one does not.
 #[test]
 fn a_full_drop_newest_ring_reports_success_and_keeps_nothing() {
   let mut ring = ring(2);
@@ -238,7 +238,7 @@ fn a_full_drop_newest_ring_reports_success_and_keeps_nothing() {
 
 /// A closed guard consumes nothing from the iterator it was handed.
 ///
-/// The distinction matters: a caller resuming from the same iterator after a
+/// This matters because a caller resuming from the same iterator after a
 /// close must find every record still there, or the close silently ate one.
 #[test]
 fn a_closed_batch_push_consumes_nothing() {
@@ -262,9 +262,9 @@ fn a_closed_batch_push_consumes_nothing() {
 /// The guarantee ends where the wrapper does.
 ///
 /// This asserts the crate's limitation on purpose. `into_inner` hands back a
-/// raw producer, and a raw producer has no flag to consult — so it publishes
+/// raw producer, and a raw producer has no flag to consult, so it publishes
 /// into a closed ring. Anything else would require `ring_core` to carry the
-/// flag, which is exactly what this crate exists to avoid.
+/// flag, which is what this crate exists to avoid.
 #[test]
 fn an_unguarded_producer_publishes_straight_through_a_close() {
   let mut ring = ring(4);
@@ -293,7 +293,7 @@ fn drain_all_loops_until_the_ring_is_actually_empty() {
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
 
-  // Fill, half-drain, refill — the tail now wraps.
+  // Fill, half-drain, refill. The tail now wraps.
   assert_eq!(producer.try_push_batch(&mut [1, 2, 3, 4].into_iter()), 4);
   assert_eq!(consumer.try_recv(), Some(1));
   assert_eq!(consumer.try_recv(), Some(2));
@@ -329,7 +329,7 @@ fn discard_all_empties_the_ring_and_counts_what_it_dropped() {
   assert!(consumer.is_empty());
 }
 
-/// `reset` is close, discard, and reopen — and leaves the flag open.
+/// `reset` is close, discard, and reopen, and it leaves the flag open.
 #[test]
 fn reset_discards_and_leaves_the_ring_open() {
   let mut ring = ring(4);
@@ -362,7 +362,7 @@ fn wait_for_close_reports_the_budget_running_out() {
 
 /// A close-aware space wait reports *which* exit it took.
 ///
-/// The `Closed` case is the one that matters: room and a close can both be
+/// The `Closed` case is the one that matters. Room and a close can both be
 /// true at once, and a producer told to stop must stop rather than publish.
 #[test]
 fn for_space_or_close_names_the_exit_it_took() {
@@ -388,7 +388,7 @@ fn for_space_or_close_reports_back_pressure_as_full() {
   let shutdown = Shutdown::new();
   assert_eq!(for_space_or_close(&pair, &shutdown, WaitKind::None, 1), Err(RingError::Full));
 
-  // Closing releases the waiter even though the ring is still full — which is
+  // Closing releases the waiter even though the ring is still full. That is
   // the whole point of a close-aware wait.
   let _ = shutdown.close();
   assert_eq!(for_space_or_close(&pair, &shutdown, WaitKind::None, 1), Ok(Wake::Closed));
@@ -402,7 +402,7 @@ fn wake_distinguishes_ready_from_closed() {
 }
 
 /// The bounded drain returns a count when it finishes and an error when it does
-/// not — which is the distinction `drain_all` cannot make.
+/// not, a distinction `drain_all` cannot make.
 ///
 /// `drain_all` against a producer that is still publishing does not terminate,
 /// and a caller watching it has no way to tell that from a slow drain. The
@@ -432,22 +432,22 @@ fn a_bounded_drain_separates_finishing_from_running_out() {
   assert_eq!(hurried, [1, 2, 3], "and what it did take is still in the sink");
 
   // Everything is already out, so a second call confirms empty on its first
-  // attempt and reports the count it moved — zero.
+  // attempt and reports the count it moved, which is zero.
   let mut confirming = Vec::new();
   assert_eq!(stopped.drain_all_bounded(&mut consumer, &mut confirming, 4), Ok(0));
   assert!(confirming.is_empty());
 
-  // A zero budget is one attempt, not none — the same reading `ring_wait`
-  // gives its own `spins`, so a caller computing the number cannot ask for no
-  // work at all.
+  // A zero budget is one attempt, not none. That is the same reading
+  // `ring_wait` gives its own `spins`, so a caller computing the number cannot
+  // ask for no work at all.
   assert_eq!(stopped.drain_all_bounded(&mut consumer, &mut confirming, 0), Ok(0));
 }
 
 /// The guard hands out the capability to close, not just the identity of the
-/// flag — and closing through it stops the guard that handed it over.
+/// flag, and closing through it stops the guard that handed it over.
 ///
-/// `Guarded::shutdown` is typed `&'a Shutdown`, so what comes back is the
-/// whole surface including `close`. That route is what makes a guard passed
+/// `Guarded::shutdown` is typed `&'a Shutdown`, so what comes back is every
+/// `Shutdown` method, `close` included. That route is what makes a guard passed
 /// into a subsystem enough to shut the subsystem down; nothing else asserted
 /// it, so the accessor read as a pointer-equality convenience.
 #[test]
@@ -461,7 +461,7 @@ fn closing_through_the_guards_own_accessor_stops_the_guard() {
 
   assert_eq!(guarded.try_push(1), Ok(()));
 
-  // Nothing but the guard is in scope for this line — the capability arrives
+  // Nothing but the guard is in scope for this line. The capability arrives
   // through the accessor, and the returned token borrows the flag, not the
   // guard, so the guard is still usable below.
   let _stopped = guarded.shutdown().close();
@@ -477,8 +477,8 @@ fn closing_through_the_guards_own_accessor_stops_the_guard() {
 /// `try_push_batch` moves each record into `try_push` and breaks on the first
 /// error, so the refused record is consumed from the iterator and dropped
 /// inside the call. The caller sees `0` accepted and an iterator that has
-/// already given up one more than that — the loss is real, this is where it is
-/// measured, and it belongs to `ring_core::Producer::try_push_batch` rather
+/// already given up one more than that. The loss is real and this test
+/// measures it. It belongs to `ring_core::Producer::try_push_batch` rather
 /// than to the guard, which only forwards.
 #[test]
 fn a_batch_into_a_full_refusing_ring_destroys_the_record_that_was_refused() {
@@ -511,7 +511,7 @@ fn a_batch_into_a_full_refusing_ring_destroys_the_record_that_was_refused() {
 /// `DropNewest` makes every push report `Ok`, so the loop never breaks and the
 /// returned number is the length of the iterator rather than the number of
 /// records the ring kept. A caller treating it as an accept-count over-reports
-/// by exactly the overflow — three claimed, one stored, here.
+/// by exactly the overflow. Here that is three claimed, one stored.
 #[test]
 fn a_batch_into_a_full_drop_newest_ring_counts_records_it_did_not_keep() {
   let mut ring = ring(2);

@@ -1,59 +1,58 @@
 # Gates that apply to the ring family.
 #
 # G7 (determinism) and G8 (oracle form) were added later, for gates this
-# family's plan never committed to, and are deliberately absent here: this
+# family's plan never committed to, and are deliberately absent here. This
 # family has no smoke binary for G7 to diff, and its reached-tests were written
 # before G8's oracle rule existed. Listing them here would make the ring family
-# report NOT REACHED for gates its plan never committed to — a yardstick
+# report NOT REACHED for gates its plan never committed to. That is a yardstick
 # applied backwards.
 #
 # The file must be non-empty and every run prints the gates it loaded, so a
 # gate silently dropped from a family is visible in that family's own output.
 #
 # G12 (mutation) is declared here and nowhere else, which inverts the pattern
-# above: it is not a later family's yardstick applied backwards, it is this
-# family's own Next Constraint turned into a gate. This family's plan closed
-# 6/6 with every feature implemented, tested, documented and manually
-# exercised, and named what those six could not see — G1 grades which lines
-# ran, never which values were checked. `ring_bench` B5 measured the gap
-# exactly: 100% line coverage over 298 lines, and the crate's own headline
-# defect reinstated without a single test noticing. The three defects G12
-# replays were found by hand in the manual rounds of 2026-08-28; declaring it
-# here converts the most valuable thing those rounds produced from a human
-# habit into a verdict, which is the same move that replaced the crate-
-# membership glob made for coverage.
+# above. G12 is this family's own Next Constraint turned into a gate, not a
+# later family's yardstick applied backwards. This family's plan closed 6/6 with
+# every feature implemented, tested, documented and manually exercised, and
+# named what those six could not see. G1 grades which lines ran, never which
+# values were checked. `ring_bench` B5 measured the gap exactly: 100% line
+# coverage over 298 lines, and the crate's own headline defect reinstated
+# without a single test noticing. The three defects G12 replays were found by
+# hand in the manual rounds of 2026-08-28. Declaring it here turns the most
+# valuable thing those rounds produced from a human habit into a verdict.
+# Replacing the crate-membership glob made the same move for coverage.
 #
 # A family with no recorded historical defects to replay would leave this gate
 # absent for the ordinary reason that a mutation probe over an empty set is the
 # vacuous pass the gate's own non-vacuity rules exist to refuse.
 #
 # G13 (survey freshness) is declared here for the same reason G12 is, one turn
-# later: it is this family's own Next Constraint turned into a gate. G12 and
+# later. It is this family's own Next Constraint turned into a gate. G12 and
 # `accepted/` between them settle every survivor a sweep finds, but both are
 # claims about a crate at the moment it was swept, and nothing on the board
 # noticed when that moment passed. The 2026-08-30 triage added eleven assertions
-# across eight crates — precisely the "tests changed shape" trigger the survey's
-# own readme names — and the re-sweep that confirmed them ran because a person
+# across eight crates. That is the "tests changed shape" trigger the survey's
+# own readme names, and the re-sweep that confirmed them ran because a person
 # remembered, not because anything asked for it.
 #
-# A family that has never been swept at all would leave this gate absent for
-# the same ordinary reason: it would report NOT REACHED for every crate about a
-# survey its plan never committed to running — the same yardstick applied
+# A family that has never been swept at all would leave this gate absent for the
+# same ordinary reason. It would report NOT REACHED for every crate about a
+# survey its plan never committed to running. That is the same yardstick applied
 # backwards that keeps G7 and G8 out of this file.
 
 # G14-G17 (doc corpus) are declared here on the same footing as G12 and G13, and
-# for the same reason one turn further on: they are this family's own next
+# for the same reason one turn further on. They are this family's own next
 # constraint turned into a gate. G2 grades documentation and reads exactly three
-# files per crate — readme.md, docs/readme.md, src/lib.rs — a narrowing it argues
-# for at length and is right about. What follows from it is that the `docs/` tree
-# those three files index has never been run, resolved, or counted by anything:
-# 792 instances and 778 findings, every one of them checked by a person once and
-# by nothing since.
+# files per crate: readme.md, docs/readme.md, src/lib.rs. G2 argues for that
+# narrowing at length and is right about it. What follows from it is that the
+# `docs/` tree those three files index has never been run, resolved, or counted
+# by anything: 792 instances and 778 findings, every one of them checked by a
+# person once and by nothing since.
 #
 # Declaring them flips this family to NOT REACHED until plan
 # `bench_harness/docs/plan/001` closes, which is the intended reading rather than
 # a regression. It is not the yardstick-applied-backwards case that keeps G7 and
-# G8 out of this file: those grade a smoke binary and an oracle form this
+# G8 out of this file. Those grade a smoke binary and an oracle form this
 # family never had, whereas every crate here has carried a `docs/` tree since
 # S1 and thirteen of them already meet the standard in full.
 
@@ -67,14 +66,14 @@ g12
 g13
 # G20 (disposition) is the fifth corpus gate and the one that does not grade the
 # corpus as a document. G14-G17 between them hold the tree's shape, its recipes,
-# its citations and its vocabulary — and a family can pass all four while every
+# its citations and its vocabulary. A family can pass all four while every
 # hazard it names is still there, because none of them asks whether anything was
 # done. 458 findings across the 33 crates sit on a tier that says something can
 # still be acted on, and until this gate existed the corpus had no way to tell a
 # hazard that was fixed from one that was merely well described.
 #
-# It is declared here for the ordinary reason: this is the only family with a
-# findings layer for it to read.
+# It is declared here for the ordinary reason that this is the only family with
+# a findings layer for it to read.
 
 g14
 g15
@@ -83,8 +82,8 @@ g17
 g20
 
 # G21 (addressing) is the gate S7 could not proceed without, and it was measured
-# into existence rather than designed. The smallest correction S7 asks for — five
-# lines in `ring_core/src/lib.rs` — left 61 recipes stale across 18 crates, and
+# into existence rather than designed. The smallest correction S7 asks for, five
+# lines in `ring_core/src/lib.rs`, left 61 recipes stale across 18 crates, and
 # not one of the 61 disagreed with the source about anything. Every one was a
 # line number that had moved. The general case measured worse: 757 line-addressed
 # extractions across 26 of the 33 crates. At that coupling 458 corrections is a
@@ -93,8 +92,8 @@ g20
 #
 # The rule extends S5's. S5 ruled that a measurement another session can change
 # is not evidence about this crate; S7-0 rules that a citation this family's
-# own corrections will invalidate is not a citation. `grep -n` survives it — it
-# finds its line by content and only the printed number moves. `sed -n 'N,Mp'` is
+# own corrections will invalidate is not a citation. `grep -n` survives it. It
+# finds its line by content, and only the printed number moves. `sed -n 'N,Mp'` is
 # the one form that keeps running, keeps exiting zero, and starts printing
 # something else.
 g21

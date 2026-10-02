@@ -1,6 +1,6 @@
 //! Ring counters.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 1 of the ring family's 33 crates, the concurrency write-path implementation.
 //! Depends on `ring_types`.
 //!
 //! `docs/feature/185_ring_stats.md` asks for counters cheap enough to leave on
@@ -8,40 +8,39 @@
 //! mild pressure from one quietly discarding traffic. Without them, a drop is
 //! invisible until something downstream fails to reconcile, and by then there is
 //! no record of whether the ring dropped anything at all. That claim holds only
-//! per call, at roughly ten nanoseconds; the aggregate ceiling across threads —
-//! bound by one `fetch_add` on one cache line, unmoved by adding cores or
-//! spreading load across counters — is a separate property this crate does not
-//! state, bound, or provide a lever to raise.
+//! per call, at roughly ten nanoseconds. The aggregate ceiling across threads is
+//! a separate property. One `fetch_add` on one cache line bounds it, and adding
+//! cores or spreading load across counters does not move it. This crate does not
+//! state that ceiling, bound it, or provide a lever to raise it.
 //!
-//! The counters are relaxed atomics: a stats read is a diagnostic, never a
+//! The counters are relaxed atomics. A stats read is a diagnostic, never a
 //! synchronisation point, so ordering them would buy nothing. The fence-cost
 //! half of that argument was never measured here, and measures within noise
-//! on this workspace's two target platforms — the layout's cache-line
-//! contention is the real, measured cost in this struct, at 2.6x-3.3x, not
-//! the ordering. That choice is why [`RingStats`] is shared by reference
+//! on this workspace's two target platforms. The measured cost in this struct
+//! is the layout's cache-line contention, at 2.6x-3.3x, not the ordering.
+//! Choosing relaxed atomics is why [`RingStats`] is shared by reference
 //! across threads without a lock.
 //!
-//! Drops are counted **per policy**, not in one bucket. A ring that dropped a
-//! hundred newest items and one that evicted a hundred oldest ones are in
-//! completely different trouble, and a single `dropped` counter cannot tell
-//! them apart.
+//! The crate counts drops **per policy**, not in one bucket. A ring that dropped
+//! a hundred newest items and one that evicted a hundred oldest ones are in
+//! different trouble, and a single `dropped` counter cannot tell them apart.
 //!
-//! **Nothing on a live ring's write path moves any of these counters, and that
-//! is worth knowing before reading one.** The only production line in the
-//! workspace that does is `stats.record_drop( policy, 1 )` inside
-//! `ring_overflow::resolve` — and no `src/` anywhere imports `resolve`.
-//! `ring_core`, the crate that owns a ring and handles the full-ring case,
-//! calls `would_resolve`, the counter-free half, and does not declare
-//! `ring_stats` at all. So outside `ring_bench`, which writes a whole run's
-//! totals in four calls of its own, every reader here returns a structural zero
-//! rather than a measured one. The methods work and are tested; what does not
-//! exist is the edge that would let a ring report through them.
+//! **Nothing on a live ring's write path moves any of these counters. Know that
+//! before reading one.** The only production line in the workspace that does
+//! is `stats.record_drop( policy, 1 )` inside `ring_overflow::resolve`, and no
+//! `src/` anywhere imports `resolve`. `ring_core`, the crate that owns a ring
+//! and handles the full-ring case, calls `would_resolve`, the counter-free
+//! half, and does not declare `ring_stats` at all. So outside `ring_bench`,
+//! which writes a whole run's totals in four calls of its own, every reader
+//! here returns a structural zero rather than a measured one. The methods work
+//! and are tested. What does not exist is the edge that would let a ring
+//! report through them.
 
 #![no_std]
 #![deny(missing_docs)]
 
-// Core-only, and now says so. Rationale at `ring_overflow/src/lib.rs`'s own
-// attribute — the property is transitive, so it is asserted in all three of
+// Core-only, and now says so. The rationale is at `ring_overflow/src/lib.rs`'s
+// own attribute. The property is transitive, so it is asserted in all three of
 // `ring_types`, this crate, and `ring_overflow` or in none of them.
 
 use core::sync::atomic::{AtomicU64, Ordering};
@@ -70,15 +69,14 @@ use ring_types::OverflowPolicy;
 ///
 /// **`{:?}` is seven independent loads, not a snapshot.** `Debug` is derived and
 /// `AtomicU64`'s own `Debug` is a relaxed load, so formatting a shared set reads
-/// seven values at seven moments and prints them as one struct literal — which
-/// is exactly how a consistent reading would look. Bumping all seven in lockstep
-/// from a single writer, over ninety-nine percent of renderings showed a spread
+/// seven values at seven moments and prints them as one struct literal. That
+/// output looks exactly like a consistent reading. With a single writer bumping
+/// all seven in lockstep, over ninety-nine percent of renderings showed a spread
 /// the set never held, the widest running to 19,831 on counters that were never
 /// more than one apart. `Clone`, `Copy` and `PartialEq` are refused here for
-/// precisely that reason and `Debug` is derived anyway, because a log line, an
-/// assertion message and a debugger watch all need something.
-/// [`RingStats::snapshot`] is what to reach for when the numbers have to agree
-/// with each other.
+/// that reason, and `Debug` is derived anyway, because a log line, an assertion
+/// message and a debugger watch all need something. Use [`RingStats::snapshot`]
+/// when the numbers have to agree with each other.
 #[derive(Debug, Default)]
 pub struct RingStats {
   claimed: AtomicU64,
@@ -93,7 +91,7 @@ pub struct RingStats {
 // The struct is `COUNTERS` counters and nothing else, checked at compile time.
 // Every field is an `AtomicU64`, so the type's size is exactly the count times
 // one counter's. This is the line an eighth field fails on, and failing here is
-// the point: before it, a counter added to the struct but left out of `reset`'s
+// the point. Before it, a counter added to the struct but left out of `reset`'s
 // array was cleared by nothing, read plausibly, stayed monotone, and failed no
 // test in the suite.
 const _: () = assert!(core::mem::size_of::<RingStats>() == RingStats::COUNTERS * core::mem::size_of::<AtomicU64>());
@@ -101,21 +99,21 @@ const _: () = assert!(core::mem::size_of::<RingStats>() == RingStats::COUNTERS *
 /// Every counter of one [`RingStats`], read once and returned together.
 ///
 /// The value type `RingStats` cannot be. `AtomicU64` forecloses `Clone`, `Copy`
-/// and `PartialEq` on the live set — a consumer that wants to hold a reading,
+/// and `PartialEq` on the live set. A consumer that wants to hold a reading,
 /// print it, diff it against an earlier one or send it somewhere needs this
 /// instead.
 ///
 /// **This is not an atomic snapshot, and no such thing is available here.** The
 /// numbers still come from [`RingStats::COUNTERS`] `Relaxed` loads taken at that
 /// many moments, so a set under traffic can return a combination the ring never
-/// held. What the type does guarantee is that the reading is *internally*
-/// consistent: `dropped_total` is the sum of the three drop fields **of this
-/// value**, and `in_flight` is **this value's own** `claimed - published`.
+/// held. What the type does guarantee is an *internally* consistent reading.
+/// Its `dropped_total` is the sum of the three drop fields **of this value**,
+/// and its `in_flight` is **this value's own** `claimed - published`.
 /// Reading those through [`RingStats::dropped_total`] and
 /// [`RingStats::in_flight`] instead re-loads the counters, so the total a caller
-/// prints need not be the sum of the breakdown printed beside it — driven from
-/// one writer that kept the three drop counters within one of each other, three
-/// to five percent of separately-read breakdowns showed a spread the ring never
+/// prints need not be the sum of the breakdown printed beside it. With one
+/// writer keeping the three drop counters within one of each other, three to
+/// five percent of separately-read breakdowns showed a spread the ring never
 /// had, the widest running to 3,325.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub struct StatsCounts {
@@ -129,7 +127,7 @@ pub struct StatsCounts {
   pub dropped_newest: u64,
   /// Items dropped under [`OverflowPolicy::DropOldest`].
   pub dropped_oldest: u64,
-  /// Publishes refused under [`OverflowPolicy::Fail`] — counted, though nothing
+  /// Publishes refused under [`OverflowPolicy::Fail`], counted although nothing
   /// was lost.
   pub failed: u64,
   /// The three drop counters above, summed from those same three reads.
@@ -143,9 +141,9 @@ pub struct StatsCounts {
 impl StatsCounts {
   /// In flight, with the caller bug kept apart from a balanced ring.
   ///
-  /// `None` means `published` exceeds `claimed` — which the counters permit,
-  /// which no correct caller produces, and which `in_flight` floors to zero, the
-  /// same value a healthy ring gives. `checked_sub` is one word different from
+  /// `None` means `published` exceeds `claimed`. The counters permit that state,
+  /// no correct caller produces it, and `in_flight` floors it to zero, the same
+  /// value a healthy ring gives. `checked_sub` is one word different from
   /// `saturating_sub` and is the only reading in the crate that tells the two
   /// apart.
   ///
@@ -170,12 +168,12 @@ impl RingStats {
   ///
   /// Rust cannot iterate a struct's fields, so the seven are written out by hand
   /// more than once: as struct fields, as `new`'s initialisers, and as
-  /// `counters`' array. The compiler already insists on the first two — a
-  /// missing field is a hard error. This constant is what makes it insist on the
-  /// third: adding an eighth field breaks the size assertion above, raising the
+  /// `counters`' array. The compiler already insists on the first two, because a
+  /// missing field is a hard error. This constant makes it insist on the third.
+  /// Adding an eighth field breaks the size assertion above, raising the
   /// constant to match breaks the array's declared length, and that error names
   /// the array by line. `ring_types` publishes `OverflowPolicy::ALL` and asserts
-  /// its length for the same reason; this is that convention applied to the one
+  /// its length for the same reason. This is that convention applied to the one
   /// hand-written set in this crate that the compiler was not already checking.
   ///
   /// ```
@@ -187,7 +185,7 @@ impl RingStats {
   /// Every counter, in declaration order.
   ///
   /// The array's length is [`RingStats::COUNTERS`], so it cannot silently fall
-  /// out of step with the struct — see that constant for what happens when an
+  /// out of step with the struct. See that constant for what happens when an
   /// eighth field arrives.
   const fn counters(&self) -> [&AtomicU64; Self::COUNTERS] {
     [
@@ -258,8 +256,8 @@ impl RingStats {
 
   /// Record `n` items lost, under the policy that lost them.
   ///
-  /// [`OverflowPolicy::Fail`] is counted too even though it loses nothing —
-  /// the caller was handed the decision, and how often that happened is the
+  /// [`OverflowPolicy::Fail`] is counted too, even though it loses nothing. The
+  /// caller was handed the decision, and how often that happened is the
   /// pressure signal for a `Fail` ring.
   ///
   /// ```
@@ -285,8 +283,8 @@ impl RingStats {
   /// Record nanoseconds spent waiting for space or data.
   ///
   /// **No crate calls this.** `wait_nanos` is the fourth of the four counters
-  /// `docs/feature/185_ring_stats.md` asks for, and `ring_wait` — the crate that
-  /// spins, yields and sleeps — declares `ring_types` and `ring_cursor` in its
+  /// `docs/feature/185_ring_stats.md` asks for. `ring_wait`, the crate that
+  /// spins, yields and sleeps, declares `ring_types` and `ring_cursor` in its
   /// manifest, not `ring_stats`. The edge that would let the waiting crate
   /// report its waiting does not exist, so [`RingStats::wait_nanos`] reads zero
   /// in every configuration this workspace can be built in. Zero is also the
@@ -320,8 +318,8 @@ impl RingStats {
     self.consumed.load(Ordering::Relaxed)
   }
 
-  /// Items lost under one policy — except `OverflowPolicy::Fail`, whose count is
-  /// refusals, not losses: the item was handed back to the caller, not dropped.
+  /// Items lost under one policy, except for `OverflowPolicy::Fail`, which counts
+  /// refusals that handed the item back to the caller and dropped nothing.
   #[must_use]
   pub fn dropped(&self, policy: OverflowPolicy) -> u64 {
     let counter = match policy {
@@ -332,9 +330,10 @@ impl RingStats {
     counter.load(Ordering::Relaxed)
   }
 
-  /// Items lost across every policy — except `OverflowPolicy::Fail`, whose count
-  /// is refusals folded in here anyway: the record-and-read pattern gives every
-  /// policy the same drop verb, so this sum cannot tell a loss from a refusal.
+  /// Items lost across every policy, `OverflowPolicy::Fail`'s refusals included.
+  ///
+  /// The record-and-read pattern gives every policy the same drop verb, so this
+  /// sum cannot tell a loss from a refusal.
   ///
   /// ```
   /// use ring_stats::RingStats;
@@ -346,11 +345,11 @@ impl RingStats {
   // Fix(ring_stats_dropped_total_overflow): `dropped_total` folded the three
   // per-policy counters with `Iterator::sum`, plain `u64` addition. `record_drop`
   // takes an unbounded `n`, so two calls whose counts summed past `u64::MAX`
-  // panicked in a debug build and silently wrapped to a small number — as low as
-  // `0` — in release, reporting a ring that lost an enormous amount of work as
-  // one that lost nothing.
+  // panicked in a debug build. In release they silently wrapped to a small number,
+  // as low as `0`, and reported a ring that lost an enormous amount of work as one
+  // that lost nothing.
   // Root cause: the fold assumed its three inputs would never sum past `u64::MAX`,
-  // but nothing enforces that — `record_drop` places no bound on `n`, unlike the
+  // but nothing enforces that. `record_drop` places no bound on `n`, unlike the
   // claim paths elsewhere in this family that gate a count before ever adding it.
   // Pitfall: an unbounded `record_*( n : u64 )` counter makes every later sum of
   // its stored value unbounded too; check the fold, not just the individual
@@ -365,14 +364,14 @@ impl RingStats {
 
   /// Nanoseconds spent waiting.
   ///
-  /// Structurally zero — see [`RingStats::record_wait`] for why nothing writes
+  /// Structurally zero. See [`RingStats::record_wait`] for why nothing writes
   /// it.
   #[must_use]
   pub fn wait_nanos(&self) -> u64 {
     self.wait_nanos.load(Ordering::Relaxed)
   }
 
-  /// Slots claimed but not yet published — a nonzero reading here at rest means
+  /// Slots claimed but not yet published; a nonzero reading here at rest means
   /// a producer took a slot and abandoned it, which is a leak of ring capacity.
   ///
   /// ```
@@ -386,28 +385,28 @@ impl RingStats {
   ///
   /// **Two loads at two moments, and the error has a direction.** `claimed` is
   /// read first and `published` second, and both only ever climb, so a publish
-  /// landing between the two is subtracted from a `claimed` that predates it:
-  /// the result comes out at or below the truth and never above it.
-  /// `saturating_sub` then floors that error at zero — which is also the reading
+  /// landing between the two is subtracted from a `claimed` that predates it.
+  /// The result comes out at or below the truth and never above it.
+  /// `saturating_sub` then floors that error at zero, which is also the reading
   /// a healthy ring gives. So a *nonzero* reading is evidence, and a *zero*
-  /// reading taken under traffic is evidence of nothing. Held against a
-  /// permanent eight-slot leak with one matched producer beside it, about one
-  /// reading in a hundred understated the leak and a handful per two million
-  /// reported no leak at all.
+  /// reading taken under traffic is evidence of nothing. With a permanent
+  /// eight-slot leak and one matched producer beside it, about one reading in a
+  /// hundred understated the leak and a handful per two million reported no
+  /// leak at all.
   ///
   /// Reversing the two loads is not the repair. Measured, it removes every miss
-  /// and invents leaks of hundreds of slots on a ring that is fine — three
+  /// and invents leaks of hundreds of slots on a ring that is fine, in three
   /// percent of readings on a healthy ring, ranging as high as 832. Take
   /// [`RingStats::snapshot`] when the reading has to be self-consistent, and
   /// [`StatsCounts::checked_in_flight`] when `published > claimed` has to be
   /// distinguishable from a balanced ring.
   ///
-  /// **Zero is where three separate roads end.** A healthy ring reads it
+  /// **Three different states all read zero.** A healthy ring reads it
   /// because every claim was published; a leak sampled at the wrong moment
   /// floors to it, per the paragraph above; and `published > claimed` floors to
   /// it too, distinguishable from the other two only through
-  /// [`StatsCounts::checked_in_flight`]'s `None`. A nonzero reading here, not a
-  /// zero one, is what this method can actually tell a caller.
+  /// [`StatsCounts::checked_in_flight`]'s `None`. Only a nonzero reading here
+  /// tells a caller something.
   #[must_use]
   pub fn in_flight(&self) -> u64 {
     self.claimed().saturating_sub(self.published())
@@ -415,8 +414,8 @@ impl RingStats {
 
   /// Every counter, read once, returned as one value.
   ///
-  /// The reading is internally consistent — its `dropped_total` is the sum of
-  /// its own three drop fields, its `in_flight` its own subtraction — but it is
+  /// The reading is internally consistent. Its `dropped_total` is the sum of its
+  /// own three drop fields, and its `in_flight` is its own subtraction. It is
   /// still [`RingStats::COUNTERS`] loads at that many moments, not an atomic
   /// snapshot. See [`StatsCounts`] for what that does and does not buy.
   ///
@@ -453,7 +452,7 @@ impl RingStats {
       dropped_oldest,
       failed,
       // Fix(ring_stats_dropped_total_overflow): same class of bug as
-      // `dropped_total`'s own fold, one call site over — see the `Fix` comment
+      // `dropped_total`'s own fold, one call site over. See the `Fix` comment
       // there for the concrete triggering sequence and root cause.
       dropped_total: dropped_newest.saturating_add(dropped_oldest).saturating_add(failed),
       in_flight: claimed.saturating_sub(published),
@@ -465,9 +464,9 @@ impl RingStats {
   ///
   /// Named for `ring_shutdown`'s reset, so a recycled ring would not carry the
   /// previous world's numbers, per
-  /// `docs/feature/184_close_reset_and_drain_all.md` — but `ring_shutdown` does
-  /// not declare this crate as a dependency, so that call does not exist yet;
-  /// today this is exercised only by this crate's own tests and doctest.
+  /// `docs/feature/184_close_reset_and_drain_all.md`. But `ring_shutdown` does
+  /// not declare this crate as a dependency, so that call does not exist yet.
+  /// Today only this crate's own tests and doctest exercise it.
   ///
   /// ```
   /// use ring_stats::RingStats;
@@ -477,18 +476,18 @@ impl RingStats {
   /// assert_eq!( s.claimed(), 0 );
   /// ```
   ///
-  /// **Not atomic, and the partial state is identifiable.** The counters are
-  /// stored in declaration order through a shared reference —
+  /// **Not atomic, and the partial state is identifiable.** `reset` stores the
+  /// counters in declaration order through a shared reference. That is
   /// [`RingStats::COUNTERS`] separate stores, `claimed` first and `wait_nanos`
-  /// last — so a concurrent reader can land between any two of them. A fill runs
-  /// that same order, setting `claimed` before `wait_nanos`, so a read caught
-  /// mid-fill returns `( set, 0 )`; a read caught mid-reset returns `( 0, set )`,
+  /// last, so a concurrent reader can land between any two of them. A fill runs
+  /// in that same order, setting `claimed` before `wait_nanos`, so a read caught
+  /// mid-fill returns `( set, 0 )`. A read caught mid-reset returns `( 0, set )`,
   /// a combination no fill and no complete state can produce. Against one writer
   /// looping fill-then-reset, that signature appeared between 5 and 101 times per
-  /// two million paired reads across six runs — rare enough to escape a casual
-  /// test, common enough to happen. The stated purpose above is exactly the case
-  /// where a reader may still be sampling: a shutdown in progress, a monitor not
-  /// yet told to stop.
+  /// two million paired reads across six runs. That is rare enough to escape a
+  /// casual test and common enough to happen. The stated purpose above is the
+  /// case where a reader may still be sampling: a shutdown in progress, a monitor
+  /// not yet told to stop.
   pub fn reset(&self) {
     for counter in self.counters() {
       counter.store(0, Ordering::Relaxed);

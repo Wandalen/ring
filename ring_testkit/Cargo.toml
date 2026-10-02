@@ -13,23 +13,23 @@ ring_core = { workspace = true }
 ring_tls = { workspace = true }
 ring_shutdown = { workspace = true }
 
-# `ring_config` is not one of message 960's declared edges, and is a
-# dev-dependency rather than an added one: `Script::run` takes a ring the caller
-# already built, so the config type appears in no signature here. Only the tests
-# and doc examples need to build a ring to drive.
+# `ring_config` is not one of message 960's declared edges. It is a
+# dev-dependency rather than an added one, because `Script::run` takes a ring the
+# caller already built, so the config type appears in no signature here. Only the
+# tests and doc examples need to build a ring to drive.
 [dev-dependencies]
 ring_config = { workspace = true }
 # `RingConfig::with_overflow` takes an `OverflowPolicy`, which `ring_config`
-# does not re-export — so a test that varies the policy has to name the crate
+# does not re-export. So a test that varies the policy has to name the crate
 # the vocabulary lives in.
 ring_types = { workspace = true }
 
-# The exhaustive half of feature 188. Only under `RUSTFLAGS="--cfg loom"`; an
+# The exhaustive half of feature 188. Only under `RUSTFLAGS="--cfg loom"`. An
 # ordinary build never sees it. The model lives in `tests/`, not `src/`, so the
 # scripted fixture stays measurable by a coverage run that does not set the cfg.
-# The cost of that placement: the same cfg-less run does not merely under-cover
-# the exhaustive file, it does not compile it — a break there still leaves
-# `verb/test` fully green (docs/workaround/002 TK54).
+# That placement has a cost. The same cfg-less run does not compile the
+# exhaustive file at all, so a break there still leaves `verb/test` fully green
+# (docs/workaround/002 TK54).
 [target.'cfg(loom)'.dev-dependencies]
 loom = { workspace = true }
 

@@ -1,9 +1,9 @@
 //! Producer and consumer sequence cursors, cache-line separated.
 //!
-//! Tier 3 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 3 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_seqno`, `ring_atomic`, `ring_align`.
 //!
-//! `docs/feature/169_padded_cursor.md` states the whole subject: a producer
+//! `docs/feature/169_padded_cursor.md` states the whole subject. A producer
 //! cursor and a consumer cursor that land on one cache line make every write by
 //! either invalidate the other's cached copy, so two cores contend on a line
 //! neither is sharing data through. Throughput then falls as core count rises,
@@ -12,20 +12,20 @@
 //! ## The padding is the crate, and it is one attribute
 //!
 //! `ring_align` holds the attribute; this crate holds the cursors that wear it.
-//! That split looks like ceremony until you notice what it buys: the padding
-//! decision is made in one place, for one reason, and every cursor in the
-//! family inherits it without a second author deciding 64 was probably fine.
+//! That split looks like ceremony, but it buys something. The padding decision
+//! is made in one place, for one reason, and every cursor in the family
+//! inherits it without a second author deciding 64 was probably fine.
 //! [`PaddedCursor`] is [`ring_atomic::AtomicSeq`] inside
-//! [`ring_align::CacheAligned`] and nothing else — no field of its own, no
-//! logic of its own.
+//! [`ring_align::CacheAligned`] and nothing else, with no field of its own and
+//! no logic of its own.
 //!
 //! ## Why size and alignment are both asserted
 //!
 //! Alignment alone does not separate two cursors. A 64-aligned type of size 8
 //! placed in an array would still put two neighbours 8 bytes apart, because
 //! alignment constrains where a value may *start*, not how much room it takes.
-//! `#[ repr( align( 64 ) ) ]` happens to round the size up too, so both hold —
-//! but the acceptance criterion names both because only their conjunction says
+//! `#[ repr( align( 64 ) ) ]` happens to round the size up too, so both hold.
+//! The acceptance criterion still names both because only their conjunction says
 //! "one per line", and a future layout change could break the second while
 //! leaving the first intact.
 //!
@@ -37,13 +37,13 @@
 //! ## Which orderings this crate names and which it fixes
 //!
 //! `ring_atomic` refuses to choose an ordering, because for a bare cell the
-//! caller genuinely has a choice and a defaulted `SeqCst` would make every
-//! benchmark meaningless. [`PaddedCursor`] inherits that: its [`SeqCell`] impl
+//! caller has a real choice and a defaulted `SeqCst` would make every
+//! benchmark meaningless. [`PaddedCursor`] inherits that. Its [`SeqCell`] impl
 //! forwards whatever the caller names.
 //!
 //! [`CursorPair`]'s gating readings are the opposite case, and fix `Acquire`
-//! rather than take a parameter — the same choice `ring_batch::claim_gated`
-//! makes, for the same reason. A caller asking "may I claim?" is about to
+//! rather than take a parameter. `ring_batch::claim_gated` makes the same choice,
+//! for the same reason. A caller asking "may I claim?" is about to
 //! overwrite a slot on the answer; a `Relaxed` load there would let it act on a
 //! stale barrier and overwrite a slot the consumer had not finished with. There
 //! is no legitimate second option to offer, so offering one would only be a way
@@ -61,7 +61,7 @@ use ring_atomic::AtomicSeq;
 /// Every read and write of a cursor is a [`SeqCell`] method, so a crate holding
 /// a `PaddedCursor` and not this trait holds a value it cannot load. Making
 /// each such crate declare `ring_atomic` itself would put a dependency in
-/// four manifests to import one trait — and would say, wrongly, that those
+/// four manifests to import one trait. It would also say, wrongly, that those
 /// crates have business with the atomic layer beyond the cursor they were
 /// handed.
 pub use ring_atomic::SeqCell;
@@ -75,8 +75,8 @@ use ring_types::{Capacity, Seq};
 /// changed and one place to be read.
 ///
 /// Public because the same decision governs every crate that reads a cursor to
-/// decide whether a slot is safe to touch — `ring_claim`, `ring_consume`,
-/// `ring_mpsc`, `ring_publish` and `ring_spsc` all import it for exactly that
+/// decide whether a slot is safe to touch. `ring_claim`, `ring_consume`,
+/// `ring_mpsc`, `ring_publish` and `ring_spsc` all import it for that
 /// reason. Each writing `Ordering::Acquire` inline would be the same argument
 /// made independently in several places, which is how a family ends up with
 /// one crate relaxed and the rest not.
@@ -90,16 +90,16 @@ pub const GATING: Ordering = Ordering::Acquire;
 /// The position of the furthest-behind cursor, or `None` when there are none.
 ///
 /// Two crates ask this question of the same kind of slice and mean opposite
-/// things by the answer — `ring_gating` reads a set of consumers to bound a
-/// producer, `ring_barrier` reads a set of dependencies to bound a consumer.
+/// things by the answer. `ring_gating` reads a set of consumers to bound a
+/// producer; `ring_barrier` reads a set of dependencies to bound a consumer.
 /// The *questions* differ, and are argued in those crates; the fold does not,
 /// and lives here so that "read every cursor at [`GATING`] and take the
 /// minimum" is written once. A second copy is how one of them ends up reading
 /// `Relaxed`.
 ///
 /// `None` rather than [`Seq::ZERO`] for an empty slice, because the two callers
-/// resolve *no dependencies* to opposite values — full headroom on one side,
-/// nothing readable on the other — and a fold that picked either would be
+/// resolve *no dependencies* to opposite values: full headroom on one side,
+/// nothing readable on the other. A fold that picked either would be
 /// wrong for one of them.
 ///
 /// ```
@@ -144,8 +144,8 @@ pub struct PaddedCursor(CacheAligned<AtomicSeq>);
 impl PaddedCursor {
   /// A cursor at `value`.
   ///
-  /// `const` in an ordinary build, and not under `--cfg loom` — inherited from
-  /// [`ring_atomic::AtomicSeq::new`], where the seam and its cost are argued.
+  /// `const` in an ordinary build, and not under `--cfg loom`, as inherited from
+  /// [`ring_atomic::AtomicSeq::new`], which argues the loom split and its cost.
   ///
   /// ```
   /// use ring_cursor::PaddedCursor;
@@ -158,7 +158,7 @@ impl PaddedCursor {
     Self(CacheAligned::new(AtomicSeq::new(value)))
   }
 
-  /// A cursor at `value` — the `--cfg loom` build, where it is not `const`.
+  /// A cursor at `value`, for the `--cfg loom` build, where it is not `const`.
   #[cfg(loom)]
   #[must_use]
   pub fn new(value: Seq) -> Self {
@@ -187,9 +187,9 @@ impl PaddedCursor {
 // Each forward below assumes `CacheAligned::get` stays a free, no-op
 // accessor. A debug assertion or a counter added to it in `ring_align` would
 // add that cost to all four methods here, and nothing in this crate's suite
-// would notice — every assertion here is about layout or arithmetic, never
-// about cost; the assumption is cheap by convention across the crate
-// boundary, with no contract enforcing it on either side.
+// would notice. Every assertion here is about layout or arithmetic, never
+// about cost. `get` is cheap by convention across the crate boundary, with
+// no contract enforcing it on either side.
 impl SeqCell for PaddedCursor {
   fn load(&self, order: Ordering) -> Seq {
     self.0.get().load(order)
@@ -212,9 +212,9 @@ impl SeqCell for PaddedCursor {
 /// them.
 ///
 /// The capacity is held here rather than passed to each reading because a pair
-/// is always a pair *for* a ring of some size: every question worth asking of
-/// two cursors — how many slots are free, how many items are pending, whether a
-/// claim is safe — is unanswerable without it, and a caller supplying it per
+/// is always a pair *for* a ring of some size. Every question worth asking of
+/// two cursors is unanswerable without it: how many slots are free, how many
+/// items are pending, whether a claim is safe. A caller supplying it per
 /// call could supply a different one each time.
 ///
 /// ```
@@ -241,7 +241,7 @@ pub struct CursorPair {
 impl CursorPair {
   /// Both cursors at zero, for a ring of `capacity` slots.
   ///
-  /// `const` in an ordinary build, and not under `--cfg loom` — inherited from
+  /// `const` in an ordinary build, and not under `--cfg loom`, as inherited from
   /// [`PaddedCursor::new`].
   ///
   /// ```
@@ -261,7 +261,7 @@ impl CursorPair {
     }
   }
 
-  /// Both cursors at zero — the `--cfg loom` build, where it is not `const`.
+  /// Both cursors at zero, for the `--cfg loom` build, where it is not `const`.
   #[cfg(loom)]
   #[must_use]
   pub fn new(capacity: Capacity) -> Self {
@@ -275,7 +275,7 @@ impl CursorPair {
   /// How far the producer has published.
   ///
   /// `GATING` is fixed only for the pair's own three readings
-  /// (`free_slots`, `pending`, `may_claim`) — this accessor hands back the
+  /// (`free_slots`, `pending`, `may_claim`). This accessor hands back the
   /// raw cursor itself, whose `SeqCell` impl forwards whatever ordering the
   /// caller names. The pair decides for the questions it answers, not for
   /// the fields it lends out.
@@ -296,7 +296,7 @@ impl CursorPair {
 
   /// How far the consumer has read.
   ///
-  /// Same boundary as [`producer`](Self::producer): fixed `GATING` covers
+  /// Same boundary as [`producer`](Self::producer). Fixed `GATING` covers
   /// this pair's own readings, not a direct load or store through the
   /// returned cursor.
   ///
@@ -330,7 +330,7 @@ impl CursorPair {
 
   /// How many slots a producer may still publish into.
   ///
-  /// Both cursors are read `Acquire` — see the module documentation for why
+  /// Both cursors are read `Acquire`. The module documentation explains why
   /// this is not a parameter.
   ///
   /// ```
@@ -370,10 +370,10 @@ impl CursorPair {
   /// not reached.
   ///
   /// Exactly [`free_slots`] being non-zero, expressed as the question a caller
-  /// actually asks. Kept as its own method because the two readings answer
-  /// different questions — "how much room" is a batch-sizing input, "may I"
-  /// is a branch — and a caller that only needs the branch should not have to
-  /// know that zero is the boundary.
+  /// asks. Kept as its own method because the two readings answer different
+  /// questions. "How much room" is a batch-sizing input and "may I" is a branch,
+  /// and a caller that only needs the branch should not have to know that zero
+  /// is the boundary.
   ///
   /// [`free_slots`]: Self::free_slots
   ///
@@ -395,7 +395,7 @@ impl CursorPair {
     ring_seqno::may_claim(self.producer.load(GATING), self.consumer.load(GATING), self.capacity)
   }
 
-  /// Whether the two cursors actually occupy different cache lines.
+  /// Whether the two cursors occupy different cache lines.
   ///
   /// The feature's claim, checked against two real addresses rather than
   /// against the type's declared size. Always true for a `CursorPair` on the

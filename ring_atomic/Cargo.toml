@@ -12,7 +12,7 @@ publish = true
 ring_types = { workspace = true }
 
 # Only under `RUSTFLAGS="--cfg loom"`. An ordinary build never sees it, never
-# resolves it, and never compiles it — see the module documentation on the seam.
+# resolves it, and never compiles it. See the module documentation on the `loom` switch.
 [target.'cfg(loom)'.dependencies]
 loom = { workspace = true }
 

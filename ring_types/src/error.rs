@@ -1,20 +1,20 @@
 //! The one error type the ring path returns.
 //!
-//! One enum rather than one per crate: a consumer sits behind the five-crate
-//! export surface (`docs/decision/121_workstream_008_contract_gaps_ruled.md` § 4)
-//! and never names the 28 internal crates, so per-crate error types would have
-//! to be converted into a shared one at the surface anyway. This is that shared
-//! one, declared once at tier 0. Crates off the ring path — `ring_bench`,
-//! `ring_factory`, `ring_flush`, `ring_registry` — declare their own.
+//! There is one enum rather than one per crate because a consumer uses only the
+//! five exported crates (`docs/decision/121_workstream_008_contract_gaps_ruled.md` § 4)
+//! and never names the 28 internal crates. Per-crate error types would have to
+//! be converted into a shared one at that boundary anyway. This is that shared
+//! one, declared once at tier 0. `ring_bench`, `ring_factory`, `ring_flush` and
+//! `ring_registry` are off the ring path and declare their own.
 //!
-//! No `error_tools`, `thiserror` or `anyhow`: `ring_types` has no dependencies
-//! at all, deliberately, so that the family's tier 0 compiles in isolation.
+//! No `error_tools`, `thiserror` or `anyhow`. `ring_types` deliberately has no
+//! dependencies at all, so that the family's tier 0 compiles in isolation.
 
 use core::fmt;
 
 /// Every way a ring operation can fail.
 ///
-/// `Copy` and allocation-free — an error on the tick path must not allocate.
+/// `Copy` and allocation-free, because an error on the tick path must not allocate.
 ///
 /// ```
 /// use ring_types::RingError;
@@ -26,14 +26,14 @@ use core::fmt;
 ///
 /// `#[ non_exhaustive ]` reserves the right to add variants, and this is the
 /// only declaration in the family that carries it. It does **not** reserve the
-/// right to add a variant that breaks a derive: `ring_bench::RunError` wraps
-/// this type and derives `Copy`, so a variant carrying a `String` — a path, a
-/// message, a name — would fail to compile three crates away, in a crate this
-/// one has never heard of.
+/// right to add a variant that breaks a derive. `ring_bench::RunError` wraps
+/// this type and derives `Copy`, so a variant carrying a `String`, such as a
+/// path, a message or a name, would fail to compile three crates away, in a
+/// crate this one has never heard of.
 ///
 /// Fix(BN26): the coupling used to be recorded on neither side. Keep new
 /// variants `Copy` (carry a numeric or `Copy` payload, or none) unless the
-/// change to `ring_bench` is being made in the same breath.
+/// same commit also changes `ring_bench`.
 ///
 /// Root cause: `#[ non_exhaustive ]` announces that variants may be added and
 /// says nothing about which traits must keep holding when they are.
@@ -59,7 +59,7 @@ pub enum RingError {
   NameTaken,
   /// No ring is registered under this name.
   NameUnknown,
-  /// A batch of the requested length cannot be served — the ring's whole
+  /// A batch of the requested length cannot be served. The ring's whole
   /// capacity is smaller than the request, so no amount of draining helps.
   BatchTooLarge {
     /// Slots asked for.
@@ -71,7 +71,7 @@ pub enum RingError {
   /// honour.
   ///
   /// The concrete case is [`crate::OverflowPolicy::DropOldest`] on a backend
-  /// guaranteeing exactly-once delivery: evicting an unread record to make room
+  /// guaranteeing exactly-once delivery. Evicting an unread record to make room
   /// contradicts the guarantee, so the ring refuses to be built rather than
   /// silently degrading to `DropNewest`. A caller who never learns their policy
   /// was not applied is worse off than one whose construction failed.
@@ -94,16 +94,16 @@ impl RingError {
   /// ```
   // Fix(ring_error_classification_not_exhaustive): was `matches!` naming only the
   //   four configuration variants, so a tenth `RingError` variant would silently
-  //   read `false` — "a traffic condition to handle" — with nothing forcing a
+  //   read `false`, meaning "a traffic condition to handle", with nothing forcing a
   //   second look. `is_transient` just below carried the identical shape.
   // Root cause: `#[ non_exhaustive ]` on this very enum documents that variants get
   //   added (see "# Adding a Variant" above); `matches!` over a positive list is the
   //   one construct that does not care, since a variant it was not told about
   //   silently falls through the pattern to `false` rather than failing to compile.
-  // Pitfall: `RingError` growing is not hypothetical for this type in particular —
-  //   the enum's own doc section exists because it already happened once (`BN26`).
+  // Pitfall: `RingError` growing is not hypothetical for this type in particular.
+  //   The enum's own doc section exists because it already happened once (`BN26`).
   //   A predicate whose default answer flips the caller's response (retry vs. fix)
-  //   is exactly the wrong place to let that growth go unnoticed.
+  //   is the wrong place to let that growth go unnoticed.
   #[must_use]
   pub const fn is_configuration(self) -> bool {
     match self {
@@ -113,7 +113,7 @@ impl RingError {
   }
 
   /// Whether retrying the same operation later could succeed without anything
-  /// else changing — true for the two conditions a peer's progress clears.
+  /// else changing. True for the two conditions a peer's progress clears.
   ///
   /// ```
   /// use ring_types::RingError;
@@ -122,10 +122,10 @@ impl RingError {
   /// assert!( !RingError::Closed.is_transient() );
   /// ```
   // Fix(ring_error_classification_not_exhaustive): same shape as `is_configuration`
-  //   above — `matches!( self, Self::Full | Self::Empty )` answered `false` for
+  //   above. `matches!( self, Self::Full | Self::Empty )` answered `false` for
   //   every variant it did not name, so a new transient condition would silently
   //   tell a caller to give up rather than retry.
-  // Root cause: see `is_configuration` above — an exhaustive match was available
+  // Root cause: see `is_configuration` above. An exhaustive match was available
   //   and not used.
   // Pitfall: the two predicates disagreeing about whether growth is a compile
   //   error would itself be a defect; both are fixed together so neither is the

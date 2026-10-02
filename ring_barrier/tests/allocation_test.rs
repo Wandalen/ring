@@ -1,4 +1,4 @@
-//! Every barrier operation allocates nothing — asserted, not argued.
+//! Asserts, rather than argues, that every barrier operation allocates nothing.
 //!
 //! ## Why this file exists
 //!
@@ -7,7 +7,7 @@
 //! `ring_cursor::slowest` that collected cursor positions into a `Vec` before
 //! folding them. Every row above zero in that table came from that one
 //! `collect()`, one crate down. When it was removed the table became false in
-//! every row at once, and nothing detected it — the numbers lived only in
+//! every row at once, and nothing detected it. The numbers lived only in
 //! prose, and prose does not run.
 //!
 //! This file replaces the scratch binary. The table it now backs is the same
@@ -18,7 +18,7 @@
 //!
 //! `ring_cursor/tests/allocation_test.rs` pins the fold. This one pins the
 //! five call shapes *this* crate exposes over it, including the two that
-//! multiply: `wait_for` reads the frontier once per spin, so a budget spent
+//! multiply. `wait_for` reads the frontier once per spin, so a budget spent
 //! against an unsatisfied predicate used to charge one allocation per
 //! attempt. Ten thousand spins were ten thousand allocations, on the path
 //! whose entire purpose is to wait cheaply. That multiplier is the reason this
@@ -28,7 +28,7 @@
 //!
 //! Both for the reasons `ring_cursor/tests/allocation_test.rs` states at
 //! length: the counter is process-global, and a silently broken counter
-//! reports zero for everything — which is the answer this file is looking
+//! reports zero for everything, which is the answer this file is looking
 //! for.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
@@ -36,8 +36,8 @@
 // family, and those panic the moment they are touched outside a
 // model closure that instruments them.
 #![cfg(not(loom))]
-// A counting allocator cannot be written in safe Rust: `GlobalAlloc` is an
-// unsafe trait by construction. The workspace denies `unsafe_code`, and the
+// A counting allocator cannot be written in safe Rust, because `GlobalAlloc` is
+// an unsafe trait by construction. The workspace denies `unsafe_code`, and the
 // two crates that override it do so in `src/lib.rs`
 // (`ring_store/docs/integration/002_every_unsafe_block_in_the_family.md`
 // measures exactly that set, and this file is not in it). The allowance here
@@ -112,8 +112,8 @@ fn every_barrier_operation_allocates_nothing() {
   ];
   one[0].store(Seq(6), Ordering::Release);
 
-  // The control arm, first: if this reads zero the counter is not working and
-  // every assertion below is vacuous.
+  // The control arm comes first. If this reads zero, the counter is not
+  // working and every assertion below is vacuous.
   let (control_calls, _, buffer) = measure(|| Vec::<Seq>::with_capacity(3));
   assert!(
     control_calls >= 1,
@@ -163,15 +163,15 @@ fn every_barrier_operation_allocates_nothing() {
   });
   assert_eq!((calls, bytes), (0, 0), "frontier() ×1000");
 
-  // The two `wait_for` rows — the ones the old table showed as 2 and 10 000,
+  // The two `wait_for` rows. The old table showed them as 2 and 10 000,
   // because `wait_for` reads the frontier once per spin plus once on success
   // ( `docs/algorithm/002_wait_for_asks_twice.md` ).
   let (calls, bytes, answer) = measure(|| Barrier::over(&one).wait_for(Seq::ZERO, 1, WaitKind::None, 1));
   assert_eq!(answer, Ok(Seq(6)), "satisfied on the first look");
   assert_eq!((calls, bytes), (0, 0), "wait_for( …, None, 1 ), satisfied at once");
 
-  // Unsatisfiable: the three-cursor barrier admits 4, never 5, so the whole
-  // budget is spent. This is the row that used to cost 80 kB.
+  // Unsatisfiable, because the three-cursor barrier admits 4, never 5, so the
+  // whole budget is spent. This is the row that used to cost 80 kB.
   let (calls, bytes, answer) = measure(|| barrier.wait_for(Seq::ZERO, 5, WaitKind::Spin, 10_000));
   assert_eq!(answer, Err(RingError::Empty), "the budget runs out");
   assert_eq!(

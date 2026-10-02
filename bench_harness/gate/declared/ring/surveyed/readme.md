@@ -9,7 +9,7 @@ when a digest stops matching the crate on disk.
 | `<crate>.surveyed` | The date that crate last swept clean, and the digest of the source and tests that were swept |
 
 One file per crate, written by the survey and **never edited by hand**. There is
-no per-crate table here on purpose: unlike `../mutant/` and `../accepted/`,
+no per-crate table here on purpose. Unlike `../mutant/` and `../accepted/`,
 whose entries each record a distinct judgement worth reading, every record in
 this directory says the same mechanical thing about a different crate. A table
 listing all 33 would restate the directory listing and go stale on every sweep.
@@ -30,20 +30,20 @@ be believed without being checked.
 ## What the digest covers, and why both halves
 
 Every `.rs` file under the crate's `src/` and `tests/`, hashed per file and then
-reduced to one line — the same walk the survey already takes as its restoration
-guard, which is why it costs nothing extra to record.
+reduced to one line. It is the same walk the survey already takes as its
+restoration guard, which is why it costs nothing extra to record.
 
-Both halves are load-bearing, for opposite reasons:
+Both halves matter, for opposite reasons:
 
 | Half | What changing it means |
 |---|---|
-| `tests/` | The suite may now kill something a ruling says survives — an acceptance could be stale |
-| `src/` | There is code no survey has ever mutated — findings could be missing entirely |
+| `tests/` | The suite may now kill something a ruling says survives, so an acceptance could be stale |
+| `src/` | There is code no survey has ever mutated, so findings could be missing entirely |
 
 A doc-comment edit to `src/` moves the digest without changing behaviour, and
 G13 will ask for a re-survey it did not strictly need. That false positive costs
 about a minute for one crate, and the alternative is deciding which source edits
-matter by reading them — which is the judgement this gate exists to avoid making.
+matter by reading them. That is the judgement this gate exists to avoid making.
 
 ## Format
 

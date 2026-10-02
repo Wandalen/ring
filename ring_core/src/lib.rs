@@ -1,36 +1,36 @@
-//! Composed ring over an SPSC, MPSC, or crossbeam backend behind one surface.
+//! Composed ring over an SPSC, MPSC, or crossbeam backend behind one API.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation. This is the
-//! **composition point**: `docs/decision/121_workstream_008_contract_gaps_ruled.md`
+//! One of the ring family's 33 crates, which implement the concurrency write-path. This is the
+//! **composition point**. `docs/decision/121_workstream_008_contract_gaps_ruled.md`
 //! § 7 rules that feature 187's crossbeam backend belongs here, behind a cargo
 //! feature, alongside the selection between [`ring_spsc`] (feature 171) and
 //! [`ring_mpsc`] (feature 172).
 //!
 //! Fix(decision_121_link_pointed_at_docsrs_not_the_ruling): this citation used
-//! to be a rustdoc reference link, `[decision 121]: https://docs.rs/ring_core`
-//! — dead by construction, since `publish = false` means this crate is never
-//! on docs.rs, and even a live link there would land on this crate's own docs
-//! rather than on decision 121's text. Root cause: the link target was never
-//! filled in past a placeholder at the commit that introduced it. Pitfall: a
-//! doc-comment citation that *looks* like a working hyperlink is checked far
-//! less often than prose, because it reads as already-verified; five sibling
+//! to be a rustdoc reference link, `[decision 121]: https://docs.rs/ring_core`.
+//! That link was dead by construction, since `publish = false` means this crate
+//! is never on docs.rs, and even a live link there would land on this crate's
+//! own docs rather than on decision 121's text. Root cause: the link target was
+//! never filled in past a placeholder at the commit that introduced it. Pitfall:
+//! a doc-comment citation that *looks* like a working hyperlink is checked far
+//! less often than prose, because it reads as already verified. Five sibling
 //! crates (`ring_wait`, `ring_overflow`, `ring_types`, `ring_bench`,
 //! `ring_seqno`) cite this exact document as plain backtick text instead of a
-//! link, which is the family's actual convention this now matches.
+//! link. That is the family's convention, and this citation now matches it.
 //!
-//! # The surface is value-shaped, and that is forced rather than chosen
+//! # The API is value-shaped, and that is forced rather than chosen
 //!
 //! The two in-house backends publish through a *slot*: claim a reservation,
 //! write in place, let the guard's `Drop` publish. `crossbeam_queue::ArrayQueue`
-//! has no such thing — it offers `push( value )` and `pop() -> Option< value >`
-//! and nothing else. A slot-shaped uniform surface therefore cannot exist
-//! across all three backends.
+//! has no such thing. It offers `push( value )` and `pop() -> Option< value >`
+//! and nothing else. A slot-shaped uniform API therefore cannot exist across
+//! all three backends.
 //!
-//! So this crate presents a **value-shaped** surface — [`Producer::try_push`]
-//! takes a `T`, [`Consumer::try_recv`] returns a `T` — and the in-place
-//! reservation API stops here. A caller that needs to build a record in the
-//! ring's own memory reaches for [`ring_spsc`] or [`ring_mpsc`] directly and
-//! gives up the backend swap; that is the trade, and it is not hidden.
+//! So this crate presents a **value-shaped** API. [`Producer::try_push`] takes
+//! a `T` and [`Consumer::try_recv`] returns a `T`, and the in-place reservation
+//! API stops here. A caller that needs to build a record in the ring's own
+//! memory reaches for [`ring_spsc`] or [`ring_mpsc`] directly and gives up the
+//! backend swap. That is the trade, and it is not hidden.
 //!
 //! # What is uniform, and what only looks uniform
 //!
@@ -56,7 +56,7 @@
 //! publish reaches it through a method here. A counter added in this crate
 //! would break that assertion with nothing in `ring_spsc`'s own dependency tree
 //! to blame. There is accordingly no `AtomicUsize` anywhere below, and no
-//! statistics: instrumentation belongs in `ring_stats` (feature 185), which is
+//! statistics. Instrumentation belongs in `ring_stats` (feature 185), which is
 //! deliberately not a dependency.
 //!
 //! ```
@@ -80,11 +80,11 @@ use ring_overflow::{Resolution, would_resolve};
 use ring_slot::TypedSlot;
 use ring_types::{Capacity, OverflowPolicy, RingError};
 
-/// Which implementation is beneath the surface.
+/// Which implementation is beneath the API.
 ///
 /// Reported by [`Ring::backend`] so a caller can recover the contract it was
-/// given — the differences the uniform surface cannot express are listed in the
-/// module documentation, and this is how a caller learns which column applies.
+/// given. The module documentation lists the differences the uniform API cannot
+/// express, and this is how a caller learns which column applies.
 ///
 /// ```
 /// use ring_config::RingConfig;
@@ -98,11 +98,11 @@ use ring_types::{Capacity, OverflowPolicy, RingError};
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Backend {
-  /// [`ring_spsc`] — one producer, binding `free_capacity`, no RMW in the path.
+  /// [`ring_spsc`]: one producer, binding `free_capacity`, no RMW in the path.
   Spsc,
-  /// [`ring_mpsc`] — many producers, advisory `free_capacity`.
+  /// [`ring_mpsc`]: many producers, advisory `free_capacity`.
   Mpsc,
-  /// `crossbeam_queue::ArrayQueue` — feature 187's interim backend.
+  /// `crossbeam_queue::ArrayQueue`, feature 187's interim backend.
   #[cfg(feature = "crossbeam")]
   Crossbeam,
 }
@@ -110,10 +110,10 @@ pub enum Backend {
 /// The storage, owning whichever backend the configuration selected.
 ///
 /// Split into ends with [`ends`](Self::ends), which mirrors [`ring_mpsc`]'s own
-/// two-step shape. The intermediate is not ceremony: `ring_mpsc`'s producer is
-/// `Copy`, so its handles borrow from a value that must outlive them both, and
-/// a one-step `split` cannot name that lifetime. Adopting the same shape for
-/// every backend is what keeps the surface uniform.
+/// two-step shape. The intermediate step exists because `ring_mpsc`'s producer
+/// is `Copy`. Its handles borrow from a value that must outlive them both, and
+/// a one-step `split` cannot name that lifetime. Using the same shape for every
+/// backend keeps the API uniform.
 #[derive(Debug)]
 pub struct Ring<T> {
   storage: Storage<T>,
@@ -132,19 +132,19 @@ impl<T: Send> Ring<T> {
   /// Build a ring, selecting the backend from the configuration.
   ///
   /// [`RingConfig::is_multi_producer`] chooses between [`ring_spsc`] and
-  /// [`ring_mpsc`]. The crossbeam backend is selected by `new_crossbeam`
-  /// rather than by a config field, because it is a build-time opt-in rather
-  /// than a property of the workload — named rather than linked for the same
-  /// reason, since under default features there is no such method to link to
-  /// and rustdoc reports the dangling reference as an error.
+  /// [`ring_mpsc`]. `new_crossbeam` selects the crossbeam backend, not a config
+  /// field, because crossbeam is a build-time opt-in and not a property of the
+  /// workload. For the same reason the method is named here but not linked.
+  /// Under default features there is no such method to link to, and rustdoc
+  /// reports the dangling reference as an error.
   ///
   /// # Errors
   ///
   /// [`RingError::PolicyUnsupported`] for `OverflowPolicy::DropOldest`, which neither
-  /// in-house backend can honour — evicting an unread record contradicts the
+  /// in-house backend can honour. Evicting an unread record contradicts the
   /// exactly-once delivery both of them guarantee. Rejecting it here, at
-  /// construction, is deliberate: the alternative is a `try_push` that silently
-  /// behaves as `DropNewest` and a caller who never learns the policy was not
+  /// construction, is deliberate. The alternative is a `try_push` that silently
+  /// behaves as `DropNewest`, and a caller who never learns the policy was not
   /// applied.
   ///
   /// ```
@@ -160,10 +160,10 @@ impl<T: Send> Ring<T> {
       return Err(RingError::PolicyUnsupported);
     }
 
-    // `match` rather than `if`/`else`: under the family's brace style the `else`
-    // keyword lands on a line of its own, where `llvm-cov` opens a region that
-    // nothing can ever execute — so the crate reads 120/121 with both arms
-    // demonstrably covered. `tests/manual/readme.md` C4 records the measurement.
+    // A `match` rather than `if`/`else`, because under the family's brace style
+    // the `else` keyword lands on a line of its own. There `llvm-cov` opens a
+    // region that nothing can ever execute, so the crate reads 120/121 with both
+    // arms demonstrably covered. `tests/manual/readme.md` C4 records the measurement.
     let storage = match config.is_multi_producer() {
       true => Storage::Mpsc(ring_mpsc::Ring::with_config(config)),
       false => Storage::Spsc(ring_spsc::Ring::with_config(config)),
@@ -180,12 +180,12 @@ impl<T: Send> Ring<T> {
   ///
   /// This is feature 187's entry point. It accepts `OverflowPolicy::DropOldest`
   /// where [`new`](Self::new) refuses it, because `ArrayQueue::force_push` does
-  /// exactly that — the one capability the in-house rings deliberately lack.
+  /// exactly that, the one capability the in-house rings deliberately lack.
   ///
   /// # Errors
   ///
-  /// None currently; the signature matches [`new`](Self::new) so the two are
-  /// interchangeable at a call site, which is the whole point of a swappable
+  /// None currently. The signature matches [`new`](Self::new) so the two are
+  /// interchangeable at a call site, which is the point of a swappable
   /// backend.
   #[cfg(feature = "crossbeam")]
   pub fn new_crossbeam(config: &RingConfig) -> Result<Self, RingError> {
@@ -312,8 +312,8 @@ impl<'a, T: Send> Ends<'a, T> {
 
 /// The writing end.
 ///
-/// Not `Clone`: cardinality is the backend's to decide, so an extra producer is
-/// requested through [`try_clone`](Self::try_clone), which can refuse.
+/// Not `Clone`. Cardinality is the backend's to decide, so a caller requests an
+/// extra producer through [`try_clone`](Self::try_clone), which can refuse.
 #[derive(Debug)]
 pub struct Producer<'a, T> {
   inner: ProducerInner<'a, T>,
@@ -333,7 +333,7 @@ impl<'a, T: Send> Producer<'a, T> {
   ///
   /// Never blocks. On a full ring the configured [`OverflowPolicy`] decides:
   /// `Fail` returns the record, `DropNewest` discards it and reports success.
-  /// `DropOldest` cannot arrive here — [`Ring::new`] refuses it, and
+  /// `DropOldest` cannot arrive here. [`Ring::new`] refuses it, and
   /// `Ring::new_crossbeam`, which exists only under the `crossbeam` feature,
   /// is the only path that accepts it. Without that feature the policy has no
   /// path at all, which is why the name is not a link.
@@ -341,8 +341,8 @@ impl<'a, T: Send> Producer<'a, T> {
   /// # Errors
   ///
   /// The record itself, under `OverflowPolicy::Fail`, when the ring is full.
-  /// Returning the value rather than a unit error is what makes a refusal
-  /// recoverable without a copy.
+  /// Returning the value rather than a unit error makes a refusal recoverable
+  /// without a copy.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -364,7 +364,7 @@ impl<'a, T: Send> Producer<'a, T> {
       ProducerInner::Mpsc(producer) => {
         // Claim before consuming the record. `ring_mpsc::Producer::push` takes
         // the value and returns `Result< Seq, RingError >`, so on a full ring
-        // the record is dropped inside it and cannot be handed back — which
+        // the record is dropped inside it and cannot be handed back, which
         // this signature promises to do. Claiming first moves the refusal ahead
         // of the move, so the record survives it.
         match producer.claim() {
@@ -398,9 +398,9 @@ impl<'a, T: Send> Producer<'a, T> {
   /// Publish as many of `records` as the ring will take, and report how many.
   ///
   /// Partial acceptance is the normal case, so the return is a count rather
-  /// than a `Result`: an all-or-nothing contract would need a rollback the ring
-  /// cannot offer cheaply. The iterator is left positioned after the last
-  /// record this call consumed.
+  /// than a `Result`. An all-or-nothing contract would need a rollback the ring
+  /// cannot offer cheaply. This call leaves the iterator positioned after the
+  /// last record it consumed.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -432,9 +432,9 @@ impl<'a, T: Send> Producer<'a, T> {
 
   /// Another handle onto the same ring, where the backend permits one.
   ///
-  /// `None` at SPSC cardinality — a second producer there is a data race that
-  /// no signature would reveal, so the refusal is the surface's only honest
-  /// answer. This is also the one machine-checkable way to tell which
+  /// `None` at SPSC cardinality. A second producer there is a data race that
+  /// no signature would reveal, so refusing is the API's only honest answer.
+  /// This is also the one machine-checkable way to tell which
   /// `free_capacity` contract applies.
   ///
   /// ```
@@ -465,8 +465,8 @@ impl<'a, T: Send> Producer<'a, T> {
 
   /// Room for at least this many more records.
   ///
-  /// **Binding at SPSC, advisory at MPSC and crossbeam** — the asymmetry the
-  /// uniform surface cannot express. Use [`try_clone`](Self::try_clone) to
+  /// **Binding at SPSC, advisory at MPSC and crossbeam.** This is the asymmetry
+  /// the uniform API cannot express. Use [`try_clone`](Self::try_clone) to
   /// learn which reading applies, or treat every reading as advisory and let
   /// [`try_push`](Self::try_push) be the authority, which is always correct.
   #[must_use]
@@ -482,7 +482,7 @@ impl<'a, T: Send> Producer<'a, T> {
   /// Whether the ring has no room, by the same reading as
   /// [`free_capacity`](Self::free_capacity).
   ///
-  /// **Binding at SPSC, advisory at MPSC and crossbeam** — it inherits that
+  /// **Binding at SPSC, advisory at MPSC and crossbeam.** It inherits that
   /// asymmetry rather than resolving it, so at MPSC a reported `true` can be
   /// false by the time the caller branches on it. Let
   /// [`try_push`](Self::try_push) be the authority, which is always correct.
@@ -512,8 +512,8 @@ enum ConsumerInner<'a, T> {
 impl<T: Send> Consumer<'_, T> {
   /// Take the next record, if one is published.
   ///
-  /// `Option`, not `Result`: "nothing available" is the normal state of a ring
-  /// drained at a barrier, and modelling it as an error makes every caller
+  /// `Option`, not `Result`, because "nothing available" is the normal state of
+  /// a ring drained at a barrier. Modelling it as an error makes every caller
   /// unwrap a non-failure.
   pub fn try_recv(&mut self) -> Option<T> {
     match &mut self.inner {
@@ -533,7 +533,7 @@ impl<T: Send> Consumer<'_, T> {
   /// Move everything currently published into `out`, and report how many.
   ///
   /// Bounded by what was published when the call began, not by what arrives
-  /// during it — otherwise it would not terminate under a live producer.
+  /// during it. Otherwise it would not terminate under a live producer.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -567,7 +567,7 @@ impl<T: Send> Consumer<'_, T> {
       }
       #[cfg(feature = "crossbeam")]
       ConsumerInner::Crossbeam(queue) => {
-        // Bounded by the length read once, up front — not by `pop` returning
+        // Bounded by the length read once, up front, and not by `pop` returning
         // `None`, which under a live producer may never happen.
         let len = queue.len();
         let taken = (0..len).filter_map(|_| queue.pop()).collect::<Vec<_>>();
@@ -583,9 +583,9 @@ impl<T: Send> Consumer<'_, T> {
   /// A lower bound: it may grow between this read and the next drain. It never
   /// shrinks on its own, since this is the only consumer.
   ///
-  /// **Binding at SPSC, advisory at MPSC and crossbeam** — the mirror image
-  /// of [`Producer::free_capacity`](Producer::free_capacity), and asymmetric
-  /// for the same reason: against one producer the reading cannot move under
+  /// **Binding at SPSC, advisory at MPSC and crossbeam.** This is the mirror
+  /// image of [`Producer::free_capacity`](Producer::free_capacity), asymmetric
+  /// for the same reason. Against one producer the reading cannot move under
   /// you, against several it can. Let [`try_recv`](Self::try_recv) be the
   /// authority, which is always correct.
   #[must_use]

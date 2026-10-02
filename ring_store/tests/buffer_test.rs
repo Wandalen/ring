@@ -5,9 +5,9 @@
 //! indexed get/set, holds no cursor and no ordering state; two distinct slot
 //! indices never alias."
 //!
-//! Three of those four clauses are ordinary. The fourth — *holds no cursor and
-//! no ordering state* — is a claim about what the type does **not** contain,
-//! and a test cannot assert an absence by exercising it. Two things stand in
+//! Three of those four clauses are ordinary. The fourth, *holds no cursor and
+//! no ordering state*, is a claim about what the type does **not** contain,
+//! and a test cannot assert an absence by exercising it. Two tests stand in
 //! for it here, and neither is the real thing:
 //!
 //! - `a_buffer_is_exactly_its_slots_and_its_capacity` pins `size_of` against
@@ -18,8 +18,8 @@
 //!   that had quietly acquired ordering state would have an opinion about the
 //!   order; this one demonstrably has none.
 //!
-//! The honest limit: a zero-sized ordering field would pass the first, and a
-//! cursor consulted only under contention would pass the second. What actually
+//! Both have a limit. A zero-sized ordering field would pass the first, and a
+//! cursor consulted only under contention would pass the second. What
 //! guarantees the absence is that the struct is 30 lines and legible. These
 //! tests catch the drift, not the original sin.
 
@@ -76,9 +76,9 @@ fn indexed_get_and_set_round_trip() {
 
 #[test]
 fn two_distinct_slot_indices_never_alias() {
-  // The feature's own words. Written into every slot a value only that slot
-  // could hold, then read every slot back: any aliasing pair shows up as a
-  // duplicate or as a value in the wrong place.
+  // The feature's own words. The test writes into every slot a value only that
+  // slot could hold, then reads every slot back. Any aliasing pair shows up as
+  // a duplicate or as a value in the wrong place.
   const N: usize = 64;
   let mut buffer: Buffer<TypedSlot<usize>> = Buffer::new(cap(N));
 
@@ -97,9 +97,9 @@ fn two_distinct_slot_indices_never_alias() {
 
 #[test]
 fn distinct_indices_have_distinct_addresses() {
-  // The stronger form of the same claim: not merely "the values differ" but
-  // "the storage differs". A `len` that over-reported while the slots were
-  // shared would pass the value test and fail this one.
+  // The stronger form of the same claim: "the storage differs", beyond "the
+  // values differ". A `len` that over-reported while the slots were shared
+  // would pass the value test and fail this one.
   let buffer: Buffer<TypedSlot<u8>> = Buffer::new(cap(16));
   let mut seen: Vec<usize> = Vec::new();
 
@@ -112,8 +112,8 @@ fn distinct_indices_have_distinct_addresses() {
 
 #[test]
 fn a_sequence_addresses_the_slot_ring_index_says_it_does() {
-  // `at` must be the fold and nothing else — a second implementation of the
-  // fold living here is exactly what `ring_index` exists to prevent.
+  // `at` must be the fold and nothing else. A second implementation of the
+  // fold living here is what `ring_index` exists to prevent.
   let capacity = cap(8);
   let mut buffer: Buffer<TypedSlot<u64>> = Buffer::new(capacity);
 
@@ -192,10 +192,10 @@ fn a_buffer_is_never_empty_because_a_capacity_is_never_zero() {
 #[test]
 fn is_empty_and_all_empty_disagree_on_a_freshly_built_buffer() {
   // The two questions named `is_empty`, on the one buffer where both answers
-  // are visible together: `is_empty` asks whether the buffer has zero slots
-  // (never true — a `Capacity` cannot be zero) and `all_empty` asks whether
-  // every slot holds nothing (true here, since nothing has been written yet).
-  // Elsewhere in this suite each is asserted alone; this pins the disagreement
+  // are visible together. `is_empty` asks whether the buffer has zero slots
+  // (never true, since a `Capacity` cannot be zero), and `all_empty` asks
+  // whether every slot holds nothing (true here, as nothing has been written).
+  // Elsewhere in this suite each is asserted alone. This pins the disagreement
   // itself, on the one buffer, in one place (-> docs/pitfall/001 BF38).
   let buffer: Buffer<TypedSlot<u8>> = Buffer::new(cap(4));
   assert!(!buffer.is_empty(), "is_empty asks about slot count, which is never zero");
@@ -254,7 +254,7 @@ fn a_borrowed_buffer_iterates_directly() {
 fn an_index_past_the_capacity_panics_rather_than_wrapping() {
   // Deliberately not an error return. A SlotIndex that came from `ring_index`
   // cannot be out of range, so one that is means two rings' capacities were
-  // mixed — a defect, and silently folding it would hide the mixing.
+  // mixed. That is a defect, and silently folding it would hide the mixing.
   let buffer: Buffer<TypedSlot<u8>> = Buffer::new(cap(4));
   let _ = buffer.get(SlotIndex(4));
 }

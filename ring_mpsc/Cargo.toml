@@ -10,7 +10,7 @@ publish = true
 
 # Eight, not the seven this manifest was scaffolded with. `ring_publish` and
 # `ring_consume` are gone and `ring_atomic`, `ring_slot` and `ring_types` are
-# new — see decision 124. Publication here is a per-slot stamp this crate owns,
+# new. See decision 124. Publication here is a per-slot stamp this crate owns,
 # so there is no published cursor for either removed crate to act on.
 [dependencies]
 ring_atomic = { workspace = true }
@@ -22,8 +22,8 @@ ring_gating = { workspace = true }
 ring_slot = { workspace = true }
 ring_types = { workspace = true }
 
-# `tests/mpsc_test.rs`'s `exhaustive` module, under `RUSTFLAGS="--cfg loom"`
-# only. `ring_atomic` swaps `AtomicSeq` for an instrumented one under the same
+# Used by `tests/mpsc_test.rs`'s `exhaustive` module, and only under
+# `RUSTFLAGS="--cfg loom"`. `ring_atomic` swaps `AtomicSeq` for an instrumented one under the same
 # cfg, so what loom explores is this crate's own stamp protocol rather than a
 # re-implementation of it.
 [target.'cfg(loom)'.dev-dependencies]

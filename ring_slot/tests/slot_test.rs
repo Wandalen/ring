@@ -1,16 +1,16 @@
-//! Tests for `ring_slot` — the two slot shapes over one ring.
+//! Tests for `ring_slot`, the two slot shapes over one ring.
 //!
 //! Claims `docs/feature/182_typed_slot_and_bytes_slot.md`. The feature's
-//! constraint is that "both use the same claim, gating, and drain — the
-//! difference is confined to what a slot contains", so the tests that matter
-//! most are the ones exercising both shapes *through the trait*: if anything
-//! downstream had to know which shape it held, the constraint would already be
-//! broken.
+//! constraint is that "both use the same claim, gating, and drain" and that
+//! "the difference is confined to what a slot contains", so the tests that
+//! matter most are the ones exercising both shapes *through the trait*. If
+//! anything downstream had to know which shape it held, the constraint would
+//! already be broken.
 //!
-//! The other load-bearing property is that a `BytesSlot` reads back exactly what
-//! was written and never the unused tail. The crate carries no `unsafe`, so this
-//! is a length-tracking question rather than an initialisation one — but a
-//! partially-filled slot leaking its previous contents would be a data leak
+//! The other property that matters is that a `BytesSlot` reads back exactly
+//! what was written and never the unused tail. The crate carries no `unsafe`,
+//! so this is a length-tracking question rather than an initialisation one. But
+//! a partially-filled slot leaking its previous contents would be a data leak
 //! across ring laps either way, which is why the overwrite cases below are
 //! explicit.
 
@@ -43,7 +43,7 @@ fn a_typed_slot_round_trips_its_value() {
 }
 
 /// Setting over an occupied slot returns the displaced value rather than
-/// dropping it — what lets an evict-oldest policy hand back what it evicted
+/// dropping it, which lets an evict-oldest policy hand back what it evicted
 /// instead of losing it silently.
 #[test]
 fn setting_over_a_value_returns_the_displaced_one() {
@@ -56,8 +56,8 @@ fn setting_over_a_value_returns_the_displaced_one() {
 
 /// `TypedSlot::clear` runs the payload's destructor; `BytesSlot::clear` cannot,
 /// and the asymmetry is the whole content of `lifecycle/002` SL31. Counting
-/// drops is the only way to see it — every API-visible effect of the two
-/// `clear`s is identical, which is exactly what makes the difference a trap.
+/// drops is the only way to see it, because every API-visible effect of the two
+/// `clear`s is identical. That sameness is what makes the difference a trap.
 #[test]
 fn clearing_a_typed_slot_runs_the_payloads_destructor() {
   use core::sync::atomic::{AtomicUsize, Ordering};
@@ -85,9 +85,9 @@ fn clearing_a_typed_slot_runs_the_payloads_destructor() {
 }
 
 /// The other half of that asymmetry, pinned structurally rather than by
-/// observation: a `BytesSlot`'s payload is inline in the slot, so there is no
+/// observation. A `BytesSlot`'s payload is inline in the slot, so there is no
 /// allocation for `clear` to release and no destructor for it to run. `clear`
-/// sets a length and the array is untouched — the residue `lifecycle/002` SL32
+/// sets a length and leaves the array untouched, the residue `lifecycle/002` SL32
 /// describes. Nothing safe can read it back, which is the point of the
 /// hand-written `Debug` and `PartialEq`, so its lifetime is established from the
 /// type's layout and from the crate's own field census instead. See
@@ -130,8 +130,8 @@ fn clearing_a_typed_slot_is_idempotent() {
   assert_eq!(slot.get(), None);
 }
 
-/// A slot holding a non-`Copy` payload works the same way — the shape is about
-/// occupancy, not about what the payload can do.
+/// A slot holding a non-`Copy` payload works the same way, because the shape
+/// is about occupancy, not about what the payload can do.
 #[test]
 fn a_typed_slot_holds_non_copy_payloads() {
   let mut slot = TypedSlot::empty();
@@ -141,7 +141,7 @@ fn a_typed_slot_holds_non_copy_payloads() {
   assert!(slot.is_empty());
 }
 
-/// A slot holding a value that is *itself* empty-looking is still occupied —
+/// A slot holding a value that is *itself* empty-looking is still occupied, because
 /// occupancy is the slot's own state, not a property read off the payload.
 #[test]
 fn a_slot_holding_a_default_value_is_still_occupied() {
@@ -167,7 +167,7 @@ fn a_fresh_bytes_slot_is_empty() {
   assert!(BytesSlot::<8>::default().is_empty());
 }
 
-/// Capacity is the const parameter, and is fixed for the slot's life — a ring's
+/// Capacity is the const parameter, and is fixed for the slot's life; a ring's
 /// slots are allocated once, so a growable slot would defeat the allocation
 /// behaviour the ring was chosen for.
 #[test]
@@ -191,7 +191,7 @@ fn a_bytes_slot_round_trips_its_payload() {
   assert!(!slot.is_empty());
 }
 
-/// A read returns the written bytes and only those — never the unused tail.
+/// A read returns the written bytes and only those, never the unused tail.
 /// Asserted across every length from empty to full, because an off-by-one in
 /// the length would leak exactly one stale byte.
 #[test]
@@ -207,7 +207,7 @@ fn a_read_never_returns_the_unused_tail() {
   }
 }
 
-/// A write filling the slot exactly is accepted — the boundary is inclusive.
+/// A write filling the slot exactly is accepted; the boundary is inclusive.
 #[test]
 fn a_write_of_exactly_capacity_is_accepted() {
   let mut slot = BytesSlot::<4>::empty();
@@ -231,7 +231,7 @@ fn an_oversized_write_is_refused_with_both_numbers() {
   );
 }
 
-/// A failed write leaves the previous contents intact — the slot is not
+/// A failed write leaves the previous contents intact; the slot is not
 /// half-updated, so a caller that handles the error still has valid data.
 #[test]
 fn a_failed_write_leaves_the_previous_contents_intact() {
@@ -254,7 +254,7 @@ fn a_failed_write_onto_an_empty_slot_leaves_it_empty() {
   assert_eq!(slot.read(), b"");
 }
 
-/// A shorter write over a longer one truncates the reading — the stale tail must
+/// A shorter write over a longer one truncates the reading; the stale tail must
 /// not reappear, which across ring laps would be a data leak between publishes.
 #[test]
 fn a_shorter_write_does_not_leak_the_longer_one() {
@@ -286,7 +286,7 @@ fn clearing_a_bytes_slot_empties_the_reading() {
   assert_eq!(slot.read(), b"z", "a cleared slot writes from nothing");
 }
 
-/// A zero-length write empties the slot rather than leaving the old payload —
+/// A zero-length write empties the slot rather than leaving the old payload;
 /// writing nothing means the slot holds nothing.
 #[test]
 fn a_zero_length_write_empties_the_slot() {
@@ -299,8 +299,8 @@ fn a_zero_length_write_empties_the_slot() {
   assert_eq!(slot.read(), b"");
 }
 
-/// A zero-capacity slot accepts only the empty payload — a degenerate case, but
-/// one a generic caller can construct, so it must not panic.
+/// A zero-capacity slot accepts only the empty payload; it is a degenerate case,
+/// but one a generic caller can construct, so it must not panic.
 #[test]
 fn a_zero_capacity_slot_accepts_only_nothing() {
   let mut slot = BytesSlot::<0>::empty();
@@ -319,7 +319,7 @@ fn a_zero_capacity_slot_accepts_only_nothing() {
 
 /// `BytesSlot` carries an inherent `is_empty` alongside the trait's, so a caller
 /// holding the concrete type need not import `Slot`. The two must never
-/// disagree — this is the only test that can catch it, since every other call
+/// disagree. This is the only test that can catch it, since every other call
 /// site resolves to whichever one is in scope.
 #[test]
 fn the_inherent_and_trait_emptiness_agree() {
@@ -339,7 +339,7 @@ fn the_inherent_and_trait_emptiness_agree() {
 }
 
 /// Two slots holding the same payload compare equal even when their backing
-/// arrays differ — which is the whole point, and is what a derived `PartialEq`
+/// arrays differ. That is the whole point, and it is what a derived `PartialEq`
 /// would get wrong. The first fixture pair is written once each from empty, so
 /// their tails coincide and it could not distinguish the two relations; the
 /// second is the case that can, and the one this test's name promises. See
@@ -371,9 +371,9 @@ fn slots_compare_by_payload_not_by_tail() {
 }
 
 /// Two slots holding different payloads do not compare equal. Every other
-/// `PartialEq` test in this file asserts `assert_eq!` — proving what a
-/// hand-written `eq` must agree with a derived one on — and none of them
-/// would notice `eq` always answering `true`. This is the one case that does.
+/// `PartialEq` test in this file asserts `assert_eq!`, proving what a
+/// hand-written `eq` must agree with a derived one on. None of them would
+/// notice `eq` always answering `true`. This is the one case that does.
 #[test]
 fn slots_with_different_payloads_are_not_equal() {
   let mut a = BytesSlot::<8>::empty();
@@ -386,10 +386,10 @@ fn slots_with_different_payloads_are_not_equal() {
 }
 
 /// A cleared slot is equal to a fresh one, and prints as one. Both were false
-/// while `Debug` and `PartialEq` were derived: the array still held the payload
+/// while `Debug` and `PartialEq` were derived. The array still held the payload
 /// after `clear` moved the length, so a cleared slot compared unequal to a
 /// fresh one and printed the bytes it no longer held. See `pitfall/002` SL43
-/// and SL44 — the residue is still in memory, it is just no longer reachable
+/// and SL44. The residue is still in memory; it is no longer reachable
 /// through any public API this type has.
 #[test]
 fn a_cleared_slot_is_indistinguishable_from_a_fresh_one() {
@@ -410,13 +410,13 @@ fn a_cleared_slot_is_indistinguishable_from_a_fresh_one() {
 }
 
 /// `TypedSlot`'s `Default` is written out as `impl< T >`, not derived. The
-/// derive would emit `impl< T : Default >` — it defaults every field, including
-/// the `Option< T >` whose own default needs nothing from `T` — and that bound
-/// would propagate to every `S : Slot + Default` consumer, silently narrowing
-/// the ring to payloads that happen to be `Default`. This test does not run
-/// anything: `NotDefault` deliberately has no `Default` impl, so the file stops
-/// compiling if the hand-written impl is ever replaced by the derive. See
-/// `non_functional_requirement/002` SL36.
+/// derive would emit `impl< T : Default >`, because it defaults every field,
+/// including the `Option< T >` whose own default needs nothing from `T`. That
+/// bound would propagate to every `S : Slot + Default` consumer, silently
+/// narrowing the ring to payloads that happen to be `Default`. This test does
+/// not run anything. `NotDefault` deliberately has no `Default` impl, so the
+/// file stops compiling if the hand-written impl is ever replaced by the
+/// derive. See `non_functional_requirement/002` SL36.
 #[test]
 fn a_slot_is_default_for_a_payload_that_is_not() {
   struct NotDefault(#[allow(dead_code)] u32);
@@ -427,8 +427,8 @@ fn a_slot_is_default_for_a_payload_that_is_not() {
 
 // ---- The shared trait ----
 
-/// Both shapes are usable through `Slot` alone, which is the feature's actual
-/// constraint: everything downstream is written against the trait and cannot
+/// Both shapes are usable through `Slot` alone, which is the feature's
+/// constraint; everything downstream is written against the trait and cannot
 /// branch on which shape it holds.
 #[test]
 fn both_shapes_drive_through_the_trait_alone() {
@@ -448,7 +448,7 @@ fn both_shapes_drive_through_the_trait_alone() {
 }
 
 /// The trait's two methods agree for both shapes across the whole occupancy
-/// cycle — empty, filled, cleared — so a drain loop written once behaves the
+/// cycle of empty, filled and cleared, so a drain loop written once behaves the
 /// same on either.
 #[test]
 fn the_trait_reports_the_same_cycle_for_both_shapes() {

@@ -3,26 +3,27 @@
 #
 # Ruled by this family's own review of where the shared-slot unsafe is sited,
 # which replaced an earlier four-name list with these three. Each crate here
-# must also justify the opt-out in its own docs/workaround/readme.md — G6
-# checks both halves, so listing a crate here is necessary and not sufficient.
+# must also justify the opt-out in its own docs/workaround/readme.md. G6
+# checks both halves, so listing a crate here is necessary but not sufficient.
 #
-# ring_spsc  — one producer and one consumer hold two ends of one slot array
-# ring_mpsc  — the same, with many producers and per-slot sequence stamps
-# ring_core  — the shared assembly both configurations are built from
+# ring_spsc: one producer and one consumer hold two ends of one slot array
+# ring_mpsc: the same, with many producers and per-slot sequence stamps
+# ring_core: the shared assembly both configurations are built from
 #
 # All three assemble a *complete* ring: slot storage plus the cursors that
 # bound it. That pairing is the whole reason the unsafe is sited here. The
-# invariant making a shared slot write sound — the producer writes only what it
-# has claimed and not published, the consumer reads only what is published and
-# not committed — is stated entirely in terms of cursors, so a crate holding
-# only the storage (ring_store, ring_slot) cannot encapsulate it behind a safe
-# API no matter how the API is shaped. The closest candidate, a
+# invariant making a shared slot write sound is stated entirely in terms of
+# cursors. The producer writes only what it has claimed and not published, and
+# the consumer reads only what is published and not committed. So a crate
+# holding only the storage (ring_store, ring_slot) cannot encapsulate it behind
+# a safe API no matter how the API is shaped. The closest candidate, a
 # SharedBuffer::split(), was ruled unsound for the same reason.
 #
-# The earlier four-name list — ring_align, ring_atomic, ring_store, ring_slot —
-# was replaced because a check of all four found no `unsafe` in any of them;
-# two said so in their own module documentation. An allowlist longer than the
-# set of crates actually using unsafe is a gate that cannot fail.
+# The earlier four-name list was ring_align, ring_atomic, ring_store and
+# ring_slot. It was replaced because a check of all four found no `unsafe` in
+# any of them, and two said so in their own module documentation. An allowlist
+# longer than the set of crates actually using unsafe is a gate that cannot
+# fail.
 #
 # Three crates, and the list is meant to stay three. A fourth needs a decision.
 

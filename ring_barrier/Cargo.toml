@@ -14,7 +14,7 @@ ring_cursor = { workspace = true }
 ring_wait = { workspace = true }
 
 # Tests only. Three of them assert the relationship between this crate's answers
-# and `ring_gating`'s over one set of cursors — see the test file's own header on
+# and `ring_gating`'s over one set of cursors. See the test file's own header on
 # why a stand-in would assert nothing. The library itself never names it.
 [dev-dependencies]
 ring_gating = { workspace = true }

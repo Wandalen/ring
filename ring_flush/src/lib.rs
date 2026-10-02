@@ -1,16 +1,16 @@
 //! Flush policies deciding when thread-local staging reaches the ring.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation.
+//! One of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_tls`, `ring_core`.
 //!
-//! One of the five crates on the family's export Contract — and the only one
+//! One of the five crates on the family's export Contract, and the only one
 //! that is a *decision* rather than a thing a consumer holds. `ring_factory`
 //! makes things, `ring_handle` and `ring_tls` are things, `ring_types` is
 //! vocabulary. Importing this crate acquires no capability; it accepts three
 //! obligations.
 //!
-//! **The crate owns no ring.** It supplies the one thing `ring_tls`
-//! deliberately withheld — a trigger — so that publication happens at a moment
+//! **The crate owns no ring.** It supplies the trigger that `ring_tls`
+//! deliberately withheld, so that publication happens at a moment
 //! somebody chose rather than at whatever moment a buffer happens to fill.
 //! [`FlushPolicy`] is `Copy` and consulted by value on a path constrained to
 //! perform zero atomics and zero allocations.
@@ -29,27 +29,27 @@
 //!
 //! # What the implementation settled
 //!
-//! Three questions the pre-implementation instances left open were answered by
-//! building, and the answers are recorded where the questions were asked.
+//! Building answered three questions the pre-implementation instances left
+//! open, and each answer is recorded where its question was asked.
 //!
 //! | Question | Settled as | Recorded in |
 //! |---|---|---|
-//! | The flush log's compilation boundary | An opt-in [`FlushLog`] the [`Flusher`] owns — no cargo feature, no `cfg` | `docs/data_structure/002_the_flush_log.md` |
+//! | The flush log's compilation boundary | An opt-in [`FlushLog`] the [`Flusher`] owns, with no cargo feature and no `cfg` | `docs/data_structure/002_the_flush_log.md` |
 //! | How a record reaches the buffer at all | [`Flusher::append`], absent from both API instances | `docs/api/001_the_policy_surface.md` |
-//! | `ConfigError::AlreadyBound` | Unreachable — `new` takes the buffer by value, so ownership enforces N3 | `docs/type/001_flush_policy.md` |
+//! | `ConfigError::AlreadyBound` | Unreachable. `new` takes the buffer by value, so ownership enforces N3 | `docs/type/001_flush_policy.md` |
 //!
-//! # The seam this crate is built on
+//! # The `ring_tls` API this crate is built on
 //!
-//! `ring_tls`'s pre-implementation surface specified `seal`/`drain`/`reset` as
-//! three calls, and what was built is `flush_into` — claim and drain fused,
-//! emptying the buffer whether or not the records land. That shape cannot
-//! satisfy this crate's O3/O4: a rejected batch would already be gone.
+//! `ring_tls`'s pre-implementation API specified `seal`/`drain`/`reset` as
+//! three calls, and what was built is `flush_into`, which fuses claim and drain
+//! and empties the buffer whether or not the records land. That shape cannot
+//! satisfy this crate's O3/O4, because a rejected batch would already be gone.
 //! `TlsBuffer::drain` was added there so the check can happen before the buffer
 //! is touched (→ `docs/algorithm/002_sequencing_seal_drain_reset.md`).
 //!
 //! Feature 176 is Reached when each of the three policies fires at exactly its
 //! stated trigger and at no other point, asserted by a scripted sequence
-//! against a recorded flush log — see `tests/flush_test.rs`.
+//! against a recorded flush log in `tests/flush_test.rs`.
 
 #![deny(missing_docs)]
 
@@ -59,8 +59,8 @@ use ring_types::RingError;
 
 /// When a buffer's staged records are published to the ring.
 ///
-/// Three variants, one carrying a parameter, and the asymmetry is load-bearing:
-/// `OnFull` and `OnBarrier` name conditions determined elsewhere — by the
+/// Three variants, one carrying a parameter, and the asymmetry follows from
+/// ownership. `OnFull` and `OnBarrier` name conditions determined elsewhere, by the
 /// buffer's capacity and by the consumer's schedule. `OnBatch( n )` names a
 /// condition this crate owns outright, which is why it is the only variant with
 /// a parameter, the only one with state, and the only one that can be
@@ -70,7 +70,7 @@ use ring_types::RingError;
 ///
 /// Withheld deliberately, and it is the most likely trait to be added by
 /// mistake. A default policy is a policy nobody chose, applied wherever someone
-/// wrote `..Default::default()` — which recreates, in one derive, exactly the
+/// wrote `..Default::default()`. That one derive would recreate exactly the
 /// "publication point nobody designed" state feature 176 exists to prevent.
 ///
 /// ```
@@ -90,9 +90,9 @@ pub enum FlushPolicy {
 
 /// Why a flush fired.
 ///
-/// Separate from [`FlushPolicy`], and the separation is the point: a log
+/// Separate from [`FlushPolicy`] on purpose. A log
 /// recording only "a flush occurred under policy `OnBatch( 64 )`" cannot detect
-/// an `OnBatch` policy that *also* fires when full — the entries are
+/// an `OnBatch` policy that *also* fires when full, because the entries are
 /// indistinguishable from correct ones. Recording why each flush fired is what
 /// turns the log from a count into evidence.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -111,13 +111,13 @@ pub enum FlushCause {
 ///
 /// The first two variants are the reason this type exists. A `bool` return, or
 /// a bare count, collapses `NotTriggered` and `TriggeredEmpty` into the same
-/// observation — nothing moved — and they mean opposite things: under
+/// observation that nothing moved, yet they mean opposite things. Under
 /// `NotTriggered` there may be any number of records waiting, and **a consumer
 /// that only ever sees it has a misconfigured [`FlushPolicy::OnBarrier`]**.
 /// Making that misconfiguration observable is the whole design intent, since
 /// the crate cannot prevent it.
 ///
-/// Not a `Result`: three of the four are ordinary outcomes. `Rejected` is the
+/// Not a `Result`, because three of the four are ordinary outcomes. `Rejected` is the
 /// backpressure the design expects, not a bug.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[must_use = "an ignored outcome is exactly how a misconfigured OnBarrier stays silent"]
@@ -142,14 +142,14 @@ pub enum FlushOutcome {
 /// Why binding a policy to a buffer was refused.
 ///
 /// Every variant is a configuration error surfaced at binding time, which is
-/// the design intent: an invalid configuration should fail before any record is
+/// the design intent. An invalid configuration should fail before any record is
 /// appended, not degrade into a different working policy after a million of
-/// them. Each unvalidated case would degrade into *a different, working policy*
-/// — and a program producing a benchmark verdict about the wrong policy is
+/// them. Each unvalidated case would degrade into *a different, working policy*,
+/// and a program producing a benchmark verdict about the wrong policy is
 /// worse than one that refuses to start.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConfigError {
-  /// `OnBatch( 0 )` would fire on every append — a fourth policy by accident.
+  /// `OnBatch( 0 )` would fire on every append, making a fourth policy by accident.
   ZeroBatch,
   /// `OnBatch( n )` with `n` above the buffer's capacity could never fire, and
   /// would degrade into `OnFull`.
@@ -163,8 +163,8 @@ pub enum ConfigError {
 
 // Added late, by the crate that first consumed this one from outside its own
 // tests. `ring_flush` is on the family's export Contract and this was the only
-// error type on that Contract implementing neither trait — `ring_types::RingError`
-// and `ring_factory::BuildError` both do — so a consumer could not render a
+// error type on that Contract implementing neither trait. `ring_types::RingError`
+// and `ring_factory::BuildError` both implement them, so a consumer could not render a
 // binding refusal or fold it into a `Box< dyn Error >` alongside the other two.
 // Found by `ring_bench`, which is the first crate to hold all three at once;
 // see that crate's `docs/integration/001`.
@@ -186,7 +186,7 @@ impl core::error::Error for ConfigError {}
 /// The third field is the [`FlushOutcome`] the same call returned, not a
 /// separate count. The pre-implementation shape was `policy | cause | count`,
 /// and a count cannot tell [`FlushOutcome::Rejected`] from
-/// [`FlushOutcome::TriggeredEmpty`] — both moved nothing, and they mean
+/// [`FlushOutcome::TriggeredEmpty`]. Both moved nothing, and they mean
 /// opposite things about whether the ring had room. Carrying the outcome makes
 /// the count derivable ([`FlushEntry::count`]) and makes the requirement that
 /// log and outcome agree true by construction rather than asserted and hoped.
@@ -208,8 +208,8 @@ impl FlushEntry {
   //   moved-record count (e.g. a partial flush) would silently report 0 moved
   //   records instead of failing to compile.
   // Root cause: `_` in a `match` accepts every variant it was not told about,
-  //   current or future, with the same arm — indistinguishable at the call
-  //   site from a variant that was actually considered and is genuinely zero.
+  //   current or future, with the same arm. At the call site that arm is
+  //   indistinguishable from a variant that was considered and is genuinely zero.
   // Pitfall: a caller summing `count()` across a log to reconcile how much data
   //   moved would silently under-count the moment such a variant existed,
   //   with nothing at this call site pointing at why the total came up short.
@@ -227,15 +227,15 @@ impl FlushEntry {
 /// # Why this exists
 ///
 /// Feature 176's criterion is partly negative: each policy fires at its trigger
-/// **and at no other point**. Proving a flush happened needs no log — observe
-/// the ring. Proving no *other* flush happened requires a record of every flush
-/// that did. You cannot observe an absence; you can only enumerate the
+/// **and at no other point**. Proving a flush happened needs no log, since the
+/// ring shows it. Proving no *other* flush happened requires a record of every
+/// flush that did. You cannot observe an absence; you can only enumerate the
 /// presences and find the set complete.
 ///
 /// # Why it has no compilation boundary
 ///
 /// A log the driver always maintains would allocate on the flush path in
-/// production and grow without bound in a long-running process — so the
+/// production and grow without bound in a long-running process, so the
 /// pre-implementation instance weighed `cfg(test)` (invisible to integration
 /// tests), `cfg(debug_assertions)` (coarse), a `flush-log` cargo feature (the
 /// acceptance criterion then holds only under a non-default feature), and a
@@ -245,14 +245,14 @@ impl FlushEntry {
 /// [`Flusher::with_log`] is called, one `Option` branch on the cold path when
 /// present. The criterion holds under default features, `cargo check` passes
 /// with and without them, and a release build that never opts in allocates
-/// nothing — which is what all four options were trying to buy.
+/// nothing. That is what all four options were trying to buy.
 ///
 /// # Completeness
 ///
 /// Entries carry the [`FlushOutcome`] the drive call returned, written inside
 /// that call rather than beside it, so a flush that produced an outcome and no
 /// entry is unrepresentable and an entry that disagrees with its outcome is
-/// unrepresentable too. That is stronger than the acceptance row asks for: the
+/// unrepresentable too. That is stronger than the acceptance row asks for. The
 /// row mandates a log and asserts against it, but requires nothing of its
 /// completeness, and a flush path that bypassed logging would satisfy every
 /// assertion while proving nothing.
@@ -275,7 +275,7 @@ impl FlushLog {
 
   /// Every flush recorded so far, in the order it happened.
   ///
-  /// Ordering is `Vec` position. There is no timestamp, deliberately: reading a
+  /// Ordering is `Vec` position. There is no timestamp, deliberately. Reading a
   /// clock is forbidden anywhere near this path, and position already carries
   /// the ordering a test needs.
   #[must_use]
@@ -309,14 +309,14 @@ impl FlushLog {
 ///
 /// There is no thread, no timer, no callback registration, and no `Drop` impl.
 /// Nothing here flushes unless [`Flusher::drive`], [`Flusher::drive_at_barrier`]
-/// or [`Flusher::drain_final`] is called. That is a deliberate commitment: the
+/// or [`Flusher::drain_final`] is called. That is a deliberate commitment. The
 /// publication point is the caller's, chosen at a cadence no crate in this
 /// family owns.
 ///
 /// # The unverifiable argument
 ///
-/// [`Flusher::drive_at_barrier`] asserts a fact this crate has no way to check
-/// — that the stage barrier really was reached. This crate knows that the call
+/// [`Flusher::drive_at_barrier`] asserts that the stage barrier really was
+/// reached, and this crate has no way to check it. This crate knows that the call
 /// was made; it does not know whether a barrier was crossed, which barrier the
 /// ring's consumer is gated on, or whether the caller holds the right barrier
 /// at all. Every consequence of a wrong announcement is the caller's, and
@@ -335,34 +335,34 @@ pub struct Flusher<'a, T> {
 
 /// The `Send` bound is inherited, not local. Every `ring_core::Producer` method
 /// requires it, so a `Flusher` over a non-`Send` record type can be constructed
-/// but can do nothing — putting the bound here makes that a compile error at
+/// but can do nothing. Putting the bound here makes that a compile error at
 /// the type rather than a puzzling `E0599` at the call.
 impl<'a, T: Send> Flusher<'a, T> {
   /// Bind a policy to a buffer and the producer its records will reach.
   ///
-  /// **This is where validation happens** — a [`FlushPolicy`] value alone
+  /// **This is where validation happens.** A [`FlushPolicy`] value alone
   /// carries no guarantee it is valid for the buffer it is about to be used
   /// with, because the batch-size rule needs the buffer's capacity to check.
   ///
-  /// The `producer` argument is not in the pre-implementation surface, which
+  /// The `producer` argument is not in the pre-implementation API, which
   /// specified `Flusher::new( buffer, policy )`. A `drive( &mut self )` with no
   /// arguments cannot reach a ring it was never given, so the ring is bound
   /// here or it is passed to every drive call; binding it once is what makes
-  /// the driver surface argument-free.
+  /// the drive calls argument-free.
   ///
   /// # Errors
   ///
-  /// [`ConfigError::ZeroBatch`] when `OnBatch( 0 )` — it would fire on every
+  /// [`ConfigError::ZeroBatch`] when `OnBatch( 0 )`, because it would fire on every
   /// append, which is a fourth policy nobody chose.
   /// [`ConfigError::BatchExceedsCapacity`] when the batch size is above the
-  /// buffer's capacity — it could never fire, and the buffer would fill and
+  /// buffer's capacity, because it could never fire, and the buffer would fill and
   /// behave as `OnFull`.
   ///
   /// There is no `AlreadyBound` variant. Binding a second policy to a bound
   /// buffer is the rule "a buffer has exactly one policy", and this signature
-  /// takes the buffer **by value** — so ownership enforces it and no runtime
+  /// takes the buffer **by value**, so ownership enforces it and no runtime
   /// check is reachable. An error variant that cannot be constructed is worse
-  /// than no variant: it invites a caller to write a match arm for a case that
+  /// than no variant, because it invites a caller to write a match arm for a case that
   /// will never arrive.
   ///
   /// ```
@@ -402,7 +402,7 @@ impl<'a, T: Send> Flusher<'a, T> {
 
   /// Record every flush this driver performs.
   ///
-  /// Opt-in, and absent by default — see [`FlushLog`] for why that replaced a
+  /// Opt-in, and absent by default. [`FlushLog`] explains why that replaced a
   /// compilation boundary rather than needing one.
   pub fn with_log(mut self) -> Self {
     self.log = Some(FlushLog::new());
@@ -428,7 +428,7 @@ impl<'a, T: Send> Flusher<'a, T> {
 
   /// How many records the staging buffer can hold before it refuses.
   ///
-  /// Fixed for the driver's lifetime — the buffer is sized once and never
+  /// Fixed for the driver's lifetime. The buffer is sized once and never
   /// grows, which is what makes [`Flusher::append`] able to refuse rather than
   /// reallocate.
   ///
@@ -436,7 +436,7 @@ impl<'a, T: Send> Flusher<'a, T> {
   /// An `OnBarrier` caller has no trigger of its own between announcements, so
   /// its buffer can fill and start refusing appends
   /// (`docs/algorithm/001`'s option 2). `capacity() - staged()` is how many
-  /// more records it may stage before that happens — the one number that lets
+  /// more records it may stage before that happens. It is the one number that lets
   /// a caller drive early instead of discovering the refusal from an `Err`.
   ///
   /// Advisory in the same way `staged` is: an append on the owning thread can
@@ -461,14 +461,14 @@ impl<'a, T: Send> Flusher<'a, T> {
 
   /// Stage one record. No atomic, no lock, no allocation, and **no flush**.
   ///
-  /// Appending never publishes: that is the driven-not-self-firing commitment.
+  /// Appending never publishes. That is the driven-not-self-firing commitment.
   /// A full buffer refuses the record rather than flushing to make room, so an
   /// `OnBarrier` buffer that fills before a barrier is announced applies
   /// backpressure to the writer instead of publishing at a point nobody chose.
   ///
   /// **There is no batch counter**, and the append path is one `push` because
   /// of it. The pre-implementation algorithm called for a `usize` incremented
-  /// here for `OnBatch` — but records staged since the last flush is exactly
+  /// here for `OnBatch`. But records staged since the last flush is exactly
   /// what the buffer's own occupancy already is, on every path: this driver
   /// owns the buffer privately, only `append` adds to it, and only a flush that
   /// succeeds empties it. A rejected flush leaves both untouched together. The
@@ -476,14 +476,14 @@ impl<'a, T: Send> Flusher<'a, T> {
   /// state and an increment on the one path this crate is not allowed to make
   /// expensive.
   ///
-  /// The redundancy was found by probe, not by reading: see
+  /// A probe found the redundancy, not a reading of the code. See
   /// `tests/manual/readme.md`'s F3.
   ///
   /// # Errors
   ///
   /// [`RingError::Full`] when the buffer already holds `capacity()` records.
-  /// **The record is not returned on refusal — it is dropped.**
-  /// `TlsBuffer::push` (`ring_tls`) has no channel to hand it back: its
+  /// **The record is not returned on refusal. It is dropped.**
+  /// `TlsBuffer::push` (`ring_tls`) has no channel to hand it back, because its
   /// signature is `Result< (), RingError >` and `RingError::Full` carries
   /// nothing, so `record` drops silently inside `push` before this function
   /// returns. Retrying with the same value is therefore not possible; the fix
@@ -497,7 +497,7 @@ impl<'a, T: Send> Flusher<'a, T> {
   ///
   /// Evaluates [`FlushPolicy::OnFull`] and [`FlushPolicy::OnBatch`].
   /// [`FlushPolicy::OnBarrier`] always returns [`FlushOutcome::NotTriggered`]
-  /// here — this is the only route by which a misconfigured `OnBarrier` becomes
+  /// here. This is the only route by which a misconfigured `OnBarrier` becomes
   /// observable, and a `drive` that fired for it would be the silent
   /// degeneration the whole design guards against.
   pub fn drive(&mut self) -> FlushOutcome {
@@ -513,7 +513,7 @@ impl<'a, T: Send> Flusher<'a, T> {
   /// policies are still evaluated, so a caller that announces barriers does not
   /// have to know which policy is bound.
   ///
-  /// **This crate believes the announcement and cannot check it** — see
+  /// **This crate believes the announcement and cannot check it.** See
   /// [`Flusher`]'s own note.
   pub fn drive_at_barrier(&mut self) -> FlushOutcome {
     match self.trigger(true) {
@@ -524,9 +524,9 @@ impl<'a, T: Send> Flusher<'a, T> {
 
   /// Publish everything staged, ignoring the policy.
   ///
-  /// A named lifecycle phase — called once, at teardown, by the owner — and not
+  /// A named lifecycle phase, called once by the owner at teardown, and not
   /// a general escape hatch. An unconditional `flush_now()` available to any
-  /// caller is the exact capability this crate exists to remove: it puts the
+  /// caller is the exact capability this crate exists to remove, because it puts the
   /// publication decision back at the call site. The distinction between the
   /// two lives in naming and documentation rather than in the type system, and
   /// is therefore a convention that can erode.
@@ -541,16 +541,16 @@ impl<'a, T: Send> Flusher<'a, T> {
   /// Which cause fires, if any. Reads the policy by value; touches no atomic.
   // Fix(flush_policy_trigger_catchall_not_exhaustive): was a guard-based match
   //   ending `_ => None`, so a fourth `FlushPolicy` variant would silently
-  //   never trigger — compiling cleanly while never firing, regardless of its
+  //   never trigger. It would compile cleanly while never firing, regardless of its
   //   own condition. Restructured to match the variant exhaustively first and
   //   apply each guard inside its own arm, preserving every existing
   //   true/false outcome exactly.
   // Root cause: a match guard (`if …`) does not participate in exhaustiveness
-  //   checking, so `_` was covering two different things at once — "the named
+  //   checking, so `_` was covering two different things at once: "the named
   //   variant's condition is false" and "a variant this match was never told
-  //   about" — and a new variant silently took the same `None` as the first.
+  //   about". A new variant silently took the same `None` as the first.
   // Pitfall: `trigger` returning `None` for a real policy is indistinguishable
-  //   from that policy's condition simply not holding yet; a caller has no
+  //   from that policy's condition not holding yet; a caller has no
   //   signal that the policy was never wired up at all.
   fn trigger(&self, at_barrier: bool) -> Option<FlushCause> {
     match self.policy {
@@ -578,7 +578,7 @@ impl<'a, T: Send> Flusher<'a, T> {
     }
   }
 
-  /// Seal, claim, drain, reset, report — the cold path, run once per flush.
+  /// The cold path, run once per flush: seal, claim, drain, reset, report.
   ///
   /// The ordering obligations are structural rather than conditional. The
   /// capacity check happens **before the buffer is touched at all**, so the
@@ -591,7 +591,7 @@ impl<'a, T: Send> Flusher<'a, T> {
       return self.record(cause, FlushOutcome::TriggeredEmpty);
     }
 
-    // Step 2 — Claim. The only step that can fail, and it fails before the
+    // Step 2: Claim. The only step that can fail, and it fails before the
     // buffer is read. `free_capacity` is a snapshot, but on a ring this
     // `Flusher` is the sole producer of it can only grow between here and the
     // push: the consumer's drain frees space and nothing else consumes it.
@@ -599,15 +599,15 @@ impl<'a, T: Send> Flusher<'a, T> {
       return self.record(cause, FlushOutcome::Rejected { staged });
     }
 
-    // Steps 1, 3 and 4 — seal, drain, reset. `TlsBuffer::drain` empties the
+    // Steps 1, 3 and 4: seal, drain, reset. `TlsBuffer::drain` empties the
     // buffer as the iterator drops, so the reset is not a separate statement
     // that could be reordered above the push.
     let count = self.producer.try_push_batch(&mut self.buffer.drain());
 
     // `count < staged` is not asserted here, and the omission is deliberate.
-    // It is reachable only by violating this crate's contract — a second
+    // It is reachable only by violating this crate's contract, with a second
     // producer on the same ring taking the space between the check above and
-    // this push — and at this point the shortfall is already unrecoverable:
+    // this push. At that point the shortfall is already unrecoverable, because
     // `try_push_batch` consumes the record it fails to place. A
     // `debug_assert!` would promise a guarantee that evaporates in exactly the
     // build where the race is likely, and no runtime check can restore records

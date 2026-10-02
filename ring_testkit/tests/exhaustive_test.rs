@@ -1,11 +1,12 @@
-//! `docs/feature/188_loom_and_testkit_helpers.md` — the exhaustive half.
+//! The exhaustive half of `docs/feature/188_loom_and_testkit_helpers.md`.
 //!
-//! The other half of feature 188: "a model checker that explores interleavings
-//! exhaustively rather than sampling whichever one the scheduler produced".
+//! This is the half of feature 188 that asks for "a model checker that explores
+//! interleavings exhaustively rather than sampling whichever one the scheduler
+//! produced".
 //! `tests/testkit_test.rs` runs one script many times and gets the same answer;
 //! this file runs a deliberately tiny case against a memory model weaker than
 //! any real hardware and checks *every* interleaving of it. Neither subsumes
-//! the other — one has scale without coverage, the other coverage without
+//! the other. One has scale without coverage, the other coverage without
 //! scale.
 //!
 //! ```text
@@ -14,18 +15,19 @@
 //!
 //! **The whole file is `cfg( loom )`.** Under `--cfg loom`, `ring_atomic`
 //! swaps in loom's atomics, and those panic when touched outside a
-//! `loom::model` — so a `ring_core::Ring` cannot even be *constructed* here
+//! `loom::model`. So a `ring_core::Ring` cannot even be *constructed* here
 //! except inside the model closure. An ordinary `cargo test` compiles this file
-//! to nothing, which is why the loom bridge itself (`leak`, `leak_ends`) is
-//! also exercised by `testkit_test.rs` under the default configuration.
+//! to nothing, which is why `testkit_test.rs` also exercises the loom bridge
+//! itself (`leak`, `leak_ends`) under the default configuration.
 //!
 //! # The declared bound
 //!
 //! One producer, one consumer, a ring of **2 slots**, and **one** push. That is
-//! the bound, and it is small on purpose: loom's execution count grows with the
-//! number of atomic operations, and the family's existing models (`ring_spsc`,
-//! `ring_mpsc`) settled on the same shape for the same reason. What is being
-//! explored is the *handshake* — a claim, a publish, a read — not throughput.
+//! the bound, and it is small on purpose, because loom's execution count grows
+//! with the number of atomic operations. The family's existing models
+//! (`ring_spsc`, `ring_mpsc`) settled on the same shape for the same reason.
+//! What the model explores is the *handshake* of a claim, a publish and a read,
+//! not throughput.
 
 #![cfg(loom)]
 
@@ -38,15 +40,15 @@ use ring_testkit::{audit_received, leak_ends};
 /// The declared bound: two slots.
 const CAPACITY: usize = 2;
 
-/// What the producer writes alongside the record. Any value a zeroed cell
-/// cannot hold by accident — zero would be indistinguishable from "never
+/// What the producer writes alongside the record. It can be any value a zeroed
+/// cell cannot hold by accident. Zero would be indistinguishable from "never
 /// written".
 const WRITTEN: usize = 0xABC;
 
 /// The two ends of a fresh ring, both `'static`.
 ///
-/// Constructed inside the model closure, never outside it: the cursors are
-/// loom atomics under this cfg and panic if touched with no model running.
+/// Constructed inside the model closure, never outside it, because the cursors
+/// are loom atomics under this cfg and panic if touched with no model running.
 fn ends() -> (ring_core::Producer<'static, u32>, ring_core::Consumer<'static, u32>) {
   let config = RingConfig::new(CAPACITY).expect("a power of two");
   leak_ends(Ring::new(&config).expect("the default policy is accepted"))
@@ -55,7 +57,7 @@ fn ends() -> (ring_core::Producer<'static, u32>, ring_core::Consumer<'static, u3
 /// **The reached-test.** No interleaving delivers a record that was never
 /// published, delivers one twice, or delivers them out of order.
 ///
-/// The consumer takes one look rather than spinning: every point at which that
+/// The consumer takes one look rather than spinning. Every point at which that
 /// look could land is a separate execution loom already runs, so a retry loop
 /// would multiply executions without adding an observation.
 #[test]
@@ -90,7 +92,7 @@ fn no_interleaving_delivers_a_record_that_was_not_published() {
 ///
 /// The store below and the cursor store inside `try_push` bracket the window
 /// the model explores. A publish that does not *release* lets the drain reach
-/// its assertion with `payload` still zero — which is the failure this model
+/// its assertion with `payload` still zero. That is the failure this model
 /// exists to rule out, and the reason a sampled test cannot stand in for it.
 #[test]
 fn a_delivered_record_carries_the_write_that_preceded_it() {
@@ -129,9 +131,9 @@ fn a_delivered_record_carries_the_write_that_preceded_it() {
 /// The consumer never observes further than the producer published.
 ///
 /// Distinct from the first test, which checks the *values* delivered. This one
-/// checks the *count*: an occupancy reading above what was published means the
-/// consumer is being offered a slot the producer has not finished with, which
-/// is a different bug from delivering the wrong record and would survive the
+/// checks the *count*. An occupancy reading above what was published means the
+/// consumer is being offered a slot the producer has not finished with. That is
+/// a different bug from delivering the wrong record, and it would survive the
 /// value check on a ring whose slots happened to be zeroed.
 #[test]
 fn the_consumer_never_sees_further_than_the_producer_published() {

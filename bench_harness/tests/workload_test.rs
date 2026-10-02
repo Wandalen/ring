@@ -1,13 +1,13 @@
-//! Determinism of the seeded workload — Test Matrix rows T01–T03, T10, T13, T14.
+//! Determinism of the seeded workload, covering Test Matrix rows T01–T03, T10, T13, T14.
 //!
-//! The three rows are deliberately not independent. T01 alone is satisfied by a
-//! generator that returns a constant, and T03 exists to refute exactly that
-//! reading: it asserts two seeds disagree, so T01's agreement is evidence of
+//! The three rows are deliberately not independent. A generator that returns a
+//! constant satisfies T01 alone, and T03 exists to refute exactly that reading.
+//! It asserts two seeds disagree, so T01's agreement is evidence of
 //! reproducibility rather than of a stuck generator. T02 then separates
-//! "reproducible at one producer count" from "reproducible across them", which
-//! is the property the harness actually needs — a candidate is benched at
-//! several producer counts and the comparison is only meaningful if it saw the
-//! same items each time.
+//! "reproducible at one producer count" from "reproducible across them". This
+//! crate needs the second, because a candidate is benched at several producer
+//! counts and the comparison is only meaningful if it saw the same items each
+//! time.
 
 use bench_harness::{Item, PayloadArchetype, Workload};
 
@@ -16,7 +16,7 @@ use bench_harness::{Item, PayloadArchetype, Workload};
 const ARCHETYPES: [PayloadArchetype; 2] = [PayloadArchetype::Uniform, PayloadArchetype::Mixed];
 
 /// The family's mixing constant, restated here deliberately rather than read
-/// from the crate — a test that imported it could not notice the crate
+/// from the crate. A test that imported it could not notice the crate
 /// changing it.
 const MIXING_CONSTANT: u64 = 0x9E37_79B9_7F4A_7C15;
 
@@ -25,7 +25,7 @@ fn indices(items: &[Item]) -> Vec<u64> {
   items.iter().map(|item| item.index).collect()
 }
 
-/// T01 — the same seed produces a byte-identical sequence on two separate runs.
+/// T01: the same seed produces a byte-identical sequence on two separate runs.
 ///
 /// Constructed twice rather than cloned, so the assertion covers the generator
 /// rather than the copy.
@@ -40,13 +40,13 @@ fn the_same_seed_produces_the_same_sequence_on_two_separate_runs() {
   }
 }
 
-/// T02 — one producer and eight produce the same multiset of items.
+/// T02: one producer and eight produce the same multiset of items.
 ///
-/// Asserts the stronger of the two available readings: not merely that the two
-/// producer counts agree with each other, but that each partitions the full
-/// sequence exactly — every item owned by exactly one producer, nothing
-/// duplicated and nothing dropped. A generator that lost the same item at both
-/// counts would satisfy the weaker reading and fail this one.
+/// Asserts the stronger of the two available readings. The weaker one is that
+/// the two producer counts agree with each other. The stronger one is that each
+/// partitions the full sequence exactly, with every item owned by exactly one
+/// producer, nothing duplicated and nothing dropped. A generator that lost the
+/// same item at both counts would satisfy the weaker reading and fail this one.
 #[test]
 fn every_producer_count_partitions_the_same_multiset() {
   let expected = Workload::new(0xFEED, 1, 256, 64, PayloadArchetype::Uniform).items();
@@ -63,9 +63,9 @@ fn every_producer_count_partitions_the_same_multiset() {
     );
   }
 
-  // The partition is genuinely a division of labour, not every producer
-  // receiving everything — which would also satisfy the reconstruction above
-  // once duplicates were sorted away, had the comparison been on a set.
+  // The partition is a division of labour, not every producer receiving
+  // everything. That would also satisfy the reconstruction above once
+  // duplicates were sorted away, had the comparison been on a set.
   let dealt = Workload::new(0xFEED, 8, 256, 8, PayloadArchetype::Uniform);
   for producer in 0..8 {
     assert_eq!(
@@ -79,11 +79,11 @@ fn every_producer_count_partitions_the_same_multiset() {
     "a producer beyond the declared count owned items"
   );
 
-  // **Fewer batches than producers leaves producers idle**, and that is
-  // asserted rather than smoothed over. 256 items in batches of 64 is four
-  // batches; dealt round-robin to eight producers, the last four get nothing
-  // and the config is measuring a four-producer workload whatever it says.
-  // A harness that hid this would report an eight-producer number for a
+  // **Fewer batches than producers leaves producers idle**, and this test
+  // asserts that rather than smoothing it over. 256 items in batches of 64 is
+  // four batches. Dealt round-robin to eight producers, the last four get
+  // nothing and the config is measuring a four-producer workload whatever it
+  // says. Hiding this would report an eight-producer number for a
   // four-producer run.
   let starved = Workload::new(0xFEED, 8, 256, 64, PayloadArchetype::Uniform);
   assert_eq!(
@@ -101,9 +101,9 @@ fn every_producer_count_partitions_the_same_multiset() {
   );
 }
 
-/// T03 — two different seeds produce different sequences.
+/// T03: two different seeds produce different sequences.
 ///
-/// This is the anti-faking check for T01: without it, a generator returning a
+/// This is the anti-faking check for T01. Without it, a generator returning a
 /// constant would pass every determinism assertion in this file.
 #[test]
 fn two_different_seeds_produce_different_sequences() {
@@ -124,7 +124,7 @@ fn two_different_seeds_produce_different_sequences() {
   }
 }
 
-/// T10 — a workload reports the configuration it is actually running, not the
+/// T10: a workload reports the configuration it is actually running, not the
 /// one it was asked for.
 ///
 /// The accessors exist so a result can be labelled with what produced it, and
@@ -151,13 +151,13 @@ fn a_workload_reports_its_effective_configuration() {
   );
   assert_eq!(clamped.batch_size(), 1, "a zero batch size was reported back unclamped");
 
-  // The clamp is load-bearing rather than cosmetic: both clamped fields are
-  // divisors in `owner_of`, so a config that kept the zero would divide by it
-  // rather than deal anything. Dealing the full sequence is the evidence.
+  // The clamp is required, not cosmetic. Both clamped fields are divisors in
+  // `owner_of`, so a config that kept the zero would divide by it rather than
+  // deal anything. Dealing the full sequence is the evidence.
   assert_eq!(clamped.items_for(0).len(), 8, "the clamped config did not deal every item");
 }
 
-/// T13 — the seed can be recovered by unmixing any item.
+/// T13: the seed can be recovered by unmixing any item.
 ///
 /// Added after the 2026-08-29 mutation survey found T01–T03 all survive
 /// replacing `^` with `|` or `&`. Those three assert the sequence is
@@ -166,9 +166,9 @@ fn a_workload_reports_its_effective_configuration() {
 /// every recorded benchmark comparison could have been changed silently, and
 /// past runs would have become incomparable with no test failing.
 ///
-/// Asserted as XOR's own algebraic property — unmixing returns the seed —
-/// rather than against captured output bytes, which would only restate
-/// whatever the code happens to do today.
+/// Asserted as XOR's own algebraic property, that unmixing returns the seed,
+/// rather than against captured output bytes. Captured bytes would only
+/// restate whatever the code happens to do today.
 #[test]
 fn the_seed_is_recoverable_from_any_item() {
   let seed = 0x0123_4567_89AB_CDEF_u64;
@@ -185,16 +185,16 @@ fn the_seed_is_recoverable_from_any_item() {
   }
 }
 
-/// T14 — `Mixed` carries `1 + index % 8` significant bytes and zero padding
+/// T14: `Mixed` carries `1 + index % 8` significant bytes and zero padding
 /// beyond them.
 ///
 /// Added after the same survey found `1 + ( index % 8 )` could become
-/// `1 * ( index % 8 )` with every test still green: T01–T03 compare `Mixed`
+/// `1 * ( index % 8 )` with every test still green. T01–T03 compare `Mixed`
 /// sequences only against other `Mixed` sequences, so a width schedule that
 /// changed consistently was invisible to all of them.
 ///
 /// Pinned against the `Uniform` payload for the same index rather than against
-/// captured bytes — the significant prefix must agree with the full record,
+/// captured bytes. The significant prefix must agree with the full record,
 /// and everything past the width must be padding.
 #[test]
 fn the_mixed_archetype_pads_beyond_its_significant_width() {

@@ -5,8 +5,8 @@ use crate::accumulator::{Accumulator, Write};
 /// What the oracle found when it compared two tables.
 ///
 /// The diverging case carries the offset rather than a bare `false`, because
-/// *where* two write paths stop agreeing is the reading that identifies which
-/// one is wrong. A boolean would make every candidate fail the same way.
+/// *where* two write paths stop agreeing identifies which one is wrong. A
+/// boolean would make every candidate fail the same way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Parity {
   /// Every byte agrees, and both tables are the same length.
@@ -14,7 +14,7 @@ pub enum Parity {
   /// The tables first disagree at this byte offset.
   ///
   /// When one table is a prefix of the other, the offset is the length of the
-  /// shorter one — the first position at which only one table has a byte.
+  /// shorter one, which is the first position at which only one table has a byte.
   Diverges {
     /// Byte offset of the first disagreement.
     offset: usize,
@@ -32,16 +32,16 @@ impl Parity {
   /// ```
   // Fix(parity_is_identical_classification_not_exhaustive): was `matches!( self,
   //   Self::Identical )`, so a third `Parity` variant would silently read
-  //   `false` — "not identical" — with nothing in this function forcing a
-  //   second look. `offset` just below already carries the exhaustive shape.
+  //   `false`, meaning "not identical", with nothing in this function forcing
+  //   a second look. `offset` just below already has the exhaustive shape.
   // Root cause: `matches!` over a single named variant is exhaustive over
-  //   nothing; it answers every variant it was not told about with the same
-  //   default, compiling cleanly however many variants `Parity` gains. Same
+  //   nothing. It answers every variant it was not told about with the same
+  //   default, and compiles cleanly however many variants `Parity` gains. Same
   //   shape as `DispatchStrategy`'s coordination predicates and
   //   this crate's own `Accumulator::is_order_independent` fix just above.
   // Pitfall: a caller gating "did the tables agree?" on this predicate would
-  //   treat a new kind of disagreement as agreement — silently wrong in the
-  //   direction that hides a real divergence from the oracle's own caller.
+  //   treat a new kind of disagreement as agreement. The error is silent, and
+  //   it hides a real divergence from the oracle's own caller.
   #[must_use]
   pub const fn is_identical(self) -> bool {
     match self {
@@ -70,10 +70,10 @@ impl Parity {
 /// The byte-parity oracle, bound to the semantics it compares under.
 ///
 /// Workstream 008's smoke test is *"all patterns produce byte-identical final
-/// tables"*, and that claim is only meaningful once the fold rule is named:
-/// two write paths that disagree under [`Accumulator::Set`] may agree under
+/// tables"*, and that claim is only meaningful once the fold rule is named.
+/// Two write paths that disagree under [`Accumulator::Set`] may agree under
 /// [`Accumulator::Delta`], and vice versa. So the semantics is a constructor
-/// argument rather than a per-call one — an oracle never compares in the
+/// argument, not a per-call one, and an oracle never compares in the
 /// abstract.
 ///
 /// ```
@@ -109,9 +109,9 @@ impl ByteParity {
 
   /// Compare two completed tables byte for byte.
   ///
-  /// Two empty tables are [`Parity::Identical`] rather than an error: nothing
-  /// written to nothing is a legitimate outcome, and a harness that treats it
-  /// as a failure cannot grade the zero-item workload.
+  /// Two empty tables are [`Parity::Identical`] rather than an error. Nothing
+  /// written to nothing is a legitimate outcome, and a grader that treats it as
+  /// a failure cannot grade the zero-item workload.
   ///
   /// ```
   /// use bench_harness::{ Accumulator, ByteParity, Parity };
@@ -139,9 +139,9 @@ impl ByteParity {
 
   /// Fold two write sequences under this oracle's semantics, then compare.
   ///
-  /// This is the call that makes the semantics load-bearing. The same two
-  /// sequences — one a reordering of the other — agree under
-  /// [`Accumulator::Delta`] and generally disagree under [`Accumulator::Set`].
+  /// This is the call where the semantics changes the result. Two sequences,
+  /// one a reordering of the other, agree under [`Accumulator::Delta`] and
+  /// generally disagree under [`Accumulator::Set`].
   ///
   /// ```
   /// use bench_harness::{ Accumulator, ByteParity, Write };

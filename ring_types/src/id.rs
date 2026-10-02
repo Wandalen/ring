@@ -2,15 +2,15 @@
 //! publications for the lifetime of a ring, and the slot index derived from it.
 //!
 //! They are separate types on purpose. `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
-//! makes the point: keeping the sequence apart from the slot is what lets a
+//! makes the point. Keeping the sequence apart from the slot is what lets a
 //! gate compare two positions that are a full lap apart, which is impossible
 //! once both have been folded into `0..capacity`.
 
 /// A publication's ordinal in a ring's whole history, counting from zero.
 ///
-/// Monotonic and, for every reachable workload, non-wrapping: at 10⁹
+/// Monotonic and, for every reachable workload, non-wrapping. At 10⁹
 /// publications per second a `u64` runs for roughly 584 years. The family
-/// depends on that — `Seq` comparison is plain `<`, with no lap-aware
+/// depends on that. `Seq` comparison is plain `<`, with no lap-aware
 /// wrap-around logic anywhere, because the wrap point is unreachable.
 ///
 /// What *does* wrap is the [`SlotIndex`] derived from it, which is a different
@@ -31,9 +31,9 @@ impl Seq {
   /// The next sequence after this one.
   ///
   /// Panics on overflow in a debug build and wraps to zero in a release
-  /// build — the standard `u64` addition behaviour. A wrapped `Seq` would
+  /// build, the standard `u64` addition behaviour. A wrapped `Seq` would
   /// silently invert every gate comparison in the family, which is why the
-  /// non-wrapping argument has to hold: at 10⁹ publications per second a
+  /// non-wrapping argument has to hold. At 10⁹ publications per second a
   /// `u64` runs for roughly 584 years, well past any reachable workload.
   ///
   /// ```
@@ -47,9 +47,9 @@ impl Seq {
 
   /// This sequence advanced by `n`.
   ///
-  /// Overflow behaves exactly as [`Seq::next`] documents — debug panics,
+  /// Overflow behaves as [`Seq::next`] documents: debug panics,
   /// release wraps to zero. The reachability argument does not carry over
-  /// unchanged: `next` needs 2⁶⁴ increments to reach the wrap, while this
+  /// unchanged. `next` needs 2⁶⁴ increments to reach the wrap, while this
   /// takes `n` from the caller and reaches it in a single call from any
   /// position. A caller deriving `n` from a batch length or a configured
   /// count owns that bound; nothing here checks it.
@@ -65,10 +65,10 @@ impl Seq {
   }
 
   /// How many publications separate this sequence from a later one, or `0`
-  /// when `later` is not actually later.
+  /// when `later` is not after it.
   ///
-  /// Saturating rather than signed: the caller that needs the direction has
-  /// already compared the two, and every caller that does not wants a count.
+  /// Saturating rather than signed, because the caller that needs the direction
+  /// has already compared the two, and every caller that does not wants a count.
   ///
   /// ```
   /// use ring_types::Seq;

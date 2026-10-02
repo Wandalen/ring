@@ -7,9 +7,9 @@ cost it imposes and the condition under which it can be deleted.
 |------|-----------------|
 
 No workarounds recorded. The gates shell out to `cargo` and `cargo tarpaulin`
-rather than linking them, which is a deliberate design choice rather than an
-absorbed constraint: the machinery must run against a workspace that does not
-yet compile, so it cannot depend on the workspace building.
+rather than linking them. That is a deliberate design choice, not an absorbed
+constraint. The machinery must run against a workspace that does not yet
+compile, so it cannot depend on the workspace building.
 
 ### Regenerate
 

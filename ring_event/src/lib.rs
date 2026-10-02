@@ -1,21 +1,22 @@
 //! Slot translators that fill a claimed slot.
 //!
-//! Tier 2 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 2 of the 33 crates of the ring family, which implements the concurrency
+//! write-path.
 //! Depends on `ring_types` and `ring_slot`.
 //!
 //! `docs/feature/182_typed_slot_and_bytes_slot.md` asks for something stronger
 //! than two slot shapes that both work: "`TypedSlot<T>` and `BytesSlot` both
 //! round-trip through the **identical** claim/publish/drain path." Two shapes
 //! each with their own write call satisfies the first reading and not the
-//! second — the paths would merely resemble one another, and a divergence
-//! between them would be a change nobody's test would notice.
+//! second. With two write calls the paths would only resemble one another, and
+//! a divergence between them would be a change nobody's test would notice.
 //!
-//! This crate is what makes the path literally one path. [`Fill`] is the write
-//! half — a payload knows how to enter a slot — and [`Peek`] is the read half,
-//! a slot knows what a reader gets back. [`publish_into`] and [`drain_from`]
-//! are then written once, generically, so a ring's publish and drain *could*
-//! call those through a single body regardless of slot shape. **`ring_core`,
-//! the crate that assembles a ring, calls neither today** — it reaches
+//! This crate makes the two shapes share one path. [`Fill`] is the write half,
+//! where a payload knows how to enter a slot. [`Peek`] is the read half, where a
+//! slot knows what a reader gets back. [`publish_into`] and [`drain_from`] are
+//! then written once, generically, so a ring's publish and drain *could* call
+//! those through a single body regardless of slot shape. **`ring_core`, the
+//! crate that assembles a ring, calls neither today.** It reaches
 //! `TypedSlot::set`/`TypedSlot::take` directly, so this crate's one path is
 //! declared but not yet the one production rings execute. Neither function
 //! can tell the two slot shapes apart, which is exactly the property feature
@@ -23,7 +24,7 @@
 //!
 //! ## Why the read half is a GAT
 //!
-//! The two shapes genuinely return different things: a `TypedSlot<T>` hands
+//! The two shapes return different things: a `TypedSlot<T>` hands
 //! back a `&T`, a `BytesSlot<N>` a `&[u8]` whose length is the payload's, not
 //! the slot's. Flattening both into one concrete return type would mean
 //! copying, and a `&[u8]` copied out of a slot is the allocation the whole
@@ -38,8 +39,8 @@ use ring_types::RingError;
 /// A payload that knows how to enter a slot of shape `S`.
 ///
 /// Implemented on the *payload*, not the slot, so adding a payload kind never
-/// touches the slot types — and so `publish_into` needs no match, no downcast
-/// and no enum of shapes.
+/// touches the slot types, and `publish_into` needs no match, no downcast and
+/// no enum of shapes.
 ///
 /// ```
 /// use ring_event::Fill;
@@ -54,17 +55,17 @@ pub trait Fill<S> {
   ///
   /// # Errors
   ///
-  /// Whatever the slot shape refuses — [`RingError::BatchTooLarge`] for a byte
-  /// payload longer than the slot, which is a configuration error rather than
-  /// back-pressure: no amount of draining makes the payload fit. A typed
+  /// Whatever the slot shape refuses. For a byte payload longer than the slot
+  /// that is [`RingError::BatchTooLarge`], a configuration error rather than
+  /// back-pressure, since no amount of draining makes the payload fit. A typed
   /// payload cannot fail, and says so by never returning `Err`.
   fn fill(self, slot: &mut S) -> Result<(), RingError>;
 }
 
 impl<T> Fill<TypedSlot<T>> for T {
   fn fill(self, slot: &mut TypedSlot<T>) -> Result<(), RingError> {
-    // Discarding the displaced value is `fill`'s documented contract — "write
-    // `self` into `slot`, replacing whatever it held" — not an oversight. A
+    // Discarding the displaced value is not an oversight. `fill`'s documented
+    // contract is "write `self` into `slot`, replacing whatever it held". A
     // caller that needs the old record calls `TypedSlot::set` directly and
     // binds it; this trait exists to give both slot shapes one signature, and
     // `BytesSlot` has nothing to hand back.
@@ -82,8 +83,8 @@ impl<const N: usize> Fill<BytesSlot<N>> for &[u8] {
 /// A slot that knows what a reader gets back from it.
 ///
 /// The read half of the shared path. `Out` is a lifetime-parameterised
-/// associated type because the two shapes return borrows of different things —
-/// see the module documentation for why neither is flattened into the other.
+/// associated type because the two shapes return borrows of different things.
+/// The module documentation explains why neither is flattened into the other.
 ///
 /// ```
 /// use ring_event::Peek;
@@ -102,17 +103,17 @@ pub trait Peek {
 
   /// The slot's contents, or `None` when nothing was published into it.
   ///
-  /// `None` is not an error: a claimed-but-unpublished slot is the state
+  /// `None` is not an error. A claimed-but-unpublished slot is the state
   /// feature 170's handshake is built to keep a consumer out of, and this is
   /// how a drain observes it.
   ///
   /// # A `BytesSlot` cannot distinguish empty from zero-length
   ///
   /// A [`BytesSlot`] records a length and nothing more, so a deliberately
-  /// published zero-byte payload reads back as `None` — identical to a slot
+  /// published zero-byte payload reads back as `None`, identical to a slot
   /// nobody has touched. This is a real limitation, not an oversight, and it is
-  /// not worth a flag byte per slot to remove: the ring already carries the
-  /// distinction, in the published-sequence handshake, and a caller that needs
+  /// not worth a flag byte per slot to remove. The ring already carries the
+  /// distinction in the published-sequence handshake, and a caller that needs
   /// "somebody published nothing" must read it there rather than from the slot.
   /// A [`TypedSlot<()>`](TypedSlot) does not share the limitation, and is the
   /// cheaper way to send a payload-free signal.
@@ -138,14 +139,14 @@ impl<const N: usize> Peek for BytesSlot<N> {
   }
 }
 
-/// Publish `payload` into `slot` — the one write path both shapes take.
+/// Publish `payload` into `slot` through the one write path both shapes take.
 ///
-/// Deliberately trivial. Its value is not what it does but that there is only
-/// one of it: a ring's publish *path* passes through here — the step where a
-/// claimed slot receives its payload — so no slot shape can acquire a publish
-/// path of its own without the signature changing. Not `ring_publish`'s
-/// `Publisher::publish`, which moves a cursor over sequence numbers and never
-/// touches a slot; that is the other half of the same operation, one level up.
+/// Deliberately trivial. What matters is that there is only one of it. A ring's
+/// publish *path* passes through here, at the step where a claimed slot receives
+/// its payload, so no slot shape can acquire a publish path of its own without
+/// the signature changing. This is not `ring_publish`'s `Publisher::publish`,
+/// which moves a cursor over sequence numbers and never touches a slot; that is
+/// the other half of the same operation, one level up.
 ///
 /// # Errors
 ///
@@ -171,17 +172,17 @@ where
   payload.fill(slot)
 }
 
-/// Read `slot` — the one read path both shapes take.
+/// Read `slot` through the one read path both shapes take.
 ///
 /// **This does not empty the slot, and the name is the trap.** It takes `&S`
 /// and hands back a borrow, so after it returns the slot still reports
 /// non-empty and still holds the payload. Freeing the slot for the next lap is
-/// a separate, mandatory third call to [`recycle`] — omitting it is neither a
+/// a separate, mandatory third call to [`recycle`]. Omitting it is neither a
 /// compile error nor a runtime error, and produces a drained ring every slot
-/// of which reads occupied. The borrow is the point rather than an oversight:
-/// `BytesSlot` cannot hand back an owned payload without copying it, so the
-/// one signature that fits both shapes is the borrowing one, and consuming the
-/// slot is factored out to the caller that knows when the read is finished.
+/// of which reads occupied. The borrow is deliberate. `BytesSlot` cannot hand
+/// back an owned payload without copying it, so the one signature that fits
+/// both shapes is the borrowing one. Consuming the slot is left to the caller,
+/// which knows when the read is finished.
 ///
 /// ```
 /// use ring_event::{ drain_from, publish_into, recycle };
@@ -208,7 +209,7 @@ where
 /// Empty `slot` through the shared path.
 ///
 /// The third of the three operations a ring performs on a slot, here for the
-/// same reason as the other two: a shape-specific reset would be a fourth path
+/// same reason as the other two. A shape-specific reset would be a fourth path
 /// the identical-path claim does not cover.
 ///
 /// ```

@@ -1,17 +1,17 @@
 //! Ring construction parameters.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
 //! `docs/feature/180_ring_config_and_factory.md` asks for everything that varies
 //! between rings collected into one value, so that a ring's shape is *data*
-//! rather than a choice of constructor. That matters twice over: it keeps the
-//! set of legal configurations enumerable instead of "whatever someone wrote a
-//! constructor for", and it means the manifest language that eventually
+//! rather than a choice of constructor. That matters for two reasons. It keeps
+//! the set of legal configurations enumerable instead of "whatever someone wrote
+//! a constructor for". It also means the manifest language that eventually
 //! describes channels describes exactly this record with no translation layer.
 //!
 //! This crate holds the record and its validation. `ring_factory` turns one
-//! into a ring — the other half of feature 180, kept separate because a
+//! into a ring. That is the other half of feature 180, kept separate because a
 //! configuration must be constructible and inspectable at tier 1, long before
 //! anything at tier 11 exists to consume it.
 
@@ -52,7 +52,7 @@ impl RingConfig {
   ///
   /// # Errors
   ///
-  /// Whatever [`Capacity::new`] rejects — a zero or non-power-of-two capacity.
+  /// Whatever [`Capacity::new`] rejects: a zero or non-power-of-two capacity.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -99,9 +99,9 @@ impl RingConfig {
 
   /// Set the expected producer count.
   ///
-  /// A count of `0` is clamped to `1`: a ring nothing can publish into has no
-  /// use, and clamping keeps the setter infallible so a builder chain does not
-  /// need a `?` in its middle.
+  /// The setter clamps a count of `0` to `1`. A ring nothing can publish into
+  /// has no use, and clamping keeps the setter infallible, so a builder chain
+  /// does not need a `?` in its middle.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -114,9 +114,11 @@ impl RingConfig {
     self
   }
 
-  /// Set the batch size, clamped to at least `1` and at most the capacity —
-  /// a batch larger than the ring can never be served however much draining
-  /// happens, so it is corrected here rather than failing at first publish.
+  /// Set the batch size, clamped to at least `1` and at most the capacity.
+  ///
+  /// A batch larger than the ring can never be served however much draining
+  /// happens, so the setter corrects it here rather than failing at first
+  /// publish.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -195,7 +197,7 @@ impl RingConfig {
 
   /// Whether this configuration needs the contended multi-producer claim.
   ///
-  /// A derived reading, and the one a factory branches on: a single-producer
+  /// A derived reading, and the one a factory branches on. A single-producer
   /// ring must not pay for a synchronisation it does not need, per
   /// `docs/feature/172_multi_producer_claim.md`.
   ///
@@ -209,8 +211,9 @@ impl RingConfig {
     self.producers > 1
   }
 
-  /// Whether this configuration is safe to use from inside a tick — true only
-  /// when waiting cannot park, per
+  /// Whether this configuration is safe to use from inside a tick.
+  ///
+  /// True only when waiting cannot park, per
   /// `docs/feature/183_try_only_operations_on_the_tick_path.md`.
   ///
   /// ```

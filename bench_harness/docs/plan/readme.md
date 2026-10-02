@@ -1,9 +1,9 @@
 # plan
 
-Staged validation plans whose stages are graded by this crate's gates. A plan
-belongs here rather than in the corpus' own `docs/plan/` when its stage table is
-read by `gate/` scripts on every run — the declaration and the thing that reads
-it stay in one place.
+Staged validation plans whose stages this crate's gates grade. A plan belongs
+here rather than in the corpus' own `docs/plan/` when `gate/` scripts read its
+stage table on every run. That keeps the declaration and the thing that reads it
+in one place.
 
 | File | Responsibility |
 |------|-----------------|

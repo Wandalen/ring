@@ -1,21 +1,21 @@
 //! Must not compile: there is no second producer.
 //!
 //! V3 of `docs/invariant/001_capability_follows_the_handle.md`, and **not part
-//! of feature 179's stated acceptance criterion** — the acceptance table names
+//! of feature 179's stated acceptance criterion**. The acceptance table names
 //! two cases and this is a third. It is here because V3 is the violation with
-//! the worst consequence: two producers against an SPSC ring is a data race,
+//! the worst consequence. Two producers against an SPSC ring is a data race,
 //! and `ring_spsc`'s correctness argument assumes it cannot happen.
 //!
 //! # The receiver must stay owned
 //!
 //! `producer` is bound by value on purpose. Rust's method resolution tries the
-//! receiver type, then `&` and `&mut` of it — so with an owned `Producer` there
+//! receiver type, then `&` and `&mut` of it, so with an owned `Producer` there
 //! is no `clone` to find. Bind a `&Producer` instead and `.clone()` resolves to
 //! `<&Producer as Clone>::clone`, which copies the *reference* and compiles.
 //!
-//! That rewrite does not silently weaken the case: it makes the file compile,
+//! That rewrite does not silently weaken the case. It makes the file compile,
 //! and a `compile_fail` case that compiles is a test failure, not a pass. The
-//! failure this case cannot see is a different one — failing for the wrong
+//! failure this case cannot see is a different one: failing for the wrong
 //! reason, which is what the pinned `.stderr` is for.
 
 use ring_config::RingConfig;

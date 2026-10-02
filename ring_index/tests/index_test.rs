@@ -1,4 +1,4 @@
-//! Tests for `ring_index` — the sequence-to-slot fold.
+//! Tests for `ring_index`, the sequence-to-slot fold.
 //!
 //! Claims the folding half of
 //! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`. Its
@@ -37,7 +37,7 @@ fn mask_equals_modulo_over_four_laps_of_every_capacity() {
 
 /// The derivation is a mask, not a division. Asserted structurally: the result
 /// equals the masked value for every capacity, which only holds when the
-/// capacity is a power of two — so a division-based implementation that
+/// capacity is a power of two. So a division-based implementation that
 /// happened to agree on modulo would still have to satisfy this.
 #[test]
 fn derivation_is_a_mask() {
@@ -63,7 +63,7 @@ fn non_power_of_two_capacity_is_rejected_upstream() {
   }
 }
 
-/// Capacity 1 is legal and degenerate: every sequence maps to slot 0.
+/// Capacity 1 is legal and degenerate, because every sequence maps to slot 0.
 #[test]
 fn capacity_one_maps_everything_to_slot_zero() {
   let c = cap(1);
@@ -72,8 +72,8 @@ fn capacity_one_maps_everything_to_slot_zero() {
   }
 }
 
-/// Two sequences alias exactly when they are a whole number of laps apart —
-/// the property the gating machinery exists to keep unobservable.
+/// Two sequences alias exactly when they are a whole number of laps apart.
+/// The gating machinery exists to keep this property unobservable.
 #[test]
 fn aliasing_is_exactly_whole_laps() {
   let c = cap(4);
@@ -129,7 +129,7 @@ fn an_empty_run_is_empty() {
 }
 
 /// A run longer than the capacity repeats slots, which is the caller's problem
-/// to prevent by gating — this crate reports the truth rather than clamping.
+/// to prevent by gating. This crate reports the truth rather than clamping.
 #[test]
 fn an_oversized_run_repeats_slots() {
   let produced = run(Seq(0), 6, cap(4));
@@ -138,7 +138,7 @@ fn an_oversized_run_repeats_slots() {
   assert_eq!(produced[1], produced[5]);
 }
 
-/// IX18: `Seq( u64::MAX )` is not a hypothetical input — `ring_mpsc::UNSTAMPED`
+/// IX18: `Seq( u64::MAX )` is not a hypothetical input. `ring_mpsc::UNSTAMPED`
 /// reserves exactly that value and a caller can hand it to `run` directly.
 /// `run` adds before it folds, so this is reachable in one step rather than
 /// after `2^64` publications. Pins the debug-build behaviour `run`'s own
@@ -150,7 +150,7 @@ fn run_overflows_at_the_top_of_the_sequence_space() {
   let _ = run(Seq(u64::MAX), 2, cap(1024));
 }
 
-/// One below the boundary the previous test pins: `run`'s last internal step
+/// One below the boundary the previous test pins. `run`'s last internal step
 /// is `start.0 + ( count - 1 )`, not `start.0 + count`, so a `start` that
 /// would overflow under the coarser sum must still succeed here. Pins the
 /// `# Panics` section's precise addend against the off-by-one a less careful

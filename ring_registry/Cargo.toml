@@ -10,7 +10,7 @@ publish = true
 
 # Initial design message 960 assigned three edges: ring_handle, ring_core,
 # ring_types. The implementation needs one. A registry stores `Split< T >` and
-# never looks inside it — `T` is opaque here, so `ring_types`' vocabulary never
+# never looks inside it. `T` is opaque here, so `ring_types`' vocabulary never
 # appears, and `ring_core::Ring` is only ever seen wrapped. Both moved to
 # dev-dependencies (where building a ring to register is exactly what a test
 # does) rather than kept as unused declarations; `ring_types` is dropped

@@ -1,18 +1,18 @@
-//! `ring_claim` — exclusive sequence-range grants.
+//! Tests for `ring_claim`'s exclusive sequence-range grants.
 //!
 //! Two features rest on this crate.
 //! `docs/feature/170_claim_publish_available_commit_handshake.md`'s claim half
 //! is here; its full reached-test lives in `ring_publish/tests/handshake_test.rs`,
 //! because the handshake is only observable once publishing exists.
-//! `docs/feature/172_multi_producer_claim.md`'s exclusivity requirement — no two
-//! producers ever granted the same sequence — is asserted here directly, and
-//! again end-to-end in `ring_mpsc/tests/mpsc_test.rs` at S5.
+//! `docs/feature/172_multi_producer_claim.md` requires that no two producers
+//! are ever granted the same sequence. This file asserts that directly, and
+//! `ring_mpsc/tests/mpsc_test.rs` asserts it again end-to-end at S5.
 //!
 //! ## What a sequential test cannot show
 //!
 //! Exclusivity is a property of concurrent claims, and a single-threaded suite
-//! passes it trivially. The five multi-threaded tests below are therefore the
-//! ones carrying the crate: `no_two_producers_are_ever_granted_the_same_sequence`
+//! passes it trivially. The five multi-threaded tests below therefore do the
+//! real work: `no_two_producers_are_ever_granted_the_same_sequence`
 //! collects every granted range from four threads and asserts the union is a
 //! partition; `no_grant_ever_passes_the_limit_under_contention` drives claims
 //! against a gate tight enough that a check-then-advance implementation
@@ -27,13 +27,13 @@
 //!
 //! Concurrency tests are probabilistic. Each is sized to fail reliably rather
 //! than occasionally against the implementation it targets, and none of them
-//! proves absence of a race — that is `loom`'s job in
+//! proves absence of a race. That is `loom`'s job in
 //! `ring_publish/tests/handshake_test.rs`.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -92,9 +92,9 @@ fn sequences_yields_exactly_the_range() {
 
 #[test]
 fn adjacent_claims_do_not_overlap() {
-  // The boundary case exclusivity actually turns on: two producers handed
-  // consecutive ranges must not be reported as colliding, or the property test
-  // that guards feature 172 would fail on correct behaviour.
+  // The boundary case exclusivity turns on. Two producers handed consecutive
+  // ranges must not be reported as colliding, or the property test that
+  // guards feature 172 would fail on correct behaviour.
   let first = Claim::new(Seq(0), 4);
   let second = Claim::new(Seq(4), 4);
 
@@ -231,8 +231,8 @@ fn claim_up_to_takes_what_is_there() {
 
 #[test]
 fn claim_up_to_never_reports_batch_too_large() {
-  // The one behavioural difference from `claim`: an over-wide `max` is a cap,
-  // not an error, because the caller asked for "up to".
+  // The one behavioural difference from `claim` is that an over-wide `max` is
+  // a cap, not an error, because the caller asked for "up to".
   let consumers = GatingSet::new(cap(4), 1);
   let claimer = Claimer::new(&consumers);
 
@@ -245,7 +245,7 @@ fn claim_up_to_never_reports_batch_too_large() {
 fn claim_up_to_of_zero_is_full_not_an_empty_claim() {
   // A caller asking for at most zero slots gets `Full` rather than a
   // zero-length success, because `claim_up_to`'s contract is "as many as are
-  // available, down to one" — there is no partial success at zero to report.
+  // available, down to one". There is no partial success at zero to report.
   let consumers = GatingSet::new(cap(4), 1);
   assert_eq!(Claimer::new(&consumers).claim_up_to(0), Err(RingError::Full));
 }
@@ -285,9 +285,9 @@ fn the_producer_cursor_is_readable_and_starts_at_zero() {
 
 #[test]
 fn the_producer_cursor_occupies_its_own_cache_line() {
-  // A `Claimer` is written by every producer and read by the gating side. Its
-  // cursor sharing a line with anything else would put the crate's hottest
-  // contention point in the same line as something read on a different path.
+  // Every producer writes a `Claimer`, and the gating side reads it. If its
+  // cursor shared a line with anything else, the crate's hottest contention
+  // point would sit in the same line as something read on a different path.
   assert_eq!(core::mem::size_of::<ring_cursor::PaddedCursor>(), 64);
 }
 
@@ -299,7 +299,7 @@ fn no_two_producers_are_ever_granted_the_same_sequence() {
   const PER_PRODUCER: usize = 2_000;
   const TOTAL: usize = PRODUCERS * PER_PRODUCER;
 
-  // Capacity exceeds the total, so nothing ever gates — this test is about
+  // Capacity exceeds the total, so nothing ever gates. This test is about
   // exclusivity alone, and a producer blocking on a full ring would only
   // reduce the contention it is trying to create.
   let consumers = GatingSet::new(cap(16_384), 0);
@@ -335,8 +335,8 @@ fn no_two_producers_are_ever_granted_the_same_sequence() {
 #[test]
 fn claims_under_contention_lose_no_sequences() {
   // Multi-slot claims, where a CAS retry that recomputes the length but not
-  // the start would produce a gap rather than an overlap — the same bug seen
-  // from the other side, and invisible to a dedup check alone.
+  // the start would produce a gap rather than an overlap. That is the same bug
+  // seen from the other side, and a dedup check alone cannot see it.
   const PRODUCERS: usize = 4;
   const CLAIMS_EACH: usize = 500;
   const WIDTH: usize = 3;
@@ -365,15 +365,15 @@ fn claims_under_contention_lose_no_sequences() {
 #[test]
 fn claim_up_to_under_contention_loses_no_sequences_either() {
   // `claim_up_to` has its own CAS loop, and until this test existed nothing
-  // ever made it retry — every other test of it is single-threaded, so the
+  // ever made it retry. Every other test of it is single-threaded, so the
   // `Err( actual ) => current = actual` arm was unreached. That arm is where
-  // the interesting bug lives: it must re-read `headroom` against the *new*
+  // the interesting bug lives. It must re-read `headroom` against the *new*
   // start, because the grant it computed was sized against the old one.
   //
   // A retry that kept the stale `granted` would hand out a range extending
-  // past the gate, which is exactly the defect
-  // `no_grant_ever_passes_the_limit_under_contention` exists to catch for
-  // `claim` — this is the same claim for the other constructor.
+  // past the gate. `no_grant_ever_passes_the_limit_under_contention` exists
+  // to catch that defect for `claim`, and this test makes the same check for
+  // the other constructor.
   const PRODUCERS: usize = 4;
   const CALLS_EACH: usize = 500;
   const MAX: usize = 3;
@@ -389,9 +389,9 @@ fn claim_up_to_under_contention_loses_no_sequences_either() {
     handles.into_iter().map(|h| h.join().expect("no producer panicked")).collect()
   });
 
-  // Unlike the fixed-width test, lengths vary — `claim_up_to` grants what is
+  // Unlike the fixed-width test, lengths vary. `claim_up_to` grants what is
   // there, and near a gate boundary that is fewer than `MAX`. So the total is
-  // not predictable and only the partition itself is asserted.
+  // not predictable, and the test asserts only the partition itself.
   let mut every: Vec<Seq> = ranges.iter().flatten().flat_map(|c| c.sequences()).collect();
   every.sort_unstable();
 
@@ -409,9 +409,9 @@ fn claim_up_to_under_contention_loses_no_sequences_either() {
 
 #[test]
 fn each_producers_own_claims_stay_in_issue_order() {
-  // Feature 172's third clause. Global order across producers is deliberately
-  // not asserted — it is not promised, and asserting it would fail correct
-  // implementations.
+  // Feature 172's third clause. The test deliberately does not assert global
+  // order across producers. Nothing promises it, and asserting it would fail
+  // correct implementations.
   const PRODUCERS: usize = 3;
   const CLAIMS_EACH: usize = 1_000;
 
@@ -445,15 +445,15 @@ fn no_grant_ever_passes_the_limit_under_contention() {
   // advance implementation grants a range past the limit within a few
   // iterations.
   //
-  // The bound is read *after* each grant, and that is what makes the assertion
-  // both sound and able to fail. Sound: the limit only ever rises, since a
-  // consumer only advances, so a claim granted legitimately against some
-  // earlier limit is still within any later one — a correct implementation can
-  // never trip this. Able to fail: a `fetch_add` grant overshoots the limit
+  // The test reads the bound *after* each grant, and that is what makes the
+  // assertion both sound and able to fail. Sound: the limit only ever rises,
+  // since a consumer only advances, so a claim granted legitimately against
+  // some earlier limit is still within any later one. A correct implementation
+  // can never trip this. Able to fail: a `fetch_add` grant overshoots the limit
   // that held at the moment it was made, and unless the consumer happens to
   // sweep past it before the read, it overshoots the later one too.
   //
-  // Reading the limit *before* the claim would give the opposite: an assertion
+  // Reading the limit *before* the claim would give the opposite, an assertion
   // that fails on correct code whenever the consumer advances in between.
   const CAPACITY: usize = 4;
   const RELEASES: u64 = 4_000;
@@ -467,11 +467,11 @@ fn no_grant_ever_passes_the_limit_under_contention() {
     scope.spawn(|| {
       for released in 1..=RELEASES {
         consumers.cursor(0).unwrap().store(Seq(released), Ordering::Release);
-        // Yielding after each release is what keeps the gate tight for the
-        // whole run rather than only at the tail. Without it the consumer
-        // finishes in a burst, races far ahead of the producers, and an
-        // overrunning grant is absorbed by a limit that has already moved past
-        // it — so the defect is only visible in the last few iterations.
+        // Yielding after each release keeps the gate tight for the whole run
+        // rather than only at the tail. Without it the consumer finishes in a
+        // burst, races far ahead of the producers, and a limit that has already
+        // moved past an overrunning grant absorbs it. The defect then shows
+        // only in the last few iterations.
         std::thread::yield_now();
       }
     });
@@ -512,14 +512,14 @@ fn no_grant_ever_passes_the_limit_under_contention() {
 ///
 /// CL33 in `docs/lifecycle/002_the_claimer_over_a_rings_life.md` recorded that
 /// `cursor()` returns a `&PaddedCursor`, that `PaddedCursor : SeqCell` is a
-/// public trait, and that every `SeqCell` method takes `&self` — so `store`
-/// and `fetch_add` are reachable by any caller holding the accessor's result.
+/// public trait, and that every `SeqCell` method takes `&self`. Any caller
+/// holding the accessor's result can therefore reach `store` and `fetch_add`.
 /// This test is that finding as executable evidence. It asserts the hazard is
 /// *real*, not that the crate is broken, so it is expected to keep passing.
 ///
-/// What it pins is the boundary the manual `§ C2` check cannot see. `§ C2`
-/// greps this crate's own source for exactly two atomic mutations, both
-/// `compare_exchange`, with no `fetch_add` and no `store` — and it passes,
+/// It pins the boundary the manual `§ C2` check cannot see. `§ C2` greps
+/// this crate's own source for exactly two atomic mutations, both
+/// `compare_exchange`, with no `fetch_add` and no `store`. That check passes,
 /// correctly, while the accessor exports both to every caller. Narrowing
 /// `cursor()` to an address or to a read-only view would stop this test
 /// compiling, which is the signal that the gap closed.
@@ -531,7 +531,7 @@ fn writing_through_the_cursor_accessor_defeats_the_gate() {
   let first = claimer.claim(4).expect("an empty ring admits a full-capacity claim");
   assert_eq!(claimer.claim(1), Err(RingError::Full), "and then the gate refuses");
 
-  // Past the gate that just refused: no `unsafe`, no crate-private access.
+  // Past the gate that just refused, with no `unsafe` and no crate-private access.
   let stolen = claimer.cursor().fetch_add(4, Ordering::AcqRel);
   assert_eq!(stolen, Seq(4), "granted the sequence the gate had just withheld");
 
@@ -549,23 +549,23 @@ fn writing_through_the_cursor_accessor_defeats_the_gate() {
 ///
 /// CL52 in `docs/workaround/001_two_const_functions_the_compiler_refuses.md`
 /// recorded that `contains` and `overlaps` were the two of `Claim`'s seven
-/// methods that were not `const`, and that nothing about them required it:
-/// both compared `Seq` values through `PartialOrd`, which a `const fn` cannot
-/// call, when the raw `u64` comparison underneath is perfectly const-callable
-/// — as `sequences`, three lines above `overlaps`, already showed by reaching
+/// methods that were not `const`, and that nothing about them required it.
+/// Both compared `Seq` values through `PartialOrd`, which a `const fn` cannot
+/// call, when the raw `u64` comparison underneath is const-callable.
+/// `sequences`, three lines above `overlaps`, already showed this by reaching
 /// through the newtype's public field.
 ///
-/// They now compare `.0` directly. This test is the pin, and it is a
-/// compile-time one: if either method loses `const`, these `const` bindings
-/// fail to build, which no runtime assertion could catch.
+/// They now compare `.0` directly. This test pins that at compile time. If
+/// either method loses `const`, these `const` bindings fail to build, which
+/// no runtime assertion could catch.
 #[test]
 fn claim_predicates_answer_in_a_const_context() {
   const A: Claim = Claim::new(Seq(4), 4);
   const B: Claim = Claim::new(Seq(6), 4);
   const C: Claim = Claim::new(Seq(8), 4);
 
-  // Evaluated by the compiler rather than the runner: each of these fails the
-  // *build* if its predicate loses `const` or starts answering differently.
+  // The compiler evaluates these, not the runner. Each one fails the *build*
+  // if its predicate loses `const` or starts answering differently.
   // That is the whole point of the test, and it has already happened by the
   // time the runner reports a pass.
   const { assert!(A.contains(Seq(7)), "Seq(7) is inside Seq(4)..Seq(8)") }
@@ -589,12 +589,12 @@ fn claim_predicates_answer_in_a_const_context() {
 /// compiled here by name.
 ///
 /// CL43 in `docs/pitfall/001_dropping_a_claim.md` claims that none of the four
-/// warns — that the `#[ must_use ]` on `Claim` fires on an unused *value*, and
-/// every one of these uses the value before losing it. That claim used to rest
-/// on a recipe that ran `cargo build` over the workspace and counted warnings,
-/// which compiled none of the four and so measured nothing. They are compiled
-/// here instead, so the crate's own `-D warnings` build is the measurement: if
-/// any route did warn, this file would not build.
+/// warns. The `#[ must_use ]` on `Claim` fires on an unused *value*, and every
+/// one of these uses the value before losing it. That claim used to rest on a
+/// recipe that ran `cargo build` over the workspace and counted warnings, which
+/// compiled none of the four and so measured nothing. This file compiles them
+/// instead, so the crate's own `-D warnings` build is the measurement. If any
+/// route did warn, this file would not build.
 ///
 /// The routes are numbered to match the finding's own listing, and the recipe
 /// under CL43 counts these four markers to prove it is still reading them.
@@ -637,7 +637,7 @@ fn none_of_the_four_abandonment_routes_warns() {
   }
   assert_eq!(reached, 1, "route 4 dropped the first iteration's claim");
 
-  // Four sequences claimed across the four routes, none of them published, and
-  // the cursor has no idea: this is the state CL44 shows the ring dying in.
+  // Four sequences claimed across the four routes, none of them published,
+  // and the cursor has no idea. CL44 shows the ring dying in this state.
   assert_eq!(claimer.claimed(), Seq(5), "five claims, five sequences, zero publications");
 }

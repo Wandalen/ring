@@ -1,20 +1,20 @@
 //! Cache-line padding constants and alignment wrappers.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
 //! `docs/feature/169_padded_cursor.md` states the problem this crate exists to
-//! solve: a producer cursor and a consumer cursor that share a cache line make
+//! solve. A producer cursor and a consumer cursor that share a cache line make
 //! every write by either invalidate the other's cached copy, so two cores
-//! contend on a line neither is actually sharing data through. The fix is to
-//! give each its own line. This crate holds the constant and the wrapper;
+//! contend on a line neither is sharing data through. The fix is to give each
+//! its own line. This crate holds the constant and the wrapper;
 //! `ring_cursor` holds the cursors that use them.
 //!
-//! No `unsafe` is needed for any of it — `#[ repr( align( 64 ) ) ]` is a safe
-//! attribute — so this crate compiles under the workspace-wide
-//! `unsafe-code = "deny"` like most of the family. It once held an entry in
+//! No `unsafe` is needed for any of it, because `#[ repr( align( 64 ) ) ]` is a
+//! safe attribute. So this crate compiles under the workspace-wide
+//! `unsafe-code = "deny"`, like most of the family. It once held an entry in
 //! `ring/bench_harness/gate/declared/ring/unsafe_allowlist.txt` permitting an
-//! opt-out it never took;
+//! opt-out it never took.
 //! [decision 123](../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
 //! removed it, on the ground that a permission nobody exercises is a bound
 //! looser than the code actually is.
@@ -23,9 +23,9 @@
 
 /// Bytes in a cache line on the family's target platforms.
 ///
-/// 64 on x86-64 and on AArch64's common configuration. Apple Silicon uses 128,
-/// and a value too small is the failure that matters — two cursors 64 bytes
-/// apart still share a 128-byte line — so a future port raises this rather than
+/// 64 on x86-64 and on AArch64's common configuration. Apple Silicon uses 128.
+/// A value too small is the failure that matters, because two cursors 64 bytes
+/// apart still share a 128-byte line. So a future port raises this rather than
 /// making it conditional per crate.
 ///
 /// ```
@@ -35,10 +35,10 @@ pub const CACHE_LINE: usize = 64;
 
 // `on_distinct_lines` below computes `a / CACHE_LINE` as a line index. That
 // equals the true line index only because lines are naturally aligned, which
-// holds only when `CACHE_LINE` is a power of two — true of every value this
-// family has used (64, 128) and unchecked until now (-> docs/algorithm/001
+// holds only when `CACHE_LINE` is a power of two. Every value this family has
+// used (64, 128) is one, and nothing checked it until now (-> docs/algorithm/001
 // AL1). `ring_types::Capacity::new` asserts the analogous precondition for
-// its own number; this is the compile-time form; a `pub const` needs no
+// its own number. This is the compile-time form, since a `pub const` needs no
 // runtime `Result`.
 const _: () = assert!(
   CACHE_LINE.is_power_of_two(),
@@ -47,11 +47,11 @@ const _: () = assert!(
 
 /// A value given a whole cache line to itself.
 ///
-/// The padding is the point: `size_of::<CacheAligned<T>>()` is a multiple of
+/// The padding is the point. `size_of::<CacheAligned<T>>()` is a multiple of
 /// [`CACHE_LINE`] for any non-zero-sized `T` that fits, so two of them in one
 /// struct are guaranteed to land on different lines. (A zero-sized `T` makes
-/// the wrapper itself zero-sized, so two of them coincide at one address —
-/// nothing in this family wraps one.)
+/// the wrapper itself zero-sized, so two of them coincide at one address.
+/// Nothing in this family wraps one.)
 ///
 /// ```
 /// use ring_align::{ CacheAligned, CACHE_LINE };
@@ -112,12 +112,12 @@ impl<T> CacheAligned<T> {
 
 /// Whether two addresses fall on different cache lines.
 ///
-/// The observable form of what [`CacheAligned`] buys: a test asserts this over
+/// The observable form of what [`CacheAligned`] buys. A test asserts this over
 /// two real fields rather than trusting `size_of` alone.
 ///
 /// Takes addresses as plain integers rather than references, because the
-/// question is about where two *fields* sit — the caller has the addresses
-/// already, and two stack locals in a doc example would say nothing.
+/// question is where two *fields* sit. The caller already has the addresses,
+/// and two stack locals in a doc example would say nothing.
 ///
 /// ```
 /// use ring_align::on_distinct_lines;

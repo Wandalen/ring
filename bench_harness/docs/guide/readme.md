@@ -2,19 +2,18 @@
 
 ### Scope
 
-- **Purpose**: Teach this crate's outcomes to someone who did not build it — what was measured, what it established, how to reproduce every number, and what the machinery does not prove.
+- **Purpose**: Teach this crate's outcomes to someone who did not build it: what was measured, what it established, how to reproduce every number, and what the machinery does not prove.
 - **Responsibility**: Carry the reader from "33 crates exist" to "I can run the verdicts myself and I know what they are worth".
 - **In Scope**: The inspection path (every command, in order); the four measured verdicts; the limits of the gates.
 - **Out of Scope**: Per-crate design rationale (each crate's own `docs/`); the stage decomposition and its verdict log (the family's own implementation plan); the reached-test definitions (→ [`acceptance/001`](../acceptance/001_feature_reached_tests.md)).
 
-### Why This Lives in `bench_harness`
+### Why this lives in `bench_harness`
 
 The guide spans all 33 `ring_*` crates, so it is leaf-proximate to none of
-them. `bench_harness` is the one crate here that is family-neutral
-— it depends on no `ring_*` crate, which is why its gates could run against an
-empty workspace on day one — and it already owns the reached-tests every verdict
-is graded against. A guide to the outcomes belongs with the thing that produced
-them.
+them. `bench_harness` is the one crate here that is family-neutral. It depends
+on no `ring_*` crate, which is why its gates could run against an empty workspace
+on day one. It already owns the reached-tests every verdict is graded against. A
+guide to the outcomes belongs with the thing that produced them.
 
 ### Reading Order
 
@@ -34,9 +33,9 @@ is the most transferable thing this effort produced.
 
 | ID | Name | Purpose | Status |
 |----|------|---------|--------|
-| 001 | [Running the Verdicts Yourself](001_running_the_verdicts_yourself.md) | Six commands, in order, from a clean checkout to the full comparison | 🔄 |
-| 002 | [The Four Verdicts](002_the_four_verdicts.md) | What the comparison established, with the evidence and the confidence for each | 🔄 |
-| 003 | [What the Gates Do Not Prove](003_what_the_gates_do_not_prove.md) | Coverage is not defect detection, and the measurement that showed it | 🔄 |
+| 001 | [Running the verdicts yourself](001_running_the_verdicts_yourself.md) | Six commands, in order, from a clean checkout to the full comparison | 🔄 |
+| 002 | [The four verdicts](002_the_four_verdicts.md) | What the comparison established, with the evidence and the confidence for each | 🔄 |
+| 003 | [What the gates do not prove](003_what_the_gates_do_not_prove.md) | Coverage is not defect detection, and the measurement that showed it | 🔄 |
 
 ### Regenerate
 

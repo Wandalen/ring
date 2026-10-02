@@ -8,21 +8,21 @@
 //!
 //! | Module | Responsibility |
 //! |--------|----------------|
-//! | `workload` | [`Workload`] — the seeded item sequence, reproducible from its seed alone |
-//! | `accumulator` | [`Accumulator`] and [`Write`] — the two semantics a write sequence folds under |
-//! | `oracle` | [`ByteParity`] and [`Parity`] — whether two completed tables agree, and where they stop |
+//! | `workload` | [`Workload`], the seeded item sequence, reproducible from its seed alone |
+//! | `accumulator` | [`Accumulator`] and [`Write`], the two semantics a write sequence folds under |
+//! | `oracle` | [`ByteParity`] and [`Parity`], which report whether two completed tables agree and where they stop |
 //!
 //! The two components answer one question between them. Workstream 008's smoke
 //! test is *"all patterns produce byte-identical final tables"*, which needs a
 //! sequence every candidate can be driven with and a rule for deciding whether
-//! the tables that come back agree. Neither half is meaningful alone: a
+//! the tables that come back agree. Neither half is meaningful alone. A
 //! sequence nothing grades measures nothing, and an oracle with no common input
 //! compares two different experiments.
 //!
-//! The design this crate must satisfy is specified under `docs/`:
+//! `docs/` specifies the design this crate must satisfy:
 //!
-//! - `docs/readme.md` — scope and related crates
-//! - `../../docs/plan/008_ring_write_path_staged.md` — the stages these gates grade
+//! - `docs/readme.md`: scope and related crates
+//! - `../../docs/plan/008_ring_write_path_staged.md`: the stages these gates grade
 
 #![deny(missing_docs)]
 

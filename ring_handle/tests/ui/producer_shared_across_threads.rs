@@ -8,8 +8,8 @@
 //! # Where the absence comes from
 //!
 //! Not from this crate. `ring_spsc`'s handles carry a
-//! `PhantomData< Cell< () > >` — a deliberate `!Sync` opt-out placed in the
-//! crate that owns the one-producer-one-consumer invariant — and `ring_core`
+//! `PhantomData< Cell< () > >`, a deliberate `!Sync` opt-out placed in the
+//! crate that owns the one-producer-one-consumer invariant. `ring_core`
 //! and then `ring_handle` inherit it structurally.
 //!
 //! **That inheritance is the reason this case is worth writing rather than

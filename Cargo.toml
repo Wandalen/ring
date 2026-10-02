@@ -2,12 +2,12 @@
 resolver = "3"
 
 members = [
-  # Family-neutral validation machinery: it depends on no ring_* crate, so its
+  # Family-neutral validation machinery. It depends on no ring_* crate, so its
   # stage gates run against an empty workspace. ring_bench (tier 12) grades
-  # write paths; this grades the family. Also grades other families in the
-  # tree (see gate/declared/) — a shared-infrastructure crate that lives here
-  # rather than at the repository root, kept alongside the family it was
-  # built to grade first.
+  # write paths; this grades the family. It also grades other families in the
+  # tree (see gate/declared/). It is shared infrastructure, but it lives here
+  # rather than at the repository root, next to the family it was built to
+  # grade first.
   "bench_harness",
 
   # The 33-crate ring_* forest, in dependency order: every crate's
@@ -100,11 +100,11 @@ future_incompatible = { level = "warn", priority = -1 }
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unsafe-code = "deny"
-# `loom` is set by RUSTFLAGS, not by any feature, so rustc has no other way to
-# learn it is a real cfg. Declared once here rather than per crate: the lints
-# table is inherited workspace-wide, and a crate cannot both inherit it and add
-# its own. Only ring_atomic, ring_cursor and ring_publish read the cfg — see
-# ring_atomic's module documentation on the seam.
+# RUSTFLAGS sets `loom`, not any feature, so rustc has no other way to learn
+# it is a real cfg. It is declared once here, not per crate, because the lints
+# table is inherited workspace-wide and a crate cannot both inherit it and add
+# its own. Only ring_atomic, ring_cursor and ring_publish read the cfg. See
+# ring_atomic's module documentation on the `loom` switch.
 unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
 
 [workspace.lints.clippy]

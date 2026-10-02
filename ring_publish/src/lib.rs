@@ -1,16 +1,16 @@
 //! Publication of claimed slots to consumers.
 //!
-//! Tier 5 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 5 of the ring family's 33 crates, which together implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`.
 //!
-//! `ring_seqno` was scaffolded into this crate's manifest before the
-//! implementation existed and is not among them. Publishing is a cursor
+//! `ring_seqno` was added to this crate's manifest before the implementation
+//! existed and is not among them. Publishing is a cursor
 //! advance and a contiguity test; it computes no distances, no free slots and
 //! no minimum. The same over-declaration was found and removed in `ring_claim`.
 //!
 //! This is the second half of
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`, and its
-//! reached-test — the whole handshake, under `loom` — lives in this crate's
+//! `docs/feature/170_claim_publish_available_commit_handshake.md`. Its
+//! reached-test runs the whole handshake under `loom` and lives in this crate's
 //! `tests/handshake_test.rs`, because publication is the point at which claim,
 //! publish, available and commit become observable together.
 //!
@@ -18,7 +18,7 @@
 //!
 //! `ring_claim` advances a cursor when a producer *takes* a range;
 //! this crate advances a different one when the producer has *finished writing*
-//! it. Between the two, the slot is claimed and unwritten — and the feature's
+//! it. Between the two, the slot is claimed and unwritten. The feature's
 //! central requirement is that a consumer never sees it.
 //!
 //! Conflating the two cursors is not a subtle bug. It publishes uninitialised
@@ -31,24 +31,24 @@
 //! *exactly* at the claim's start. A producer whose predecessor has not
 //! finished is told so and must try again.
 //!
-//! The alternative — publishing to the highest contiguous point, or tracking
-//! per-slot availability in a bitmap — would let producer B's publication
+//! The alternative is to publish to the highest contiguous point, or to track
+//! per-slot availability in a bitmap. Either would let producer B's publication
 //! proceed while producer A is still writing. That works, and it is what a
-//! high-contention multi-producer ring eventually needs; it is deliberately not
-//! here, because it is `ring_mpsc`'s problem at S5 and putting it in the
-//! primitive would make the primitive untestable without a second producer.
+//! high-contention multi-producer ring eventually needs. It is deliberately not
+//! here, because it is `ring_mpsc`'s problem at S5, and putting it in this crate
+//! would make the crate untestable without a second producer.
 //!
 //! ## Why a plain spin, and not a `WaitKind`
 //!
 //! [`Publisher::publish`] loops on a `spin_loop` hint with no wait strategy and
 //! no budget, which everywhere else in this family would be a bug. Here it is
-//! the correct shape, and the difference is what is being waited *for*.
+//! correct, and the difference is what the loop waits *for*.
 //!
-//! Waiting for space is unbounded: it depends on a consumer that may be slow,
+//! Waiting for space is unbounded. It depends on a consumer that may be slow,
 //! stalled, or gone, so it needs a strategy and a give-up. Waiting for your
 //! predecessor to publish is bounded by that producer finishing a slot write it
-//! has already started and cannot abandon — it is not blocked on anything
-//! itself. A `WaitKind` here would offer a `Park` that can only ever hurt, and
+//! has already started and cannot abandon. That producer is not blocked on
+//! anything itself. A `WaitKind` here would offer a `Park` that can only ever hurt, and
 //! a budget whose exhaustion has no correct handling.
 
 #![deny(missing_docs)]
@@ -58,8 +58,8 @@ use ring_types::Seq;
 
 /// The ordering a publication is made visible at.
 ///
-/// `Release`, paired with the consumer's `Acquire` read of the same cursor:
-/// that pairing is the entire happens-before edge between a producer's slot
+/// `Release`, paired with the consumer's `Acquire` read of the same cursor.
+/// That pairing is the entire happens-before edge between a producer's slot
 /// writes and a consumer's reads of them. Weakening it to `Relaxed` produces a
 /// ring that works on x86, where the hardware supplies the ordering the code
 /// failed to ask for, and races on aarch64.
@@ -67,8 +67,8 @@ const PUBLISH: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Rele
 
 /// The frontier a consumer may read up to.
 ///
-/// Separate from `ring_claim::Claimer`'s cursor on purpose — see the module
-/// documentation on why conflating them publishes unwritten slots.
+/// Separate from `ring_claim::Claimer`'s cursor on purpose. The module
+/// documentation explains why conflating them publishes unwritten slots.
 ///
 /// ```
 /// use ring_publish::Publisher;
@@ -114,7 +114,7 @@ impl Publisher {
     &self.cursor
   }
 
-  /// How far publication has reached — one past the last readable sequence.
+  /// How far publication has reached, as one past the last readable sequence.
   ///
   /// ```
   /// use ring_publish::Publisher;
@@ -134,10 +134,10 @@ impl Publisher {
   ///
   /// # Errors
   ///
-  /// The current published position, when it is not `start` — meaning some
-  /// earlier claim has not been published yet. Deliberately not a `RingError`:
-  /// this is not a failure, it is `compare_exchange`'s "try again", and the
-  /// value returned is what to try against next.
+  /// The current published position, when it is not `start`. That means some
+  /// earlier claim has not been published yet. Deliberately not a `RingError`,
+  /// because this is `compare_exchange`'s "try again" rather than a failure.
+  /// The returned value is what to try against next.
   ///
   /// ```
   /// use ring_publish::Publisher;
@@ -160,8 +160,8 @@ impl Publisher {
   /// Publish `len` sequences starting at `start`, waiting for this producer's
   /// turn.
   ///
-  /// Spins rather than taking a [`ring_types::WaitKind`] — see the module
-  /// documentation for why a strategy would be wrong here rather than merely
+  /// Spins rather than taking a [`ring_types::WaitKind`]. The module
+  /// documentation explains why a strategy would be wrong here, not merely
   /// absent.
   ///
   /// ```
@@ -183,9 +183,9 @@ impl Publisher {
   ///
   /// A caller whose *predecessor* dropped its claim without publishing waits
   /// just as long, and that one is not the waiting caller's bug at all. The
-  /// module documentation's termination argument — a predecessor "cannot
-  /// abandon" a slot write it has already started — describes correct
-  /// producers rather than a property the types enforce:
+  /// module documentation's termination argument says a predecessor "cannot
+  /// abandon" a slot write it has already started. That describes correct
+  /// producers, not a property the types enforce.
   /// `ring_claim::Claim` has no destructor, so an abandoned claim is a
   /// `#[ must_use ]` warning and nothing more, and `let _ = …` silences even
   /// that. Of the two deadlocks this is the reachable one, and the only
@@ -201,7 +201,7 @@ impl Publisher {
 
   /// Whether `seq` has been published and is therefore readable.
   ///
-  /// The consumer-facing question feature 170 is graded on: a slot claimed but
+  /// Feature 170 is graded on this consumer-facing question. A slot claimed but
   /// not published must answer `false`.
   ///
   /// ```

@@ -6,15 +6,15 @@
 //! in part: "`ring_trace` records one entry per sequence operation when
 //! enabled and zero when not."
 //!
-//! Two numbers, both literal. The `zero` half is the one that matters most —
-//! the ring family's whole output is a measured comparison between candidate
+//! Two numbers, both literal. The `zero` half is the one that matters most.
+//! The ring family's whole output is a measured comparison between candidate
 //! ring implementations, and a trace that recorded anything at all when
 //! switched off would put a lock and an allocation on the path being measured.
 //!
 //! `ring_stats/tests/stats_test.rs` claims the counter halves of the same
 //! feature. The two crates are tested apart because they are not two
-//! implementations of one thing: a counter answers "how many" in constant space
-//! and is always on; a trace answers "which, in what order" and is off by
+//! implementations of one thing. A counter answers "how many" in constant space
+//! and is always on. A trace answers "which, in what order" and is off by
 //! default because it is not.
 
 use std::thread;
@@ -35,8 +35,8 @@ fn an_enabled_trace_records_exactly_one_entry_per_operation() {
   // Fix(weak_len_assert_sweep_1633): both assertions here are counts of the
   // same underlying `Vec` (`len()` is a field read, `entries().len()` reads
   // the cloned log), so together they still prove nothing about which 50
-  // entries resulted — 50 copies of `Seq(0)` would pass identically to the
-  // 50 distinct sequences the test's own name promises. Root cause:
+  // entries resulted. A log of 50 copies of `Seq(0)` would pass identically to
+  // the 50 distinct sequences the test's own name promises. Root cause:
   // count-only assertions on `trace`/`trace.entries()`. Fix: pin the whole
   // entry log against `record`'s own behavior (`entries_guard().push(...)`,
   // no coalescing), proving each of the 50 calls produced its own entry for
@@ -137,7 +137,7 @@ fn entries_come_back_in_the_order_recorded() {
 #[test]
 fn a_batch_is_one_entry_carrying_its_count_not_n_entries() {
   // A trace that expanded a batch claim into 64 entries would contradict the
-  // very thing it is evidence of — feature 177's "one operation, not 64".
+  // thing it is evidence of, feature 177's "one operation, not 64".
   let trace = Trace::enabled();
   trace.record(TraceOp::Claim, Seq(8), 64);
 
@@ -219,12 +219,12 @@ fn an_operation_prints_as_its_name() {
 
 #[test]
 fn the_operation_kinds_are_exactly_the_five_declared() {
-  // ALL must stay in step with the enum, but nothing here forces that: the
+  // ALL must stay in step with the enum, but nothing here forces that. The
   // exhaustive match below fails to compile when a discriminant is *added* to
-  // the enum — a guard `name()` in src/lib.rs already provides, one compile
-  // error earlier — and says nothing about whether the new variant was also
-  // added to ALL. Keeping ALL in step with the enum is a manual step; this
-  // test's exhaustiveness is a (harmless, redundant) copy of name()'s guard.
+  // the enum, a guard `name()` in src/lib.rs already provides one compile
+  // error earlier. The match says nothing about whether the new variant was
+  // also added to ALL. Keeping ALL in step with the enum is a manual step, and
+  // this test's exhaustiveness is a (harmless, redundant) copy of name()'s guard.
   fn covered(op: TraceOp) -> bool {
     match op {
       TraceOp::Claim | TraceOp::Publish | TraceOp::Consume | TraceOp::Commit | TraceOp::Drop => true,
@@ -305,8 +305,8 @@ fn clearing_a_disabled_trace_is_harmless() {
 
 #[test]
 fn concurrent_recorders_lose_no_entry() {
-  // A trace shared across producers must not drop an entry under contention —
-  // a log with a hole in it reads exactly like a run where the operation never
+  // A trace shared across producers must not drop an entry under contention.
+  // A log with a hole in it reads exactly like a run where the operation never
   // happened, which is the one misreading a diagnostic must not invite.
   const THREADS: usize = 4;
   const EACH: usize = 2_000;
@@ -356,9 +356,9 @@ fn a_disabled_trace_stays_empty_under_contention() {
 
 #[test]
 fn end_saturates_instead_of_reading_backwards_at_the_top_of_u64() {
-  // `ring_mpsc::UNSTAMPED` is `Seq( u64::MAX )` — the one sequence the family
+  // `ring_mpsc::UNSTAMPED` is `Seq( u64::MAX )`, the one sequence the family
   // publishes by name. `end()` used to compute this with a bare `+`, which
-  // wraps to `0` in release and panics under debug assertions; either way the
+  // wraps to `0` in release and panics under debug assertions. Either way the
   // rendered line misleads or kills the diagnostic reading it (`pitfall/001`
   // TR41).
   let entry = TraceEntry {

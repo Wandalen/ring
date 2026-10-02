@@ -1,11 +1,11 @@
-# Full family gate suite — slow, honest signal.
+# Full family gate suite. Slow, but an honest signal.
 #
 # Runs `bench_harness/gate/run_all.sh --family ring` (g1-g22) in full, exactly
-# as `verb/gate` does locally. Failures go red: the workflow never runs on
-# PRs, so nothing is blocked — but the Gates badge must mean something.
+# as `verb/gate` does locally. Failures go red. The workflow never runs on
+# PRs, so a failure blocks nothing, but the Gates badge must mean something.
 # Fast per-push verification lives in `ci.yml`.
 #
-# Schedule: `master` pushes + nightly + manual dispatch — never on every PR,
+# Schedule: `master` pushes + nightly + manual dispatch. Never on every PR,
 # because g1 (tarpaulin) is slow and g12 rewrites files under `src/` while it
 # runs, so it must not overlap any concurrent build of the same tree.
 

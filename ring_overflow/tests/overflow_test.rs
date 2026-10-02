@@ -1,4 +1,4 @@
-//! Tests for `ring_overflow` — what a full ring does.
+//! Tests for `ring_overflow`, which decides what a full ring does.
 //!
 //! Claims the handler half of
 //! `docs/feature/174_overflow_policy_enum_and_handlers.md`; the enum half lives
@@ -8,11 +8,11 @@
 //! The acceptance criterion filed at
 //! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` is
 //! negative: **exactly three discriminants, and no overwrite variant**. That
-//! absence is what makes a successful publish mean something — under every
+//! absence is what makes a successful publish mean something. Under every
 //! policy here, a publish reporting success kept the item. A fourth variant that
 //! overwrote unread data would silently break every consumer written against
-//! the other three, so the exhaustiveness assertions below are the load-bearing
-//! ones, not decoration.
+//! the other three, so the exhaustiveness assertions below are the ones that
+//! matter, not decoration.
 
 use ring_overflow::{Resolution, resolve, would_resolve};
 use ring_stats::RingStats;
@@ -39,15 +39,15 @@ fn distinct_policies_give_distinct_resolutions() {
   assert_eq!(seen.len(), 3);
 }
 
-/// The acceptance criterion, asserted structurally: exhaustively matching three
+/// The acceptance criterion, asserted structurally. Exhaustively matching three
 /// named variants compiles, which it could not if a fourth existed. A test that
-/// merely listed three would still pass after someone added `Overwrite`.
+/// only listed three would still pass after someone added `Overwrite`.
 ///
-/// `Resolution::ALL` is asserted against alongside it. The `match` alone catches
-/// a fourth variant only here, in this one helper — it says nothing about the
+/// The test also asserts against `Resolution::ALL`. The `match` alone catches
+/// a fourth variant only here, in this one helper. It says nothing about the
 /// count anywhere else, and a published `ALL` that had drifted out of step with
 /// the enum would hand every iterating test a short list to loop over while this
-/// one still compiled. Pinning both together is what makes `ALL` load-bearing
+/// one still compiled. Pinning both together is what makes `ALL` enforced
 /// rather than decorative.
 #[test]
 fn resolution_has_exactly_three_variants_and_no_overwrite() {
@@ -78,7 +78,7 @@ fn resolution_has_exactly_three_variants_and_no_overwrite() {
 }
 
 /// No resolution both keeps the incoming item and destroys unread data without
-/// saying so — the invariant an overwrite variant would break. Evicting is
+/// saying so. That is the invariant an overwrite variant would break. Evicting is
 /// permitted, but only because it is *reported* as a loss.
 #[test]
 fn no_resolution_overwrites_unread_data_silently() {
@@ -95,13 +95,13 @@ fn no_resolution_overwrites_unread_data_silently() {
   }
 
   // **The antecedent is asserted, not assumed.** `accepted_incoming()` is true
-  // for `EvictedOldest` alone, which needs `OverflowPolicy::DropOldest` — a
+  // for `EvictedOldest` alone, which needs `OverflowPolicy::DropOldest`, a
   // policy no default build accepts. Dropping it from `OverflowPolicy::ALL` on
-  // exactly those grounds is a plausible future edit, and it would leave this
-  // loop iterating over policies none of which enter the branch: the crate's
-  // central safety test, green, checking nothing. An implication whose
-  // antecedent never holds is satisfied by anything, so a test of one has to
-  // prove the antecedent held.
+  // exactly those grounds is a plausible future edit. This loop would then
+  // iterate over policies none of which enter the branch, and the crate's
+  // central safety test would be green while checking nothing. An implication
+  // whose antecedent never holds is satisfied by anything, so a test of one has
+  // to prove the antecedent held.
   assert_eq!(
     checked, 1,
     "no policy in OverflowPolicy::ALL produces an accepting resolution — \
@@ -122,7 +122,7 @@ fn the_two_readings_partition_the_outcomes() {
   assert!(!Resolution::Refused.accepted_incoming());
 }
 
-/// A refusal loses nothing — the whole reason `Fail` exists is that the caller
+/// A refusal loses nothing. The whole reason `Fail` exists is that the caller
 /// keeps the item and decides for itself.
 #[test]
 fn a_refusal_loses_nothing() {
@@ -131,7 +131,7 @@ fn a_refusal_loses_nothing() {
 }
 
 /// `resolve` returns what `would_resolve` predicts, on the two policies that
-/// keep going — so the pure form is a faithful preview and not a second,
+/// keep going. So the pure form is a faithful preview and not a second,
 /// drifting implementation.
 #[test]
 fn resolve_agrees_with_would_resolve() {
@@ -155,7 +155,7 @@ fn fail_hands_the_decision_back_as_an_error() {
   assert_eq!(would_resolve(OverflowPolicy::Fail), Resolution::Refused);
 }
 
-/// Exactly one counter moves per call, on every policy — so a stats read
+/// Exactly one counter moves per call, on every policy, so a stats read
 /// accounts for every full-ring event, not only the lossy ones.
 #[test]
 fn exactly_one_counter_moves_per_call() {
@@ -183,16 +183,16 @@ fn a_refusal_is_counted_even_though_it_loses_nothing() {
   assert_eq!(stats.dropped_total(), 4);
 }
 
-/// `resolve` is not idempotent on its error path, and that is pinned rather than
-/// left to be discovered.
+/// `resolve` is not idempotent on its error path, and this test pins that
+/// instead of leaving it to be discovered.
 ///
-/// The counter is incremented before the policy is matched, so `Err` returns
-/// with shared state already changed — against the usual reading that an `Err`
-/// means nothing happened. A caller that treats `Full` as retryable and calls
-/// again for the *same* arrival therefore records two full-ring events for one.
-/// The behaviour is intended; what was missing was anything stating it, so this
-/// test fails if someone "fixes" the ordering to make `Err` effect-free and
-/// silently changes what every stats reader is counting.
+/// `resolve` increments the counter before it matches the policy, so `Err`
+/// returns with shared state already changed. That goes against the usual
+/// reading that an `Err` means nothing happened. A caller that treats `Full` as
+/// retryable and calls again for the *same* arrival therefore records two
+/// full-ring events for one. The behaviour is intended. What was missing was
+/// anything stating it, so this test fails if someone "fixes" the ordering to
+/// make `Err` effect-free and silently changes what every stats reader counts.
 #[test]
 fn retrying_a_refusal_counts_the_same_arrival_twice() {
   let stats = RingStats::new();
@@ -208,8 +208,8 @@ fn retrying_a_refusal_counts_the_same_arrival_twice() {
     "resolve became idempotent — every stats consumer's arithmetic just changed"
   );
 
-  // `would_resolve` is the retry-safe half, and the reason the pairing exists:
-  // decide with it as often as you like, record with `resolve` once.
+  // `would_resolve` is the retry-safe half, and the reason the pairing exists.
+  // Decide with it as often as you like, and record with `resolve` once.
   for _ in 0..8 {
     assert_eq!(would_resolve(one_arrival_at_a_full_ring), Resolution::Refused);
   }
@@ -217,7 +217,7 @@ fn retrying_a_refusal_counts_the_same_arrival_twice() {
 }
 
 /// Counts accumulate across calls and stay separated by policy, so a mixed run
-/// reports which pressure it was actually under.
+/// reports which pressure it was under.
 #[test]
 fn counts_accumulate_and_stay_separated() {
   let stats = RingStats::new();
@@ -235,9 +235,9 @@ fn counts_accumulate_and_stay_separated() {
   assert_eq!(stats.dropped_total(), 6);
 }
 
-/// `would_resolve` touches no counters — the property that makes it safe for a
-/// factory validating a configuration, which must not fabricate pressure the
-/// ring never experienced.
+/// `would_resolve` touches no counters. That makes it safe for a factory
+/// validating a configuration, which must not fabricate pressure the ring
+/// never experienced.
 #[test]
 fn would_resolve_touches_no_counters() {
   let stats = RingStats::new();
@@ -247,8 +247,8 @@ fn would_resolve_touches_no_counters() {
   assert_eq!(stats.dropped_total(), 0);
 }
 
-/// The resolution is a plain value: `Copy`, comparable, hashable — so a caller
-/// can tabulate outcomes without cloning or borrowing.
+/// The resolution is a plain value that is `Copy`, comparable and hashable, so
+/// a caller can tabulate outcomes without cloning or borrowing.
 #[test]
 fn a_resolution_is_a_plain_comparable_value() {
   let a = Resolution::EvictedOldest;
@@ -263,7 +263,7 @@ fn a_resolution_is_a_plain_comparable_value() {
   assert_eq!(counts.len(), 3, "three policies must key three distinct buckets");
 }
 
-/// The policy's own self-description agrees with what the handler does — the
+/// The policy's own self-description agrees with what the handler does, so the
 /// two crates cannot drift apart on which policies report failure.
 #[test]
 fn policy_self_description_agrees_with_the_handler() {

@@ -1,18 +1,18 @@
 //! Runtime invariant checks over a live ring.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation.
+//! One of the ring family's 33 crates, which together implement the concurrency write-path.
 //!
 //! # Why this crate exists
 //!
 //! The family's cursor arithmetic assumes its own invariants and does not check
-//! them. That assumption is correct and the arithmetic is right to make it — but
-//! when it is violated, the readings do not merely fail to report the problem,
-//! they report the healthiest state they can express.
+//! them. That assumption is correct and the arithmetic is right to make it. But
+//! when an invariant is violated, the readings report the healthiest state they
+//! can express instead of the problem.
 //!
 //! A ring whose consumer cursor has run ahead of its producer reports
 //! `free_slots = capacity`, `pending = 0`, and `may_claim = true`: the exact
-//! readings of a new, empty ring, including the one a producer acts on. Measured,
-//! not inferred — see `docs/pitfall/001_saturating_arithmetic_reports_health.md`.
+//! readings of a new, empty ring, including the one a producer acts on. This is
+//! measured, not inferred, in `docs/pitfall/001_saturating_arithmetic_reports_health.md`.
 //!
 //! Nothing here runs unless called. These are checks for a test, a debug build,
 //! or an investigation, deliberately absent from the claim path.
@@ -66,7 +66,7 @@ use ring_types::{Capacity, Seq};
 /// `Acquire`, matching the gating reads in `ring_cursor` this crate is checking
 /// the results of. A weaker ordering would let a check observe a cursor pair
 /// that no thread ever held, and report a violation of an invariant that was
-/// never violated — a false positive in a diagnostic is worse than no
+/// never violated. A false positive in a diagnostic is worse than no
 /// diagnostic, because it sends an investigation somewhere there is nothing to
 /// find.
 const OBSERVE: Ordering = Ordering::Acquire;
@@ -75,24 +75,24 @@ const OBSERVE: Ordering = Ordering::Acquire;
 ///
 /// Every check in this crate reads the two cursors, and the order is not
 /// neutral. The cursors are monotonic and the two loads cannot be atomic
-/// together, so on a live ring one of them is always the older reading — and
+/// together, so on a live ring one of them is always the older reading, and
 /// which one decides which false positive is reachable. An old producer against
 /// a fresh consumer fabricates **D1**; the other order fabricates D2.
 ///
-/// Producer-first is the deliberate choice, and it is the worse-looking one: D1
-/// is the violation [`Violation::ConsumerAheadOfProducer`] exists to surface
+/// Producer-first is the deliberate choice, and it is the worse-looking one. D1
+/// is the violation [`Violation::ConsumerAheadOfProducer`] exists to report
 /// precisely because nothing else shows it, so a spurious D1 is the false
 /// positive a reader has no second source to refute. It is kept because the
-/// alternative is not better, only quieter — a spurious D2 is refuted by
-/// glancing at `pending`, which means the reachable false positive would be the
-/// one most likely to be dismissed, in the one direction where dismissal is
-/// cheap. A diagnostic whose noise is easy to ignore trains its reader to ignore
-/// it.
+/// alternative is quieter, not better. A spurious D2 is refuted by glancing
+/// at `pending`, which means the reachable false positive would be the one
+/// most likely to be dismissed, in the one direction where dismissal is
+/// cheap. A diagnostic whose noise is easy to ignore trains its reader to
+/// ignore it.
 ///
 /// The window is a couple of instructions wide and `check` is documented as
 /// wanting a quiescent ring, so neither ordering is a defect. What was a defect
 /// was making this choice three times, at three call sites, without making it
-/// once — so it is made here, and the three sites call this.
+/// once. So it is made here, and the three sites call this.
 fn observe_pair(pair: &CursorPair) -> (Seq, Seq) {
   let producer = pair.producer().load(OBSERVE);
   let consumer = pair.consumer().load(OBSERVE);
@@ -124,18 +124,18 @@ impl fmt::Display for Cursor {
 /// formatted at the site that knows how the report will be read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Violation {
-  /// D1 — the consumer has read past what the producer published.
+  /// D1: the consumer has read past what the producer published.
   ///
   /// **The dangerous one.** The family's arithmetic saturates here, so this
   /// state reads as an empty, healthy ring and `may_claim` returns `true`.
   ConsumerAheadOfProducer {
     /// Where the producer had published to.
     producer: Seq,
-    /// Where the consumer claimed to have read to — past `producer`.
+    /// Where the consumer claimed to have read to, past `producer`.
     consumer: Seq,
   },
 
-  /// D2 — the producer is more than a full lap ahead of the consumer.
+  /// D2: the producer is more than a full lap ahead of the consumer.
   ///
   /// Unread slots have been overwritten. Less dangerous than
   /// [`Self::ConsumerAheadOfProducer`] only because it leaves evidence: `pending`
@@ -149,7 +149,7 @@ pub enum Violation {
     capacity: usize,
   },
 
-  /// D3 — a cursor holds a smaller sequence than it did at a previous
+  /// D3: a cursor holds a smaller sequence than it did at a previous
   /// observation.
   ///
   /// Only reachable through [`Watch`]; a single observation cannot see it,
@@ -188,7 +188,7 @@ impl fmt::Display for Violation {
         consumer.0, producer.0
       ),
       // The distance is the crate's only arithmetic outside a check, and it was
-      // written `saturating_sub` — in the crate whose founding measurement is
+      // written `saturating_sub`, in the crate whose founding measurement is
       // that saturating arithmetic reports health it cannot support. Reached
       // through `check_seqs` the guard has already run and it cannot underflow;
       // reached through a hand-built variant (the fields are public and the enum
@@ -225,7 +225,7 @@ impl core::error::Error for Violation {}
 /// [`Violation::ProducerLappedConsumer`].
 ///
 /// Reads both cursors once, `Acquire`, and compares them directly rather than
-/// through `ring_seqno` — whose saturating arithmetic is what makes the first of
+/// through `ring_seqno`, whose saturating arithmetic is what makes the first of
 /// the two invisible.
 ///
 /// **Reads only.** Nothing here stores, and the two loads are the same loads a
@@ -253,20 +253,20 @@ pub fn check(pair: &CursorPair) -> Result<(), Violation> {
 /// The comparison, over values rather than over cursors.
 ///
 /// Split out because [`Watch`] needs the same two questions asked of sequences
-/// it has already read — reading them a second time would compare two different
+/// it has already read. Reading them a second time would compare two different
 /// observations and could report a violation that never existed.
 fn check_seqs(producer: Seq, consumer: Seq, capacity: Capacity) -> Result<(), Violation> {
-  // The subtraction is the D1 check. Written as two independent blocks — a
-  // `consumer.0 > producer.0` guard, then a bare `producer.0 - consumer.0` — the
-  // second is sound only because the first precedes it, and nothing but their
-  // order holds that in place: both operands are `u64`, so a reordering
-  // compiles, and with no `overflow-checks` in any workspace profile a release
+  // The subtraction is the D1 check. Written as two independent blocks, a
+  // `consumer.0 > producer.0` guard and then a bare `producer.0 - consumer.0`,
+  // the second block is sound only because the first precedes it. Nothing but
+  // their order holds that in place. Both operands are `u64`, so a reordering
+  // compiles. With no `overflow-checks` in any workspace profile, a release
   // build wraps to roughly `u64::MAX`, which exceeds every capacity and so
-  // returns `ProducerLappedConsumer` for a ring whose actual defect is D1. The
-  // wrong diagnosis, delivered confidently, from the crate whose job is the
-  // right one.
+  // returns `ProducerLappedConsumer` for a ring whose actual defect is D1. That
+  // is the wrong diagnosis, delivered confidently, from the crate whose job is
+  // the right one.
   //
-  // `checked_sub` removes the ordering rather than documenting it: D1 is
+  // `checked_sub` removes the ordering instead of documenting it. D1 is
   // precisely the case where the subtraction has no answer, so there is no
   // second block to put in the wrong place and no operand order to get wrong.
   let Some(pending) = producer.0.checked_sub(consumer.0) else {
@@ -287,7 +287,7 @@ fn check_seqs(producer: Seq, consumer: Seq, capacity: Capacity) -> Result<(), Vi
 /// A cursor pair watched across observations, so that a cursor going backwards
 /// is visible.
 ///
-/// [`check`] cannot see D3 and no stateless check can: a pair reading `(0, 0)`
+/// [`check`] cannot see D3 and no stateless check can. A pair reading `(0, 0)`
 /// is either a new ring or a wholly corrupted one, and the reading is identical.
 /// A `Watch` keeps the previous observation so the comparison exists.
 ///
@@ -315,15 +315,15 @@ fn check_seqs(producer: Seq, consumer: Seq, capacity: Capacity) -> Result<(), Vi
 ///
 /// # Not `Copy`, deliberately
 ///
-/// The three fields are all `Copy`, so this type could be — and was. It is not,
-/// because a `Watch` is *the* record of what was last seen, and a silent copy is
-/// a second baseline that diverges from the first. The one left behind reports
-/// [`Violation::CursorWentBackwards`] for every later observation of a perfectly
-/// healthy ring, because its baseline is stale rather than because anything moved
-/// backwards.
+/// The three fields are all `Copy`, so this type could be `Copy`, and it once
+/// was. It is not now, because a `Watch` is *the* record of what was last seen,
+/// and a silent copy is a second baseline that diverges from the first. The one
+/// left behind reports [`Violation::CursorWentBackwards`] for every later
+/// observation of a healthy ring, because its baseline is stale rather than
+/// because anything moved backwards.
 ///
-/// `Clone` is kept: checkpointing a watch before a suspect phase and comparing
-/// afterwards is a real use. Requiring the `.clone()` is what makes the fork a
+/// `Clone` is kept, because checkpointing a watch before a suspect phase and
+/// comparing afterwards is a real use. Requiring the `.clone()` is what makes the fork a
 /// decision instead of a typo.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Watch {
@@ -335,15 +335,15 @@ pub struct Watch {
 impl Watch {
   /// Start watching, taking the current observation as the baseline.
   ///
-  /// The pair is checked as it stands — a `Watch` started against an already
+  /// The pair is checked as it stands. A `Watch` started against an already
   /// broken pair reports that immediately rather than adopting the broken state
   /// as its baseline and reporting nothing forever after.
   ///
   /// # What this does not guarantee
   ///
-  /// The check is on the **baseline**, not on the ring, and it is worth being
-  /// precise about how far that reaches — because the guarantee is strong enough
-  /// to be relied on and narrow enough to be relied on wrongly.
+  /// The check is on the **baseline**, not on the ring. This section is precise
+  /// about how far that reaches, because the guarantee is strong enough to be
+  /// relied on and narrow enough to be relied on wrongly.
   ///
   /// - **D3 is unchecked here, necessarily.** A backwards move is a property of
   ///   two readings and this call has one. A `Watch` started *after* a cursor
@@ -352,9 +352,9 @@ impl Watch {
   /// - **It says nothing about the pair passed to [`Self::observe`].** Nothing
   ///   ties a `Watch` to the pair it was built from, so a watch validated against
   ///   one ring and then observed against another carries a construction-time
-  ///   guarantee about a ring it is no longer reporting on. The two combine into
-  ///   something neither states alone: the strongest guarantee this type offers
-  ///   is voided by a call that type-checks.
+  ///   guarantee about a ring it is no longer reporting on. Together the two say
+  ///   something neither says alone. A call that type-checks voids the strongest
+  ///   guarantee this type offers.
   ///
   /// # Errors
   ///
@@ -374,14 +374,14 @@ impl Watch {
   /// Take another observation and compare it with the last one.
   ///
   /// On success the observation becomes the new baseline. On failure it does
-  /// **not**: a `Watch` that adopted a corrupt reading would report the
+  /// **not**. A `Watch` that adopted a corrupt reading would report the
   /// corruption once and then treat it as the new normal, which turns a
   /// permanent fault into a single lost message.
   ///
   /// # Errors
   ///
   /// [`Violation::CursorWentBackwards`] for either cursor, checked before D1 and
-  /// D2 — a cursor that moved backwards explains any ordering violation that
+  /// D2. A cursor that moved backwards explains any ordering violation that
   /// came with it, and reporting the consequence instead of the cause sends an
   /// investigation to the wrong place.
   pub fn observe(&mut self, pair: &CursorPair) -> Result<(), Violation> {
@@ -426,12 +426,12 @@ impl Watch {
 /// independently and describe the same ring; on a quiescent ring their sum is
 /// the capacity. This is the one check here that is about a *ring* rather than
 /// about cursors, and it is the only one available to a caller holding a
-/// `ring_core::Ring` — nothing in the family hands out a `CursorPair`.
+/// `ring_core::Ring`, because nothing in the family hands out a `CursorPair`.
 ///
 /// **It cannot detect a consumer ahead of its producer.** Both readings derive
 /// from the saturating arithmetic that masks that state, so a D1-corrupted ring
-/// satisfies this check exactly as a healthy one does. Measured, and pinned by
-/// `check_ends_cannot_see_the_corruption_check_can` — see
+/// satisfies this check exactly as a healthy one does. This is measured, and
+/// `check_ends_cannot_see_the_corruption_check_can` pins it. See
 /// `docs/integration/001`, whose J4 is precisely "do not read a pass here as
 /// evidence against D1".
 ///
@@ -441,19 +441,19 @@ impl Watch {
 /// produces false positives; that is a precondition on the caller, not a defect
 /// to be worked around here.
 ///
-/// The `T : Send` bound is inherited, not chosen: `ring_core` puts it on the
+/// The `T : Send` bound is inherited, not chosen. `ring_core` puts it on the
 /// ends themselves, so `len` and `free_capacity` are not callable without it.
 ///
 /// # Where the capacity comes from
 ///
 /// **The parameter is here because of a borrow, not because you are meant to
 /// choose it.** Neither end carries a capacity accessor, and `Ring::capacity`
-/// takes `&self` while `Ring::ends` takes `&mut self` — so once the ends exist,
+/// takes `&self` while `Ring::ends` takes `&mut self`. So once the ends exist,
 /// the ring is exclusively borrowed and the number is out of reach. It is not
 /// derivable from anything this function is passed.
 ///
 /// It is derivable one statement earlier, and that is the only shape worth
-/// copying: read it off the ring **before** splitting, and pass the binding.
+/// copying. Read it off the ring **before** splitting, and pass the binding.
 ///
 /// ```rust,ignore
 /// let mut ring : Ring< u32 > = Ring::new( &config )?;

@@ -36,24 +36,23 @@ def main( argv ):
 
   # Finding(at_standard_checks_three_of_g14s_seven_categories): both this sort
   # key and `at` below compare only the three headline counts (def/inst/find)
-  # against their floors. shape.check() — the actual G14 verdict this
-  # docstring claims never to disagree with — also fails a crate for an
-  # `extra` undeclared definition dir, a `missing` declared one, a `thin`
-  # definition under two instances, or an AGREE/INDEX mismatch between a
-  # finding's heading, its definition-readme row and its Module Index row —
-  # none of which this file reads at all. A crate could clear def/inst/find
-  # and still carry any of those, showing "at standard" here while G14
-  # reports it NOT REACHED. No live trigger: checked directly, not assumed —
-  # ran shape.check() against every one of the 33 real ring crates and
-  # compared its REACHED/NOT-REACHED verdict to this file's own `at`
-  # computation for each; zero disagreements today. That is a property of
-  # the current corpus being clean on every category this file does not
-  # check, not a guarantee this code provides — the two computations are
-  # independent, and the docstring's "a rendering of the first" claim holds
-  # only as long as that coincidence does. Closing the gap for good means
-  # driving `at` from shape.check()'s own verdict (import and call it per
-  # crate) rather than re-deriving three of its seven conditions here, which
-  # is a heavier change than a drive-by.
+  # against their floors. shape.check(), the actual G14 verdict this docstring
+  # claims never to disagree with, also fails a crate for an `extra`
+  # undeclared definition dir, a `missing` declared one, a `thin` definition
+  # under two instances, or an AGREE/INDEX mismatch between a finding's
+  # heading, its definition-readme row and its Module Index row. This file
+  # reads none of those. A crate could clear def/inst/find and still carry any
+  # of them, showing "at standard" here while G14 reports it NOT REACHED. No
+  # live trigger, checked directly, not assumed: shape.check() ran against
+  # every one of the 33 real ring crates, and its REACHED/NOT-REACHED verdict
+  # was compared to this file's own `at` computation for each, with zero
+  # disagreements today. That is a property of the current corpus being clean
+  # on every category this file does not check, not a guarantee this code
+  # provides. The two computations are independent, and the docstring's "a
+  # rendering of the first" claim holds only as long as that coincidence does.
+  # Closing the gap for good means driving `at` from shape.check()'s own
+  # verdict (import and call it per crate) rather than re-deriving three of
+  # its seven conditions here, which is a heavier change than a drive-by.
   rows.sort( key = lambda r: ( r[ 1 ] >= md and r[ 2 ] >= mi and r[ 3 ] >= mf, r[ 3 ], r[ 2 ], r[ 0 ] ) )
 
   print( f'  {"crate":<18} {"defs":>9} {"inst":>9} {"findings":>11}   state' )

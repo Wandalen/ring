@@ -7,22 +7,22 @@
 //!
 //! `ring_slot/tests/slot_test.rs` already claims the byte-identity halves
 //! against each shape directly. What it cannot claim, because it holds no such
-//! thing, is *identical path* — two shapes each round-tripping through their
+//! thing, is *identical path*. Two shapes each round-tripping through their
 //! own code is the reading that criterion is written to exclude.
 //!
-//! So the load-bearing tests here are the ones that never name a shape:
+//! So the tests that carry the claim are the ones that never name a shape.
 //! `round_trip` and `land_and_read` below are generic, monomorphised once per
 //! shape from a single body, and driven over real `ring_store` storage. If a
-//! shape ever needed a special case, one of them would stop compiling — which
-//! is a stronger signal than an assertion failing, because it cannot be
-//! satisfied by adjusting a number.
+//! shape ever needed a special case, one of them would stop compiling. That is
+//! a stronger signal than an assertion failing, because nobody can satisfy it
+//! by adjusting a number.
 
 use ring_event::{Fill, Peek, drain_from, publish_into, recycle};
 use ring_slot::{BytesSlot, Slot, TypedSlot};
 use ring_store::Buffer;
 use ring_types::{Capacity, RingError, Seq};
 
-/// The whole point: one body, no shape named, used by both shapes below.
+/// One body that names no shape, used by both shapes below; this is the whole point.
 fn round_trip<S, P>(slot: &mut S, payload: P) -> Option<S::Out<'_>>
 where
   S: Peek,
@@ -32,8 +32,8 @@ where
   drain_from(slot)
 }
 
-/// The same, but through real storage addressed by a sequence — the shape the
-/// ring itself uses.
+/// The same, but through real storage addressed by a sequence, the way the
+/// ring itself addresses it.
 fn land_and_read<S, P>(buffer: &mut Buffer<S>, seq: Seq, payload: P) -> bool
 where
   S: Peek + Slot + Default,
@@ -117,10 +117,11 @@ fn an_unpublished_bytes_slot_reads_as_nothing_rather_than_as_an_empty_payload() 
 
 #[test]
 fn a_zero_length_publish_is_indistinguishable_from_unpublished_and_says_so() {
-  // The honest limit of the previous test: a `BytesSlot` records length, and a
-  // zero-length write leaves the same length an untouched slot has. This is
-  // documented here rather than hidden, because a caller who needs the two
-  // apart must carry the distinction elsewhere — in the handshake, not the slot.
+  // This is the limit of the previous test. A `BytesSlot` records length, and a
+  // zero-length write leaves the same length an untouched slot has. This test
+  // documents that rather than hiding it, because a caller who needs the two
+  // apart must carry the distinction elsewhere, in the handshake rather than
+  // the slot.
   let mut slot = BytesSlot::<8>::empty();
   publish_into(&mut slot, &[][..]).unwrap();
 
@@ -134,9 +135,9 @@ fn a_byte_payload_longer_than_the_slot_is_refused_and_changes_nothing() {
   let mut slot = BytesSlot::<4>::empty();
   publish_into(&mut slot, &b"abcd"[..]).unwrap();
 
-  // Not `Full`: a payload that does not fit is a configuration error, and no
-  // amount of draining shrinks it. The same distinction `ring_batch` draws
-  // between `BatchTooLarge` and `Full`, applied one level down.
+  // This is not `Full`. A payload that does not fit is a configuration error,
+  // and no amount of draining shrinks it. The same distinction `ring_batch`
+  // draws between `BatchTooLarge` and `Full`, applied one level down.
   let refused = publish_into(&mut slot, &b"abcde"[..]);
   assert_eq!(
     refused,
@@ -152,9 +153,9 @@ fn a_byte_payload_longer_than_the_slot_is_refused_and_changes_nothing() {
 
 #[test]
 fn a_typed_publish_cannot_fail() {
-  // Not a tautology worth skipping: it pins that the shared signature's Result
-  // is the byte shape's need, and that the typed shape pays no runtime check
-  // for it.
+  // This is not a tautology worth skipping. It pins that the shared signature's
+  // Result is the byte shape's need, and that the typed shape pays no runtime
+  // check for it.
   let mut slot = TypedSlot::empty();
   for i in 0..100u32 {
     assert_eq!(publish_into(&mut slot, i), Ok(()));
@@ -164,8 +165,8 @@ fn a_typed_publish_cannot_fail() {
 
 // ------------------------------------------------------------------- recycling
 
-/// `drain_from` reads and does not empty — for both shapes, identically. Named
-/// after the trap rather than after the mechanism: a caller who reads "drain"
+/// `drain_from` reads and does not empty, for both shapes identically. Named
+/// after the trap rather than after the mechanism. A caller who reads "drain"
 /// as "remove" gets a ring every slot of which reports occupied after a full
 /// pass, with no compile error and no runtime error to say so. That is why the
 /// third call exists and why the function's own documentation opens by denying
@@ -211,9 +212,9 @@ fn recycling_empties_either_shape_through_the_same_call() {
   assert_eq!(drain_from(&bytes), None);
 
   // EV12: pin recycle's "identical path" claim at the value level too, not
-  // only through `drain_from`/`is_empty` — a recycled byte slot must compare
+  // only through `drain_from`/`is_empty`. A recycled byte slot must compare
   // and print exactly as a fresh one, through the shape's own `PartialEq`/
-  // `Debug`, the same surface a caller would actually inspect.
+  // `Debug`, the same functions a caller would inspect.
   assert_eq!(bytes, BytesSlot::<8>::empty(), "a recycled byte slot equals a fresh one");
 }
 
@@ -242,8 +243,8 @@ fn a_recycled_storage_slot_stops_returning_the_previous_lap() {
 
 #[test]
 fn fill_is_implemented_on_the_payload_so_a_new_payload_needs_no_slot_change() {
-  // Demonstrated by using the trait directly rather than through the free
-  // function: this is what a caller adding a payload kind would write.
+  // This uses the trait directly rather than through the free function,
+  // because that is what a caller adding a payload kind would write.
   let mut slot = TypedSlot::empty();
   Fill::fill(3u8, &mut slot).unwrap();
   assert_eq!(slot.get(), Some(&3));

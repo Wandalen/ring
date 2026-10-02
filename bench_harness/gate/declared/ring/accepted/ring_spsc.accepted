@@ -7,4 +7,4 @@
 #
 # See accepted/readme.md, "The alignment canaries".
 
-ring/ring_spsc/src/lib.rs:364:5: replace Ring<S>::on_distinct_lines -> bool with true
+ring_spsc/src/lib.rs:405:5: replace Ring<S>::on_distinct_lines -> bool with true

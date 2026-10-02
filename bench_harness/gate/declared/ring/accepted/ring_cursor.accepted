@@ -11,4 +11,4 @@
 # "The alignment canaries", for why leaving these three unkillable is the point
 # rather than a concession.
 
-ring/ring_cursor/src/lib.rs:440:5: replace CursorPair::on_distinct_lines -> bool with true
+ring_cursor/src/lib.rs:481:5: replace CursorPair::on_distinct_lines -> bool with true

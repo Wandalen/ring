@@ -16,5 +16,5 @@
 # shape, which is a performance property. Asserting it would mean asserting on a
 # clock, the same trade `ring_bench` refuses, for the same reason.
 
-ring/ring_wait/src/lib.rs:121:30: replace % with + in pause
-ring/ring_wait/src/lib.rs:121:30: replace % with / in pause
+ring_wait/src/lib.rs:113:29: replace % with + in pause
+ring_wait/src/lib.rs:113:29: replace % with / in pause

@@ -39,14 +39,14 @@
 # is one API detail: `try_push` gives the record back, `try_push_batch` does
 # not.
 
-ring/ring_poll/src/lib.rs:298:17: replace < with <= in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with <= in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with == in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with > in push_within
-ring/ring_poll/src/lib.rs:378:16: replace < with <= in push_batch_within
-ring/ring_poll/src/lib.rs:378:16: replace < with == in push_batch_within
-ring/ring_poll/src/lib.rs:378:16: replace < with > in push_batch_within
-ring/ring_poll/src/lib.rs:414:17: replace < with <= in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with <= in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with == in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with > in recv_within
+ring_poll/src/lib.rs:273:17: replace < with <= in push_within
+ring_poll/src/lib.rs:279:20: replace < with <= in push_within
+ring_poll/src/lib.rs:279:20: replace < with == in push_within
+ring_poll/src/lib.rs:279:20: replace < with > in push_within
+ring_poll/src/lib.rs:344:16: replace < with <= in push_batch_within
+ring_poll/src/lib.rs:344:16: replace < with == in push_batch_within
+ring_poll/src/lib.rs:344:16: replace < with > in push_batch_within
+ring_poll/src/lib.rs:373:17: replace < with <= in recv_within
+ring_poll/src/lib.rs:378:16: replace < with <= in recv_within
+ring_poll/src/lib.rs:378:16: replace < with == in recv_within
+ring_poll/src/lib.rs:378:16: replace < with > in recv_within

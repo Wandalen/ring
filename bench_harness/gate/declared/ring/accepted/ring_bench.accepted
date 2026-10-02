@@ -31,10 +31,10 @@
 # worse. If that trade is ever revisited, this file is where the revisit starts.
 #
 # NOT accepted, and deliberately absent from this list: the closing partial-batch
-# count at `src/lib.rs:1056`, which the same survey found and which *was*
+# count in `run_mutex_queue`, which the same survey found and which *was*
 # defendable without a clock. It is defended now, and held by `mutant/S1` rather
 # than excused here. The two files are the two answers to the same question.
 
-ring/ring_bench/src/lib.rs:732:5: replace Outcome::write_nanos -> u128 with 0
-ring/ring_bench/src/lib.rs:732:5: replace Outcome::write_nanos -> u128 with 1
-ring/ring_bench/src/lib.rs:1051:31: replace == with != in run_mutex_queue
+ring_bench/src/lib.rs:686:5: replace Outcome::write_nanos -> u128 with 0
+ring_bench/src/lib.rs:686:5: replace Outcome::write_nanos -> u128 with 1
+ring_bench/src/lib.rs:965:27: replace == with != in run_mutex_queue

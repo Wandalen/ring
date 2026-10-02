@@ -104,7 +104,7 @@ Comment lines start with `#`; every other line is one survivor, matched against
 `cargo mutants`' own `missed.txt` output by exact whole-line comparison.
 
 ```
-ring_bench/src/lib.rs:732:5: replace Outcome::write_nanos -> u128 with 0
+ring_bench/src/lib.rs:686:5: replace Outcome::write_nanos -> u128 with 0
 ```
 
 Copy the line verbatim from `-mutants_out/mutants.out/missed.txt` rather than

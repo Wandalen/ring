@@ -191,7 +191,7 @@ c.sequences().collect::< Vec< _ > >();
 ```
 
 ### `ring_publish`. Make claimed visible.
-`Publisher::try_publish(start,len)->Result<Seq>` via CAS, only when predecessor published; cursor is *not* claim cursor (else consumer sees uninitialised memory; passes single-thread, fails loom). Hosts the 4-crate handshake reached-test (20k items real threads + loom exhaustive 1v1). Only unbounded spin in family.
+`Publisher::try_publish(start,len)->Result<Seq>` via CAS, only when predecessor published; cursor is *not* claim cursor (else consumer sees uninitialised memory; passes single-thread, fails loom). Hosts the claim/publish/consume handshake test (real threads plus an exhaustive loom model). Only unbounded spin in family.
 > Granny: step 2 in words: "letters are in, flags up, in ticket order". You cannot raise flag 14 before flag 13 is up, otherwise mailman sees a hole. Uses a separate "published" bookmark so nobody peeks at half-written letters.
 ```rust
 let p = Publisher::new();
@@ -230,7 +230,7 @@ let b = BatchClaim::new( Seq( 10 ), 3 );
 ## 3. Rings
 
 ### `ring_spsc`. Single-producer ring.
-`Ring<S>::new(cap)/with_config`, `split()->(Producer,Consumer)` (borrowed, `!Sync` stops cross-thread share at compile time), `Producer::claim/push_with/try_push`, `Consumer::drain/drain_up_to->Batch`. 2×`Release` stores, no RMW. `unsafe` (2 fns + `Sync`) sited here with loom model (x86 passes 100k items even with wrong ordering; loom catches it).
+`Ring<S>::new(cap)/with_config`, `split()->(Producer,Consumer)` (borrowed, `!Sync` stops cross-thread share at compile time), `Producer::claim/push_with/try_push`, `Consumer::drain/drain_up_to->Batch`. 2×`Release` stores, no RMW. `unsafe` (the slot accessors + `Sync`) sited here with loom model (x86 passes 100k items even with wrong ordering; loom catches it).
 > Granny: one sender, one mailman. Simplest post office: no queue at the counter, just two flags. The compiler itself forbids a second sender or sharing ends across threads.
 ```rust
 let mut r : Ring< TypedSlot< u8 > > = Ring::new( cap );
@@ -240,7 +240,7 @@ c.drain();
 ```
 
 ### `ring_mpsc`. Multi-producer ring.
-`Ring::new(cap)`, `ends()->Ends`, `Ends::split()->(Producer:Copy,Consumer:!Clone/!Sync)`, `Reserved(DerefMut)->publish on drop`, `published_through()`. Per-slot stamp (=seq when published) + consumer scan. No producer waits for its predecessor (unlike `Publisher::publish`); the consumer pays for the scan. `ring_publish`/`ring_consume` deliberately *not* used (cursor-advance shape doesn't fit). Ex-`mpsc_ring`.
+`Ring::new(cap)`, `ends()->Ends`, `Ends::split()->(Producer:Copy,Consumer:!Clone/!Sync)`, `Reserved(DerefMut)->publish on drop`, `published_through()`. Per-slot stamp (=seq when published) + consumer scan. No producer waits for its predecessor (unlike `Publisher::publish`); the consumer pays for the scan. `ring_publish`/`ring_consume` deliberately *not* used (cursor-advance shape doesn't fit).
 > Granny: many senders, one mailman. Each sender stamps its box with its ticket number when done; mailman scans forward "is the stamp what I expect?" No sender waits for another sender. The mailman does a bit more looking instead. Sender handle is copyable (pass it to threads), mailman handle is not.
 ```rust
 let mut r : Ring< TypedSlot< u8 > > = Ring::new( cap );
@@ -325,8 +325,8 @@ poll::try_push_with_budget( &mut p, v, b );
 ## 5. Observe / test / measure
 
 ### `ring_stats`. Counters. `no_std`.
-`RingStats::record_claim/publish/drop(policy,n)`, `claimed/published/dropped(policy)/dropped_total/in_flight/reset`. No production path reads them yet (2 dependents, neither on hot path). Observability only. No `Clone/Copy/PartialEq` (7 atomics ⇒ no snapshot; `Debug` is 7 loads, can show spread that never existed).
-> Granny: the tally sheet: how many tickets given, published, thrown away. For the manager, not for the workers. Nobody on the fast path reads it. Photographing 7 counters at 7 moments can show a combination that never existed at once.
+`RingStats::record_claim/publish/drop(policy,n)`, `claimed/published/dropped(policy)/dropped_total/in_flight/reset`. No production path reads them yet, and nothing on a hot path depends on them. Observability only. No `Clone/Copy/PartialEq` (one atomic per counter ⇒ no snapshot; `Debug` loads them one at a time, so it can show a spread that never existed).
+> Granny: the tally sheet: how many tickets given, published, thrown away. For the manager, not for the workers. Nobody on the fast path reads it. Reading the counters one at a time can show a combination that never existed at once.
 ```rust
 stats.record_claim( 4 );
 stats.record_publish( 4 );
@@ -368,7 +368,7 @@ c.fastest();
 ```
 
 ### `bench_harness`. Neutral grader. Depends on no `ring_*` crate, because the grader must run before graded builds.
-`Workload` (seeded items), `Accumulator/Write` (fold semantics), `ByteParity/Parity` (table agreement + first divergence), `gate/declared/<family>/gates.txt` + `gate/run_all.sh --family <name>` (ring:14 gates, orbital:11). `ring_bench` grades write-path candidates; this grades families. Lives here because ring was first target, not only target.
+`Workload` (seeded items), `Accumulator/Write` (fold semantics), `ByteParity/Parity` (table agreement + first divergence), `gate/declared/<family>/gates.txt` + `gate/run_all.sh --family <name>`. `ring_bench` grades write-path candidates; this grades a declared family. Lives here because ring was its first target.
 > Granny: the exam board, independent of any school so it can examine empty classrooms on day one. Hands out the same seeded homework to everyone, then checks byte-for-byte if final tables match and points at the first difference. Run `gate/run_all.sh --family ring` for the current score, don't trust a number copied here.
 ```rust
 let w = Workload::seeded( 42, 1000 );

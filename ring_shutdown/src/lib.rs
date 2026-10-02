@@ -11,8 +11,10 @@
 //! So this crate enforces the ordering with *types*. [`Shutdown::close`]
 //! returns a [`Stopped`] token, and `drain_all` and `discard_all` are methods
 //! on that token rather than free functions. There is no way to spell a drain
-//! that did not follow a close, and [`Stopped::reopen`] consumes the token, so
-//! there is no way to spell one that follows a *reopen* either.
+//! that did not follow a close. [`Stopped::reopen`] consumes the token it is
+//! called on, so a drain on *that* token cannot follow its reopen. A token from
+//! an earlier `close` is a separate value and survives the reopen, so a drain
+//! after a reopen still compiles through it.
 //!
 //! One rule is still convention. Nothing forces a producer to consult the flag.
 //! [`Shutdown::guard`] is the mitigation. A [`Guarded`] producer checks before

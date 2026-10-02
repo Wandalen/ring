@@ -1,87 +1,73 @@
-# workaround
+# `ring_mpsc` opts out of the workspace unsafe-code deny so many producers can write disjoint slots of one array
 
-External constraints `ring_mpsc` absorbs.
+Status: Accepted
 
-### Scope
+## Context
 
-- **Purpose**: Record every external constraint this crate compensates for, so each one carries a cost and a deletion condition.
-- **Responsibility**: Document this crate's workarounds, or record explicitly that it has none.
-- **In Scope**: Constraints originating outside this repository — for a crate whose only dependencies are workspace siblings, that means the language, the toolchain, and the targets.
-- **Out of Scope**: This crate's own design decisions, which are not workarounds however unusual they look; constraints compensated in shared tooling elsewhere in the workspace.
+The workspace sets `unsafe-code = "deny"` and `undocumented_unsafe_blocks = "deny"`. In `ring_mpsc::Ring`, any number
+of producers write slots while the one consumer reads others, all through shared references to one allocation.
+`ring_mpsc::Producer` is `Copy` and `Sync` on purpose, since giving each thread its own copy is what multi-producer
+means. Which producer may write which slot is a runtime fact about cursor values, settled by a compare-exchange in
+`ring_claim::Claimer::claim`. The borrow checker reasons about scopes and cannot see it.
 
-### Overview
+The invariant is stated in the claim cursor, the per-slot stamps and the consumer cursor. `ring_store` and `ring_slot`
+hold none of those, so the unsafe code has to live in a crate that holds both the storage and the cursors.
+`bench_harness/gate/declared/ring/unsafe_allowlist.txt` names this crate, and gate G6 requires this file to justify
+the opt-out.
 
-**Two, both from the language.**
+## Decision
 
-This crate is the family's only multi-producer ring, and it is one of two crates
-that hold storage *and* the cursors bounding it. That combination is what puts
-it on the workspace unsafe allowlist: two producers writing two different slots
-of one array is a disjointness the borrow checker cannot express, and no safe
-formulation of it exists. Both workarounds below are that one constraint seen
-from two sides — the opt-out that lets the code be written
-([`001`](001_the_unsafe_code_opt_out_and_its_obligations.md)), and the `Sync`
-impl that lets the type cross a thread boundary
-([`002`](002_an_unsafe_impl_sync_the_compiler_cannot_derive.md)).
+`ring_mpsc` carries `#![allow(unsafe_code)]`, and its unsafe code is confined to these items:
 
-**The earlier reading of this file was that there were none**, on the argument
-that a crate with no published dependency has nothing external to compensate
-for. Every dependency being a workspace sibling is true and it is the wrong
-test: the language is external, and it is the language this crate works around.
-The supporting dependency list was also wrong in both directions — it named
-`ring_publish` and `ring_consume`, which are not dependencies, and omitted
-`ring_atomic`, `ring_slot` and `ring_types`, which are.
+- `unsafe impl<S: Send> Sync for Ring<S>`, because the slots are `Buffer<UnsafeCell<S>>` and the compiler will not
+  derive `Sync` through an `UnsafeCell`;
+- the private `unsafe fn Ring::slot` and `Ring::slot_mut`, each one deref of a single slot's `UnsafeCell`;
+- their call sites in `Reserved`'s `Deref` and `DerefMut` impls and in `Batch::get` and `Batch::get_mut`.
 
-```sh
-cd "$(git rev-parse --show-toplevel)"/ring_mpsc
-printf 'path deps:        '; grep -c 'path = "\.\./ring_' Cargo.toml
-printf 'published deps:   '; grep -cE '^[a-z-]+ = \{ version' Cargo.toml
-printf 'the siblings:     '; grep -oE 'ring_[a-z]+' Cargo.toml | sort -u | tr '\n' ' '; echo
-printf 'unsafe in code:   '
-grep -vE '^\s*(//|///|//!)' src/lib.rs | grep -c 'unsafe'
-```
+These rules bound it:
 
-Live output:
+- No unsafe API is public, and callers carry no obligation. A `Reserved` comes only from `Producer::claim`, after the
+  claim passed the `GatingSet` headroom check. A `Batch` comes only from `Consumer::drain` or `Consumer::drain_up_to`,
+  which stop at the first slot whose stamp, read at `OBSERVE`, does not equal its sequence. So `slot_mut` is reached
+  only for a claimed, unpublished sequence or a published, uncommitted one.
+- There is one consumer. `Ring::ends` takes `&mut self`, `Ends::split` takes `&mut self`, and `Consumer` is neither
+  `Clone` nor `Sync`.
+- Happens-before runs both ways. The `PUBLISH` store and `OBSERVE` load on a stamp carry the payload write to the
+  consumer. The `COMMIT` store and `ring_cursor::GATING` load on the consumer cursor carry the payload read back to
+  the producers before a slot is reused.
+- The `UnsafeCell` wraps each slot, not the whole `Buffer`. The whole-buffer form materialised `&mut Buffer<S>` over
+  the entire allocation, so two producers writing different slots aliased all of it, and Miri reported a retag
+  conflict.
 
-```
-path deps:        8
-published deps:   0
-the siblings:     ring_atomic ring_store ring_claim ring_config ring_consume ring_cursor ring_gating ring_mpsc ring_publish ring_slot ring_types 
-unsafe in code:   10
-```
+Maintainers carry two obligations. `Ring::ends` must keep its `&mut self` receiver, because the `Sync` argument rests
+on there being one consumer, and the only guard is a `compile_fail` doctest that holds two `Ends` at once. The stamp
+test in `Ring::contiguous_end` must stay an equality, because `!= UNSTAMPED` or `>=` would read a previous lap's stamp
+as published.
 
-**This file is where the allowlist points.** `gate/declared/ring/unsafe_allowlist.txt`
-names three crates and requires each to justify its opt-out in its own
-this file; G6 enforces that by scanning for the word here. So
-a **None.** in this file was not merely incomplete — it was the enforced
-obligation left undischarged, and it survived because G6's own scan pattern
-omitted the house codestyle's spaces and matched no crate at all
-(→ [`../decisions/001`](../decisions/001_ring_core_sits_on_the_unsafe_allowlist_without_unsafe.md)).
+The bound is `S: Send`, not `S: Sync`. A record is written on a producer's thread and read on the consumer's, so it
+moves between threads and is never shared.
 
-### Sources
+`ring_spsc` carries the identical `unsafe impl` line on a different argument, exactly two threads and ends that must
+not be `Sync`. See [its record](../../../ring_spsc/docs/workaround/readme.md).
 
-| File | Relationship |
-|------|-----------------|
-| `Cargo.toml` | The dependency surface: eight path dependencies, no published crate |
-| `src/lib.rs` | The ten unsafe lines both workarounds account for |
-| `../../../bench_harness/gate/declared/ring/unsafe_allowlist.txt` | Names this crate and requires the justification to live in this file |
-| `../../../bench_harness/gate/g6_unsafe.sh` | Enforces that requirement — the gate this file answers to |
+## Alternatives considered
 
+- **Put the unsafe code in `ring_store` or `ring_slot`.** A storage-only crate cannot state the cursor invariant. A
+  `SharedBuffer::split()` was considered and found unsound for that reason.
+- **One `UnsafeCell` around the whole `Buffer`.** Unsound, as Miri showed.
+- **Safe code only.** Nothing safe expresses "each producer has exclusive access to the one slot it claimed", so the
+  ring could not be written.
 
-### Regenerate
+## Consequences
 
-```sh
-cd "$(git rev-parse --show-toplevel)"/ring_mpsc/docs/workaround
-printf 'instances:                '; ls [0-9][0-9][0-9]_*.md | wc -l
-printf 'finding headings inside:  '; grep -hoE '^### MP[0-9]+ ' [0-9][0-9][0-9]_*.md | wc -l
-printf 'rows in the table below:  '; grep -coE '^\| MP[0-9]+ ' readme.md
-# instances:                2
-# finding headings inside:  3
-# rows in the table below:  3
-```
-### Findings Recorded Here
-
-| ID | Subject | Tier | Finding |
-|----|---------|------|---------|
-| MP50 | the unsafe sites | n/a — observation | The four call sites of `slot`/`slot_mut` are all inside `Reserved` or `Batch`, neither of which can be constructed for an ungated sequence. |
-| MP51 | the unsafe census | n/a — observation | `ring_mpsc` and `ring_spsc` each carry exactly ten `unsafe` lines in code, and no other crate in the family carries any. |
-| MP52 | consumer uniqueness | **latent hazard** | The `Sync` impl's first safety clause cites `ends`' and `split`'s receivers, so a convenience change to either invalidates it silently. |
+- The `compile_fail` guards in the crate's `//!` (no second consumer by `Clone`, `Consumer` not `Sync`, no second
+  split, no second `Ends`, no `Reserved` outliving the ring it borrows) run only under `cargo test --doc`, which
+  `verb/test` and CI run. A nextest-only run, such as `verb/test_only`, checks none of them.
+- `COMMIT`'s `Release` has no behavioural check. Only the test
+  `the_orderings_are_the_ones_the_publication_invariant_names` reads the constant. The crate's `tests/manual/readme.md`
+  records that weakening it to `Relaxed` survived both loom models and 120 hardware runs on aarch64.
+- The loom models, `mod exhaustive` in `tests/mpsc_test.rs`, cover the publish edge and the drain bound and run only
+  under `--cfg loom`. The Loom CI workflow runs them on `master` pushes and nightly, and no verb runs them. No verb or
+  workflow runs Miri.
+- Delete the opt-out when a safe abstraction, from `std` or a dependency, can express exclusive access to one element
+  of a shared array gated by a runtime cursor comparison. None exists. The `Sync` impl retires with it.

@@ -28,6 +28,11 @@ REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../.." && pwd )"
 GATE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DECL_ROOT="$GATE_DIR/declared"
 
+# The gates parse cargo and nextest output, so color codes must stay out of it.
+# Under CARGO_TERM_COLOR=always, G2 read `\e[1m\e[92m   Doc-tests\e[0m` and
+# found no crate reached.
+export CARGO_TERM_COLOR=never
+
 # Where crates live, and how these gates find themselves.
 #
 # The declarations are located from BASH_SOURCE rather than from a literal under

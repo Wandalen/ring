@@ -69,8 +69,8 @@ impl Parity {
 
 /// The byte-parity oracle, bound to the semantics it compares under.
 ///
-/// The family's smoke test is *"all patterns produce byte-identical final
-/// tables"*, and that claim is only meaningful once the fold rule is named.
+/// The smoke test this oracle serves is *"all patterns produce byte-identical
+/// final tables"*, and that claim is only meaningful once the fold rule is named.
 /// Two write paths that disagree under [`Accumulator::Set`] may agree under
 /// [`Accumulator::Delta`], and vice versa. So the semantics is a constructor
 /// argument, not a per-call one, and an oracle never compares in the

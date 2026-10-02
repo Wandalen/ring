@@ -12,12 +12,14 @@
 //! | `accumulator` | [`Accumulator`] and [`Write`], the two semantics a write sequence folds under |
 //! | `oracle` | [`ByteParity`] and [`Parity`], which report whether two completed tables agree and where they stop |
 //!
-//! The two components answer one question between them. The family's smoke
-//! test is *"all patterns produce byte-identical final tables"*, which needs a
+//! The two components answer one question between them. The smoke test they
+//! serve is *"all patterns produce byte-identical final tables"*, which needs a
 //! sequence every candidate can be driven with and a rule for deciding whether
 //! the tables that come back agree. Neither half is meaningful alone. A
 //! sequence nothing grades measures nothing, and an oracle with no common input
-//! compares two different experiments.
+//! compares two different experiments. No declared family runs that smoke test
+//! today. The `ring` family declares no smoke binary in
+//! `gate/declared/ring/smoke.txt`.
 
 #![deny(missing_docs)]
 

@@ -48,8 +48,10 @@ pub enum RingError {
   /// A capacity that is not a power of two was requested; the offending value
   /// is carried so the caller can report it.
   CapacityNotPowerOfTwo(usize),
-  /// The ring has no free slot and its [`crate::OverflowPolicy`] is
-  /// [`crate::OverflowPolicy::Fail`].
+  /// There are fewer free slots than the operation needs. Code that applies an
+  /// [`crate::OverflowPolicy`] returns this only under
+  /// [`crate::OverflowPolicy::Fail`]. The rings and claimers apply no policy and
+  /// return it whenever the room is missing.
   Full,
   /// The ring has no unread item and the caller asked not to wait.
   Empty,
@@ -116,7 +118,8 @@ impl RingError {
   /// progress in the meantime. True for the two conditions a peer's progress
   /// clears. `Full` clears when the consumer drains and `Empty` when a producer
   /// publishes. Against a stalled peer neither clears, and this method cannot
-  /// tell a stalled peer from a slow one.
+  /// tell a stalled peer from a slow one. `ring_barrier`'s `Barrier::wait_for`
+  /// pitfall names a case with no peer, where `Empty` never clears.
   ///
   /// ```
   /// use ring_types::RingError;

@@ -54,7 +54,7 @@ cargo nextest run -p ring_core --offline --features crossbeam
 
 | Suite | Result under the mutation |
 |---|---|
-| `core_test` | **FAIL**, including at least `a_partial_batch_push_reports_its_count_and_consumes_the_refused_record`, `drop_newest_discards_the_incoming_record_without_an_error`, `a_refused_record_comes_back_on_every_backend`, `four_threads_publishing_through_clones_lose_nothing` |
+| `core_test` | **FAIL**, including at least `a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record`, `drop_newest_discards_the_incoming_record_without_an_error`, `a_refused_record_comes_back_on_every_backend`, `four_threads_publishing_through_clones_lose_nothing` |
 | doc tests | **none fail** |
 
 Then all pass after the restore.

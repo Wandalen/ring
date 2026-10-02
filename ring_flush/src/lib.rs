@@ -599,16 +599,17 @@ impl<'a, T: Send> Flusher<'a, T> {
     // Steps 1, 3 and 4: seal, drain, reset. `TlsBuffer::drain` empties the
     // buffer as the iterator drops, so the reset is not a separate statement
     // that could be reordered above the push.
-    let count = self.producer.try_push_batch(&mut self.buffer.drain());
+    let (Ok(count) | Err((count, _))) = self.producer.try_push_batch(&mut self.buffer.drain());
 
     // `count < staged` is not asserted here, and the omission is deliberate.
     // It is reachable only by violating this crate's contract, with a second
     // producer on the same ring taking the space between the check above and
-    // this push. At that point the shortfall is already unrecoverable, because
-    // `try_push_batch` consumes the record it fails to place. A
-    // `debug_assert!` would promise a guarantee that evaporates in exactly the
-    // build where the race is likely, and no runtime check can restore records
-    // that are already gone. What is reported is what landed.
+    // this push. At that point the shortfall is already unrecoverable: the
+    // refused record is discarded above, and the drain empties the rest of the
+    // buffer as it drops. A `debug_assert!` would promise a guarantee that
+    // evaporates in exactly the build where the race is likely, and no runtime
+    // check can restore records that are already gone. What is reported is what
+    // landed.
     self.record(cause, FlushOutcome::Flushed { count })
   }
 

@@ -1,6 +1,6 @@
 # `free_capacity` keeps one `usize` signature on every backend, binding at SPSC and advisory elsewhere
 
-Status: Accepted
+Status: Deferred
 
 ## Context
 
@@ -21,6 +21,9 @@ rule that it is its ring's only producer.
 
 ## Decision
 
+Keep one plain signature until a caller shows which reading it needs. This is the shape in force, not a ruling that
+the SPSC guarantee is worth what it costs.
+
 - `free_capacity`, `is_full`, `Consumer::len` and `Consumer::is_empty` keep one plain signature on every backend.
   Each method's documentation states the split and names the authority, `Producer::try_push` for the producer and
   `Consumer::try_recv` for the consumer.
@@ -40,7 +43,8 @@ rule that it is its ring's only producer.
 - **Return a wrapper type that carries the reading.** Every caller unwraps it, and every production caller wants a
   plain `usize` to compare.
 - **Advisory everywhere by contract.** Free, but it gives up a real guarantee that `ring_spsc` provides and a caller
-  could rely on.
+  could rely on. No caller relies on it today, so this is the likeliest resolution if neither revisit trigger below
+  ever fires.
 - **A `Cardinality` enum reported by a method.** The caller checks, then acts in a separate step, and the two can
   drift apart.
 - **Cardinality in the type, as `Ring<T, Single>` and `Ring<T, Multi>`.** Answers the question at compile time, and

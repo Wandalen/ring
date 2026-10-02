@@ -18,8 +18,8 @@ getconf LEVEL1_DCACHE_LINESIZE
 ```
 
 **Expected:** `64` on this host. If it reports 128, the constant is wrong for
-this machine and the padding is decorative. Record that as a finding rather
-than adjusting the test.
+this machine and the padding is decorative. Record that in the Run Record
+rather than adjusting the test.
 
 ## M2: the crate really contains no `unsafe`
 
@@ -38,9 +38,9 @@ needed; no `unsafe` block, function, impl, or trait. No `allow` hits at all.
 Scope both greps to `src/` and the manifest. Grepping the crate root makes this
 plan file match its own search string and report a hit that is not there.
 
-The crate is also absent from the *justified* set in
-`bench_harness/gate/declared/ring/unsafe_allowlist.txt` in practice, even
-though it is permitted there.
+The crate is also absent from
+`bench_harness/gate/declared/ring/unsafe_allowlist.txt`, the list of crates
+permitted to opt out of the lint.
 
 ## M3: the padding is observable on real addresses, not just in `size_of`
 

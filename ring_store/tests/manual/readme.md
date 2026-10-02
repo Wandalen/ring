@@ -1,15 +1,13 @@
 # ring_store manual testing plan
 
 `tests/buffer_test.rs` asserts the buffer stores and addresses correctly. This
-plan covers the one clause of
-`docs/feature/168_ring_buffer_storage.md` that a passing test cannot establish.
-The clause **"holds no cursor and no ordering state"** is a claim about what the
-type does *not* contain, and no amount of exercising a type demonstrates an
-absence.
+plan covers the one claim a passing test cannot establish. That the buffer
+**holds no cursor and no ordering state** is a claim about what the type does
+*not* contain, and no amount of exercising a type demonstrates an absence.
 
 The test file has two stand-ins for it, a `size_of` pin and an out-of-order
 write sweep, and names the holes in both. What closes the question is a human
-reading a thirty-line struct. That reading is this plan.
+reading a short struct. That reading is this plan.
 
 Run from the workspace root.
 
@@ -37,6 +35,8 @@ grep -nE "cursor|Ordering|atomic" ring_store/src/lib.rs \
 
 **Expected:** the first count is non-zero, and the second produces no output at
 all. A zero first count means the pattern is wrong and the check proves nothing.
+An empty second result alone cannot tell "the crate is clean" from "the pattern
+matches nothing anywhere", which is why the first command exists.
 
 ## M3. The panic decision is documented where a caller will hit it
 
@@ -82,9 +82,3 @@ as a compiled assertion with an example's shape.
 | 2026-08-28 | M3 | ✅ | Both `# Panics` blocks present; `get`'s carries the full four-line reasoning, `get_mut`'s defers to it with "As [`Buffer::get`]". |
 | 2026-08-28 | M4 | ✅ | Body is `self.slots.is_empty()`, the same slice `len` measures; the doc states "Always false, since a `Capacity` cannot be zero". |
 | 2026-08-28 | M5 | ✅ | 8 doc tests pass. |
-
-M2's first command exists because of how the check failed on its first draft:
-the executable-only grep returned nothing, which is indistinguishable between
-"the crate is clean" and "the pattern matches nothing anywhere". Counting all
-lines first makes the check non-vacuous. That is the same discipline
-`docs/invariant/001_gate_non_vacuity.md` applies to the gates.

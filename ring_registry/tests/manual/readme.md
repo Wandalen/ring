@@ -1,14 +1,13 @@
 # Manual testing for ring_registry
 
-Six stages. Each states a **prediction before it is run**, so a wrong
-prediction is recorded as a finding rather than quietly corrected into agreement
-with the result.
+Each stage states a **prediction before it is run**, so a wrong prediction is
+recorded as a finding rather than quietly corrected into agreement with the
+result.
 
-Two stages carry the weight. M1 measures the claim that
-[`docs/pitfall/001`](../../docs/pitfall/001_insert_would_have_replaced_silently.md)
-is built on, rather than leaving it as reasoning. M6 is where the prediction was
-wrong. It put a measured byte count on the crate's one argued-over signature
-decision. The rest cover things the automated suite structurally cannot.
+Two stages carry the weight. M1 measures, rather than argues, that an
+`insert`-based registry would lose a ring. M6 puts a measured byte count on the
+crate's one argued-over signature decision. The rest cover things the automated
+suite structurally cannot.
 
 Run from the repository root.
 
@@ -38,7 +37,7 @@ after a second insert:       drops=4 len=1
 contains(events)=true
 ```
 
-The pitfall is measured, not inferred. Note what a test would have to look at to
+The loss is measured, not inferred. Note what a test would have to look at to
 notice: not `len`, not `contains`, not any retrieval, only the drop counter.
 
 ---
@@ -86,10 +85,9 @@ emptiness is not mistaken for a bug.
 cargo +nightly udeps -p ring_registry --all-targets --all-features
 ```
 
-**Prediction:** clean. `ring_core` and `ring_types` were moved out of
-`[dependencies]` when the implementation showed the record type is opaque here
-(→ [`docs/integration/001`](../../docs/integration/001_one_declared_edge_of_three.md));
-`ring_core` and `ring_config` remain as dev-dependencies, both used by the tests.
+**Prediction:** clean. The record type is opaque here, so the library needs only
+`ring_handle`. `ring_core` and `ring_config` are dev-dependencies, both used by
+the tests.
 
 **Result (2026-08-28):** `All deps seem to have been used.`
 
@@ -105,8 +103,7 @@ cargo tarpaulin -p ring_registry --all-features --out Stdout 2>&1 \
 **Prediction:** 100%. Every operation has a named test and the only branch is the
 `Entry` match, both arms of which are exercised.
 
-**Result (2026-08-28):** `28/28`. Reached on the first measurement, without a
-coverage-driven test added afterwards.
+**Result (2026-08-28):** `28/28`.
 
 ---
 
@@ -131,23 +128,17 @@ error: the `Err`-variant returned from this function is very large
 
 **This is the most useful stage in the plan despite being a lint.** The
 prediction was wrong because it was made about the *implementation*, and the lint
-is about the *signature*. The signature is the one part of this crate that was
-argued at length before it was written
-(→ [`decisions/readme.md`](../../docs/decisions/readme.md) Closed 2). The lint
-did not find a mistake; it put a number on a cost the decision had accepted
-without one. 448 bytes, on the `Ok` path as well as the `Err` path.
+is about the *signature*, which hands a refused ring back inside the error
+([ADR 001](../../docs/decisions/001_the_registry_stays_minimal_until_a_consumer_asks.md)
+records the cost). The lint did not find a mistake; it put a number on a cost
+the choice had accepted without one. 448 bytes, on the `Ok` path as well as the
+`Err` path.
 
-Two remedies were available and both were refused, because each undoes Closed 2:
-dropping the payload destroys the caller's ring, and boxing it allocates on the
-failure path to narrow a `Result` whose bytes `register` already takes by value
-on the way in. The suppression is on `register` alone, with a `reason =`, so the
-next oversized `Result` still fails the build.
-
-The same run had a secondary finding, unrelated and fixed rather than
-suppressed. Four `producer.try_push( .. ).ok().expect( .. )` calls in the test
-file tripped `clippy::ok_expect`. They were written that way to dodge a `Debug`
-bound and are now `assert!( .. .is_ok(), "within capacity" )`, which dodges it
-without the lint.
+Two remedies are available and both are refused, because each undoes that
+choice: dropping the payload destroys the caller's ring, and boxing it allocates
+on the failure path to narrow a `Result` whose bytes `register` already takes by
+value on the way in. The suppression is on `register` alone, with a `reason =`,
+so the next oversized `Result` still fails the build.
 
 **After the fix:** clean both ways.
 
@@ -163,12 +154,6 @@ without the lint.
 | M4 | No unused dependencies | ✅ clean |
 | M5 | Fully covered | ✅ 28/28 |
 | M6 | Clippy-clean under `-D warnings` | ❌ **prediction wrong**: `result_large_err`, 448 bytes; allowed with a reason, plus 4 `ok_expect` fixed |
-
-**Predictions wrong: 1 of 6**, and it is M6. The five that were right cover a
-`HashMap` with one refusal, which is what a crate this small should produce. The
-two that earned their run are M1, which turns the pitfall from an argument into a
-measurement, and M6, which turns the crate's one deliberate signature decision
-from a qualitative trade into a number.
 
 **Environment:** `2026-08-28`, Linux 6.8.0, `cargo nextest`, `cargo tarpaulin`,
 `cargo +nightly udeps`, `cargo clippy`. 14 tests + 1 doc test, all passing.

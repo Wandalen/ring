@@ -9,7 +9,7 @@ Run from the workspace root.
 
 ## M1. The fold compiles to a mask, not a division
 
-The acceptance criterion says "computed by mask not division". A test asserting
+The fold must be computed by mask, not division. A test asserting
 `of(seq, cap) == seq % cap` passes either way, because for powers of two the two
 agree. The only way to tell is to look at what the code does.
 

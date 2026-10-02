@@ -1,10 +1,9 @@
 # ring_barrier manual testing plan
 
-`tests/barrier_test.rs` covers this crate's half of
-`docs/feature/178_sequence_barrier_and_gating_set.md`, the minimum across sets
-of 1, 2 and 3 cursors. The coverage is exhaustive. The test places the minimum
-at every index of every set size from one to eight, so a fold that reads an end
-rather than folding fails 30 of those 36 cases.
+`tests/barrier_test.rs` covers the minimum across a set of cursors, and the
+coverage is exhaustive. The test places the minimum at every index of every set
+size from one to eight, so a fold that reads one end rather than folding fails
+every case where the minimum sits elsewhere.
 
 The risk this crate carries is not in the fold. It is that `ring_barrier` and
 `ring_gating` look like the same crate. Both hold a set of cursors and both
@@ -30,18 +29,13 @@ grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \
 ```
 
 **Expected:** no output. `Capacity` is not imported and does not appear at all,
-not even in a doc example. That is a weaker result than it was before the
-signature changed. While `Barrier::over` took a `&GatingSet`, every doc example
-here had to build one, so a capacity was in the file and this check was reading
-real restraint. Now the constructor takes a bare `&[ PaddedCursor ]` and there
-is nothing to build. The check passes because capacity has no way in, not
-because it was kept out.
+not even in a doc example. The constructor takes a bare `&[ PaddedCursor ]`, so
+the check passes because capacity has no way in, not because it was kept out.
 
-So the assertion that matters moved to the test file.
+So the assertion that matters is in the test file.
 `available_ignores_capacity_entirely` reads one set of cursors from both sides
 at once: `GatingSet::headroom` clamped to 4, `Barrier::available` reporting
-1,000 over the same cursors. That is the claim this grep used to make and can
-no longer make on its own.
+1,000 over the same cursors. This grep cannot make that claim on its own.
 
 ## B2. The dependencies are a borrowed slice, never an owned aggregate
 
@@ -58,16 +52,11 @@ grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \
   | grep -nE "Vec<|Vec ?<|GatingSet|PaddedCursor"
 ```
 
-**Expected:** no `Vec` and no `GatingSet` of any kind. There are five hits, all
+**Expected:** no `Vec` and no `GatingSet` of any kind. Every hit is
 `PaddedCursor`: the `use`, the field `dependencies : &'a [ PaddedCursor ]`,
 `over`'s parameter, `dependencies()`'s return, and `cursor()`'s
 `Option< &'a PaddedCursor >`. The `'a` on the last two is what ties a handed-out
 cursor back to the borrowed slice, so a caller cannot outlive what it reads.
-
-That second mistake is not hypothetical. This crate made it until
-`ring_publish/tests/handshake_test.rs` could not be written. That is the
-staged-validation loop working as intended: build the machinery, and let it
-tell you the design is wrong.
 
 ## B3. The two empty-set answers are both deliberate
 
@@ -81,7 +70,7 @@ grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \
   | grep -nE "map_or|ok_or|unwrap_or"
 ```
 
-**Expected:** exactly two hits: `map_or( 0, … )` in `available` and
+**Expected:** only `map_or( 0, … )` in `available` and
 `ok_or( RingError::Empty )` in `wait_for`. No `unwrap_or`, and in particular no
 `unwrap_or( Seq::ZERO )`. `frontier` returns `Option` so that "no dependencies"
 stays distinguishable from "dependencies, all at zero", and an `unwrap_or`
@@ -92,9 +81,8 @@ together, so the two crates cannot be quietly aligned without a test failing.
 
 ## B4. Every declared dependency is used
 
-Three real dependencies and one dev-dependency, and each needs checking against
-its own consumer. Before `ring_gating` moved to `[dev-dependencies]`, this check
-was a single command over the whole manifest. That command reports
+The library's dependencies and the dev-dependency each need checking against
+their own consumer. A single command over the whole manifest would report
 `ring_gating` as unused, because the library does not use it and must not.
 
 ```bash
@@ -118,7 +106,7 @@ are named in the library; `ring_gating` is named only in the tests.
 
 `ring_wait` is the one easy to lose. Only `wait_for` uses it, and that is the
 method most likely to be seen as redundant with the caller's own retry loop.
-`ring_gating` is the one easy to *re-promote*. Three tests assert the
+`ring_gating` is the one easy to *re-promote*. Some tests assert the
 relationship between this crate's answers and that crate's over one set of
 cursors, and the shortest way to make them compile is to move the dependency
 back up, which would quietly restore the coupling B2 exists to prevent.
@@ -135,10 +123,6 @@ grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \
   | grep -n -A 5 "pub fn wait_for"
 ```
 
-`-A 5` rather than `-A 3`, because the signature spans two lines. A three-line
-window stops at the wait call and never reaches the return, so that check could
-not see the line its expected result is about.
-
 **Expected:** the body waits and then returns `self.frontier()`, with no
 arithmetic on `from` or `count` anywhere in it. `wait_for_returns_the_frontier_and_not_the_requested_count`
 asserts the outcome; this reads the structure, because the arithmetic version
@@ -146,20 +130,21 @@ passes that test whenever the frontier happens to equal the request.
 
 ## B6. The concurrent tests have a concurrent writer
 
-Two tests in the suite spawn a thread. Both would still pass with the spawn
-removed. `a_barrier_never_reports_a_frontier_a_dependency_has_not_reached`
-asserts a cursor that never moves, and it would pass trivially against a set
-nobody is touching. The spawn is what makes it a race test rather than a
-tautology.
+The two tests that spawn a thread,
+`a_consumer_waiting_on_a_producer_thread_makes_progress` and
+`a_barrier_never_reports_a_frontier_a_dependency_has_not_reached`, would both
+still pass with the spawn removed. The second asserts a cursor that never moves,
+and it would pass trivially against a set nobody is touching. The spawn is what
+makes it a race test rather than a tautology.
 
 ```bash
 grep -c "thread::scope" ring_barrier/tests/barrier_test.rs
 grep -n "scope.spawn" ring_barrier/tests/barrier_test.rs
 ```
 
-**Expected:** `2` from the first, and two `scope.spawn` calls from the second.
-If either disappears, the crate keeps a green suite and loses its only coverage
-of the property it exists to provide.
+**Expected:** one `thread::scope` and one `scope.spawn` in each of those two
+tests. If either disappears, the crate keeps a green suite and loses its only
+coverage of the property it exists to provide.
 
 ---
 

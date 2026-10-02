@@ -28,7 +28,7 @@ EOF
 
 Expected: adding that expression to a test file and building fails with
 `mismatched types`, naming `Seq` and `SlotIndex`. A build that succeeds means
-the two types have collapsed into one and feature 167's separation is gone.
+the two types have collapsed into one.
 
 ### M2. `Capacity` cannot be constructed around its own validation
 
@@ -47,7 +47,7 @@ after both validation branches have returned.
 
 ### M3. Overflow has no overwrite variant
 
-Feature 174's key claim is a negative. The automated test asserts the
+The claim to check is a negative. The automated test asserts the
 set has three members; a reader should confirm by eye that none of the three
 overwrites unread data.
 
@@ -74,9 +74,10 @@ cargo doc -p ring_types --no-deps --open
 
 ### M5. The 584-year reachability figure holds up under direct arithmetic
 
-`Seq::next` and `advanced_by` are protected against wrapping only because the
-wrap point sits far outside any reachable workload (`docs/pitfall/001`); neither
-has a saturating mode. `seq_does_not_wrap_within_any_reachable_workload`
+`Seq::next` is protected against wrapping only because the wrap point sits far
+outside any reachable workload, and it has no saturating mode. `advanced_by`
+has none either, and its caller owns the bound on `n`.
+`seq_does_not_wrap_within_any_reachable_workload`
 asserts the quotient exceeds 500 without ever calling `next` or `advanced_by`,
 so a person needs to check the figure itself by hand, beyond whether some test
 passes.
@@ -86,11 +87,10 @@ awk 'BEGIN { printf "%.1f\n", (2^64 - 1) / 1e9 / 86400 / 365.25 }'
 ```
 
 Expected: approximately `584` years, matching the figure quoted in
-`src/id.rs`'s doc comments on `next` and `advanced_by`, and in
-`docs/pitfall/001`, `docs/item/struct/002_seq.md`, `docs/data_structure/001`,
-and `docs/api/001`. A materially different result means either `u64`'s range
-changed or the 10⁹/s publish-rate assumption no longer holds, and every one of
-those citations needs re-deriving from whatever the true figure becomes.
+`src/id.rs`'s doc comments on `Seq` and `Seq::next`. A materially different
+result means either `u64`'s range changed or the 10⁹/s publish-rate assumption
+no longer holds, and both citations need re-deriving from whatever the true
+figure becomes.
 
 ## Run Record
 

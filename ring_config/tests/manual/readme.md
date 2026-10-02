@@ -51,20 +51,16 @@ grep -n -A 10 "pub struct RingConfig" ring_config/src/lib.rs
 
 ## M4: the tick-safety reading matches what a system would need
 
-`is_tick_safe` is what feature 183 branches on. It must be exactly
-"non-blocking", not a hand-maintained list that drifts from `WaitKind`.
-
-```bash
-grep -n -A 6 "pub fn is_tick_safe" ring_config/src/lib.rs
-```
-
-**Expected:** the body delegates to `WaitKind::is_non_blocking` rather than
-matching variants itself. A local `match` would silently answer wrongly the
-first time a fifth wait kind is added.
+`is_tick_safe` must be exactly "non-blocking", not a hand-maintained list that
+drifts from `WaitKind`.
 
 ```bash
 grep -nE -A 6 "pub (const )?fn is_tick_safe" ring_config/src/lib.rs
 ```
+
+**Expected:** the body delegates to `WaitKind::is_non_blocking` rather than
+matching variants itself. A local `match` would silently answer wrongly the
+first time a wait kind is added.
 
 ## M5: the doc examples are the API's first reader
 
@@ -83,7 +79,3 @@ cd ring_config && cargo test --doc
 | 2026-08-28 | M3 | ✅ | All five fields private (`capacity`, `wait`, `overflow`, `producers`, `batch`), so struct-literal construction cannot route around the clamp. |
 | 2026-08-28 | M4 | ✅ | Body is `self.wait.is_non_blocking()`, which is delegation, not a local match. |
 | 2026-08-28 | M5 | ✅ | 13 doc tests pass. |
-
-The first run of M1/M2/M4 reported "method missing" because the grep pattern was
-`pub fn` and every method here is `pub const fn`. The commands above carry
-`(const )?` for that reason. The finding was in the check, not the crate.

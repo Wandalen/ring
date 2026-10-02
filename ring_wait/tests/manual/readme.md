@@ -1,8 +1,7 @@
 # ring_wait manual testing plan
 
-`tests/wait_test.rs` asserts the clauses
-`docs/feature/173_wait_kind_and_strategies.md` is graded on: all four strategies
-present, `None` non-blocking, every wait bounded. Those are countable.
+`tests/wait_test.rs` asserts that all four strategies are present, that `None`
+does not block, and that every wait is bounded. Those are countable.
 `none_evaluates_the_predicate_exactly_once` counts to one, and
 `escalation_terminates_from_every_starting_point` walks four chains to their
 ends.
@@ -12,12 +11,11 @@ there are four of them. `Spin`, `Yield`, and `Park` are behaviourally identical
 under test: each returns true, each loops again, and a suite of three could be
 one. The difference is entirely in what happens to the core between two
 readings, and no assertion in a test file can observe that. So the checks below
-read the source, and two of them read it for a thing a passing test would
-actively hide.
+read the source, some of them for a thing a passing test would actively hide.
 
 Run from the workspace root. The code-line filter here is
 `^[[:space:]]*//`, which drops `///`, `//!` and plain `//` alike. This crate's
-`Park` arm carries a six-line ordinary comment mentioning `thread::park`, and a
+`Park` arm carries an ordinary comment mentioning `thread::park`, and a
 filter that only dropped doc comments would read that prose as code.
 
 ## W1. Every wait is bounded, structurally
@@ -127,8 +125,7 @@ comm -23 \
 ```
 
 **Expected:** no output. `ring_cursor` earns its place through `for_space` and
-`for_data`; before those existed the dependency was declared and unused, which
-`cargo udeps` would have caught at level 4 and this check catches now.
+`for_data`. A dependency that is declared but unused shows up here.
 
 ---
 

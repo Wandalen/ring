@@ -4,9 +4,8 @@
 covers the claim that no test can make on its own: that there is **no fourth
 outcome**, and that the absence is required rather than incidental.
 
-Feature 174's acceptance criterion is negative: "exactly three discriminants,
-no overwrite variant". A negative is what a passing test suite is worst at
-guaranteeing. A test listing three variants keeps passing after someone adds a
+The requirement is negative: exactly three outcomes, no overwrite variant. A
+negative is what a passing test suite is worst at guaranteeing. A test listing three variants keeps passing after someone adds a
 fourth.
 
 Run from the workspace root.
@@ -24,7 +23,7 @@ catch-all.
 ## M2. A fourth variant would break the build, not slip through
 
 The exhaustive `match` in `would_resolve` and in the test's `name` helper is what
-enforces the criterion. Confirm neither has a wildcard arm.
+enforces the count. Confirm neither has a wildcard arm.
 
 ```bash
 grep -nE -A 8 "pub const fn would_resolve" ring_overflow/src/lib.rs
@@ -33,7 +32,7 @@ grep -n "_ =>" ring_overflow/src/lib.rs ring_overflow/tests/overflow_test.rs
 
 **Expected:** the first shows three arms and no `_`. The second finds nothing.
 A wildcard anywhere would let a fourth variant compile silently, which is the
-whole failure mode this criterion exists to prevent.
+failure this plan exists to prevent.
 
 ## M3. The enum is not `#[non_exhaustive]`
 

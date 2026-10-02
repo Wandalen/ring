@@ -1,16 +1,14 @@
 # ring_tls manual testing plan
 
-`tests/tls_test.rs` asserts the two numbers
-`docs/feature/175_thread_local_buffer_and_flush_into.md` names: zero atomic
-operations to accumulate, one to land. Both are measured through
+`tests/tls_test.rs` asserts the crate's two numbers: zero atomic operations to
+accumulate, one to land. Both are measured through
 `ring_atomic::CountingSeq`, which counts operations **on the cursor it was
 handed**. That is the right instrument for the flush and a blunt one for the
 push. A `push` that took a lock, or allocated, or touched some *other* atomic
 would still leave the cursor's count at zero.
 
 So this plan reads the push path directly. "Zero atomic operations" is a claim
-about a body six lines long; the cheapest way to check it is to read the six
-lines.
+about a short body; the cheapest way to check it is to read it.
 
 Run from the workspace root.
 
@@ -20,7 +18,8 @@ Run from the workspace root.
 sed -n '/  pub fn push(/,/^  }/p' ring_tls/src/lib.rs
 ```
 
-**Expected:** a bounds check, a `Vec::push`, an `Ok`. Nothing else.
+**Expected:** a bounds check, a `Vec::push` with a `debug_assert!` that the
+capacity did not grow, an `Ok`. Nothing else.
 
 ## M2. No atomic, lock or allocation appears in it
 
@@ -29,7 +28,10 @@ sed -n '/  pub fn push(/,/^  }/p' ring_tls/src/lib.rs \
   | grep -nE "Ordering|atomic|lock|Mutex|with_capacity|reserve|Box::|Vec::"
 ```
 
-**Expected:** no output.
+**Expected:** only the reservation check, the `let reserved` binding and the
+`debug_assert!` that compares against it, whose message names `with_capacity`.
+No atomic, lock or allocation call. This rules out an explicit allocation, not a growth inside
+`Vec::push`, because grep sees a method call, not a growth. M3 covers that.
 
 ## M3. `Vec::push` cannot reallocate, because the two bounds are the same number
 
@@ -90,7 +92,7 @@ cargo test -p ring_tls --doc
 ```
 
 **Expected:** every example passes, and the type-level example shows the zero
-and the one together. Those two numbers *are* the feature.
+and the one together. Those two numbers *are* the crate's claim.
 
 ## Run Record
 
@@ -103,9 +105,3 @@ and the one together. Those two numbers *are* the feature.
 | 2026-08-28 | M5 | ✅ | Body is `self.items.clear()`; the doc says "Distinct from a flush precisely because it advances no cursor" and names the consequence. |
 | 2026-08-28 | M6 | ✅ | `flush_into` documents that a silent skip would make the operation count depend on the data. |
 | 2026-08-28 | M7 | ✅ | 6 doc tests pass; the `TlsBuffer` example asserts `total == 0` after 64 pushes and `total == 1` after the flush. |
-
-M3 is the check worth keeping. M2 is the one that looks like it proves "no
-allocation", and it does not. `Vec::push` allocates when full, and grep sees a
-method call, not a growth. The guarantee is entirely in two numbers being the
-same, which is why the check asks a reader to compare them rather than asking a
-pattern to match.

@@ -1,7 +1,7 @@
 # ring_gating manual testing plan
 
-`tests/gating_test.rs` carries the producer half of
-`docs/feature/178_sequence_barrier_and_gating_set.md`. Its central assertion,
+`tests/gating_test.rs` carries the producer half of the gating mechanism. Its
+central assertion,
 that a stalled consumer stops the producer at exactly one lap, is fully
 automatable. A stopped cursor, a counted loop, and an exact boundary leave no
 judgement in it.
@@ -19,17 +19,9 @@ make impossible.
 Each check below is a source reading for that reason. Run from the workspace
 root.
 
-The first three were rewritten when the load-and-fold moved out of this crate
-into `ring_cursor::slowest`, shared with `ring_barrier`. They had asserted that
-this crate iterated its cursors correctly and named `GATING` twice; both are now
-false. Both were replaced by the stronger claim the move makes available, that
-this crate does none of it at all. A check whose *expectation* still matched
-after such a move would not have been reading anything the behaviour depends
-on.
-
 ## M1. The fold is delegated, not restated
 
-`slowest` must fold across the whole set, and the fold itself now lives in
+`slowest` must fold across the whole set, and the fold itself lives in
 `ring_cursor`. A single-consumer test cannot tell a real fold apart from
 `cursors[0].load()`, and neither can a multi-consumer test whose slow consumer
 happens to sit at index 0.
@@ -44,8 +36,7 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
 The pattern deliberately omits a bare `.map(`. `limit` maps over the `Option`
 that `slowest` already returned, which consumes the delegated answer rather
 than computing one. (`headroom` spells its own consumption `map_or`, which a
-bare `.map(` does not match in any case, and `frontier` is `ring_barrier`'s
-method and appears nowhere in this crate.) Widening the pattern to catch
+bare `.map(` does not match in any case.) Widening the pattern to catch
 `limit` would make this check fail on correct code, and that is how a source
 reading gets deleted rather than fixed.
 
@@ -62,9 +53,7 @@ how one of them ends up `Relaxed`.
 ## M2. This crate names no ordering at all
 
 The whole family reads cursors to decide whether a slot is safe to touch, and
-that decision is stated once, in `ring_cursor::GATING`. Before the fold moved,
-the strongest available claim here was "`GATING` twice and no bare `Ordering::`".
-Now the claim is stronger and simpler.
+that decision is stated once, in `ring_cursor::GATING`.
 
 ```bash
 grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
@@ -72,7 +61,7 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
 ```
 
 **Expected:** **no output at all.** No `Ordering::`, no `GATING`, and no
-`SeqCell`. This crate no longer performs an atomic read, so it has no ordering
+`SeqCell`. This crate performs no atomic read, so it has no ordering
 to name and no reason to import the trait that would let it. A hit of any kind
 means a load came back into a crate whose job is arithmetic over an answer
 someone else read.
@@ -91,14 +80,10 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
   | grep -nE "\.0[[:space:]]*[-+]|saturating_sub|wrapping_sub"
 ```
 
-**Expected:** from the first command, `1 ring_cursor::slowest` and
-`1 ring_seqno::free_slots`, the delegated fold and the delegated arithmetic, one
-call each. From the second, **no output at all**. Any arithmetic on a `Seq`'s inner
-`u64` in this crate is a second implementation of `ring_seqno`.
-
-`slowest` moved crates without changing meaning. It was
-`ring_seqno::slowest` over a `Vec< Seq >` this crate built by hand, and is now
-`ring_cursor::slowest` over the cursors directly. The `Vec` went with it.
+**Expected:** from the first command, `ring_cursor::slowest` and
+`ring_seqno::free_slots` and nothing else, the delegated fold and the delegated
+arithmetic. From the second, **no output at all**. Any arithmetic on a `Seq`'s
+inner `u64` in this crate is a second implementation of `ring_seqno`.
 
 ## M4. The two failures are ordered, and the order matters
 
@@ -114,8 +99,9 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
   | grep -nE "RingError::(BatchTooLarge|Full)"
 ```
 
-**Expected:** two hits, `BatchTooLarge` on the lower line number. The capacity
-test is unconditional and comes first; the headroom test is what remains.
+**Expected:** one hit for each, `BatchTooLarge` on the lower line number. The
+capacity test is unconditional and comes first; the headroom test is what
+remains.
 
 ## M5. The empty set returns capacity, not zero
 
@@ -135,8 +121,7 @@ grep -vE "^[[:space:]]*(///|//!)" ring_gating/src/lib.rs \
   | grep -nE "map_or|unwrap_or|Seq::ZERO"
 ```
 
-**Expected:** exactly one hit, `map_or( self.capacity.get(), … )` in
-`headroom`. No `Seq::ZERO`, and no `unwrap_or` of any kind. The empty case has
+**Expected:** only `map_or( self.capacity.get(), … )` in `headroom`. No `Seq::ZERO`, and no `unwrap_or` of any kind. The empty case has
 its own answer, and it is a capacity, not a position.
 
 ## M6. Every declared dependency is used

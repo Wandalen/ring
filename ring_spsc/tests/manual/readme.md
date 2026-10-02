@@ -1,20 +1,17 @@
 # ring_spsc manual testing plan
 
-`tests/spsc_test.rs` carries the reached-test for
-`docs/feature/171_spsc_ring_api.md` and 27 tests around it, and the crate's
-module documentation carries five `compile_fail` doc tests. Line coverage was
-100% over 82 coverable lines as of 2026-08-28; re-measure rather than trust
-that figure, since the source has grown since (`tests/manual/readme.md` S1's
-Run Record row).
+`tests/spsc_test.rs` carries the reached-test, one producer and one consumer
+exchanging 100 000 items, and the tests around it, plus `loom` models under
+`--cfg loom`. The crate's module documentation carries the `compile_fail` doc
+tests.
 
-The gap automation leaves here is the largest of any crate in the family, and
-it has one cause. **This is the first crate that opts out of the workspace's
-`unsafe-code = "deny"`, and no test can demonstrate the absence of undefined
-behaviour.** A data race that does not fire on this run passes. So the checks
-below are about the *shape* the soundness argument rests on: that the unsafe
-code is where it was ruled to be, that the negatives are checked, and that the
-orderings are the ones the design claims. Two mutation checks then establish
-that the suite can fail at all.
+The gap automation leaves here has one cause. **This crate opts out of the
+workspace's `unsafe-code = "deny"`, and no test can demonstrate the absence of
+undefined behaviour.** A data race that does not fire on this run passes. So
+the checks below are about the *shape* the soundness argument rests on: that
+the unsafe code is where it was ruled to be, that the negatives are checked,
+and that the orderings are the ones the design claims. Two mutation checks then
+establish that the suite can fail at all.
 
 Run from the workspace root. The code-line filter is `^[[:space:]]*//`, which
 drops `///`, `//!` and plain `//` alike. This crate's module documentation
@@ -27,8 +24,8 @@ implementation.
 **This is a mutation check: it edits the source, runs the test, and restores.**
 Take a copy first; the restore is the whole procedure, not a formality.
 
-Feature 171's condition has three behavioural clauses: byte-parity, order, and
-zero loss. The argument for asserting all three of one run is that each is
+The reached-test's condition has three behavioural clauses: byte-parity, order,
+and zero loss. The argument for asserting all three of one run is that each is
 independently violable. That argument is worth exactly as much as the suite's
 ability to notice each one, so this check breaks the ring three different ways
 and confirms a different clause catches each.
@@ -63,22 +60,19 @@ cp /tmp/-spsc_orig.rs ring_spsc/src/lib.rs
 cargo nextest run -p ring_spsc --all-features
 ```
 
-**Expected:** `exit 100` for each of the three mutations, then a clean 28/28
-after the restore. It was 25/25 when this step was first written, and the total
-grew by three as S9 and S10 added tests; re-run rather than trust either
-figure. A mutation that passes means the reached-test is asserting less than
-feature 171 requires, and the gate would report REACHED against a ring that
+**Expected:** `exit 100` for each of the three mutations, then all tests pass
+after the restore. A mutation that passes means the reached-test asserts less
+than its three clauses, and the gate would report REACHED against a ring that
 loses records.
 
 **`exit 124` is a failure of this check, not a pass.** That is `timeout`'s own
 code, and it means the mutated run *hung* instead of failing. For that reason
-each invocation is wrapped in `timeout 120` rather than run bare. Mutation B
-produced exactly that on its first run, and the defect was in the test, not in
-the mutation. The consumer loop said `while received.len() < ITEMS`, so a ring
-that skips records waits forever for records that will never arrive. In CI
-that reads as a slow machine. The loop now samples the producer's
+wrap each invocation in `timeout 120` rather than run it bare. A consumer loop
+on `while received.len() < ITEMS` hangs that way, because a ring that skips
+records leaves it waiting forever for records that will never arrive, and in CI
+that reads as a slow machine. The reached-test's loop samples the producer's
 `is_finished()` *before* each drain and stops when a finished producer leaves an
-empty ring, so a lost record fails in about 30ms with a readable count mismatch.
+empty ring, so a lost record fails fast with a readable count mismatch.
 
 The sampling order is the correctness of that exit, so do not "tidy" it.
 Checking `is_finished()` after the drain instead of before would let the
@@ -87,14 +81,14 @@ record it was about to receive, turning a correct ring into a flaky failure.
 
 Run mutation C more than once. It is a race, not a deterministic error. With
 capacity 1 024 and 100 000 items the producer laps the consumer readily, but a
-scheduler that happens to run the consumer hot could hide it. It failed 5/5
-times when measured. Anything less means the reached-test's capacity is too
-large relative to the item count to force the wrap it depends on.
+scheduler that happens to run the consumer hot could hide it. It should fail on
+every run. Anything less means the reached-test's capacity is too large relative
+to the item count to force the wrap it depends on.
 
 ## S2. No lock in the path, and no read-modify-write either
 
-This is feature 171's fourth clause, and the only one no test run can
-demonstrate. An execution that did not block proves nothing about one that might.
+Lock-freedom is the crate's fourth clause, after parity, order and zero loss,
+and the only one no test run can demonstrate. An execution that did not block proves nothing about one that might.
 
 ```bash
 grep -nE "Mutex|RwLock|Condvar|park|sleep|spin|fetch_add|compare_exchange|fetch_update" \
@@ -103,8 +97,7 @@ grep -nE "Mutex|RwLock|Condvar|park|sleep|spin|fetch_add|compare_exchange|fetch_
 
 Number **first**, then drop comments. The reverse order,
 `grep -v ... | grep -n ...`, numbers the *filtered* stream, so every line
-number it prints is the position in a file that does not exist on disk. Here
-that understated the real positions by roughly 500 lines.
+number it prints is the position in a file that does not exist on disk.
 
 **Expected:** no output at all, not one hit. The producer path is a load, a
 compare, a write and a release store; the consumer path is a load, a subtract,
@@ -118,12 +111,12 @@ The complement checks that the two paths *do* end in a release store, one each:
 grep -nE "\.store\(" ring_spsc/src/lib.rs | grep -vE "^[0-9]+:[[:space:]]*//"
 ```
 
-**Expected:** exactly two hits, both `HANDOFF`, at lines **794**
-(`Reservation::drop`) and **1137** (`Batch::drop`). Two is the number. A third store means something publishes
-or commits outside a guard's drop, which is the abandonment case the guard shape
+**Expected:** two hits, both `HANDOFF`, one in `Reservation::drop` and one in
+`Batch::drop`. Two is the number. A third store means something publishes or
+commits outside a guard's drop, which is the abandonment case the guard shape
 exists to make unreachable.
 
-## S3. The unsafe is exactly where decision 123 put it, and no wider
+## S3. The unsafe stays where it was sited, and no wider
 
 ```bash
 grep -n "unsafe fn\|unsafe impl\|allow( unsafe_code )" ring_spsc/src/lib.rs
@@ -131,24 +124,21 @@ grep -c "SAFETY:" ring_spsc/src/lib.rs
 ```
 
 **Expected:** one `#![ allow( unsafe_code ) ]`; exactly two `unsafe fn`,
-`slot` and `slot_mut`; and exactly one `unsafe impl`, for `Sync`. Seven
-`SAFETY:` comments: one on the `unsafe impl`, one inside each of the two
-`unsafe fn`, and one at each of the four call sites. Those sites are
-`Reservation`'s `Deref` and `DerefMut`, and `Batch::get` and `Batch::get_mut`.
+`slot` and `slot_mut`; and exactly one `unsafe impl`, for `Sync`. One
+`SAFETY:` comment per unsafe site: one on the `unsafe impl`, one inside each
+`unsafe fn`, and one at each call site. Those call sites are `Reservation`'s
+`Deref` and `DerefMut`, and `Batch::get` and `Batch::get_mut`.
 
-The count is the check, so note that it is seven, not four. The
-two `unsafe fn` carry `# Safety` *sections* stating a precondition; the four
-call sites carry `SAFETY:` *comments* discharging it. The workspace's
-`undocumented_unsafe_blocks = "deny"` would catch a call site that acquired a
-fifth caller without a comment. It would not catch one that acquired a comment
-saying the wrong thing; only reading these seven against each other catches
-it.
+The count is the check, and it counts sites, not `unsafe fn`. The two
+`unsafe fn` carry `# Safety` *sections* stating a precondition; the call sites
+carry `SAFETY:` *comments* discharging it. The workspace's
+`undocumented_unsafe_blocks = "deny"` would catch a new call site without a
+comment. It would not catch one with a comment saying the wrong thing; only
+reading the comments against each other catches a *stale* one.
 
 A third `unsafe fn` means the unsafe code grew. That is not forbidden, but it
-changes what decision 123 ruled and what `docs/workaround/readme.md` justifies,
-and both must move with it. The workspace's `undocumented_unsafe_blocks = "deny"`
-catches a missing `SAFETY` comment on a block; nothing but this check catches a
-*stale* one.
+changes what [docs/workaround/readme.md](../../docs/workaround/readme.md)
+records, and the record must move with it.
 
 Every path into an `unsafe` operation must also stay private:
 
@@ -173,9 +163,9 @@ grep -c '^//! ```compile_fail' ring_spsc/src/lib.rs
 cargo test --doc -p ring_spsc --all-features 2>&1 | grep -c "compile fail ... ok"
 ```
 
-**Expected:** five `compile_fail` blocks and five passing. The pattern is
-anchored to the fence rather than to the bare word. A plain
-`grep -c compile_fail` returns six, because the surrounding prose names the
+**Expected:** the two counts are equal, so every `compile_fail` block passes.
+The pattern is anchored to the fence rather than to the bare word. A plain
+`grep -c compile_fail` returns more, because the surrounding prose names the
 mechanism too, and a check that counts its own explanation drifts the moment
 the prose is reworded.
 
@@ -190,24 +180,24 @@ starts failing:
 cargo test --doc -p ring_spsc --all-features 2>&1 | tail -5
 ```
 
-**Expected:** `test result: FAILED` naming the block you edited. This procedure
-found two dead checks on first writing: `let _ = shared;` inside a spawned
-closure captures nothing at all under edition-2021 precise capture, and a second
-`split()` compiles fine when the first pair is never used again, because NLL
-ends its borrow immediately. Both blocks were green and both tested nothing.
+**Expected:** `test result: FAILED` naming the block you edited. A block that
+stays green here tests nothing. Two ways that happens: `let _ = shared;` inside
+a spawned closure captures nothing at all under edition-2021 precise capture,
+and a second `split()` compiles fine when the first pair is never used again,
+because NLL ends its borrow immediately.
 
 The blocks must live in `src/lib.rs`, not in `tests/spsc_test.rs`, because
-**rustdoc collects doc tests from the library target only.** The same five
-blocks written in an integration test file are never compiled. Confirm the
-count moves when they do:
+**rustdoc collects doc tests from the library target only.** The same blocks
+written in an integration test file are never compiled. Confirm the count moves
+when they do:
 
 ```bash
 cargo test --doc -p ring_spsc --all-features 2>&1 | grep "^running"
 ```
 
-**Expected:** `running 26 tests` and `running 5 tests`, two suites. The second
-is the `compile_fail` set. If it says `running 0 tests`, the blocks have been
-moved somewhere rustdoc does not look.
+**Expected:** two `running N tests` lines, two suites. The second is the
+`compile_fail` set, and its count matches the block count above. If it says
+`running 0 tests`, the blocks have been moved somewhere rustdoc does not look.
 
 ## S5. The orderings are asymmetric, deliberately
 
@@ -228,10 +218,9 @@ acquire, and the slot writes it was supposed to make visible are then a data rac
 
 **Why this is a source reading and not a test, stated carefully.** The usual
 justification is that a missing acquire passes anyway on strongly-ordered
-hardware, so no test could catch it. That justification does not apply here.
-This dev host is aarch64 (Neoverse-N1), which is weakly ordered, so such a
-mutation *might* be observable. The real reason this stays a source reading is
-narrower. The window is small, the failure is probabilistic, and S9 measured
+hardware, so no test could catch it. That justification does not hold on a
+weakly ordered host such as aarch64, where such a mutation *might* be
+observable. The real reason this stays a source reading is narrower. The window is small, the failure is probabilistic, and S9 measured
 what that looks like in practice: the analogous `HANDOFF` mutation survives
 100 000 items. A check that fails sometimes is worth having, but it does not
 replace reading which cursor each load names, which is deterministic.
@@ -249,16 +238,9 @@ comm -23 \
      | grep -oE "ring_[a-z_]+" | sort -u )
 ```
 
-**Expected:** no output. Five dependencies, all used.
-
-The scaffolded manifest declared six: `ring_store`, `ring_cursor`,
-`ring_claim`, `ring_publish`, `ring_consume`, `ring_config`. The
-implementation needed a different five. `ring_claim`, `ring_publish` and
-`ring_consume` all went, because each answers a question that only arises when
-producers can overtake one another; `ring_slot` and `ring_types` arrived,
-because `ring_store` re-exports neither the `Slot` trait it is generic over nor
-the `Seq` its API speaks in. This is the third scaffolded manifest in the family
-found to over-declare, so the check earns its place.
+**Expected:** no output, so every declared dependency is used. `ring_slot` and
+`ring_types` are direct dependencies because `ring_store` re-exports neither the
+`Slot` trait it is generic over nor the `Seq` its API speaks in.
 
 The absences are part of the design and should stay absent:
 
@@ -278,11 +260,10 @@ grep -nE "const (ITEMS|CAPACITY|LAPS)" ring_spsc/tests/spsc_test.rs
 grep -c "thread::scope" ring_spsc/tests/spsc_test.rs
 ```
 
-**Expected:** `ITEMS = 100_000` in the reached-test, the figure feature 171
-names and not a smaller one chosen for speed. `CAPACITY = 1_024`, so the ring
-wraps 97 times and the producer must wait on the consumer. Four
-`thread::scope` blocks: the reached-test, the capacity-2 stress test, and the
-two departure tests.
+**Expected:** `ITEMS = 100_000` in the reached-test, not a smaller figure
+chosen for speed. `CAPACITY = 1_024`, so the ring wraps 97 times and the
+producer must wait on the consumer. One `thread::scope` block each for the
+reached-test, the capacity-2 stress test, and the two departure tests.
 
 The capacity-2 test is the one that would be quietly deleted as redundant. It is
 not redundant. At capacity 1 024 the producer rarely blocks, so the reached-test
@@ -292,8 +273,8 @@ hit on nearly every push.
 
 ## S8. The doc examples do not stand in for the tests
 
-Twenty-six doc tests is a lot, and a reader may reasonably assume they cover
-the public API. They do not, by construction. Each shows one operation's *shape*.
+The doc tests are many, and a reader may reasonably assume they cover the
+public API. They do not, by construction. Each shows one operation's *shape*.
 
 ```bash
 grep -oE "Capacity::new\( [0-9_]+ \)" ring_spsc/src/lib.rs | sort | uniq -c | sort -rn
@@ -305,9 +286,9 @@ doc example wraps the ring even once or fills one beyond a handful of slots, so
 none of them reaches the wrap, saturation and contention cases. That is the
 right division, since a doc example that stress-tested would be unreadable. But
 it means a coverage figure driven by doc tests would be measuring the wrong
-thing. `cargo tarpaulin` does not count doc tests, which is why the coverage
-figure in this page's opening paragraph is attributable to `tests/spsc_test.rs`
-alone, not to the doc examples above.
+thing. `cargo tarpaulin` does not count doc tests, which is why the crate's line
+coverage is attributable to `tests/spsc_test.rs` alone, not to the doc examples
+above.
 
 ---
 
@@ -319,15 +300,15 @@ on its own. A model that never observes the state it asserts about passes
 identically to one that observes it and finds it correct. The only way to tell
 them apart is to break the code deliberately and confirm the model notices.
 
-**The finding this stage exists to record.** The first version of
-`exhaustive::a_published_record_is_never_observed_before_its_payload_write`
-pushed a byte into a `TypedSlot` and asserted the byte arrived. Under
-`HANDOFF` mutated to `Relaxed` it **passed**, because loom instruments only
-its own atomics, and a slot payload lives in plain memory behind the ring's
-`UnsafeCell`. Loom never modelled the write, so it could not report it
-unobserved. That is the third silently-vacuous check found in this crate, after
-the `compile_fail` blocks in the wrong target and the two that compiled. The
-common shape is a green result that was never capable of being red.
+**Why the model does not assert on the slot.** Loom instruments only its own
+atomics, and a slot payload lives in plain memory behind the ring's
+`UnsafeCell`. A model that pushes a byte into a `TypedSlot` and asserts the byte
+arrived **passes** under `HANDOFF` mutated to `Relaxed`, because loom never
+models the write and so cannot report it unobserved. So
+`exhaustive::a_published_record_is_never_observed_before_the_write_that_preceded_it`
+stores to a separate loom atomic before the publish and asserts the drain sees
+that store. A green result that was never capable of being red is the shape
+this stage guards against.
 
 ### Step 1. The model fails when the publish stops releasing
 
@@ -354,12 +335,10 @@ PASSES; only `the_two_orderings_are_the_ones_the_design_names` fails, and it
 fails by reading the constant, not by observing a wrong value. 100 000 items do
 not reorder those two stores. Scale is not coverage.
 
-**And that holds on weakly-ordered hardware, which makes it stronger than it
-first reads.** This dev host is aarch64 (Neoverse-N1), not x86-64, so the usual
-"it would only show on a weaker target" escape is unavailable. The mutation
-survives 100 000 items on precisely the kind of machine that is supposed to
-expose it. An earlier revision of this section attributed the result to x86-64
-and thereby explained away the one finding worth keeping.
+**And that holds on weakly-ordered hardware.** The mutation survives 100 000
+items on aarch64 (Neoverse-N1), precisely the kind of machine that is supposed
+to expose it, so the usual "it would only show on a weaker target" escape is
+unavailable.
 
 ### Step 2. Restore, and confirm both halves are green
 
@@ -369,7 +348,7 @@ RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep "tes
 cargo nextest run -p ring_spsc --all-features 2>&1 | tail -3
 ```
 
-**Expected:** loom 2/2, ordinary 27/27.
+**Expected:** every loom model and every ordinary test passes.
 
 ### Step 3. The two halves are never compiled together
 
@@ -377,14 +356,13 @@ cargo nextest run -p ring_spsc --all-features 2>&1 | tail -3
 grep -nE "^#\[ cfg\( (not\( )?loom" tests/spsc_test.rs
 ```
 
-**Expected:** exactly two hits: `#[ cfg( not( loom ) ) ]` on `mod threaded` at
-line 62 and `#[ cfg( loom ) ]` on `mod exhaustive` at line 924.
+**Expected:** two hits: `#[ cfg( not( loom ) ) ]` on `mod threaded` and
+`#[ cfg( loom ) ]` on `mod exhaustive`.
 
 The pattern is anchored to the attribute at column zero deliberately. The
-unanchored form `grep -n 'cfg( loom )'` returns **three**, because the module
-documentation explains the gate in prose. So the check as previously written
-contradicted its own stated expectation of two, and drifted *upward*, which
-reads as extra safety rather than as breakage.
+unanchored form `grep -n 'cfg( loom )'` also counts the module documentation's
+prose about the gate, so it drifts *upward*, which reads as extra safety rather
+than as breakage.
 
 The gate is not stylistic. Loom's atomics panic when touched outside a
 `loom::model`, and every test in `threaded` constructs a `Ring` whose cursors
@@ -393,24 +371,23 @@ runnable at all, and it is also why neither can quietly stand in for the other.
 
 ---
 
-## S10. What the composition point found that this suite could not
+## S10. What composing with `ring_mpsc` shows that this suite cannot
 
-`ring_core` (feature 187) is the first crate to use this one through a uniform
-API shared with `ring_mpsc`. Composing two siblings side by side is a
-different check from testing either. It compares them, and a suite that only
-tests *this* ring cannot.
+`ring_core` uses this crate through a uniform API shared with `ring_mpsc`.
+Composing two siblings side by side is a different check from testing either.
+It compares them, and a suite that only tests *this* ring cannot.
 
-Three divergences showed up. **Only one was a gap in this crate**; the other
-two are real and were deliberately absorbed rather than fixed.
+It shows three divergences. **One needed a method in this crate**; `ring_core`
+absorbs the other two.
 
-### 1. `Batch::get_mut` was missing, and was added here
+### 1. `Batch::get_mut` exists for `ring_core`'s drain
 
 `get` yields `&S`, which is enough to read a record but not to move one out.
-`TypedSlot::take` needs `&mut`. `ring_core`'s surface hands the caller a `T`
+`TypedSlot::take` needs `&mut`. `ring_core`'s API hands the caller a `T`
 rather than a `&T`, because `ArrayQueue::pop` returns an owned value and no
 borrow can outlive the pop. So the uniform drain cannot be built on `get` alone.
 
-`ring_mpsc`'s batch always had its counterpart. This one did not.
+`ring_mpsc`'s batch has the same method.
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -419,10 +396,11 @@ grep -c 'pub fn get_mut' ring_spsc/src/lib.rs                    # 1 — present
 git show HEAD:ring_spsc/src/lib.rs | grep -c 'pub fn drain_up_to' # 1 — this one pre-existed
 ```
 
-The third line is the control. `ring_core` needs `drain_up_to` just as much,
-because a full `drain()` would commit the whole batch on `Drop` while
-returning one record. But it was already here, so the composition point found
-one gap rather than two.
+**Expected:** the working tree has both `get_mut` and `drain_up_to`. The `0`
+beside the first `git show HEAD:` line holds only on a checkout from before
+`get_mut` was added; any later `HEAD` prints `1`. `ring_core` needs
+`drain_up_to` just as much, because a full `drain()` would commit the whole
+batch on `Drop` while returning one record.
 
 ### 2. This crate has no `Ends` type; `ring_mpsc` does
 
@@ -434,8 +412,8 @@ grep -c 'pub struct Ends' ring_mpsc/src/lib.rs   # 1
 Two sibling crates, two different split shapes. `ring_core` absorbs the
 difference. Its `EndsInner::Spsc` holds `&mut ring_spsc::Ring` directly while
 `EndsInner::Mpsc` holds a `ring_mpsc::Ends`. **Absorbed, not fixed**, because
-adding an `Ends` here would be API churn to serve one consumer's tidiness rather
-than any caller's need.
+adding an `Ends` here would be API churn to serve one consumer's tidiness
+rather than any caller's need.
 
 ### 3. This crate's `Producer` is neither `Copy` nor `Clone`; `ring_mpsc`'s is `Copy`
 
@@ -445,78 +423,43 @@ grep -c 'impl.*Copy.*for Producer' ring_mpsc/src/lib.rs   # 1
 ```
 
 This is the sharpest of the three, and it is **not** a defect in this crate.
-Exclusive access is the whole point of a single-producer ring. It matters
-because it makes this crate the single blocker for a family-wide API
-question. `ring_handle` specifies `try_push( &self, … )`, `ring_core` implements
-`&mut self`, and the divergence reduces to this one `impl`. Recorded at
-[`ring_core/docs/integration/002`](../../../ring_core/docs/integration/002_handle_surface_divergence.md),
-owned by S6.
+Exclusive access is the whole point of a single-producer ring. It is also why
+`ring_core`'s and `ring_handle`'s `try_push` take `&mut self`, not `&self`.
 
-### Two unrun predictions
-
-Written before running, unlike the three checks above, whose outputs were
-already known when this stage was written:
+### Two follow-up checks
 
 ```bash
 grep -rn 'get_mut' ring_spsc/tests/                       # A
 grep -n 'fn is_full' -A 14 ring_core/src/lib.rs           # B
 ```
 
-**A. Expect at least one hit.** G1 requires 100% line coverage of this crate,
-so a method added for an external consumer must be reached by something here. If
-the only reach is the doc example, that is a finding: a method covered by
-documentation rather than by a test.
-
-**B. Expect `free_capacity() == 0` on at least the MPSC arm.** `ring_spsc` has
-`is_full`; `ring_mpsc` does not. So `ring_core` must synthesize it for that arm,
-which is a fourth absorbed asymmetry not yet recorded anywhere.
-
-**Result (2026-08-28): both predictions held, and both taught something the
-prediction did not anticipate.**
-
-**A held, and the grep was written wrong.** `get_mut` is properly tested.
-`a_record_taken_through_get_mut_leaves_its_slot_empty_across_a_wrap` at
-`tests/spsc_test.rs:561` takes through it across a wrap and checks the slot is
-empty afterwards, so the method is not doc-covered-only. But a large share of
-the unanchored hits are **this file**, which lives under `tests/`. The grep
-counts its own prose, including, unavoidably, this very sentence and every
-other one on this page that names the method. That is defect shape 1 from
-`ring_core`'s own plan summary, and this stage was written while naming that
-shape, with `ring_core` C9's grep anchored against it two paragraphs earlier.
-The anchored form:
+**A. Expect at least one hit in a `.rs` file.** G1 requires 100% line coverage
+of this crate, so a method added for an external consumer must be reached by
+something here. If the only reach is the doc example, that is a finding: a
+method covered by documentation rather than by a test.
+`a_record_taken_through_get_mut_leaves_its_slot_empty_across_a_wrap` in
+`tests/spsc_test.rs` takes through `get_mut` across a wrap and checks the slot
+is empty afterwards. The unanchored grep also counts **this file**, which lives
+under `tests/` and names the method in its own prose. Use the anchored form:
 
 ```bash
 grep -rn 'get_mut' ring_spsc/tests/ --include='*.rs'   # 7 hits, all real
 ```
 
-**The unanchored count and "this file"'s share of it are deliberately not
-pinned to a number here.** Both are self-referential in a way the anchored
-form is not. This paragraph's own prose contains the string `get_mut`, so
-every edit to this page, including the one that first wrote this caveat,
-changes the very count it would be citing. `2026-09-11`'s bug hunt found this
-mid-drift (11 unanchored / 4-in-this-file / 5 anchored, originally, had become
-17 / 10 / 7 by the time it was checked) and corrects only the anchored number
-above, which counts `.rs` files this page cannot itself perturb. Pin an exact
-unanchored figure here and the next paragraph added anywhere on this page
-quietly makes it wrong again.
+Never pin the unanchored count. This page's own prose contains the string
+`get_mut`, so every edit here changes it. The anchored form counts only `.rs`
+files, which this page cannot perturb.
 
-**Knowing a defect shape does not prevent it.** That is the argument for
-running the commands rather than reviewing them. Review is what produced the
-broken version, twice, in the same sitting.
+**B. Expect `self.free_capacity() == 0` for every backend.** `ring_spsc` has
+`is_full`; `ring_mpsc` does not. `ring_core::Producer::is_full` has no `match`
+and no per-arm dispatch, so it never calls `ring_spsc::is_full` at all. It
+sidesteps the asymmetry by not using the SPSC method.
 
-**B held, and is more uniform than predicted.** `ring_core::Producer::is_full`
-is `self.free_capacity() == 0` for *every* backend. There is no `match`, no
-per-arm dispatch, and `ring_core` therefore never calls `ring_spsc::is_full`
-at all. So `ring_core` does not absorb the asymmetry by synthesizing the MPSC
-arm; it sidesteps it by not using the SPSC one.
-
-That has a consequence the prediction did not reach. **`is_full` inherits
-`free_capacity`'s split contract exactly.** `free_capacity` is binding at SPSC
-and advisory elsewhere, so `is_full() == false` does not mean a push will be
-accepted at MPSC or crossbeam. Recorded at
-[`ring_core/docs/pitfall/001`](../../../ring_core/docs/pitfall/001_free_capacity_carries_two_contracts.md),
-where it belongs, rather than left implicit in a table cell reading "agrees with
-`free_capacity() == 0`".
+**`is_full` therefore inherits `free_capacity`'s split contract exactly.**
+`free_capacity` is binding at SPSC and advisory elsewhere, so
+`is_full() == false` does not mean a push will be accepted at MPSC or
+crossbeam. See `ring_core`'s
+[decision on `free_capacity`](../../../ring_core/docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md).
 
 ---
 

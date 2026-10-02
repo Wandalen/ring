@@ -1,13 +1,11 @@
 # ring_consume manual testing plan
 
-`tests/consume_test.rs` covers the consumer half of
-`docs/feature/170_claim_publish_available_commit_handshake.md` with 21 tests
-over `available` and `commit`, including an exhaustive sweep of every
-(position, candidate) pair up to the frontier.
+`tests/consume_test.rs` covers `available` and `commit`, including an
+exhaustive sweep of every (position, candidate) pair up to the frontier.
 
 The gap automation leaves here is that this crate's central risk is a *wiring*
 mistake, not a logic one. A `Consumer` whose cursor is private compiles, runs,
-passes all 21 tests, and gates nothing. The producer would be reading a cursor
+passes every test, and gates nothing. The producer would be reading a cursor
 nobody ever advances and would lap the consumer on the first pass. The type
 system cannot express "this borrow came from the producer's gating set", so the
 checks below read for the shape that makes the mistake impossible instead.
@@ -101,17 +99,16 @@ comm -23 \
      | grep -oE "ring_[a-z_]+" | sort -u )
 ```
 
-**Expected:** no output. Four dependencies, all used. Unlike `ring_claim` and
+**Expected:** no output. Every dependency is used. Unlike `ring_claim` and
 `ring_publish`, this crate needs `ring_seqno`, because `available` is a distance
 computation and that is what `ring_seqno::pending` is for.
 
 ## N6. The exhaustive sweep builds a fresh consumer per case
 
 The sweep in `the_accepted_commits_are_exactly_the_available_range_inclusive_of_both_ends`
-is the crate's strongest test, and its first draft defeated itself. It reused one
-consumer across the inner loop. Since an accepted commit *moves the position*,
-later iterations were silently testing a different case than the one they
-asserted.
+is the crate's strongest test, and reusing one consumer across the inner loop
+would defeat it. Since an accepted commit *moves the position*, later
+iterations would silently test a different case than the one they assert.
 
 ```bash
 grep -n -B 6 "let accepted = consumer.commit" ring_consume/tests/consume_test.rs

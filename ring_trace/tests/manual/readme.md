@@ -1,8 +1,7 @@
 # ring_trace manual testing plan
 
-`tests/trace_test.rs` asserts the two numbers
-`docs/feature/185_ring_stats.md` names for this crate: one entry per operation
-when enabled, zero when not. A test can count entries. It cannot check what
+`tests/trace_test.rs` asserts one entry per operation when the trace is enabled
+and zero when it is not. A test can count entries. It cannot check what
 matters about the disabled path, that it **returns before touching the lock**.
 A disabled trace that took and released the mutex on every call would record
 zero entries and pass every assertion, while putting a contended lock on the
@@ -24,9 +23,13 @@ any mutex access. A trace switched off must cost a predictable-branch read of a
 
 ## M2. Every lock access goes through one place
 
-Four read methods and one write method all touch the same mutex. If each
+Every method that reads or writes the log touches the same mutex. If each
 handles a poisoned lock its own way, they will disagree about what a poisoned
-trace means, and the disagreement will surface as a diagnostic that lies.
+trace means, and the disagreement will surface as a diagnostic that lies. A
+site that panics on poison kills the producer thread the trace was added to
+observe. A site that reports `0` makes "nothing happened" and "the log broke"
+read the same. No test can poison the lock, so only reading the call sites side
+by side finds this.
 
 ```bash
 grep -nE "\.lock\(\)|entries_guard" ring_trace/src/lib.rs
@@ -83,8 +86,8 @@ grep -n -B 8 "pub struct TraceEntry" ring_trace/src/lib.rs
 ```
 
 **Expected:** `count` is documented as the thing that keeps a batch claim one
-entry rather than 64, because expanding it would contradict feature 177's own
-claim that it *was* one operation.
+entry rather than 64, because the claim *was* one operation and expanding it
+would contradict that.
 
 ## M7. The doc examples are the API's first reader
 
@@ -106,11 +109,3 @@ disabled cases side by side, since the pair is the feature.
 | 2026-08-28 | M5 | ✅ | `Self::disabled()`, documented as "the state a ring that was never asked to trace must be in". |
 | 2026-08-28 | M6 | ✅ | `count`'s field doc and the struct doc both state it; the struct doc names feature 177 explicitly. |
 | 2026-08-28 | M7 | ✅ | 9 doc tests pass. |
-
-M2 is the check that earned this plan, and the defect it found is worse than it
-looks in the table. A poisoned trace would have **panicked the producer thread**
-on the write path, a diagnostic killing the thread it was added to observe. At
-the same time it would have reported `0` entries to whoever read it, making
-"nothing happened" and "the log broke" indistinguishable. Every test in `trace_test.rs`
-passed throughout, because no test can poison the lock. The only instrument that
-finds this is a person reading five call sites next to each other.

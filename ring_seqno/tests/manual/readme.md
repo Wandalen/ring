@@ -21,7 +21,7 @@ grep -rn "lap" ring_seqno/src/lib.rs | head -20
 
 **Expected:** the module doc explains comparison across laps, and at least one
 function's own doc names the lap boundary. The word `wrap` does not describe the
-*arithmetic*, since the crate compares and does not wrap (decision 121 § 6).
+*arithmetic*, since the crate compares and does not wrap.
 
 ## M2. The exclusive claim boundary is documented where it is used
 

@@ -6,8 +6,8 @@ memory model must be **readable in one place**, and every ordering decision must
 be the caller's rather than this crate's.
 
 A helper that quietly chose `SeqCst` would make every test above pass and every
-benchmark meaningless. For a workstream whose entire output is a measured
-comparison between candidate rings, that is the worse failure. It is also
+benchmark meaningless. For a family whose output is a measured comparison
+between candidate rings, that is the worse failure. It is also
 invisible to a test suite, because a program with the wrong orderings is still a
 correct program.
 
@@ -43,7 +43,7 @@ beside, because the sequence operation carries its own ordering.
 grep -nE "fn (load|store|fetch_add|compare_exchange)" ring_atomic/src/lib.rs
 ```
 
-**Expected:** all twelve signatures (four on the trait, four per impl) name
+**Expected:** every signature, on the trait and on both impls, names
 `order : Ordering`, or `success`/`failure` for compare-exchange. No default, no
 `_seqcst` convenience wrapper.
 
@@ -70,9 +70,9 @@ is not written down, the next reader deletes it.
 grep -n -B 2 -A 14 "Why a trait rather than a struct" ring_atomic/src/lib.rs
 ```
 
-**Expected:** the module documentation names feature 175's "zero atomic
-operations" and feature 177's "one fence, not 64", and says why neither is
-assertable against a bare `AtomicU64`.
+**Expected:** the module documentation names both criteria, "zero atomic
+operations" and "one fence, not 64", and says why neither is assertable against
+a bare `AtomicU64`.
 
 ## M6. The doc examples are the API's first reader
 

@@ -16,8 +16,8 @@ sed -n '/^pub fn claim</,/^}/p' ring_batch/src/lib.rs
 ```
 
 **Expected:** a single-expression body containing one `fetch_add` and no loop,
-no retry, no second cursor read. Feature 177's "one fence, not 64" should be
-apparent from the body alone, not only from the counting assertion.
+no retry, no second cursor read. The single operation should be apparent from
+the body alone, not only from the counting assertion.
 
 ## M2. `claim_gated` adds loads, not a second advance
 

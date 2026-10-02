@@ -1,10 +1,10 @@
 # ring_slot manual testing plan
 
 `tests/slot_test.rs` asserts both slot shapes behave. This plan covers the
-feature's constraint, which is architectural rather than behavioural: "both use
-the same claim, gating, and drain" and "the difference is confined to what a
-slot contains." A test can show both shapes work; only reading the code shows
-that nothing downstream *can* tell them apart.
+constraint the module doc states, which is architectural rather than
+behavioural: "both use the same claim, gating, and drain" and "the difference is
+confined to what a slot contains." A test can show both shapes work; only
+reading the code shows that nothing downstream *can* tell them apart.
 
 Run from the workspace root.
 
@@ -28,9 +28,8 @@ grep -rn "unsafe\|MaybeUninit" ring_slot/src/
 ```
 
 **Expected:** the only hits are inside doc comments stating none is used. The
-crate is listed in `bench_harness/gate/declared/ring/unsafe_allowlist.txt` as
-*permitted* to carry `unsafe`, and does not use the permission. Do not treat the
-allowlist entry as evidence that it does.
+crate is absent from `bench_harness/gate/declared/ring/unsafe_allowlist.txt`, so
+the workspace `unsafe-code = "deny"` lint refuses any `unsafe` here.
 
 ## M3. A shorter write cannot leak the previous payload's tail
 

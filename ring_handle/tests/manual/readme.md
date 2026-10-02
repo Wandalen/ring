@@ -6,30 +6,26 @@ result.
 
 The prediction-first order is the point. A stage written after seeing the output
 records what happened; a stage written before it can be *wrong*, and a wrong
-prediction is the only thing here that teaches anything. This round produced
-two: H4's was already relied on in four doc instances before it was measured,
-and H5's was wrong within a minute of the guard being written.
+prediction is the only thing here that teaches anything.
 
 ## Why these five are manual
 
 | Stage | Why a test cannot do it |
 |---|---|
-| H1 | The suite reports pass/fail. Whether each case fails *for the intended reason* is a reading of seven `.stderr` files. A case rejected for a typo passes exactly as loudly as one rejected for the right reason |
+| H1 | The suite reports pass/fail. Whether each case fails *for the intended reason* is a reading of every `.stderr` file. A case rejected for a typo passes exactly as loudly as one rejected for the right reason |
 | H2 | It requires editing `src/lib.rs` to introduce a violation. A test cannot add a method to the crate under test |
 | H3 | It asks whether a case is right for the reason its author believed. Nothing fails if the reason is wrong; the case still passes |
-| H4 | A prediction four instances asserted as fact. Confirming it needs a measurement, and the measurement is what showed it was wrong |
+| H4 | A size claim that reads as obvious. Confirming it needs a measurement, and the measurement is what showed it was wrong |
 | H5 | A reading of *why* a guard fired. The suite reported red; whether that red was the guard working or the guard misreading its own documentation is a judgement about the match, not about the result |
 
 ---
 
 ## H1. Every case is rejected, and for the stated reason
 
-`tests/ui_test.rs` reports one pass for five programs. That single bit says
+`tests/ui_test.rs` reports one pass for all its programs. That single bit says
 nothing about *why* each was rejected. A compile-fail case that fails for an
 unrelated reason, such as a typo'd method, a missing import or a moved value, is
-the standard way such a suite rots
-(→ [`non_functional_requirement/001`](../../docs/non_functional_requirement/001_proven_by_code_that_must_not_compile.md)'s
-measurement step 2).
+the standard way such a suite rots.
 
 **Command.**
 
@@ -38,12 +34,10 @@ cd "$(git rev-parse --show-toplevel)"/ring_handle
 for f in tests/ui/*.stderr; do printf '%s: ' "$f"; head -1 "$f"; done
 ```
 
-**Prediction.** Five files. This stage was run when there were five cases;
-the two added afterwards are covered in the note below the result. The three
-absence cases report `E0599: no method
-named <X> found`, each naming the method the case is *about*. The `!Sync` case
-reports a trait-bound error mentioning `Sync`, not `E0599`. That is a different
-kind of rejection, and a case reporting `E0599` there would mean the program was
+**Prediction.** The absence cases report `E0599: no method named <X> found`,
+each naming the method the case is *about*. The `!Sync` case reports a
+trait-bound error mentioning `Sync`, not `E0599`. That is a different kind of
+rejection, and a case reporting `E0599` there would mean the program was
 rejected before it ever got to the auto-trait.
 
 **Result (2026-08-28): holds.**
@@ -57,14 +51,13 @@ tests/ui/producer_shared_across_threads.stderr: error[E0277]: `Cell<()>` cannot 
 ```
 
 Each `E0599` names the method its own case is about: `try_recv` on the
-producer, `try_push` on the consumer, `clone` on each. The fifth is `E0277` on
-`Cell<()>`, as predicted.
+producer, `try_push` on the consumer, `clone` on each. The `!Sync` case is
+`E0277` on `Cell<()>`, as predicted.
 
-(The listing above is from the first run, when there were five cases. The two
-added afterwards, `producer_try_clones` and `ring_used_after_split`, report
-`E0599: no method named try_clone` and `E0382: borrow of moved value: ring`
-respectively. The second is the only case here rejected by the *borrow
-checker* rather than by name resolution.)
+The listing above predates two cases. `producer_try_clones` reports
+`E0599: no method named try_clone`, and `ring_used_after_split` reports
+`E0382: borrow of moved value: ring`. The second is the only case here rejected
+by the *borrow checker* rather than by name resolution.
 
 **The `!Sync` line is the one worth reading twice.** It does not mention
 `ring_handle` at all in its first line. The `!Sync` property is inherited from
@@ -78,8 +71,8 @@ artifact**, which is more than the assertion itself was asked to provide.
 
 ## H2. The suite goes red when the violation is real
 
-Five programs that do not compile is also an accurate description of five
-programs containing typos. H1 rules out the typo; it does not establish that the
+A set of programs that do not compile is also what a set of programs containing
+typos looks like. H1 rules out the typo; it does not establish that the
 mechanism *responds* to the thing it exists to detect. The only way to establish
 that is to commit the violation.
 
@@ -99,7 +92,7 @@ cargo test -p ring_handle --test ui_test
 ```
 
 **Prediction.** `producer_drains.rs` fails, with trybuild reporting that it
-compiled when it was expected not to. The other four still pass, since none of
+compiled when it was expected not to. The other cases still pass, since none of
 them mentions `try_recv`. After removing the method the suite is green again.
 
 **Result (2026-08-28): holds.**
@@ -152,9 +145,8 @@ it, because there is no `E0382: use of moved value`.
 twice without a move error.
 
 **So the case is right for exactly the reason claimed**, and the warning in the
-file is worth its space. This is the inverse of `ring_poll`'s P1, which found a
-check *more* correct than its author realised. Here the case depended on the
-author's reasoning, and the reasoning turned out to be sound. That outcome
+file is worth its space. The case depended on the author's reasoning, and the
+reasoning turned out to be sound. That outcome
 produces no documentation change and is still worth the two minutes, because an
 unchecked "obviously" is how a case quietly becomes decorative.
 
@@ -167,10 +159,7 @@ degradation is loud. The one this case cannot see is the one H1 covers.
 
 ## H4. What do the handles weigh?
 
-Three doc instances asserted the handles are "one pointer", 8 bytes:
-[`data_structure/001`](../../docs/data_structure/001_two_handles_over_one_backend.md)'s
-shape table, `type/001`'s U6, `type/002`'s C6, plus `state_machine/001`'s test
-row. None of them measured it.
+A handle looks like "one pointer", 8 bytes. This stage measures it.
 
 **Command.**
 
@@ -195,34 +184,27 @@ of a `Ring`. `Drain` is 16: a reference and a `usize`.
 | `Drain< '_, '_, u32 >` | 16 | 16 | Held |
 
 **Where the wrong number came from is the finding.** "One pointer" describes a
-hand-rolled handle over a single backend. That is what the instances were
-imagining, since they were written before `ring_core` existed in its current
-form. The real handle wraps a *dispatching* handle. `ring_core` picks among
-three backends at runtime, so a discriminant is unavoidable, and the producer
-also carries the policy that decides whether a full ring refuses or
-drops.
+hand-rolled handle over a single backend. The real handle wraps a *dispatching*
+handle. `ring_core` picks among its backends at runtime, so a discriminant is
+unavoidable, and the producer also carries the policy that decides whether a
+full ring refuses or drops.
 
-**The fix was not to correct 8 to 24.** An absolute figure is wrong again the
-moment `ring_core` adds a fourth backend. `tests/handle_test.rs`'s
+**The fix is not to correct 8 to 24.** An absolute figure is wrong again the
+moment `ring_core` adds a backend. `tests/handle_test.rs`'s
 `the_wrapper_costs_nothing` asserts **equality with the wrapped handle**
-instead. That equality is the property the instances were reaching for: this
+instead. That equality is the property "one pointer" was reaching for: this
 crate's newtype adds no field. It also stays true across layout changes one
 crate down.
-
-**A prediction that had been asserted as fact in four places, and was wrong in
-all four.** It survived because it was plausible, repeated, and never
-instrumented; the cost of checking it was one `println!`.
 
 ---
 
 ## H5. Why did the source scan go red?
 
-`handle_test.rs::no_parking_shaped_name_appears_in_the_source` closes the
-residual gap [`invariant/002`](../../docs/invariant/002_no_parking_operation_is_reachable.md)
-names. `ring_poll::PARKING_CRATES` watches the dependency graph, so a
-`std::thread::sleep` written inline adds no manifest edge and is invisible to
-it. The first version scanned `src/lib.rs` for six substrings, one of them the
-bare word `park`.
+`handle_test.rs::no_parking_shaped_name_appears_in_the_source` closes a gap the
+dependency check leaves. `ring_poll::PARKING_CRATES` watches the dependency
+graph, so a `std::thread::sleep` written inline adds no manifest edge and is
+invisible to it. The first version scanned `src/lib.rs` for substrings, one of
+them the bare word `park`.
 
 **Command.** Run the suite with the guard in place.
 
@@ -244,12 +226,10 @@ The match is in the module documentation: *"would put a **park**ing operation
 within reach of the tick path"*. **The guard fired on the prose explaining what
 the guard is for.**
 
-**This is the first defect shape in `ring_poll`'s catalogue, a grep counting
-its own prose, and it arrived within a minute of the guard being written.**
-Knowing the shape did not prevent it. What the catalogue bought was the time to
-diagnosis. The failure was read correctly on sight rather than investigated as
-a real violation, which is a smaller saving than not making the mistake and a
-real one.
+**This is a known defect shape, a grep counting its own prose.** Knowing the
+shape did not prevent it. What it bought was the time to diagnosis. The failure
+was read correctly on sight rather than investigated as a real violation, which
+is a smaller saving than not making the mistake and a real one.
 
 **Fix.** Strip `//`-to-end-of-line before scanning, and narrow `park` to
 `::park` and `park(`. Both, not either:

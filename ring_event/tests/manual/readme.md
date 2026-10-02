@@ -2,9 +2,8 @@
 
 `tests/event_test.rs` drives both slot shapes through one generic body and
 asserts they round-trip. That establishes the bodies *compile* for both shapes.
-It cannot establish the stronger reading of
-`docs/feature/182_typed_slot_and_bytes_slot.md`, "both round-trip through the
-**identical** claim/publish/drain path", because a function could branch
+It cannot establish the stronger claim, that both shapes round-trip through the
+**identical** claim/publish/drain path, because a function could branch
 internally on a shape and still satisfy every assertion in that file.
 
 So this plan is a source reading: **the three shared functions must not name a
@@ -31,9 +30,12 @@ grep -nE "TypedSlot|BytesSlot" ring_event/src/lib.rs \
   | grep -vE "^[0-9]+:[[:space:]]*(///|//!)"
 ```
 
-**Expected:** the `use` line and the four `impl` headers (plus their `fill`
-signatures), and nothing else. A shape name in a free function would mean the
-path forked.
+**Expected:** the `use` line and lines inside the `impl` blocks, and nothing
+else. A shape name in a free function would mean the path forked.
+
+List the hits rather than count them, and drop doc lines first. The shared
+functions' doc examples must name a concrete shape to demonstrate anything, so
+a count over the whole file reads those examples as a violation.
 
 ## M3: adding a payload kind requires no change to any slot type
 
@@ -92,14 +94,3 @@ shapes going through the same two calls. That example is the feature.
 | 2026-08-28 | M4 | ✅ | Module doc's "Why the read half is a GAT" section names the copy that flattening would cost. |
 | 2026-08-28 | M5 | ✅ *(after fix)* | First run found 3 hits, **all in `tests/`** and none in `src/`. The limitation was asserted but never stated where a caller reads. `Peek::peek` gained an "A `BytesSlot` cannot distinguish empty from zero-length" section naming the handshake as where the distinction lives and `TypedSlot<()>` as the cheaper signal. |
 | 2026-08-28 | M6 | ✅ | 5 doc tests pass; `publish_into`'s example drives both shapes through the same two calls. |
-
-M5 is the check that earned this plan. Both halves of the ambiguity were known,
-since the test file names it, asserts it, and explains it. But a limitation
-recorded only in a test is a limitation the caller finds by hitting it. The
-grep's answer ("3 hits, all under `tests/`") is exactly the shape of that failure.
-
-M2 was first drafted as a *count* of shape names appearing after the shared
-functions begin, and reported 4, which read as a violation. All four were inside
-those functions' own doc examples, which necessarily name a concrete shape to
-demonstrate anything. Counting is the wrong instrument here; listing the hits
-with their line kind is the right one, and is what the command above now does.

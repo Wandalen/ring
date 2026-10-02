@@ -47,15 +47,15 @@ import recipes
 # One awk invocation within a (possibly multi-command) recipe body: the
 # program in single quotes, then the target file as the word immediately
 # following. Shell single-quotes admit no escaping of their own, so the
-# program body is exactly "everything up to the next quote character" — every
+# program body is exactly "everything up to the next quote character". Every
 # awk recipe in this corpus follows that convention (no embedded `'`). No `$`
 # anchor after the target: `ring_handle/docs/lifecycle/002_...md` pipes the
 # same invocation's output to `head -4`, and requiring the target to run to
 # end of line missed the invocation entirely rather than merely mis-sizing it.
 _AWK_INVOCATION = re.compile( r"^[ \t]*awk\s+'([^']*)'\s*(\S+)", re.MULTILINE )
 
-# A shell line continuation — backslash immediately before a newline — joined
-# into the space it stands in for, matching how bash itself reads it before
+# A shell line continuation, a backslash immediately before a newline, joined
+# into the space it stands in for. This matches how bash itself reads it before
 # `_AWK_INVOCATION` ever sees the text. Without this, `ring_handle`'s awk
 # invocation split across two physical lines was read only as far as the
 # trailing backslash, which `(\S+)` then captured as the "target" in place of
@@ -64,12 +64,12 @@ _LINE_CONTINUATION = re.compile( r'\\\n[ \t]*' )
 
 # One awk pattern-action clause inside a program: `/regex/{`. The trailing `{`
 # is what marks an anchored rule rather than a bare NR-range condition that
-# reuses an earlier clause's anchor and carries none of its own — e.g.
-# `n1 && NR <= n1 + 7 { print }`, which this pattern correctly does not match.
-# The regex body is `(?:\\.|[^/\\])*` rather than `[^/]*` so an escaped slash
-# (`\/`, how this corpus spells a literal `/` inside an awk-quoted pattern —
-# `///` for a Rust doc-comment marker is the recurring case) does not end the
-# clause early.
+# reuses an earlier clause's anchor and carries none of its own, such as `n1 &&
+# NR <= n1 + 7 { print }`, which this pattern correctly does not match. The
+# regex body is `(?:\\.|[^/\\])*` rather than `[^/]*` so an escaped slash does
+# not end the clause early. `\/` is how this corpus spells a literal `/` inside
+# an awk-quoted pattern, and `///` for a Rust doc-comment marker is the
+# recurring case.
 _AWK_CLAUSE = re.compile( r'/((?:\\.|[^/\\])*)/[ \t]*\{' )
 
 # The recipe's own declared root, per this repo's `rulebook.md` § Documentation
@@ -80,28 +80,27 @@ _AWK_CLAUSE = re.compile( r'/((?:\\.|[^/\\])*)/[ \t]*\{' )
 #
 # Finding(cd_line_never_matches_the_corpus_own_git_rev_parse_idiom): this
 # pattern requires the cd argument to start with a literal `/`, so it can
-# only ever match a hardcoded absolute path — never `cd "$(git rev-parse
-# --show-toplevel)"`, the actual idiom "an absolute cd as the first line of
-# nearly every block" turns out to mean in practice: the argument starts
-# with `"`, not `/`. Measured directly, not assumed: every one of the 182
-# awk-clause-bearing commands across the whole corpus (ring/, module/,
-# substrate/) uses exactly that idiom, and _CD_LINE matches precisely zero
-# of them — not "rare," never. `_command_root` therefore always falls
-# through to its caller's `default_root` for every real recipe today, and
-# the "read the *last* one... for the rare body that changes directory
-# twice" mechanism this comment describes has not fired once in the corpus
-# that exists. No live trigger for `check()` specifically: its own
-# `default_root` is `_repo_root(docs)`, a `.git`-ancestor walk that resolves
-# to the same repository root `$(git rev-parse --show-toplevel)` would have
-# produced at runtime, so the fallback is not merely safe here, it is
-# independently correct. The gap that stays real is the one
-# `dead_clauses`'s own docstring already names for a *different* caller: a
-# fixture lifted from git history whose command text carries a genuine
-# stale literal absolute path (not the git-rev-parse form) would still be
-# preferred by this function over that caller's own fixture root, exactly
-# as documented there — `anchors_test.py` does not exercise that path
-# either way, since its fixture strips the `cd` line rather than supplying
-# one for `_command_root` to choose between.
+# only ever match a hardcoded absolute path. It never matches `cd "$(git
+# rev-parse --show-toplevel)"`, which is what "an absolute cd as the first
+# line of nearly every block" turns out to mean in practice: the argument
+# starts with `"`, not `/`. Measured directly, not assumed: every one of the
+# 182 awk-clause-bearing commands across the whole corpus (ring/, module/,
+# substrate/) uses exactly that idiom, and _CD_LINE matches zero of them.
+# Not "rare," never. `_command_root` therefore always falls through to its
+# caller's `default_root` for every real recipe today, and the "read the
+# *last* one... for the rare body that changes directory twice" mechanism
+# this comment describes has not fired once in the corpus that exists. No
+# live trigger for `check()` specifically: its own `default_root` is
+# `_repo_root(docs)`, a `.git`-ancestor walk that resolves to the same
+# repository root `$(git rev-parse --show-toplevel)` would have produced at
+# runtime. So the fallback is both safe and independently correct here. The
+# gap that stays real is the one `dead_clauses`'s own docstring already
+# names for a *different* caller. A fixture lifted from git history whose
+# command text carries a genuine stale literal absolute path (not the
+# git-rev-parse form) would still be preferred by this function over that
+# caller's own fixture root, exactly as documented there. `anchors_test.py`
+# does not exercise that path either way, since its fixture strips the `cd`
+# line rather than supplying one for `_command_root` to choose between.
 _CD_LINE = re.compile( r'^[ \t]*cd[ \t]+(/\S+)[ \t]*$', re.MULTILINE )
 
 

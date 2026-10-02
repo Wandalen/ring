@@ -1,64 +1,99 @@
 //! Sequence-range claiming without waiting.
 //!
-//! Tier 5 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types`, `ring_cursor`, `ring_gating`.
+//! Part of the ring family's concurrency write path.
 //!
-//! `ring_seqno` was scaffolded into this crate's manifest before the
-//! implementation existed and is not among them: every piece of sequence
-//! arithmetic claiming needs is either `ring_types::Seq`'s own (`advanced_by`,
-//! and the `Ord` that makes range containment a comparison rather than a
-//! subtraction) or already inside `ring_gating::GatingSet::headroom`, which
-//! reaches `ring_seqno` on this crate's behalf. Declaring it here as well would
-//! be a dependency carried for the shape of the forest rather than for a call.
+//! This crate does not depend on `ring_seqno`, though it was in the manifest
+//! before the implementation existed. Every piece of sequence arithmetic claiming
+//! needs is either `ring_types::Seq`'s own (`advanced_by`, and the `Ord` that
+//! makes range containment a comparison rather than a subtraction) or already
+//! inside `ring_gating::GatingSet::headroom`, which reaches `ring_seqno` on this
+//! crate's behalf. Declaring it here as well would be a dependency carried for
+//! the shape of the forest rather than for a call.
 //!
-//! Claiming is the first half of
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`: a producer
-//! takes exclusive ownership of a range of sequences, writes into the slots
-//! they index, and only then publishes. `ring_publish` is the second half.
+//! Claiming is the first half of the claim/publish handshake. A producer takes
+//! exclusive ownership of a range of sequences, writes into the slots they
+//! index, and only then publishes. `ring_publish` is the second half.
 //!
-//! Multi-producer exclusivity is
-//! `docs/feature/172_multi_producer_claim.md`'s requirement, and it is the
-//! reason this crate exists rather than being two lines inside `ring_publish`:
-//! no two producers may ever be granted the same sequence.
+//! Multi-producer claiming requires exclusivity. No two producers may ever be
+//! granted the same sequence, and that requirement is why this crate exists
+//! instead of being two lines inside `ring_publish`.
+//!
+//! ## Invariant: no two producers hold one sequence
+//!
+//! Only one compare-exchange in [`Claimer::claim`] or [`Claimer::claim_up_to`]
+//! can move the cursor off a given value. Every other caller adopts the
+//! winner's value and computes a disjoint range from it. The gate plays no
+//! part in this. With no consumer registered, exclusivity still holds and
+//! producers simply run past where a consumer would be.
+//!
+//! **Excluded.** An order across producers. Each producer's own claims come
+//! back in increasing order, while two producers' claims interleave however
+//! their exchanges land. Also excluded are writes through [`Claimer::cursor`],
+//! which can grant one range twice, as that accessor documents.
+//!
+//! **Enforced by.** `no_two_producers_are_ever_granted_the_same_sequence`,
+//! `claims_under_contention_lose_no_sequences`,
+//! `claim_up_to_under_contention_loses_no_sequences_either` and
+//! `each_producers_own_claims_stay_in_issue_order`, with no consumer
+//! registered, and `no_grant_ever_passes_the_limit_under_contention` under a
+//! binding gate. No test asserts that claims refused by a binding gate and then
+//! retried leave no hole in the sequence space.
+//!
+//! ## Invariant: a refused claim moves nothing
+//!
+//! A call that returns `Err` leaves [`Claimer::claimed`] where it found it,
+//! because the only write is the exchange on the `Ok` path. That is what makes
+//! retrying on [`RingError::Full`] safe. A claim that moved the cursor and then
+//! failed would leak a slot on every attempt.
+//!
+//! **Enforced by.** `a_failed_claim_advances_nothing`.
 //!
 //! ## Why claiming never waits
 //!
-//! Every function here returns immediately — `Ok` with a range, or `Err` saying
-//! why not. That is not an incidental design choice; it is what lets the same
-//! primitive serve a spinning producer, a parking producer, and the tick path
-//! that must not block at all. A claim that waited internally would force the
-//! wait strategy into this crate and make `WaitKind::None` unimplementable
-//! above it.
+//! Every function here returns immediately, with `Ok` and a range or with
+//! `Err` saying why not. That is what lets the same claim functions serve a
+//! spinning producer, a parking producer, and the tick path that must not
+//! block at all. A claim that waited internally would force the wait
+//! strategy into this crate and make `WaitKind::None` unimplementable above
+//! it.
 //!
-//! The caller that wants to wait composes: `ring_wait::for_space`, then
+//! A caller that wants to wait calls `ring_wait::for_space`, then
 //! [`Claimer::claim`].
 //!
 //! ## Why a claim is `#[must_use]` and carries no destructor
 //!
 //! A [`Claim`] is a promise the producer made to itself: these sequences are
 //! mine and I will publish them. Dropping one without publishing strands the
-//! range — the producer cursor has already advanced past it, so those slots are
-//! never written and never reclaimed, and every consumer stalls at the gap
-//! forever.
+//! range. The producer cursor has already advanced past it, so those slots
+//! are never written and never reclaimed, and every consumer stalls at the
+//! gap forever.
 //!
-//! There is deliberately no `Drop` impl that "releases" the claim. Releasing is
-//! not possible: another producer may already have claimed the range beyond it,
-//! so rewinding the cursor would hand out sequences twice, which is the one
-//! thing `docs/feature/172` forbids outright. The type is `#[must_use]` so the
-//! compiler objects to the common accident, and the invariant is stated here
-//! for the uncommon one.
+//! There is deliberately no `Drop` impl that "releases" the claim, because
+//! releasing is not possible. Another producer may already have claimed the
+//! range beyond it, so rewinding the cursor would hand out sequences twice, the
+//! one thing multi-producer claiming forbids outright. A `Drop` that published
+//! instead would need the ring's publisher, and this crate does not depend on
+//! `ring_publish`. The type is `#[must_use]`, which catches a bare discarded
+//! value and nothing else. [`Claim`]'s pitfall lists the routes it misses.
 //!
 //! ## Why the CAS loop is not `fetch_add`
 //!
 //! A `fetch_add` claim is shorter and wrong. It advances the cursor
-//! unconditionally, so the gating check has to happen *before* it — and between
-//! that check and the add, another producer can take the space the check just
-//! found. The result is a producer holding a range that overlaps a slot a
-//! consumer is still reading, which no later check can undo because the range
-//! is already granted.
+//! unconditionally, so the gating check has to happen *before* it. Between
+//! that check and the add, another producer can take the space the check
+//! just found. The producer then holds a range that overlaps a slot a
+//! consumer is still reading. No later check can undo that, because the
+//! range is already granted.
 //!
 //! The compare-exchange loop re-reads the gate inside the retry, so the
-//! decision to grant and the granting itself are one atomic step.
+//! decision to grant and the granting itself are one atomic step. A granted
+//! range never ends past the consumers' limit as it stood at the grant,
+//! because the gate is read at the value being exchanged.
+//! `no_grant_ever_passes_the_limit_under_contention` checks it.
+//!
+//! The retry has no budget. A failed exchange means a peer's claim landed, so
+//! some producer always makes progress, but one producer can keep losing for
+//! as long as its peers keep winning.
 
 #![deny(missing_docs)]
 
@@ -68,8 +103,8 @@ use ring_types::{RingError, Seq};
 
 /// The ordering a successful claim publishes the new cursor value at.
 ///
-/// `AcqRel` rather than `Release`: the success case is both a release of the
-/// cursor advance to other producers and an acquire of whatever the producer
+/// `AcqRel` rather than `Release`, because a successful exchange releases the
+/// cursor advance to other producers and also acquires whatever the producer
 /// whose value we replaced had done. A bare `Release` would let this producer's
 /// slot writes be reordered before it observed the previous producer's claim.
 const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering::AcqRel;
@@ -79,6 +114,27 @@ const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering
 /// Half-open: `start..end`, so an empty claim and a one-slot claim are not the
 /// same value, and `end` is directly the sequence the producer cursor now sits
 /// at.
+///
+/// # Pitfall: a dropped claim stops the ring, and the lint rarely says so
+///
+/// **Trap.** Relying on `#[must_use]` to catch a claim that never reaches a
+/// publish. It fires only on a value nobody binds. `let _ = claimer.claim( 4 )`,
+/// an early return or `?` between the claim and the write, an unwind, and a
+/// `continue` past the publish all compile without a warning. A bare
+/// `claimer.claim( 4 );` does warn, but with `Result`'s generic message rather
+/// than this type's, and the compiler suggests `let _ =`, which is the first
+/// route above.
+///
+/// **Failure.** Every later publish waits on the lost range, as
+/// `ring_publish::Publisher::publish` documents, and once the ring fills
+/// [`Claimer::claim`] returns [`RingError::Full`] for good. That is the same
+/// value healthy back-pressure returns, so a retry loop spins instead of
+/// failing. One lost sequence stops the ring as completely as a thousand.
+///
+/// **Mitigation.** Publish on every path out of the scope that holds the claim,
+/// including early returns and unwinds. A stall from a lost claim shows as
+/// `ring_publish`'s published cursor staying behind [`Claimer::claimed`] for
+/// longer than any slot write takes.
 ///
 /// ```
 /// use ring_claim::Claim;
@@ -101,15 +157,15 @@ impl Claim {
   /// A claim of `len` sequences beginning at `start`.
   ///
   /// Public because `ring_publish` and the test suites of both crates need to
-  /// construct one directly; a producer obtains real claims from
-  /// [`Claimer::claim`], which is the only path that establishes exclusivity.
+  /// construct one directly. A producer gets real claims from
+  /// [`Claimer::claim`], the only path that establishes exclusivity.
   ///
   /// ```
   /// use ring_claim::Claim;
   /// use ring_types::Seq;
   /// assert_eq!( Claim::new( Seq::ZERO, 0 ).len(), 0 );
   /// ```
-  // No `#[ must_use ]` here: `Claim` itself already carries one *with a
+  // No `#[ must_use ]` here. `Claim` itself already carries one *with a
   // message*, and a bare attribute on the constructor would only shadow it
   // with a less informative warning.
   pub const fn new(start: Seq, len: usize) -> Self {
@@ -178,9 +234,9 @@ impl Claim {
   /// ```
   #[must_use]
   pub const fn contains(self, seq: Seq) -> bool {
-    // Compared as raw `u64` rather than through `Seq`'s operators: `PartialOrd`
-    // is not callable in a `const fn`, and reaching through the newtype for two
-    // comparisons is the entire cost of having this one at compile time.
+    // Compares raw `u64` values instead of `Seq`'s operators, because
+    // `PartialOrd` is not callable in a `const fn`. Reaching through the newtype
+    // for two comparisons is the entire cost of having this one at compile time.
     seq.0 >= self.start.0 && seq.0 < self.end().0
   }
 
@@ -199,9 +255,9 @@ impl Claim {
 
   /// Whether this range shares any sequence with `other`.
   ///
-  /// The property `docs/feature/172_multi_producer_claim.md` forbids across
-  /// producers, exposed so a test can assert it directly rather than
-  /// reconstructing the comparison at every call site.
+  /// This is the property multi-producer claiming forbids across producers. It
+  /// is public so a test can assert it directly instead of reconstructing the
+  /// comparison at every call site.
   ///
   /// ```
   /// use ring_claim::Claim;
@@ -214,10 +270,10 @@ impl Claim {
   /// ```
   #[must_use]
   pub const fn overlaps(self, other: Self) -> bool {
-    // Raw `u64` comparisons for the same reason `contains` uses them, and with
-    // more at stake: this predicate is the one the exclusivity tests assert
-    // with, so having it answerable at compile time is worth reaching through
-    // the newtype for.
+    // Raw `u64` comparisons for the same reason `contains` uses them, and
+    // with more at stake. The exclusivity tests assert with this predicate,
+    // so having it answerable at compile time is worth reaching through the
+    // newtype for.
     !self.is_empty() && !other.is_empty() && self.start.0 < other.end().0 && other.start.0 < self.end().0
   }
 }
@@ -225,7 +281,7 @@ impl Claim {
 /// The producer cursor and the gate it must respect, together.
 ///
 /// Holds both because granting a claim requires reading the gate and advancing
-/// the cursor as one step — see the module documentation on why the two cannot
+/// the cursor as one step. The module documentation explains why the two cannot
 /// be separated without handing out overlapping ranges.
 ///
 /// ```
@@ -271,21 +327,21 @@ impl<'a> Claimer<'a> {
   /// # This is a convention, not encapsulation
   ///
   /// `PaddedCursor` implements the public `SeqCell` trait, and every one of
-  /// its methods takes `&self` — so a `&PaddedCursor` is enough to `store` the
-  /// cursor backwards or `fetch_add` it past the gate. The second is exactly
-  /// the design this crate's module documentation rejects, reachable from
-  /// outside in one line of safe code, and
+  /// its methods takes `&self`. A `&PaddedCursor` is therefore enough to
+  /// `store` the cursor backwards or `fetch_add` it past the gate. The second
+  /// is the design this crate's module documentation rejects, and outside code
+  /// reaches it in one line of safe code.
   /// `writing_through_the_cursor_accessor_defeats_the_gate` in
   /// `tests/claim_test.rs` demonstrates both failure modes it produces:
   /// a grant past a gate that had just returned `Full`, and two live `Claim`s
   /// that `Claim::overlaps` reports as covering the same sequences.
   ///
-  /// Monotonicity is therefore a property of the *methods* — `claim`,
-  /// `claim_up_to`, `claimed` — and not of the cursor itself. Read it, hand it
+  /// Monotonicity is therefore a property of the *methods* `claim`,
+  /// `claim_up_to` and `claimed`, not of the cursor itself. Read it, hand it
   /// to `ring_publish`, take its address for a layout assertion; do not write
   /// through it. The crate's manual `§ C2` check greps this crate's own source
-  /// for `store` and `fetch_add` and passes, which is correct and says nothing
-  /// about callers.
+  /// for `store` and `fetch_add` and passes. That result is correct and says
+  /// nothing about callers.
   ///
   /// ```
   /// use ring_claim::Claimer;
@@ -318,12 +374,11 @@ impl<'a> Claimer<'a> {
     self.consumers
   }
 
-  /// How far claiming has advanced — one past the last sequence handed out.
+  /// How far claiming has advanced, as one past the last sequence handed out.
   ///
-  /// Note this is *claimed*, not published: a slot counted here may still be
+  /// This is *claimed*, not published, so a slot counted here may still be
   /// mid-write. `ring_publish` tracks the published frontier separately, and
-  /// conflating the two is exactly what
-  /// `docs/feature/170_claim_publish_available_commit_handshake.md` forbids.
+  /// the claim/publish handshake forbids conflating the two.
   ///
   /// ```
   /// use ring_claim::Claimer;
@@ -343,11 +398,11 @@ impl<'a> Claimer<'a> {
   /// How many slots could be claimed right now.
   ///
   /// A hint only. Between this reading and a [`claim`] another producer may
-  /// take the space — which is why `claim` re-checks rather than trusting a
+  /// take the space. That is why `claim` re-checks rather than trusting a
   /// prior `headroom`.
   ///
-  /// Costs one load plus one more per registered consumer — cheap for a
-  /// diagnostic, worth avoiding in a hot loop with many consumers.
+  /// Costs one load plus one more per registered consumer. That is cheap for a
+  /// diagnostic and worth avoiding in a hot loop with many consumers.
   ///
   /// [`claim`]: Self::claim
   ///
@@ -369,21 +424,27 @@ impl<'a> Claimer<'a> {
 
   /// Claim exactly `count` contiguous sequences, or fail.
   ///
-  /// Never waits and never claims fewer than asked — see
-  /// [`claim_up_to`] for the partial variant.
+  /// Never waits and never claims fewer than asked. [`claim_up_to`] is the
+  /// partial variant.
   ///
   /// [`claim_up_to`]: Self::claim_up_to
   ///
   /// # Errors
   ///
-  /// [`RingError::BatchTooLarge`] when `count` exceeds the ring's capacity: a
-  /// configuration error no consumer's progress can fix, so a retry loop must
-  /// stop. [`RingError::Full`] when the space is not available *right now* —
-  /// back-pressure, so a retry loop should keep going.
+  /// [`RingError::BatchTooLarge`] when `count` exceeds the ring's capacity.
+  /// That is a configuration error no consumer's progress can fix, so a retry
+  /// loop must stop. [`RingError::Full`] when the space is not available
+  /// *right now*. That is back-pressure, so a retry loop should keep going.
+  /// `Full` does not say whether the ring was full at the first look or a peer
+  /// took the last room during a retry. Both call for the same wait. One cause
+  /// of `Full` never clears by waiting, and [`Claim`]'s pitfall describes it.
   ///
-  /// A `count` of zero always succeeds, even on a full ring — there is
+  /// A `count` of zero always succeeds, even on a full ring, because there is
   /// nothing for back-pressure to block. [`claim_up_to`] treats a zero grant
-  /// as `Full` instead; the two functions disagree here on purpose.
+  /// as `Full` instead. The two functions disagree here on purpose. A zero
+  /// claim is still not free. It runs the compare-exchange, swapping the cursor
+  /// for its own value on the line every producer contends for, while a call
+  /// refused at its first look never reaches it.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -409,10 +470,10 @@ impl<'a> Claimer<'a> {
       });
     }
 
-    // The gate is the loop condition, and is therefore re-read on every
-    // iteration: on a failed exchange another producer moved the cursor, so
-    // the headroom computed against the old value is stale and granting on it
-    // would overlap that producer's range.
+    // The gate is the loop condition, so the loop re-reads it on every
+    // iteration. A failed exchange means another producer moved the cursor.
+    // The headroom computed against the old value is then stale, and granting
+    // on it would overlap that producer's range.
     let mut current = self.claimed();
     while count <= self.consumers.headroom(current) {
       let next = current.advanced_by(count as u64);
@@ -430,15 +491,34 @@ impl<'a> Claimer<'a> {
   /// For a batching producer that would rather write four items now than wait
   /// for room for eight.
   ///
+  /// # Algorithm: the grant shrinks under contention
+  ///
+  /// The width is recomputed on every retry, as `max` capped by the headroom
+  /// at the value the failed exchange returned. A producer that loses the
+  /// exchange asks for whatever is left rather than for the same amount, so a
+  /// retry can grant less than the first attempt would have. [`claim`] keeps
+  /// `count` fixed, so its retry either grants that width or fails.
+  ///
   /// # Errors
   ///
   /// [`RingError::Full`] when not even one slot is free. Never
-  /// `BatchTooLarge` — a `max` wider than the ring is not an error here, it is
-  /// simply more than will be granted.
+  /// `BatchTooLarge`. A `max` wider than the ring is not an error here, only
+  /// more than the call will grant.
   ///
   /// A `max` of zero is also `Full`, since there is no partial success at
-  /// zero to report — this differs from [`claim`], which treats a `count`
+  /// zero to report. This differs from [`claim`], which treats a `count`
   /// of zero as always satisfiable.
+  ///
+  /// # Pitfall: an empty batch reads as a full ring
+  ///
+  /// **Trap.** Passing a batch's length as `max` and treating `Full` as
+  /// back-pressure to retry, as [`claim`] documents it.
+  ///
+  /// **Failure.** An empty batch makes `max` zero, and a `max` of zero returns
+  /// `Full` on any ring, an empty one included. The retry loop waits for a
+  /// consumer to free room that is already free, and never exits.
+  ///
+  /// **Mitigation.** Skip the call when there is nothing to write.
   ///
   /// [`claim`]: Self::claim
   ///
@@ -457,10 +537,10 @@ impl<'a> Claimer<'a> {
   /// assert_eq!( claimer.claim_up_to( 1 ), Err( RingError::Full ) );
   /// ```
   pub fn claim_up_to(&self, max: usize) -> Result<Claim, RingError> {
-    // `granted @ 1..` binds the grant and gates on it in one expression, which
-    // is what keeps the headroom re-read in the loop condition rather than
-    // duplicated between a pre-loop computation and the retry arm. A grant of
-    // zero — no room, or a `max` of zero — exits to the `Full` below.
+    // `granted @ 1..` binds the grant and gates on it in one expression. That
+    // keeps the headroom re-read in the loop condition instead of duplicated
+    // between a pre-loop computation and the retry arm. A grant of zero, from
+    // no room or from a `max` of zero, exits to the `Full` below.
     let mut current = self.claimed();
     while let granted @ 1.. = max.min(self.consumers.headroom(current)) {
       let next = current.advanced_by(granted as u64);

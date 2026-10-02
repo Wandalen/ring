@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #@ purpose: Apply this repo's adopted rustfmt style (rustfmt.toml) across the
 #@          whole workspace. check::1 verifies without writing (CI-safe);
-#@          default applies in place. Must run under +nightly — rustfmt.toml's
-#@          unstable_features (group_imports, imports_layout) silently no-op
-#@          on stable.
+#@          default applies in place. Must run under +nightly, because
+#@          rustfmt.toml's unstable_features (group_imports, imports_layout)
+#@          silently no-op on stable.
 #@ tags: verb, fmt
 set -euo pipefail
 

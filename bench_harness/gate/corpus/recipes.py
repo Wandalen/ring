@@ -59,8 +59,8 @@ import corpus_lib as lib
 
 # Cargo writes this to stderr, once per invocation, whenever another cargo
 # process holds the lock it wants. It is a scheduling artefact of whatever else
-# happened to be running that minute, never evidence about the crate — and
-# because `run` compares stdout+stderr, a recipe carrying an unfiltered cargo
+# happened to be running that minute, never evidence about the crate. Because
+# `run` compares stdout+stderr, a recipe carrying an unfiltered cargo
 # call would otherwise pass alone and fail beside a concurrent build. Dropped
 # from the *actual* side only: a document that already baked one of these in
 # stays a loud STALE until someone cleans it, which is the correct outcome.
@@ -237,8 +237,8 @@ def check( docs ):
         _check_readme( kind / 'readme.md', f'{d.name}/{kind.name}', problems )
 
   # The crate-level readme itself, one level up from every definition readme
-  # above — previously never opened at all, since `lib.instances` requires a
-  # directory and the loop above walks only `docs`'s own subdirectories.
+  # above. It was previously never opened at all, since `lib.instances` requires
+  # a directory and the loop above walks only `docs`'s own subdirectories.
   _check_readme( docs / 'readme.md', '.', problems, optional = True )
 
   return problems

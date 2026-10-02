@@ -1,22 +1,22 @@
-//! Slot payload views — typed and raw bytes.
+//! Slot payload views: typed and raw bytes.
 //!
-//! Tier 1 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
-//! `docs/feature/182_typed_slot_and_bytes_slot.md` asks for two slot shapes over
-//! one ring: a typed slot for traffic whose shape is known at compile time, and
+//! The typed-slot-and-bytes-slot feature asks for two slot shapes over one
+//! ring: a typed slot for traffic whose shape is known at compile time, and
 //! a bytes slot for traffic that arrives from outside and is decoded later.
-//! The reason for both is a cost asymmetry — force everything through bytes and
-//! in-process command traffic pays an encoding cost for nothing; type the ring
+//! The reason for both is a cost asymmetry. Force everything through bytes, and
+//! in-process command traffic pays an encoding cost for nothing. Type the ring,
 //! and opaque host traffic has nowhere to go without a second ring built for it.
-//! That asymmetry is argued here, not measured: the family's own bench crate
+//! That asymmetry is argued here, not measured. The family's own bench crate
 //! times `TypedSlot` on both ring implementations and has never instantiated
 //! `BytesSlot`, so the difference this paragraph claims has no number behind it.
 //!
-//! The feature's constraint is that "both use the same claim, gating, and drain
-//! — the difference is confined to what a slot contains." That is enforced here
-//! by [`Slot`]: one trait both shapes implement, so everything downstream is
-//! written against the trait and cannot branch on which shape it has.
+//! The feature's constraint is that "both use the same claim, gating, and drain"
+//! and that "the difference is confined to what a slot contains." [`Slot`]
+//! enforces that here. It is one trait both shapes implement, so everything
+//! downstream is written against the trait and cannot branch on which shape it
+//! has.
 //!
 //! No `unsafe`. A [`BytesSlot`] is a fixed-length buffer plus a length, so a
 //! partially-filled slot reads back exactly what was written and nothing else,
@@ -46,21 +46,21 @@ pub trait Slot {
   /// **Not a promise to overwrite.** For a shape that owns what it stores
   /// (`TypedSlot`), the old value's destructor runs, so nothing survives the
   /// call. For a shape that stores by copying into fixed storage
-  /// (`BytesSlot`), the bytes are not zeroed — only the length that marks
-  /// them unreachable through this trait's own API moves. Both are "empty"
-  /// by [`Slot::is_empty`]; only one is empty in memory.
+  /// (`BytesSlot`), the bytes are not zeroed. Only the length moves, and the
+  /// length is what marks them unreachable through this trait's own API. Both
+  /// are "empty" by [`Slot::is_empty`]; only one is empty in memory.
   ///
   /// **How long the residue lasts.** For `BytesSlot`, until a write of at
   /// least that length lands on the same slot, or the ring holding it is
-  /// dropped — not until the next lap. A ring reuses slot `i` every lap and
-  /// nothing sweeps the array in between: `ring_store::Buffer::clear` is the
+  /// dropped, not until the next lap. A ring reuses slot `i` every lap and
+  /// nothing sweeps the array in between. `ring_store::Buffer::clear` is the
   /// only bulk reset in the family and is wired to no lifecycle event.
   /// So a slot holds the longest payload ever written to its position, and
   /// clearing it moves a length rather than erasing anything. No public API
-  /// on either shape can read past the length — `Debug` and `PartialEq` are
-  /// written by hand on `BytesSlot` for exactly that reason — but the bytes
-  /// are in the process's memory until overwritten, which is the property a
-  /// caller handling secrets has to plan around.
+  /// on either shape can read past the length. `Debug` and `PartialEq` are
+  /// written by hand on `BytesSlot` for that reason. But the bytes stay in
+  /// the process's memory until overwritten, and a caller handling secrets
+  /// has to plan around that.
   fn clear(&mut self);
 }
 
@@ -95,14 +95,14 @@ impl<T> TypedSlot<T> {
 
   /// Place `value` in the slot, returning whatever it held before.
   ///
-  /// Returning the displaced value rather than dropping it keeps the door open
-  /// for a future evict-oldest policy to hand a caller what it evicted instead
-  /// of losing it silently — but `ring_overflow` does not depend on this crate
-  /// and cannot reach this return value today. The one reader that binds it now
-  /// is `ring_core`'s `debug_assert`, confirming a freshly claimed slot came
+  /// Returning the displaced value rather than dropping it would let a future
+  /// evict-oldest policy hand a caller what it evicted instead of losing it
+  /// silently. But `ring_overflow` does not depend on this crate and cannot
+  /// reach this return value today. The one reader that binds it now is
+  /// `ring_core`'s `debug_assert`, which confirms a freshly claimed slot came
   /// back empty rather than handing anything back to a caller.
   ///
-  /// Deliberately **not** `#[ must_use ]`, unlike [`TypedSlot::take`]: on a ring
+  /// Deliberately **not** `#[ must_use ]`, unlike [`TypedSlot::take`]. On a ring
   /// the displaced value belongs to a lap the consumer already finished, so
   /// dropping it is the ordinary case rather than a lost record. `core` marks
   /// neither `Option::replace` nor `Option::take` for the same kind of reason.
@@ -132,7 +132,7 @@ impl<T> TypedSlot<T> {
   /// Remove and return the held value, leaving the slot empty.
   ///
   /// This is the *only* way a payload leaves a `TypedSlot`, so discarding the
-  /// result always destroys a record — which is why it is `#[ must_use ]` and
+  /// result always destroys a record. That is why it is `#[ must_use ]` and
   /// [`TypedSlot::set`] is not. `set`'s return is a value the caller usually
   /// did not ask for and frequently should drop; on a ring, the slot it
   /// displaces belongs to a lap the consumer already finished.
@@ -150,9 +150,9 @@ impl<T> TypedSlot<T> {
   }
 }
 
-// Written out rather than derived, and the difference is load-bearing.
+// Written out rather than derived, and the difference matters.
 // `#[ derive( Default ) ]` on a tuple struct emits `impl< T : Default >`,
-// because it defaults every field — including the `Option< T >`, whose own
+// because it defaults every field, including the `Option< T >`, whose own
 // `Default` is `None` and needs nothing from `T`. That bound would propagate
 // to every `S : Slot + Default` consumer (`ring_store`, `ring_mpsc`,
 // `ring_spsc` all use it), silently narrowing the ring to payloads that
@@ -182,17 +182,17 @@ impl<T> Slot for TypedSlot<T> {
 /// behaviour the ring was chosen for.
 ///
 /// The two fields below read like `N + 8` bytes on the struct definition
-/// alone. At the `N` this family actually instantiates, the `usize`'s 8-byte
+/// alone. At the `N` this family instantiates, the `usize`'s 8-byte
 /// alignment folds in as padding too, so the true cost sits closer to `2N`.
 ///
 /// Every bit pattern of `[ u8; N ]` and of `usize` is valid, so this type has
-/// no spare bit to hide a discriminant in — wrapping it in `Option` costs a
+/// no spare bit to hide a discriminant in. Wrapping it in `Option` costs a
 /// full extra word at any `N`, unlike `TypedSlot`, whose `Option` is free. No
 /// caller does that today; a future fallible API returning this type by value
 /// should prefer `Result` with a niche-carrying error over that wrapping.
 ///
 /// `Clone` copies the full `[ u8; N ]` array regardless of how many bytes are
-/// actually written, so its cost is proportional to `N`, not to `len`. A
+/// written, so its cost is proportional to `N`, not to `len`. A
 /// generic bound of `Slot + Clone` accepts this shape at that flat cost
 /// alongside `TypedSlot< T >`, whose clone tracks the payload instead and
 /// exists only when `T` itself is `Clone`.
@@ -200,12 +200,12 @@ impl<T> Slot for TypedSlot<T> {
 /// **The slot is its first `len` bytes, everywhere.** [`BytesSlot::read`],
 /// [`BytesSlot::len`], [`BytesSlot::is_empty`] and this type's `Debug` and
 /// `PartialEq` all agree on that. The last two are written by hand rather than
-/// derived, because a derived pair compares and prints all `N` — including the
+/// derived, because a derived pair compares and prints all `N`. That includes the
 /// residue of longer payloads written to the same slot on earlier laps, which
 /// [`Slot::clear`] does not erase. Derived, a cleared slot would print the
 /// bytes it no longer holds and compare unequal to a fresh one; written by
 /// hand, the residue is unreachable through every public API this type has.
-/// `Clone` is still derived and still copies all `N` — it reproduces the
+/// `Clone` is still derived and still copies all `N`, so it reproduces the
 /// value's storage, not the value.
 ///
 /// ```
@@ -229,9 +229,9 @@ pub struct BytesSlot<const N: usize> {
 
 // Hand-written over `read()` rather than derived over the fields. A derived
 // impl reads all `N` bytes, including the tail past `len` that no accessor can
-// reach and that `clear` deliberately does not zero — so it would print a
+// reach and that `clear` deliberately does not zero. So it would print a
 // cleared slot's former payload and distinguish two slots no caller can tell
-// apart. Matching `Vec`'s convention: the spare capacity is storage, not value.
+// apart. This matches `Vec`'s convention, where spare capacity is storage, not value.
 impl<const N: usize> core::fmt::Debug for BytesSlot<N> {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     f.debug_struct("BytesSlot").field("payload", &self.read()).finish()
@@ -287,7 +287,7 @@ impl<const N: usize> BytesSlot<N> {
 
   /// Whether nothing has been written.
   ///
-  /// Duplicates [`Slot::is_empty`] deliberately: a caller holding a concrete
+  /// Duplicates [`Slot::is_empty`] deliberately. A caller holding a concrete
   /// `BytesSlot` should not need the trait in scope to ask, and the trait impl
   /// below delegates here so the two can never disagree.
   ///
@@ -307,12 +307,12 @@ impl<const N: usize> BytesSlot<N> {
   ///
   /// # Errors
   ///
-  /// [`RingError::BatchTooLarge`] when `payload` exceeds the slot's capacity —
-  /// reusing that variant because the shape of the problem is identical: a
-  /// request bigger than the fixed room available, which no amount of draining
-  /// resolves. The rendered message still says "batch" and "ring capacity",
-  /// wording that names a multi-slot reservation this call never makes —
-  /// `RingError` has no byte-denominated variant to borrow instead.
+  /// [`RingError::BatchTooLarge`] when `payload` exceeds the slot's capacity.
+  /// The call reuses that variant because the shape of the problem is
+  /// identical: a request bigger than the fixed room available, which no amount
+  /// of draining resolves. The rendered message still says "batch" and "ring
+  /// capacity", wording that names a multi-slot reservation this call never
+  /// makes. `RingError` has no byte-denominated variant to borrow instead.
   ///
   /// ```
   /// use ring_slot::BytesSlot;
@@ -334,7 +334,7 @@ impl<const N: usize> BytesSlot<N> {
     Ok(())
   }
 
-  /// The bytes written, and only those — never the unused tail.
+  /// The bytes written and only those, never the unused tail.
   ///
   /// ```
   /// use ring_slot::BytesSlot;
@@ -349,7 +349,7 @@ impl<const N: usize> BytesSlot<N> {
 }
 
 // Written out for the same reason as `TypedSlot`'s, though this shape could
-// not use the derive even if the bound were harmless: `[ u8; N ]` implements
+// not use the derive even if the bound were harmless. `[ u8; N ]` implements
 // `Default` only at the handful of `N` the standard library enumerates, not at
 // a generic `N`, so `#[ derive( Default ) ]` here does not compile at all.
 impl<const N: usize> Default for BytesSlot<N> {

@@ -3,10 +3,10 @@
 /// One recorded write against a table cell.
 ///
 /// A write carries no timestamp and no producer id. Under [`Accumulator::Set`]
-/// its position in the sequence is what decides the outcome; under
-/// [`Accumulator::Delta`] nothing about its position matters. That asymmetry is
-/// the whole subject of this module, and keeping the record itself
-/// order-agnostic is what lets the same slice be folded both ways.
+/// its position in the sequence decides the outcome. Under
+/// [`Accumulator::Delta`] its position does not matter. That asymmetry is the
+/// whole subject of this module. Because the record itself is order-agnostic,
+/// the same slice can be folded both ways.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Write {
   /// Which cell of the table this write lands on.
@@ -33,11 +33,10 @@ impl Write {
 
 /// How a sequence of [`Write`]s folds into the table an oracle compares.
 ///
-/// Ruled by `docs/decision/050_deferred_mutation_accumulator_scope.md`, which
-/// scopes last-write-wins to structural changes and idempotent overwrites, and
-/// requires accumulation-style writes to be summed instead. The distinction is
-/// not a preference: for an accumulation, a deterministic overwrite loses an
-/// update exactly as surely as an arbitrary one does.
+/// Last-write-wins applies only to structural changes and idempotent
+/// overwrites. Accumulation-style writes are summed instead. The distinction is
+/// not a matter of preference. For an accumulation, a deterministic overwrite
+/// loses an update exactly as surely as an arbitrary one does.
 ///
 /// ```
 /// use bench_harness::{ Accumulator, Write };
@@ -64,14 +63,14 @@ impl Accumulator {
   /// Every variant, in discriminant order.
   ///
   /// The length constrains this array against its own initialiser, never
-  /// against the enum — a third variant leaves `ALL` at two and passes the
-  /// assertion below. What refuses one is the wildcard-free `match` in
-  /// `is_order_independent` just under this, and the one in `fold` below it;
-  /// both live in this file, so growth is a compile error rather than a test
-  /// failure. Decay in the other direction — a variant replaced by a duplicate
-  /// of its sibling — is what the assertions can reach, and is covered by the
-  /// membership check in `the_order_independence_flag_matches_the_fold`
-  /// (`tests/oracle_test.rs`), which records the measurement that put it there.
+  /// against the enum. A third variant leaves `ALL` at two and passes the
+  /// assertion below. What refuses a third variant is the wildcard-free `match`
+  /// in `is_order_independent` just under this, and the one in `fold` below it.
+  /// Both live in this file, so growth is a compile error rather than a test
+  /// failure. The assertions can reach decay in the other direction, where a
+  /// variant is replaced by a duplicate of its sibling. The membership check in
+  /// `the_order_independence_flag_matches_the_fold` (`tests/oracle_test.rs`)
+  /// covers that case and records the measurement that put it there.
   ///
   /// ```
   /// use bench_harness::Accumulator;
@@ -88,12 +87,12 @@ impl Accumulator {
   /// assert!( Accumulator::Delta.is_order_independent() );
   /// ```
   // Fix(accumulator_order_independence_not_exhaustive): was `matches!( self, Self::Delta )`,
-  // which classifies silently instead of refusing to compile — a third variant would
-  // compile straight into `false` with no signal, unlike `fold`'s own exhaustive match
-  // just below, which forces a decision. `Accumulator::ALL` and the T12 test in
-  // `tests/oracle_test.rs` only cover variants a developer remembers to add to `ALL`, so
-  // they are not a substitute for this. Same shape as `DispatchStrategy`'s
-  // `matches!`-based coordination predicates silently misclassifying a new strategy.
+  // which classifies silently instead of refusing to compile. A third variant would
+  // compile straight into `false` with no signal. `fold`'s own exhaustive match just
+  // below, by contrast, forces a decision. `Accumulator::ALL` and
+  // `the_order_independence_flag_matches_the_fold` in `tests/oracle_test.rs` only
+  // cover variants a developer remembers to add to `ALL`, so they are not a
+  // substitute for this.
   #[must_use]
   pub const fn is_order_independent(self) -> bool {
     match self {
@@ -105,9 +104,9 @@ impl Accumulator {
   /// Fold `writes` into a `cells`-long table under this semantics.
   ///
   /// Cells no write touches read zero. A write naming a cell at or beyond
-  /// `cells` is discarded rather than panicking — a table is a fixed extent,
-  /// and an out-of-range write is a property of the workload rather than an
-  /// error the oracle should raise.
+  /// `cells` is discarded instead of panicking. A table is a fixed extent, and
+  /// an out-of-range write is a property of the workload, not an error the
+  /// oracle should raise.
   ///
   /// ```
   /// use bench_harness::{ Accumulator, Write };

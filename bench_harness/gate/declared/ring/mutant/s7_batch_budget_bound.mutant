@@ -1,14 +1,14 @@
 # `push_batch_within`'s budget bound, spending one attempt more than it should.
 #
-# The whole `ring_poll` retry loop looks untestable from a single thread —
-# nothing changes between attempts, so a repeated attempt can only find the same
+# The whole `ring_poll` retry loop looks untestable from a single thread.
+# Nothing changes between attempts, so a repeated attempt can only find the same
 # answer. That is true of `push_within` and `recv_within`, whose survivors are
 # in ../accepted/ for exactly that reason. It is false here, and the difference
 # is what this declaration exists to hold.
 #
 # `ring_core::Producer::try_push_batch` pulls a record from the iterator before
 # it can know whether there is room, so a refusal consumes and drops the record
-# it could not place — that crate's own doctest pins this as intended. So every
+# it could not place. That crate's own doctest pins this as intended. So every
 # extra attempt against a full ring destroys one more record, and the attempt
 # count is observable after all: not in the published total, not in the
 # consumer's length, but in what is left of the caller's iterator.

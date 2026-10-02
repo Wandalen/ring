@@ -6,8 +6,8 @@
 # least a line apart. The method returns `true` for every pair that can exist.
 #
 # Killing the mutant would need two cursors closer than 64 bytes, which cannot
-# be built while the alignment holds — and the alignment is asserted directly,
-# here and in `ring_align`, by tests that swept clean. See accepted/readme.md,
+# be built while the alignment holds. Tests that swept clean assert the
+# alignment directly, here and in `ring_align`. See accepted/readme.md,
 # "The alignment canaries", for why leaving these three unkillable is the point
 # rather than a concession.
 

@@ -1,4 +1,4 @@
-//! `ring_cursor::slowest` allocates nothing — asserted, not argued.
+//! Asserts, rather than argues, that `ring_cursor::slowest` allocates nothing.
 //!
 //! ## Why this file exists
 //!
@@ -6,13 +6,13 @@
 //! `cursors.iter().map( | c | c.load( GATING ) ).collect::< Vec< _ > >()`
 //! and hand the `Vec` to `ring_seqno::slowest`, because `ring_seqno` folds over
 //! values and this crate holds cells. That cost one heap allocation on every
-//! gate read, inside the CAS retry loop of `ring_claim::claim` — and it was
-//! documented as a measured fact across six crates before it was removed.
+//! gate read, inside the CAS retry loop of `ring_claim::claim`. Six crates
+//! documented it as a measured fact before it was removed.
 //!
 //! Removing it was a source change with nothing pinning it. Every downstream
 //! document that quoted the number had to be rewritten by hand, and nothing
 //! would have caught the same allocation coming back. This file is that
-//! missing guard: it measures, rather than reasons about, the one property
+//! missing guard. It measures, rather than reasons about, the one property
 //! those documents now assert.
 //!
 //! ## Why one `#[ test ]` and not several
@@ -26,9 +26,9 @@
 //!
 //! ## Why the control arm is not optional
 //!
-//! An allocation counter that is silently broken — miscompiled away, never
-//! installed, counting into a different static — reports zero for everything,
-//! which is exactly the answer this file is looking for. `a_control_that_must
+//! An allocation counter can be silently broken: miscompiled away, never
+//! installed, or counting into a different static. It then reports zero for
+//! everything, which is the answer this file is looking for. `a_control_that_must
 //! _allocate` below forces a real allocation through the same counter in the
 //! same process, so a zero from the measured calls means "nothing allocated"
 //! rather than "nothing was watching".
@@ -38,13 +38,11 @@
 // family, and those panic the moment they are touched outside a
 // model closure that instruments them.
 #![cfg(not(loom))]
-// A counting allocator cannot be written in safe Rust: `GlobalAlloc` is an
-// unsafe trait by construction. The workspace denies `unsafe_code`, and the
-// two crates that override it do so in `src/lib.rs`
-// (`ring_store/docs/integration/002_every_unsafe_block_in_the_family.md`
-// measures exactly that set, and this file is not in it). The allowance here
-// is test-only, covers one wrapper that forwards to `std::alloc::System`
-// unchanged, and adds no unsafe code to any shipped crate.
+// A counting allocator cannot be written in safe Rust. `GlobalAlloc` is an
+// unsafe trait by construction. The workspace denies `unsafe_code`, and the two
+// crates that override it do so in `src/lib.rs`. This file is not one of them.
+// The allowance here is test-only, covers one wrapper that forwards to
+// `std::alloc::System` unchanged, and adds no unsafe code to any shipped crate.
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -112,7 +110,7 @@ fn the_gating_fold_allocates_nothing_at_every_arity() {
     PaddedCursor::new(Seq(9)),
   ];
 
-  // The control arm, first: if this reads zero the counter is not working and
+  // The control arm comes first. If this reads zero the counter is not working and
   // every assertion below is vacuous.
   let (control_calls, control_bytes, buffer) = measure(|| {
     let mut buffer = Vec::<Seq>::with_capacity(3);
@@ -132,7 +130,7 @@ fn the_gating_fold_allocates_nothing_at_every_arity() {
   );
   drop(buffer);
 
-  // The empty case was already free before the `Vec` was removed — an empty
+  // The empty case was already free before the `Vec` was removed. An empty
   // `collect()` yields `Vec::new()`, which never reaches the allocator. It is
   // measured anyway, because it is the one case that would have stayed green
   // through the whole regression this file guards against.

@@ -1,37 +1,37 @@
-//! Tests for `ring_align` — cache-line padding.
+//! Tests for `ring_align`'s cache-line padding.
 //!
-//! Claims the padding half of `docs/feature/169_padded_cursor.md`. The feature's
-//! own words: "the padding is the whole point", because two cursors sharing a
-//! line make every write by either invalidate the other's cached copy. The
-//! structural assertion — 64-byte size and alignment — is what a test can
-//! decide; the throughput claim the feature also makes needs a number nobody has
-//! stated yet, which is why `docs/plan/008_ring_write_path_staged.md` splits
-//! stage S3 out and applies scale-invariance recursion inside it.
+//! Claims the padding half of `docs/feature/169_padded_cursor.md`. In the
+//! feature's own words, "the padding is the whole point", because two cursors
+//! sharing a line make every write by either invalidate the other's cached copy.
+//! A test can decide the structural assertion, 64-byte size and alignment. The
+//! throughput claim the feature also makes needs a number nobody has stated yet.
 //!
 //! The cursor type that consumes these wrappers is `ring_cursor`; this crate
 //! owns only the constant and the wrapper.
 
 use ring_align::{CACHE_LINE, CacheAligned, on_distinct_lines};
 
-/// The constant is 64 — the line size on the family's stated target platforms.
+/// The constant is 64, the line size on the family's stated target platforms.
 #[test]
 fn cache_line_is_sixty_four() {
   assert_eq!(CACHE_LINE, 64);
 }
 
-/// The direction of a future change to `CACHE_LINE` matters and nothing but
-/// this test said so before now: raising it (-> docs/decisions/001 E1) only
-/// spends memory, but lowering it silently defeats every guarantee in this
-/// crate, because `on_distinct_lines` stays calibrated to the same wrong
-/// number it divides by (-> docs/pitfall/001, docs/decisions/001 AL14).
-/// Pinned as a floor rather than an exact value — `cache_line_is_sixty_four`
-/// above already pins the value — so a deliberate raise still passes and
-/// only a decrease trips this.
+/// The direction of a future change to `CACHE_LINE` matters, and before this
+/// test nothing said so.
+///
+/// Raising it only spends memory. Lowering it silently defeats every guarantee
+/// in this crate, because `on_distinct_lines` stays calibrated to the same
+/// wrong number it divides by
+/// (-> `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
+/// Pinned as a floor rather than an exact value, because
+/// `cache_line_is_sixty_four` above already pins the value. So a deliberate
+/// raise still passes and only a decrease trips this.
 #[test]
 fn cache_line_must_not_shrink_below_the_current_known_minimum() {
   // `core::hint::black_box` defeats the compiler's constant-folding of
   // `CACHE_LINE >= 64` (both operands are literals today), which otherwise
-  // trips `clippy::assertions_on_constants` — the comparison is a genuine
+  // trips `clippy::assertions_on_constants`. The comparison is a genuine
   // runtime regression guard against a future *decrease* of the constant,
   // not dead code the lint should silence.
   assert!(
@@ -43,7 +43,7 @@ fn cache_line_must_not_shrink_below_the_current_known_minimum() {
 }
 
 /// A wrapped value occupies exactly one line, for every payload smaller than
-/// one. Both size and alignment, because either alone is insufficient: an
+/// one. Both size and alignment, because either alone is insufficient. An
 /// aligned type smaller than a line still lets a second one share it.
 #[test]
 fn a_wrapped_value_occupies_exactly_one_line() {
@@ -63,9 +63,9 @@ fn an_oversized_payload_rounds_up_to_whole_lines() {
   assert_eq!(size, 128);
 }
 
-/// The observable consequence, and the one the feature actually cares about:
-/// two wrapped fields in one struct land on different cache lines. Asserted on
-/// real addresses, not on `size_of` alone.
+/// The observable consequence, and the one the feature cares about, is that two
+/// wrapped fields in one struct land on different cache lines. Asserted on real
+/// addresses, not on `size_of` alone.
 #[test]
 fn two_wrapped_fields_land_on_different_lines() {
   #[derive(Debug)]
@@ -85,9 +85,10 @@ fn two_wrapped_fields_land_on_different_lines() {
   assert!(on_distinct_lines(a, b));
 }
 
-/// Two *unwrapped* fields do share a line — the negative control that shows the
-/// test above is measuring the padding rather than something the layout would
-/// have done anyway.
+/// Two *unwrapped* fields do share a line.
+///
+/// This is the negative control. It shows the test above measures the padding
+/// rather than something the layout would have done anyway.
 #[test]
 fn two_unwrapped_fields_share_a_line() {
   #[derive(Debug)]
@@ -97,7 +98,7 @@ fn two_unwrapped_fields_share_a_line() {
   }
 
   // Pin `pair` to the start of a cache line so the assertion measures
-  // adjacency, not allocator luck: a bare `Naive` on the stack can land
+  // adjacency, not allocator luck. A bare `Naive` on the stack can land
   // with `producer` at the tail of one line and `consumer` in the next.
   // The wrapper pads around the pair, never between its fields.
   #[repr(align(64))]
@@ -113,8 +114,8 @@ fn two_unwrapped_fields_share_a_line() {
   assert!(!on_distinct_lines(a, b), "the unpadded pair should share a line");
 }
 
-/// `on_distinct_lines` reads line boundaries, not raw distance: two addresses
-/// 2 bytes apart can straddle a boundary and two 62 apart can share a line.
+/// `on_distinct_lines` reads line boundaries, not raw distance. Two addresses
+/// 2 bytes apart can straddle a boundary, and two 62 apart can share a line.
 #[test]
 fn distinct_lines_follows_boundaries_not_distance() {
   assert!(!on_distinct_lines(0, 63), "0 and 63 are both in line 0");
@@ -125,7 +126,7 @@ fn distinct_lines_follows_boundaries_not_distance() {
   assert!(!on_distinct_lines(100, 100));
 }
 
-/// The wrapper is transparent to its payload: what goes in comes out, through
+/// The wrapper is transparent to its payload. What goes in comes out, through
 /// every accessor.
 #[test]
 fn the_wrapper_round_trips_its_payload() {

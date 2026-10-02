@@ -1,14 +1,15 @@
 # `BytesSlot`'s hand-written `PartialEq`, answering `true` unconditionally.
 #
 # The type's whole reason to hand-write `eq` instead of deriving it is to
-# compare `read()` — the first `len` bytes — rather than the full backing
+# compare `read()`, the first `len` bytes, rather than the full backing
 # array, so two slots holding the same payload over different tails still
 # compare equal. Every test proving that relies only on `assert_eq!`: two
 # slots that should be equal, checked to actually be equal. None of them
-# would notice a body that answered `true` for every pair, equal or not —
-# the same one-polarity shape `readme.md` already names for `is_empty`
-# across six other crates, one arity up: a relation asserted on only one of
-# its two outcomes is indistinguishable from a constant returning it.
+# would notice a body that answered `true` for every pair, equal or not.
+# That is the same one-polarity shape `readme.md` already names for
+# `is_empty` across six other crates, one arity up. A relation asserted on
+# only one of its two outcomes is indistinguishable from a constant
+# returning it.
 #
 # Two slots holding different payloads, checked to compare unequal, is the
 # one case that tells them apart.

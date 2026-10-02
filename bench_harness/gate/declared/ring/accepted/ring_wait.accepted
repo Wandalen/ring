@@ -6,16 +6,15 @@
 #     }
 #     true
 #
-# The loop bound decides how many hint instructions execute and nothing else —
-# the arm returns the constant `true` either way. `% 8` becoming `+ 8` or `/ 8`
+# The loop bound decides how many hint instructions execute and nothing else.
+# The arm returns the constant `true` either way. `% 8` becoming `+ 8` or `/ 8`
 # changes the iteration count and no observable value, so no assertion can
 # separate them.
 #
-# Worth being clear about what is *not* being excused here: `pause`'s return
-# value is tested, at both polarities, in this crate's own suite. What survives
-# is only the backoff shape, which is a performance property. Asserting it would
-# mean asserting on a clock — the same trade `ring_bench` refuses and for the
-# same reason.
+# This does *not* excuse `pause`'s return value, which is tested, at both
+# polarities, in this crate's own suite. What survives is only the backoff
+# shape, which is a performance property. Asserting it would mean asserting on a
+# clock, the same trade `ring_bench` refuses, for the same reason.
 
 ring/ring_wait/src/lib.rs:121:30: replace % with + in pause
 ring/ring_wait/src/lib.rs:121:30: replace % with / in pause

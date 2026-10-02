@@ -31,8 +31,8 @@ pub struct Item {
 ///
 /// **The sequence does not depend on `producer_count`.** Each item is a pure
 /// function of `( seed, index )`, and the producer count only decides how the
-/// same items are handed out. That is what makes determinism structural rather
-/// than a property the generator has to be careful to preserve: there is no
+/// same items are handed out. That makes determinism structural, not a
+/// property the generator has to be careful to preserve. There is no
 /// interleaving for a thread count to perturb, because nothing is generated in
 /// thread order in the first place.
 ///
@@ -59,9 +59,9 @@ impl Workload {
   /// batches of `batch_size`.
   ///
   /// `producer_count` and `batch_size` are each clamped to a minimum of one.
-  /// Zero of either describes no workload at all rather than an error worth
-  /// returning, and clamping keeps the constructor total — a harness that can
-  /// panic while being configured is a harness that cannot grade a bad config.
+  /// Zero of either describes no workload at all, not an error worth
+  /// returning. Clamping keeps the constructor total, because a grader that can
+  /// panic while being configured cannot grade a bad config.
   #[must_use]
   pub const fn new(seed: u64, producer_count: usize, item_count: u64, batch_size: u64, archetype: PayloadArchetype) -> Self {
     Self {
@@ -116,8 +116,8 @@ impl Workload {
   /// ```
   #[must_use]
   pub const fn item(self, index: u64) -> Item {
-    // The family's established mixing constant — a neighbouring index differs
-    // in every byte rather than in one, so a fold landing one slot over
+    // The family's established mixing constant. With it, a neighbouring index
+    // differs in every byte rather than in one, so a fold landing one slot over
     // produces an obviously wrong payload instead of a nearly-right one.
     let mixed = self.seed ^ index.wrapping_mul(0x9E37_79B9_7F4A_7C15);
     let bytes = mixed.to_le_bytes();

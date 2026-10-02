@@ -1,18 +1,18 @@
-# Stage scope — which crates and features each stage's reached-test covers.
+# Stage scope: which crates and features each stage's reached-test covers.
 #
 # Transcribed from this family's own staged plan, whose reached-test column
 # reads "G1–G6 over the N crates" for every stage.
 # Without this file the gates only grade the whole family, so a stage verdict
-# would have to wait for the Final Goal — which is the opposite of what staged
+# would have to wait for the Final Goal. That is the opposite of what staged
 # validation is for.
 #
 # Format, whitespace-separated:  <stage> <crates,comma-separated> <features,comma-separated>
 #
-# S9 is the Final Goal and deliberately absent: it is the unscoped run, which is
-# what `run_all.sh` with no argument already does. Adding it here as "all 33 /
-# all 22" would create a second place for that list to drift from reality.
+# S9 is the Final Goal and deliberately absent. It is the unscoped run, which is
+# what `run_all.sh` with no argument already does. Adding it here as "every
+# crate, every feature" would create a second place for that list to drift.
 #
-# M0 and M1 are also absent — neither is graded by G1–G6 over a crate set. M0's
+# M0 and M1 are also absent, because neither is graded by G1–G6 over a crate set. M0's
 # reached-test is that all six gates report NOT REACHED, and M1's is a corpus
 # count.
 

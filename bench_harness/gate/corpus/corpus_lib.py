@@ -27,8 +27,8 @@ FINDING_HEADING = re.compile( r'^### ([A-Z]{2}\d+) — ' )
 DEFN_ROW = re.compile( r'^\| ([A-Z]{2}\d+) \| (.*?) \| (.*?) \| (.*) \|$' )
 
 # A row of the Module Index's `## Findings` table. Column order differs from the
-# definition readme's on purpose — Subject and Tier swap places, and a fifth
-# `Where` column carries the link. Two orders for one fact is a real hazard and
+# definition readme's on purpose. Subject and Tier swap places, and a fifth
+# `Where` column carries the link. Two orders for one fact is a real hazard, and
 # G16 is the gate that holds them equal.
 MASTER_ROW = re.compile(
   r'^\| ([A-Z]{2}\d+) \| (.*?) \| (.*?) \| (.*?) \| \[([a-z_]+/\d+)\]\(([^)]+)\) \|$'
@@ -38,7 +38,7 @@ MASTER_ROW = re.compile(
 INSTANCE_NAME = re.compile( r'^(\d\d\d)_.*\.md$' )
 
 # Any ATX heading, captured so its depth (the run of `#`) can be compared
-# against another heading's — see `_section_rows`. Public (no leading
+# against another heading's. See `_section_rows`. Public (no leading
 # underscore): `citations.py`'s own `### Tests` section scan needs the same
 # depth comparison and would otherwise duplicate this regex rather than the
 # parsing loop around it, which has a shape of its own there (folded into a

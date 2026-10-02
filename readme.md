@@ -1,37 +1,32 @@
 # ring
 
-Ring Factory is a lock-free write path that lets many concurrent producer
+Ring Factory is a lock-free write path. It lets many concurrent producer
 threads submit work to a single ordered consumer without contending on a
-shared lock, eliminating the lock-convoy jitter that would erode a tight
-latency budget under load. Its claim, publish, and commit protocol is
-designed as a reusable foundation for latency-critical, strictly-ordered
-systems such as order-matching engines, where many concurrent order
-submissions must funnel into one deterministic, low-latency decision stream.
+shared lock, so there is no lock-convoy jitter to erode a tight latency
+budget under load. Its claim, publish, and commit protocol is designed for
+reuse in latency-critical, strictly-ordered systems such as order-matching
+engines, where many concurrent order submissions must funnel into one
+deterministic, low-latency decision stream.
 
-*A 34-crate concurrency write path, decomposed one mechanism per crate —
-unsafe forbidden by default, and nothing gets adopted without first winning
-a measured benchmark.*
+*A concurrency write path, one mechanism per crate. Unsafe is
+forbidden by default, and nothing gets adopted without first winning a
+measured benchmark.*
 
 ![Rust](https://img.shields.io/badge/rust-2024_edition-orange)
 ![Unsafe](https://img.shields.io/badge/unsafe-forbidden-brightgreen)
-![Crates](https://img.shields.io/badge/crates-34-blue)
 ![Concurrency](https://img.shields.io/badge/concurrency-loom--checked-blueviolet)
 [![CI](https://github.com/Wandalen/ring/actions/workflows/ci.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/ci.yml)
 [![Gates](https://github.com/Wandalen/ring/actions/workflows/gates.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/gates.yml)
 [![Loom](https://github.com/Wandalen/ring/actions/workflows/loom.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/loom.yml)
 
-The concurrency write-path family: 33 `ring_*` mechanism crates plus
-`bench_harness`, its family-neutral stage-gate and workload oracle. All 34
-are for-keeps, non-demo crates, and together they form this repository's own
-Cargo workspace ([`Cargo.toml`](Cargo.toml)). The family was extracted into
-this standalone repository on 2026-09-29, after an earlier internal
-reorganization had already consolidated it into a single top-level directory
-so its dependency graph was no longer nested inside an unrelated crate set.
+The family is the `ring_*` mechanism crates plus `bench_harness`, its
+family-neutral stage-gate and workload oracle. Together they form this
+repository's Cargo workspace ([`Cargo.toml`](Cargo.toml)).
 
 ## Quickstart
 
-`ring_factory` is the family's entry point — the other 32 crates are reached
-through it, not imported directly:
+`ring_factory` is the family's entry point. You reach the other crates
+through it instead of importing them directly:
 
 ```rust
 use ring_factory::{ Factory, RingConfig };
@@ -50,40 +45,40 @@ producer/consumer split does and doesn't allow.
 
 ## Architecture
 
-The dependency graph is rooted at `ring_types` and `ring_align` — the only
-two crates with no `ring_*` dependency of their own — and is acyclic by
-construction: [`Cargo.toml`](Cargo.toml)'s member list is in dependency
+The dependency graph is rooted at `ring_types` and `ring_align`, the only
+two crates with no `ring_*` dependency of their own. It is acyclic by
+construction. [`Cargo.toml`](Cargo.toml)'s member list is in dependency
 order, so a cycle would fail to build. That ordering is the whole build
-order — nothing further is needed to bring the family up from nothing.
-Eleven tiers deep, computed from the crates' own manifests rather than
-asserted:
+order, and nothing further is needed to bring the family up from nothing.
+Each crate's tier is one more than the deepest tier among its dependencies,
+dev-dependencies included:
 
 ```mermaid
 graph TD
-    T0["Tier 0 — 2 crates<br/>ring_types · ring_align"]
-    T1["Tier 1 — 7 crates<br/>ring_atomic · ring_config · ring_index · ring_seqno · ring_slot · ring_stats · ring_trace"]
-    T2["Tier 2 — 4 crates<br/>ring_batch · ring_store · ring_cursor · ring_overflow"]
-    T3["Tier 3 — 4 crates<br/>ring_event · ring_gating · ring_spsc · ring_wait"]
-    T4["Tier 4 — 3 crates<br/>ring_barrier · ring_claim · ring_tls"]
-    T5["Tier 5 — 2 crates<br/>ring_consume · ring_mpsc"]
-    T6["Tier 6 — 2 crates<br/>ring_core · ring_publish"]
-    T7["Tier 7 — 5 crates<br/>ring_debug · ring_flush · ring_handle · ring_poll · ring_shutdown"]
-    T8["Tier 8 — 2 crates<br/>ring_registry · ring_testkit"]
-    T9["Tier 9 — 1 crate<br/>ring_factory"]
-    T10["Tier 10 — 1 crate<br/>ring_bench"]
+    T0["Tier 0<br/>ring_types · ring_align"]
+    T1["Tier 1<br/>ring_atomic · ring_config · ring_index · ring_seqno · ring_slot · ring_stats · ring_trace"]
+    T2["Tier 2<br/>ring_batch · ring_store · ring_cursor · ring_overflow"]
+    T3["Tier 3<br/>ring_event · ring_gating · ring_spsc · ring_wait"]
+    T4["Tier 4<br/>ring_barrier · ring_claim · ring_tls"]
+    T5["Tier 5<br/>ring_consume · ring_mpsc"]
+    T6["Tier 6<br/>ring_core · ring_publish"]
+    T7["Tier 7<br/>ring_debug · ring_flush · ring_handle · ring_poll · ring_shutdown"]
+    T8["Tier 8<br/>ring_registry · ring_testkit"]
+    T9["Tier 9<br/>ring_factory"]
+    T10["Tier 10<br/>ring_bench"]
     T0 --> T1 --> T2 --> T3 --> T4 --> T5 --> T6 --> T7 --> T8 --> T9 --> T10
 ```
 
-`bench_harness` sits outside this graph entirely — family-neutral validation
-machinery with no `ring_*` dependency, grading several crate families from
-outside all of them (→ [`bench_harness/readme.md`](bench_harness/readme.md)).
-Only five of the 33 are meant to be depended on from outside the family:
-`ring_types`, `ring_handle`, `ring_tls`, `ring_flush`, and `ring_factory` —
-the rest are internal to the family's own composition.
+`bench_harness` sits outside this graph. It is family-neutral validation
+machinery with no `ring_*` dependency, and it grades the family from outside
+it (see [`bench_harness/readme.md`](bench_harness/readme.md)). Only these crates
+are meant to be depended on from outside the family: `ring_types`,
+`ring_handle`, `ring_tls`, `ring_flush`, and `ring_factory`.
+The rest are internal to the family's own composition.
 
 ## Why in-house, not off-the-shelf
 
-**Reasons, at a glance:**
+Reasons, at a glance:
 
 1. Determinism needs a reproducible total order
 2. Exact shape: many producers, one ordered consumer
@@ -94,32 +89,32 @@ the rest are internal to the family's own composition.
 7. Known pattern re-implemented in-house, not invented
 8. One crate per concern enables focused verification
 
-The 33 mechanism crates exist because the property they implement — a
-slot-shaped channel with exactly-once delivery and a *reproducible total
-order* — is a correctness requirement a deterministic consumer depends on,
-not a performance preference a general-purpose crate happens to satisfy.
+The mechanism crates implement a slot-shaped channel with exactly-once
+delivery and a *reproducible total order*. A deterministic consumer depends
+on that property for correctness. It is a requirement, not a performance
+preference a general-purpose crate happens to satisfy.
 Adoption is gated on benchmarking in-house pattern candidates against each
 other on this project's own workload, never on a crates.io survey
-([`ring_mpsc/docs/non_functional_requirement/001_measured_before_adopted.md`](ring_mpsc/docs/non_functional_requirement/001_measured_before_adopted.md)).
+([`ring_bench`](ring_bench/readme.md) runs that comparison).
 
 One crate is the deliberate exception. `ring_core` absorbs `crossbeam-queue`
 as a feature-gated interim backend, so consumers are not blocked on the
-in-house rings earning the operating history `ring_bench` exists to produce —
-the full reasoning, its costs, and its exact removal condition are recorded in
-[`ring_core/docs/workaround/001_crossbeam_queue_as_interim_backend.md`](ring_core/docs/workaround/001_crossbeam_queue_as_interim_backend.md).
+in-house rings earning the operating history `ring_bench` exists to produce.
+The reasoning, its costs, and its removal conditions are recorded in
+[`ring_core/docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md`](ring_core/docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md).
 
 ## Crates
 
 | Directory | Responsibility |
 |-----------|-----------------|
-| [`bench_harness/`](bench_harness/readme.md) | Stage gates and workload oracle for several crate families, this one included — depends on no `ring_*` crate |
-| [`ring_types/`](ring_types/readme.md) | Shared ids, errors, and policy enums for the ring family — no ring logic |
+| [`bench_harness/`](bench_harness/readme.md) | Stage gates and workload oracle for the family. Depends on no `ring_*` crate |
+| [`ring_types/`](ring_types/readme.md) | Shared ids, errors, and policy enums for the ring family. No ring logic |
 | [`ring_seqno/`](ring_seqno/readme.md) | Sequence numbers and their wrapping arithmetic |
 | [`ring_index/`](ring_index/readme.md) | Sequence-to-slot index mapping for power-of-two capacities |
 | [`ring_align/`](ring_align/readme.md) | Cache-line padding constants and alignment wrappers |
 | [`ring_atomic/`](ring_atomic/readme.md) | Atomic sequence helpers with explicit memory orderings |
 | [`ring_config/`](ring_config/readme.md) | Ring construction parameters |
-| [`ring_slot/`](ring_slot/readme.md) | Slot payload views — typed and raw bytes |
+| [`ring_slot/`](ring_slot/readme.md) | Slot payload views, typed and raw bytes |
 | [`ring_cursor/`](ring_cursor/readme.md) | Producer and consumer sequence cursors, cache-line separated |
 | [`ring_store/`](ring_store/readme.md) | Power-of-two slot storage array |
 | [`ring_wait/`](ring_wait/readme.md) | Wait strategies for space and data availability |
@@ -145,15 +140,15 @@ the full reasoning, its costs, and its exact removal condition are recorded in
 | [`ring_trace/`](ring_trace/readme.md) | Optional sequence-operation trace log |
 | [`ring_debug/`](ring_debug/readme.md) | Runtime invariant checks over a live ring |
 | [`ring_testkit/`](ring_testkit/readme.md) | Determinism-test fixtures driving scripted claim and drain sequences |
-| [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements — mutex, ring, and thread-local staging |
+| [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements of mutex, ring, and thread-local staging |
 
 ## Tooling
 
 ```sh
-verb/test                        # full suite, all 34 crates — final verification
-verb/test_only crate::ring_spsc  # filtered to one crate — ordinary development
+verb/test                        # full suite, every crate. Final verification
+verb/test_only crate::ring_spsc  # filtered to one crate. Ordinary development
 ```
 
 | Directory | Responsibility |
 |-----------|-----------------|
-| [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...) — not a crate, no `Cargo.toml` |
+| [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...). Not a crate, no `Cargo.toml` |

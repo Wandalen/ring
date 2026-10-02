@@ -1,15 +1,13 @@
 //! Batch claim objects spanning a contiguous sequence range.
 //!
-//! Tier 2 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types`, `ring_seqno`, `ring_atomic` and `ring_index`.
+//! Part of the ring family's concurrency write path.
 //!
-//! `docs/feature/177_batch_claim_and_batch_drain.md` states the claim this crate
-//! has to make true: "the memory fences that make the handshake correct are paid
-//! per operation, not per item, so a batch of sixty-four costs roughly what a
-//! single item costs."
+//! The batch feature states the claim this crate has to make true: "the memory
+//! fences that make the handshake correct are paid per operation, not per item,
+//! so a batch of sixty-four costs roughly what a single item costs."
 //!
-//! Measured, the claim holds and improves with more producers — but below
-//! roughly eight items there is nothing to amortise: a batch of one costs the
+//! Measured, the claim holds and improves with more producers. But below
+//! roughly eight items there is nothing to amortise. A batch of one costs the
 //! same as an unbatched claim of one, and a batch of zero costs a full atomic
 //! borne entirely by other threads.
 //!
@@ -20,9 +18,9 @@
 //!    [`CountingSeq`](ring_atomic::CountingSeq), because "roughly what a single
 //!    item costs" is otherwise a claim nobody checks.
 //! 2. **Contiguous.** The sequences a claim returns are consecutive, which is
-//!    what preserves a thread-local buffer's internal order when it lands —
-//!    hard problem 118's requirement that a system's own writes survive the
-//!    merge in order.
+//!    what preserves a thread-local buffer's internal order when it lands.
+//!    That is the requirement that a system's own writes survive the merge in
+//!    order.
 //!
 //! A [`BatchClaim`] is a *range*, not a buffer. It says which sequences the
 //! caller owns; what goes in them is `ring_store`'s and `ring_event`'s
@@ -39,7 +37,7 @@ use ring_types::{Capacity, RingError, Seq, SlotIndex};
 
 /// A contiguous run of sequences one caller owns.
 ///
-/// Ownership here is by construction rather than by enforcement: the cell was
+/// Ownership here is by construction rather than by enforcement. The cell was
 /// advanced past this range, so no other claimer can be handed a sequence
 /// inside it.
 ///
@@ -85,7 +83,7 @@ impl BatchClaim {
 
   /// Whether the claim owns nothing.
   ///
-  /// An empty claim is legal and distinct from a failed one: asking for zero
+  /// An empty claim is legal and distinct from a failed one. Asking for zero
   /// slots succeeds and yields nothing, which lets a flush of an empty
   /// thread-local buffer take the same path as a full one.
   ///
@@ -99,20 +97,19 @@ impl BatchClaim {
     self.count == 0
   }
 
-  /// One past the last sequence owned. A property of this claim alone —
-  /// under contention the cell itself will usually have moved past it by
-  /// the time this is read, sometimes by a large margin (-> BA28).
+  /// One past the last sequence owned, as a property of this claim alone.
+  /// Under contention the cell itself will usually have moved past it by
+  /// the time this is read, sometimes by a large margin.
   ///
   /// # Panics
   ///
-  /// In a debug build, if `start.0 + count` overflows `u64` — unreachable via
-  /// the cursor in practice (2⁶⁴ sequences at one claim per nanosecond is 584
-  /// years) but reachable in one line through [`BatchClaim::new`], which is
+  /// In a debug build, if `start.0 + count` overflows `u64`. That is unreachable
+  /// via the cursor in practice (2⁶⁴ sequences at one claim per nanosecond is
+  /// 584 years), but reachable in one line through [`BatchClaim::new`], which is
   /// public, `const`, and takes both fields unvalidated. In a release build
   /// the addition wraps instead of panicking, and every method routing
   /// through `end` (`contains`, `sequences`, `overlaps`) then answers as
-  /// though the claim were empty — including for its own `start`
-  /// (-> docs/pitfall/002 BA44).
+  /// though the claim were empty, including for its own `start`.
   ///
   /// ```
   /// use ring_batch::BatchClaim;
@@ -141,7 +138,7 @@ impl BatchClaim {
 
   /// The owned sequences, in issue order.
   ///
-  /// Issue order is the point: a batch drain reading these in order is what
+  /// Issue order is the point. A batch drain reading these in order is what
   /// makes a staged buffer's contents arrive in the order they were staged.
   ///
   /// ```
@@ -158,7 +155,7 @@ impl BatchClaim {
   /// Whether this claim and `other` share any sequence.
   ///
   /// Two overlapping claims mean two producers writing one slot. The
-  /// whole-run contention test does not call this — it uses a `HashSet`
+  /// whole-run contention test does not call this. It uses a `HashSet`
   /// over individual sequences instead, a stronger check that also catches
   /// an off-by-one at either end. This method's own two tests exercise it
   /// directly: abutting, shared, self, containment, and the empty-range
@@ -180,13 +177,13 @@ impl BatchClaim {
 
 /// Claim `count` contiguous sequences from `cursor`, in one atomic operation.
 ///
-/// This is the amortisation feature 177 is about: the cost is one `fetch_add`
-/// whether `count` is 1 or 64. The ordering is the caller's — see
-/// `ring_atomic`'s module documentation for why this crate does not pick one.
+/// This is the amortisation the batch feature is about. The cost is one `fetch_add`
+/// whether `count` is 1 or 64. The ordering is the caller's.
+/// `ring_atomic`'s module documentation explains why this crate does not pick one.
 ///
 /// Performs **no gating**. A claim taken without consulting a consumer barrier
-/// can outrun the ring; [`claim_gated`] checks first — exactly for a single
-/// producer, advisory under several (see its own `# One producer only`
+/// can outrun the ring. [`claim_gated`] checks first, exactly for a single
+/// producer and advisory under several (see its own `# One producer only`
 /// section below). Both exist because the SPSC path knows its own consumer
 /// and the MPSC path does not, and forcing the cheap case through the gated
 /// signature would make every SPSC claim pay for a barrier read it does not
@@ -213,28 +210,28 @@ pub fn claim<C: SeqCell>(cursor: &C, count: usize, order: Ordering) -> BatchClai
 
 /// Claim `count` contiguous sequences only if the ring has room for them.
 ///
-/// The gated form: reads the slowest consumer's position, checks that `count`
-/// slots are free, and only then advances the cursor. Still one advancing
-/// operation — the barrier read is a load, not a fence on the claim path.
+/// The gated form reads the slowest consumer's position, checks that `count`
+/// slots are free, and only then advances the cursor. It is still one advancing
+/// operation, because the barrier read is a load, not a fence on the claim path.
 ///
 /// `order` governs the advance only. The two gating reads are always
 /// `Ordering::Acquire`, chosen here rather than left to the caller, because
-/// they are not free choices: the whole point of reading the consumer's
-/// position is to establish that its writes happened-before this claim, and a
+/// they are not free choices. Reading the consumer's position exists to
+/// establish that its writes happened-before this claim, and a
 /// `Relaxed` load would let a producer act on a stale barrier and overwrite a
 /// slot the consumer had not finished with. This crate leaves the *advance*
-/// ordering open because it genuinely varies with the protocol built on top;
-/// the gating loads do not vary, so pretending they were a parameter would
-/// offer a caller a choice with exactly one correct answer.
+/// ordering open because it varies with the protocol built on top. The
+/// gating loads do not vary, so making them a parameter would offer a caller
+/// a choice with exactly one correct answer.
 ///
 /// # One producer only
 ///
-/// The gate and the advance are two separate operations and nothing holds the
-/// cursor still between them: a second producer can take the free slots this
+/// The gate and the advance are two separate operations, and nothing holds the
+/// cursor still between them. A second producer can take the free slots this
 /// call just counted, before this call's `fetch_add` runs, and both claims are
-/// then granted past the limit. Safe for a single producer, racy for several —
-/// and the restriction is a real one rather than a caveat, because the shape
-/// that makes it racy is the shape `ring_claim` exists to reject.
+/// then granted past the limit. This is safe for a single producer and racy for
+/// several. The restriction is a real one rather than a caveat, because the
+/// shape that makes it racy is the shape `ring_claim` exists to reject.
 ///
 /// `ring_claim::Claimer::claim` is the multi-producer form. It applies the
 /// same two guards, but moves the second inside a compare-exchange retry so
@@ -244,12 +241,12 @@ pub fn claim<C: SeqCell>(cursor: &C, count: usize, order: Ordering) -> BatchClai
 ///
 /// # `producer` and `consumer` must be distinct
 ///
-/// `P` and `C` share one bound and nothing else connects them; nothing in
+/// `P` and `C` share one bound and nothing else connects them. Nothing in
 /// this signature stops the same cell from being passed as both. Doing so
 /// makes `free_slots` see zero in-flight sequences on every call, so the gate
 /// always reports the whole capacity free and never returns
-/// [`RingError::Full`] (-> docs/type/001 BA46). `producer` and `consumer`
-/// must be the two distinct ends of one ring.
+/// [`RingError::Full`]. `producer` and `consumer` must be the two distinct ends
+/// of one ring.
 ///
 /// # Errors
 ///
@@ -317,8 +314,8 @@ pub fn claim_gated<P: SeqCell, C: SeqCell>(
 /// The sequences of `claim`, paired with the slot each addresses, in issue
 /// order.
 ///
-/// The drain side of feature 177. Returning the pair rather than just the slot
-/// index keeps the sequence available to the consumer, which needs it to
+/// The drain side of the batch feature. Returning the pair rather than just the
+/// slot index keeps the sequence available to the consumer, which needs it to
 /// advance its own cursor and to detect that it has been lapped.
 ///
 /// ```

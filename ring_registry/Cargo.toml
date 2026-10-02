@@ -8,13 +8,10 @@ readme = "readme.md"
 description = "Named ring registry"
 publish = true
 
-# Initial design message 960 assigned three edges: ring_handle, ring_core,
-# ring_types. The implementation needs one. A registry stores `Split< T >` and
-# never looks inside it — `T` is opaque here, so `ring_types`' vocabulary never
-# appears, and `ring_core::Ring` is only ever seen wrapped. Both moved to
-# dev-dependencies (where building a ring to register is exactly what a test
-# does) rather than kept as unused declarations; `ring_types` is dropped
-# outright. See docs/integration/001.
+# One edge. A registry stores `Split< T >` and never looks inside it. `T` is
+# opaque here, so `ring_types`' vocabulary never appears, and `ring_core::Ring`
+# is only ever seen wrapped. `ring_core` and `ring_config` are dev-dependencies,
+# because building a ring to register is what a test does.
 [dependencies]
 ring_handle = { workspace = true }
 

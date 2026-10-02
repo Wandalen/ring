@@ -1,4 +1,4 @@
-//! `ring_handle` — two ends, two values, disjoint capabilities.
+//! `ring_handle`: two ends, two values, disjoint capabilities.
 //!
 //! # What this file is arranged around
 //!
@@ -12,24 +12,24 @@
 //!
 //! # What is deliberately not here
 //!
-//! **No test that a second `Producer` cannot be obtained.** It cannot — there
-//! is no `Clone` and no `try_clone` — and a test cannot call a method that does
+//! **No test that a second `Producer` cannot be obtained.** There is no
+//! `Clone` and no `try_clone`, and a test cannot call a method that does
 //! not exist. H1 records the compiler's answer instead.
 //!
 //! **No test of the drop order.** `Split` owns the ring and the pair borrows
 //! from an `Ends` that borrows from the `Split`, so the compiler already rejects
 //! every order but the correct one. There is nothing left to check at runtime.
 //!
-//! **No `is_closed`.** It is absent by decision, not by omission — see
-//! `docs/decisions/002`. The crate that owns the flag is `ring_shutdown`, and
-//! depending on it here would put a parking operation within reach of the tick
-//! path.
+//! **No `is_closed`.** It is absent by decision, not by omission. See
+//! `docs/decisions/002_handles_have_no_is_closed.md`. The crate that owns the
+//! flag is `ring_shutdown`, and depending on it here would put a parking
+//! operation within reach of the tick path.
 
 #![cfg(test)]
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure, so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -47,7 +47,7 @@ fn ring(slots: usize) -> Ring<u32> {
 /// A ring of `slots` capacity that refuses rather than dropping.
 ///
 /// The default policy is `DropNewest`, under which a full push reports `Ok`
-/// having discarded the record — so a test *about* a refusal needs this one.
+/// having discarded the record, so a test *about* a refusal needs this one.
 fn refusing_ring(slots: usize) -> Ring<u32> {
   let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
   Ring::new(&config).unwrap()
@@ -55,12 +55,12 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
 
 // ── The reached-test ──────────────────────────────────────────────────────
 
-/// Feature 179's reached-test: the two ends go to two threads, and neither
-/// thread shares a mutable reference with the other.
+/// The reached-test, where the two ends go to two threads and neither thread
+/// shares a mutable reference with the other.
 ///
 /// The scoped threads are what make the claim observable. Each closure takes
 /// one handle **by move**; there is no `&mut Ring` anywhere in the test, and
-/// there could not be — `Split::new` consumed it.
+/// there could not be, because `Split::new` consumed it.
 #[test]
 fn the_two_ends_travel_to_separate_threads() {
   let mut split = Split::new(ring(64));
@@ -156,7 +156,7 @@ fn try_recv_batch_moves_what_is_waiting() {
 /// The drain's bound is fixed at the call that made it, not as it runs.
 ///
 /// This is the guarantee that separates a bounded drain from a live-lock, and
-/// it is asserted **without threads**: the producer is a separate value, so it
+/// it is asserted **without threads**. The producer is a separate value, so it
 /// can publish while the `Drain` iterator is alive. A fourth record published
 /// after the iterator exists is not yielded by it.
 #[test]
@@ -184,7 +184,7 @@ fn drain_is_bounded_at_the_call_that_made_it() {
 /// A drain stops when the ring empties, in lockstep with its own bound.
 ///
 /// `remaining` is read once, at creation, from a count `Consumer::len` documents
-/// as only ever growing under single-consumer cardinality — so for a `Drain`
+/// as only ever growing under single-consumer cardinality. So for a `Drain`
 /// that nothing refills mid-iteration, the bound and the ring's contents are
 /// consumed in exact lockstep. `size_hint` below proves `remaining` has already
 /// reached zero *before* the final call, which is what makes that call return
@@ -219,11 +219,10 @@ fn drain_of_an_empty_ring_yields_nothing() {
 /// An empty ring answers immediately rather than spinning until something
 /// arrives.
 ///
-/// `docs/api/002`'s guarantee 1. "Returns `Option`" and "returns promptly" are
-/// two claims, and a retry loop added inside `try_recv` would satisfy the first
-/// while silently spending a frame budget — `docs/pitfall/001`'s F6. The bound
-/// is loose on purpose: it discriminates a return from a park, not one
-/// nanosecond from another.
+/// "Returns `Option`" and "returns promptly" are two claims, and a retry loop
+/// added inside `try_recv` would satisfy the first while silently spending a
+/// frame budget. The bound is loose on purpose. It discriminates a return from
+/// a park, not one nanosecond from another.
 #[test]
 fn an_empty_ring_answers_promptly() {
   let mut split = Split::new(ring(8));
@@ -244,10 +243,9 @@ fn an_empty_ring_answers_promptly() {
 
 /// Dropping one handle leaves the other usable.
 ///
-/// R3 of `docs/lifecycle/001`. The two handles borrow disjointly from the same
-/// `Ends`, so neither's lifetime is tied to the other's — but that is a claim
-/// about the shape rather than something the shape announces, and R3 asked for
-/// it asserted rather than assumed.
+/// The two handles borrow disjointly from the same `Ends`, so neither's
+/// lifetime is tied to the other's. But that is a claim about the shape rather
+/// than something the shape announces, so it is asserted rather than assumed.
 #[test]
 fn dropping_one_handle_leaves_the_other_usable() {
   let mut split = Split::new(refusing_ring(4));
@@ -258,7 +256,7 @@ fn dropping_one_handle_leaves_the_other_usable() {
     producer.try_push(7).unwrap();
     {
       // The consumer's lifetime ends at this brace. Scoping it rather than
-      // calling `drop` keeps clippy's `drop_non_drop` quiet, which is fair:
+      // calling `drop` keeps clippy's `drop_non_drop` quiet, which is fair, since
       // neither handle has a destructor, and the point here is the *borrow*
       // ending, not a destructor running.
       let _gone = consumer;
@@ -275,10 +273,10 @@ fn dropping_one_handle_leaves_the_other_usable() {
 
 /// Records left in the ring are dropped exactly once when the ring goes.
 ///
-/// R4 of `docs/lifecycle/001`. Undrained records are the case that leaks
-/// silently: nothing observes them, so a double-drop or a missed drop shows up
-/// as a corrupted allocator or a leak far from here. `u32` cannot catch it —
-/// this needs a type whose destructor counts.
+/// Undrained records are the case that leaks silently. Nothing observes them,
+/// so a double-drop or a missed drop shows up as a corrupted allocator or a
+/// leak far from here. `u32` cannot catch it; this needs a type whose
+/// destructor counts.
 #[test]
 fn undrained_records_are_dropped_exactly_once() {
   use std::sync::atomic::{AtomicUsize, Ordering};
@@ -312,11 +310,10 @@ fn undrained_records_are_dropped_exactly_once() {
 
 /// Given the same publication sequence, two runs drain identically.
 ///
-/// K4 of `docs/lifecycle/002`. That instance's finding is that the determinism
-/// this crate is *credited* with enabling is enforced by the barrier rather
-/// than here — what this crate can actually assert is the narrower half: the
-/// ring itself introduces no ordering nondeterminism, so a fixed publication
-/// history produces a fixed drain.
+/// The determinism this crate is *credited* with enabling is enforced by the
+/// barrier rather than here. What this crate can assert is the narrower half:
+/// the ring itself introduces no ordering nondeterminism, so a fixed
+/// publication history produces a fixed drain.
 #[test]
 fn draining_at_the_same_point_is_deterministic() {
   fn run() -> Vec<u32> {
@@ -338,13 +335,12 @@ fn draining_at_the_same_point_is_deterministic() {
 
 // ── Across the backends ───────────────────────────────────────────────────
 
-/// The handle surface behaves the same whichever backend is beneath it.
+/// The handle API behaves the same whichever backend is beneath it.
 ///
-/// Requirement 1 of `docs/integration/001`: one dependency conceals backends
-/// whose contracts differ, and the only thing keeping the surface uniform is a
-/// test that runs against each. `ring_core` selects between the in-house rings
-/// by producer count, so two of the three need no feature; the third is behind
-/// `crossbeam` and is covered below.
+/// One dependency conceals backends whose contracts differ, and the only thing
+/// keeping the API uniform is a test that runs against each. `ring_core`
+/// selects between the in-house rings by producer count, so two of the three
+/// need no feature; the third is behind `crossbeam` and is covered below.
 #[test]
 fn the_in_house_backends_behave_alike() {
   for producers in [1, 4] {
@@ -369,7 +365,7 @@ fn the_in_house_backends_behave_alike() {
   }
 }
 
-/// The same surface, on feature 187's interim backend.
+/// The same API, on the interim crossbeam backend.
 ///
 /// Separate from [`the_in_house_backends_behave_alike`] because it is reached
 /// through `Ring::new_crossbeam` rather than by configuration, and because the
@@ -393,13 +389,13 @@ fn the_crossbeam_backend_behaves_alike() {
 
 // ── The structure ─────────────────────────────────────────────────────────
 
-/// The wrapper costs nothing: each handle is exactly its backend handle.
+/// The wrapper costs nothing, because each handle is exactly its backend handle.
 ///
-/// `docs/data_structure/001` asked for "one pointer", which was written before
-/// `ring_core`'s handles existed and is wrong for them — they carry an enum
-/// discriminant and an overflow policy. The property that actually matters is
-/// the one `docs/algorithm/002` states: a handle adds no state of its own.
-/// Equality of sizes is that property, measured.
+/// The pre-implementation spec asked for "one pointer", which was written
+/// before `ring_core`'s handles existed and is wrong for them, since they carry
+/// an enum discriminant and an overflow policy. The property that matters is
+/// that a handle adds no state of its own. Equality of sizes is that property,
+/// measured.
 #[test]
 fn the_wrapper_costs_nothing() {
   use core::mem::size_of;
@@ -416,8 +412,7 @@ fn the_wrapper_costs_nothing() {
   );
 }
 
-/// Q1 and Q2 of `docs/non_functional_requirement/002_send_without_sync.md`:
-/// both handles cross a thread boundary on their own, with no guard type.
+/// Both handles cross a thread boundary on their own, with no guard type.
 ///
 /// `the_two_ends_travel_to_separate_threads` already exercises this, but it
 /// would also fail for a dozen unrelated reasons. A static assertion names the
@@ -432,30 +427,30 @@ fn both_handles_are_send() {
   assert_send::<ring_handle::Consumer<'_, u32>>();
 }
 
-// Q5 — `Sync` is absent on both handles — is pinned by
+// The absence of `Sync` on both handles is pinned by
 // `tests/ui/producer_shared_across_threads.rs`, not here. "Not `Sync`" is not
-// expressible as a static assertion: there is no negative trait bound, so the
+// expressible as a static assertion. There is no negative trait bound, so the
 // only mechanism that fails when `Sync` appears is a program that must not
 // compile.
 
 /// No parking-shaped name appears in this crate's own source.
 ///
-/// `docs/invariant/002` names a residual gap that `ring_poll::PARKING_CRATES`
-/// cannot see. That guard watches the **dependency graph**: `ring_handle` gains
-/// a parking operation only by taking a dependency on `ring_wait`, and any such
-/// edge fails `ring_poll`'s suite. A `std::thread::sleep` written inline in a
-/// forwarding method adds no edge, so it is invisible to it — `std` is not a
-/// manifest entry.
+/// There is a residual gap that `ring_poll::PARKING_CRATES` cannot see. That
+/// guard watches the **dependency graph**: `ring_handle` gains a parking
+/// operation only by taking a dependency on `ring_wait`, and any such edge
+/// fails `ring_poll`'s suite. A `std::thread::sleep` written inline in a
+/// forwarding method adds no edge, because `std` is not a manifest entry, so
+/// that guard cannot see it.
 ///
 /// This is the cheap half of that gap, closed where the source is. It reads the
 /// crate's own text rather than its manifest, which is a different instrument
 /// answering a different question, and it is deliberately a substring scan
-/// rather than a parse: a name that would need parsing to find is not the kind
+/// rather than a parse. A name that would need parsing to find is not the kind
 /// of edit this catches.
 ///
 /// **Comments are stripped before the scan, and that is not a detail.** The
 /// first version of this test scanned the raw file for the bare substring
-/// `park` and failed — on the module documentation explaining that no *parking*
+/// `park` and failed. It hit the module documentation explaining that no *parking*
 /// operation may be reachable. A guard that fires on the prose describing it is
 /// the defect shape `ring_poll`'s manual plan catalogues first, and it arrived
 /// here within a minute of the guard being written. `tests/manual/readme.md` H5
@@ -463,8 +458,8 @@ fn both_handles_are_send() {
 ///
 /// **What it does not catch, stated so nobody mistakes it for more:** a busy
 /// loop, a `Duration` arriving through a type alias, or a blocking call reached
-/// through a dependency other than `ring_wait`. Row 3 of `invariant/002`'s
-/// mechanism table — "if anyone looks" — still covers those.
+/// through a dependency other than `ring_wait`. Those are still covered only
+/// "if anyone looks".
 #[test]
 fn no_parking_shaped_name_appears_in_the_source() {
   const FORBIDDEN: [&str; 7] = [
@@ -492,13 +487,12 @@ fn no_parking_shaped_name_appears_in_the_source() {
   );
 }
 
-/// Every exported type is `Debug`, so a panic message can name what it held —
+/// Every exported type is `Debug`, so a panic message can name what it held,
 /// and printing one changes nothing about it.
 ///
-/// The second half is C7 of [`docs/type/002_consumer.md`], the one rule in that
-/// instance that types cannot enforce: `Debug` takes `&self`, so nothing stops
-/// an implementation from draining into the formatter and reporting the
-/// contents. The compiler would accept it. A test that formats a loaded
+/// The second half is the one rule on `Consumer` that types cannot enforce.
+/// `Debug` takes `&self`, so nothing stops an implementation from draining into
+/// the formatter and reporting the contents. The compiler would accept it. A test that formats a loaded
 /// consumer and then checks `len()` is the only thing that would not.
 ///
 /// The `Drain` line is the same rule at its sharpest. `Drain` is an iterator
@@ -528,14 +522,14 @@ fn every_handle_can_be_printed() {
   assert_eq!(consumer.len(), loaded, "formatting a Drain drained it");
 }
 
-/// HD44: `Consumer`'s `#[ derive( Debug ) ]` forwards through `ring_core` and
+/// `Consumer`'s `#[ derive( Debug ) ]` forwards through `ring_core` and
 /// `ring_spsc`'s own hand-written impl before "must not print slot contents"
-/// is actually kept — three links down from every doc comment that states the
-/// constraint. `every_handle_can_be_printed` cannot see a regression there: a
+/// is kept in code, three links down from every doc comment that states the
+/// constraint. `every_handle_can_be_printed` cannot see a regression there. A
 /// `Debug` that printed every pending record would still contain "Consumer"
 /// and would not itself call `try_recv`, so that test would keep passing.
 /// What such a regression cannot avoid is a formatted string that grows with
-/// the item count — bind that instead of the mechanism, the same shape as
+/// the item count. Bind that instead of the mechanism, the same shape as
 /// `the_wrapper_costs_nothing`'s `size_of` equality.
 #[test]
 fn debug_output_length_does_not_grow_with_item_count() {

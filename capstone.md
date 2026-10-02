@@ -17,7 +17,7 @@ This is a real codebase, not a toy: unsafe is `deny`-by-default with a
 `bench_harness/gate/declared/ring/unsafe_allowlist.txt`), it already runs
 `loom` model-checking on part of the concurrency-critical tier, and it has
 its own home-grown stage-gate verification suite (`bench_harness/gate/`,
-gates named `g1`...`g22`) enforcing coverage, doc freshness, and unsafe-code
+gates named `g1`...`g22`) enforcing coverage, rustdoc coverage, and unsafe-code
 review. Whatever a topic below adds, wire it in the same spirit: a gate that
 can fail, not a claim that sounds true.
 
@@ -95,17 +95,16 @@ can't silently break a public API; a CHANGELOG convention.
 
 ### 5. Public API docs — docs.rs-grade rustdoc
 
-**The gap:** this project has an unusually rich *internal* doc corpus per
-crate (`docs/api/`, `docs/algorithm/`, `docs/decisions/`, `docs/invariant/`,
-...) — but that's design-rationale documentation, not the `///` rustdoc
-that actually renders on docs.rs. `cargo doc --no-deps` currently builds
+**The gap:** this project keeps design rationale per crate as ADRs under
+`docs/decisions/`, but that's design-rationale documentation, not the `///`
+rustdoc that actually renders on docs.rs. `cargo doc --no-deps` currently builds
 clean, which is a good floor, not a ceiling.
 
 **Deliverables:** `#![warn(missing_docs)]` (or `deny`, if the team's
 ambitious) across all 34 crates; every public item gets a doc comment, and
 the ones that benefit from it get a runnable example; a polished top-level
-`lib.rs` doc comment per crate that links back to the richer `docs/`
-corpus instead of duplicating it.
+`lib.rs` doc comment per crate that links to the crate's `docs/decisions/`
+ADRs instead of duplicating them.
 
 ### 6. `no_std` / embedded-readiness audit
 
@@ -162,14 +161,12 @@ blank page.
 
 **The gap:** two kinds. First, process: no `CONTRIBUTING.md`, no issue/PR
 templates, no "five minutes to your first build" guide. Second, content
-drift from the move itself — the family's own internal freshness gate
-(`bench_harness/gate/corpus/recipes.py`, "G15") was still reporting ~362
-problems (325 stale-output, 35 unverifiable-by-design, 2 missing-recipe) as
-of the extraction.
+drift from the move itself. The family's own internal freshness gate
+(`bench_harness/gate/corpus/recipes.py`, "G15") reported ~362 problems as of
+the extraction. That corpus has since been replaced by per-crate
+`docs/decisions/` ADRs and G15 retired, so this half is closed.
 
-**Deliverables:** `CONTRIBUTING.md` + a real quickstart; the G15 problem
-count driven toward zero (`bench_harness/docs/guide/002_the_four_verdicts.md`
-explains what each finding type means and what fixing it looks like).
+**Deliverables:** `CONTRIBUTING.md` + a real quickstart.
 Less flashy than fuzzing or CI, but a library nobody can onboard to isn't
 production-ready no matter how correct the code underneath it is — and
 this topic has the lowest floor to get started, useful if one teammate
@@ -186,14 +183,14 @@ harder.
   semver-check passing, `cargo publish --dry-run` succeeding for all 34
   crates), phrase it that way. This project already grades itself that way
   — match its own standard rather than inventing a new one.
-  `bench_harness/docs/guide/001_running_the_verdicts_yourself.md` is the
+  `bench_harness/gate/readme.md` is the
   existing model to follow.
-  - `bench_harness/docs/guide/003_what_the_gates_do_not_prove.md` is worth
+  - `bench_harness/docs/decisions/002_defects_are_graded_by_mutation_not_coverage.md` is worth
     reading before designing a new gate — it's the project's own honest
     accounting of what a passing gate doesn't actually guarantee, and a
     useful template for scoping a new one honestly.
 - **Integration point at the end:** a joint session where each owner
   demos their gate going from red to green on a real (planted) violation —
   the same "prove it can fail" standard
-  `bench_harness/docs/invariant/001_gate_non_vacuity.md` already holds
+  `bench_harness/docs/decisions/001_a_gate_counts_only_after_failing_for_its_own_reason.md` already holds
   itself to.

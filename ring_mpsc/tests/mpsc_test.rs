@@ -1,16 +1,15 @@
 //! Integration tests for `ring_mpsc`.
 //!
-//! Carries `docs/feature/172_multi_producer_claim.md`'s reached-test: four
-//! producer threads exchange 100 000 items with byte-parity, no sequence
+//! Carries `docs/feature/172_multi_producer_claim.md`'s reached-test, in which
+//! four producer threads exchange 100 000 items with byte-parity, no sequence
 //! granted twice, and each producer's own items preserved in its issue order.
 //!
-//! # These tests can see an ordering bug, and that was measured rather than
-//! assumed
+//! # These tests can see an ordering bug, and that was measured rather than assumed
 //!
-//! `docs/invariant/002_publication_ordering.md` says a green suite is not
-//! evidence for the publication ordering, because on x86-64 a `Relaxed` publish
-//! is unobservable — the hardware supplies the ordering the code failed to ask
-//! for. That reasoning is right and its premise does not hold here: this
+//! `ring_mpsc::PUBLISH`'s documentation says a `Relaxed` publish works on
+//! x86-64, where the hardware supplies the ordering the code failed to ask
+//! for. So a green suite on x86-64 is no evidence for the publication
+//! ordering. That reasoning is right, but its premise does not hold here. This
 //! workspace's host is `aarch64-unknown-linux-gnu` (ARM Neoverse-N1), which is
 //! weakly ordered. Check it with `rustc -vV | grep host`.
 //!
@@ -24,24 +23,24 @@
 //!
 //! Roughly one run in four. That is the "once in a billion transactions"
 //! heisenbug the invariant describes, made frequent by 100 000 elements of
-//! sustained contention on hardware that can actually reorder — and it is why
-//! the parity test is at that scale rather than a convenient smaller one.
+//! sustained contention on hardware that can reorder. It is also why the parity
+//! test is at that scale rather than a convenient smaller one.
 //!
 //! **A 23% detection rate is a real check, not a reliable one.** Three quarters
-//! of runs would still report green against a genuinely broken publish, so a
-//! single passing run of this file is not evidence either. The `exhaustive`
-//! module is what closes that gap: `loom` enumerates the interleavings
-//! exhaustively rather than sampling them, so its verdict does not depend on
-//! which one the scheduler happened to pick. The two are complementary — real
-//! hardware at scale, and every interleaving at small scale.
+//! of runs would still report green against a broken publish, so a single
+//! passing run of this file is not evidence either. The `exhaustive` module
+//! closes that gap. `loom` enumerates the interleavings exhaustively rather
+//! than sampling them, so its verdict does not depend on which one the
+//! scheduler happened to pick. The two complement each other: real hardware at
+//! scale, and every interleaving at small scale.
 //!
 //! The whole ordinary body is `#[ cfg( not( loom ) ) ]` because a `Ring`'s
 //! cursors and stamps are `ring_atomic` cells, which panic outside a
 //! `loom::model` under `--cfg loom`.
 //!
-//! Both halves are exercised by `tests/manual/readme.md`'s run record — the
-//! ordinary suite under an ordinary build, the models under
-//! `RUSTFLAGS="--cfg loom"`, and both again under the weakened publish above.
+//! `tests/manual/readme.md`'s run record exercises both halves: the ordinary
+//! suite under an ordinary build, the models under `RUSTFLAGS="--cfg loom"`,
+//! and both again under the weakened publish above.
 
 #![cfg(test)]
 
@@ -68,12 +67,12 @@ mod threaded {
   /// had unbounded retry loops on both sides. Weakening `PUBLISH` to `Relaxed`
   /// killed the consumer thread on a failed `expect`, whereupon the producers
   /// spun on `RingError::Full` forever and the whole suite hung instead of
-  /// failing — a test that cannot report the defect it was written to catch.
+  /// failing. The test could not report the defect it was written to catch.
   /// Every wait below is bounded so the failure arrives as a message.
   const PATIENCE: std::time::Duration = std::time::Duration::from_secs(30);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Feature 172's reached-test.
+  // The reached-test.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// Four producers, 25 000 items each, exchanged with byte-parity.
@@ -86,8 +85,8 @@ mod threaded {
   /// - **No sequence granted twice.** Every claimed sequence is distinct, which
   ///   is the contended claim's own property rather than the ring's.
   /// - **Per-producer issue order.** A producer's own items arrive in the order
-  ///   it issued them. Nothing constrains the interleaving *between* producers —
-  ///   that is what concurrent claiming means — but a mechanism that reordered
+  ///   it issued them. Nothing constrains the interleaving *between* producers,
+  ///   which is what concurrent claiming means. But a mechanism that reordered
   ///   one producer's own items would have granted its sequences out of order.
   #[test]
   fn four_producers_exchange_one_hundred_thousand_items_with_byte_parity() {
@@ -108,7 +107,7 @@ mod threaded {
 
     std::thread::scope(|scope| {
       for id in 0..PRODUCERS {
-        // No rebind needed: `Producer` is `Copy`, so `move` copies it into each
+        // No rebind needed. `Producer` is `Copy`, so `move` copies it into each
         // closure rather than moving the one handle into the first.
         let granted = &granted;
 
@@ -126,9 +125,10 @@ mod threaded {
                   reserved.set(value);
                   break;
                 }
-                // Back-pressure: the consumer has not caught up. Retrying is
-                // the whole of the `Fail` policy's contract — but not forever,
-                // or a dead consumer becomes a hang rather than a failure.
+                // Back-pressure means the consumer has not caught up. Retrying
+                // is the whole of the `Fail` policy's contract, but not
+                // forever, or a dead consumer becomes a hang rather than a
+                // failure.
                 Err(RingError::Full) => {
                   assert!(
                     std::time::Instant::now() < deadline,
@@ -145,19 +145,19 @@ mod threaded {
           // Fix(mpsc_test_granted_received_lock_poison_recovery): all four
           // producer threads (`granted`, here) and the one consumer thread
           // (`received`, below) share one `Mutex< Vec< _ > >` apiece for the
-          // whole `std::thread::scope` block above — a panic in any one
+          // whole `std::thread::scope` block above. A panic in any one
           // producer's tiny critical section (an allocator failure inside
-          // `extend`, say) would poison the lock and cascade into every other
-          // still-running producer's own `.expect()` here panicking too, with
-          // a confusing "no panic while holding the lock" message burying
+          // `extend`, say) would poison the lock. Every other still-running
+          // producer's own `.expect()` here would then panic too, and the
+          // confusing "no panic while holding the lock" message would bury
           // whichever producer's panic was the real, original one.
           // `thread::scope` already re-panics with *a* real panic once every
-          // thread is joined regardless, so recovering here changes nothing
-          // about whether this test fails — only whether the message reported
-          // is the actual bug or a poisoned-lock echo of it.
-          // Pitfall: a lock scoped to a single test function still has real,
-          // live sibling threads racing on it while that function's own
-          // `thread::scope` block runs — "it can't outlive the test" does not
+          // thread is joined, regardless, so recovering here does not change
+          // whether this test fails. It changes only whether the message
+          // reported is the actual bug or a poisoned-lock echo of it.
+          // Pitfall: a lock scoped to a single test function still has live
+          // sibling threads racing on it while that function's own
+          // `thread::scope` block runs. "It can't outlive the test" does not
           // mean "it can't poison a sibling mid-test."
           granted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(mine);
         });
@@ -208,27 +208,27 @@ mod threaded {
     });
 
     // Fix(mpsc_test_granted_received_lock_poison_recovery): `into_inner` can
-    // observe the same poisoning `granted`/`received` above already guard
-    // against — unreachable today only because `thread::scope` above would
-    // already have re-panicked on any real thread panic before execution
-    // reaches here, an invariant this file should not have to keep proving
-    // by inspection every time the threading above changes.
+    // observe the same poisoning that `granted`/`received` above already guard
+    // against. It is unreachable today only because `thread::scope` above
+    // would already have re-panicked on any real thread panic before
+    // execution reaches here. This file should not have to keep proving that
+    // invariant by inspection every time the threading above changes.
     let granted = granted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
     let received = received.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
 
-    // Claim 1 — byte-parity as a multiset.
+    // Claim 1 is byte-parity as a multiset.
     assert_eq!(received.len(), TOTAL, "every offered item arrived exactly once");
     let mut sorted = received.clone();
     sorted.sort_unstable();
     let expected: Vec<u64> = (0..TOTAL as u64).collect();
     assert_eq!(sorted, expected, "the multiset of received items is the multiset offered");
 
-    // Claim 2 — no sequence granted twice.
+    // Claim 2 is that no sequence is granted twice.
     assert_eq!(granted.len(), TOTAL);
     let distinct: HashSet<Seq> = granted.iter().copied().collect();
     assert_eq!(distinct.len(), TOTAL, "no two producers were granted the same sequence");
 
-    // Claim 3 — each producer's own items stayed in its issue order.
+    // Claim 3 is that each producer's own items stayed in its issue order.
     for id in 0..PRODUCERS {
       let lo = encode(id, 0);
       let hi = encode(id, PER_PRODUCER - 1);
@@ -243,23 +243,22 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Adversarial contention audit — measured, not inferred.
+  // Adversarial contention audit, measured rather than inferred.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// Eight producers against a ring sixteen times smaller than the reached-test
-  /// above, with every `RingError::Full` retry actually counted rather than
-  /// assumed from thread count.
+  /// above, with every `RingError::Full` retry counted rather than assumed from
+  /// thread count.
   ///
   /// The reached-test above proves the mechanism holds at scale (100 000
   /// items, capacity 1024, ~97 wraps) but never asks whether the producers
-  /// actually collided — it retries silently on `RingError::Full` and never
-  /// counts how often that happened. A green run of that test alone is
-  /// consistent with a contention-free execution where the consumer always
-  /// kept ahead. This test closes that gap with a real counter: `full_retries`
-  /// increments on every observed `RingError::Full` across all eight
-  /// producers, and the test fails loudly if that counter is ever zero — a
-  /// pass here is evidence contention actually happened during this run, not
-  /// an inference from thread count.
+  /// collided. It retries silently on `RingError::Full` and never counts how
+  /// often that happened. A green run of that test alone is consistent with a
+  /// contention-free execution where the consumer always kept ahead. This test
+  /// closes that gap with a counter. `full_retries` increments on every
+  /// observed `RingError::Full` across all eight producers, and the test fails
+  /// if that counter is ever zero. A pass here is evidence that contention
+  /// happened during this run, not an inference from thread count.
   ///
   /// Three things this shape stresses harder than any existing test:
   ///
@@ -267,20 +266,19 @@ mod threaded {
   ///   words set to the same producer/index encoding. A claim-exclusivity bug
   ///   letting two producers' writes land in the same slot would need all
   ///   sixteen words (both producers' eight) to interleave into a
-  ///   self-consistent record purely by chance to escape detection — the
+  ///   self-consistent record purely by chance to escape detection. The
   ///   single-word payload above cannot see this class of corruption at all,
   ///   because one word cannot be internally inconsistent with itself.
   /// - **Wraparound density under real contention.** Capacity 8 against 32 000
-  ///   items is 4 000 laps — eight times denser than
+  ///   items is 4 000 laps, eight times denser than
   ///   `every_slot_is_reused_across_many_laps_without_loss_or_duplication`'s
-  ///   500 laps — and unlike that test, every lap here happens while producers
-  ///   are actively contending for the slots the consumer is reclaiming, not
-  ///   single-threaded.
-  /// - **Genuine, measured back-pressure.** `full_retries > 0` is asserted,
-  ///   not hoped for — eight producers against eight slots with one consumer
+  ///   500 laps. That test is single-threaded. Here every lap happens while
+  ///   producers contend for the slots the consumer is reclaiming.
+  /// - **Measured back-pressure.** The test asserts `full_retries > 0` instead
+  ///   of hoping for it. Eight producers against eight slots with one consumer
   ///   make `RingError::Full` all but certain, and the assertion turns that
-  ///   near-certainty into a checked fact about the run that actually
-  ///   happened, rather than a claim resting on the thread count alone.
+  ///   near-certainty into a checked fact about the run that happened, rather
+  ///   than a claim resting on the thread count alone.
   #[test]
   fn producers_under_measured_contention_at_small_capacity_show_no_torn_or_duplicated_records() {
     const PRODUCERS: u64 = 8;
@@ -319,8 +317,8 @@ mod threaded {
                   break;
                 }
                 Err(RingError::Full) => {
-                  // The measured counter this test exists to provide: a real,
-                  // observed collision against capacity, not an inference
+                  // The counter this test exists to provide. Each increment is
+                  // an observed collision against capacity, not an inference
                   // from thread count.
                   full_retries.fetch_add(1, Ordering::Relaxed);
                   assert!(
@@ -367,8 +365,8 @@ mod threaded {
               )
             });
 
-            // Self-consistency: every word of a genuinely single-owner record
-            // is identical. A claim-exclusivity bug letting a second
+            // Self-consistency check. Every word of a single-owner record is
+            // identical. A claim-exclusivity bug letting a second
             // producer's write land in this slot would need all eight words
             // to agree by chance to hide from this check.
             let first = record[0];
@@ -395,28 +393,28 @@ mod threaded {
     let granted = granted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
     let received = received.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
 
-    // The measured-contention assertion: this is the whole point of the test.
-    // A pass here is direct evidence that producers actually collided against
-    // capacity during this run, not an assumption resting on thread count.
+    // The measured-contention assertion is the whole point of the test. A
+    // pass here is direct evidence that producers collided against capacity
+    // during this run, not an assumption resting on thread count.
     assert!(
       full_retries.load(Ordering::Relaxed) > 0,
       "zero RingError::Full observed across {PRODUCERS} producers at capacity 8 — \
        this run measured no contention at all, so it proves nothing about it"
     );
 
-    // Claim 1 — byte-parity as a multiset.
+    // Claim 1 is byte-parity as a multiset.
     assert_eq!(received.len(), TOTAL, "every offered item arrived exactly once");
     let mut sorted = received.clone();
     sorted.sort_unstable();
     let expected: Vec<u64> = (0..TOTAL as u64).collect();
     assert_eq!(sorted, expected, "the multiset of received items is the multiset offered");
 
-    // Claim 2 — no sequence granted twice.
+    // Claim 2 is that no sequence is granted twice.
     assert_eq!(granted.len(), TOTAL);
     let distinct: HashSet<Seq> = granted.iter().copied().collect();
     assert_eq!(distinct.len(), TOTAL, "no two producers were granted the same sequence");
 
-    // Claim 3 — each producer's own items stayed in its issue order.
+    // Claim 3 is that each producer's own items stayed in its issue order.
     for id in 0..PRODUCERS {
       let lo = encode(id, 0);
       let hi = encode(id, PER_PRODUCER - 1);
@@ -431,7 +429,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Decision 123 ruling 4 — the shape the soundness argument rests on.
+  // The shape the soundness argument in `docs/workaround/readme.md` rests on.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// The producer is shareable and the consumer is not.
@@ -441,12 +439,12 @@ mod threaded {
   /// constructible, because two consumers would each scan-then-commit the same
   /// cursor and hand out records the other had already taken.
   ///
-  /// The positive half is asserted here; the negative half — that `Consumer` is
-  /// neither `Clone` nor `Sync` — cannot be, because a type not implementing a
-  /// trait has no runtime evidence. It lives in `src/lib.rs` as `compile_fail`
-  /// doc tests, which is the only executable form a negative has, and there
-  /// rather than here because rustdoc collects doc tests from the library
-  /// target only.
+  /// This test asserts the positive half. It cannot assert the negative half,
+  /// that `Consumer` is neither `Clone` nor `Sync`, because a type not
+  /// implementing a trait has no runtime evidence. The negative half lives in
+  /// `src/lib.rs` as `compile_fail` doc tests, which is the only executable
+  /// form a negative has. It lives there rather than here because rustdoc
+  /// collects doc tests from the library target only.
   #[test]
   fn the_producer_is_send_and_sync_and_copy_which_is_what_multi_producer_means() {
     fn assert_send<T: Send>() {}
@@ -464,11 +462,10 @@ mod threaded {
 
   /// The claim cursor and the consumer cursor do not share a cache line.
   ///
-  /// Seam I2 of `docs/integration/001_family_dependency_seam.md`: this crate
-  /// states the padding as a contract and `ring_cursor` implements it. A
-  /// sibling change dropping the alignment would put the single most contended
-  /// write in the crate on the same line as the consumer's commit, and break
-  /// nothing that compiles.
+  /// This crate states the padding as a contract and `ring_cursor` implements
+  /// it. A sibling change dropping the alignment would put the single most
+  /// contended write in the crate on the same line as the consumer's commit,
+  /// and break nothing that compiles.
   #[test]
   fn the_claim_cursor_and_the_consumer_cursor_are_on_distinct_cache_lines() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(8));
@@ -479,7 +476,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // The published watermark — seam I6, and the property total order rests on.
+  // Total order rests on the published watermark.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// A gap below a published sequence hides everything above it.
@@ -489,7 +486,7 @@ mod threaded {
   /// an arbitrary one, so at any instant the set of published sequences may
   /// have holes. A drain that stopped at the *highest* published sequence
   /// rather than the first gap would deliver sequence 3 before sequence 1
-  /// existed — element counts would still reconcile, and total order would be
+  /// existed. Element counts would still reconcile, and total order would be
   /// silently broken.
   #[test]
   fn the_drain_stops_at_the_first_unpublished_sequence_not_the_highest_published() {
@@ -552,14 +549,17 @@ mod threaded {
     assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(2));
   }
 
-  /// An unwritten claim publishes an empty record, not a torn one.
+  /// An unwritten claim on the first lap publishes an empty record, not a torn
+  /// one.
   ///
   /// `Reserved`'s `Drop` publishes unconditionally, which is what makes the
-  /// publish impossible to skip. `docs/api/001_producer_publish_surface.md`
-  /// objects that a guard therefore publishes a partially-written slot on a
-  /// panic between claim and write. It does not: the slot was left `Default` by
-  /// the consumer that drained it, so the observable result is one empty record
-  /// — defined, drainable, and distinguishable from a written one.
+  /// publish impossible to skip. One objection is that a guard therefore
+  /// publishes a partially-written slot on a panic between claim and write. It
+  /// does not. It publishes the slot as it stands. On the first lap the slot is
+  /// still `Default`, so the observable result is one empty record: defined,
+  /// drainable, and distinguishable from a written one. On a later lap the slot
+  /// holds whatever record the consumer did not take, which this test does not
+  /// cover.
   #[test]
   fn a_claim_dropped_without_a_write_publishes_an_empty_record() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -575,8 +575,8 @@ mod threaded {
     assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(7));
   }
 
-  /// A claim never published wedges the ring — the cost the guard exists to
-  /// remove, demonstrated by holding a guard rather than by leaking one.
+  /// A claim never published stalls the ring, which is the cost the guard
+  /// exists to remove, shown here by holding a guard rather than leaking one.
   #[test]
   fn an_unpublished_claim_blocks_every_later_sequence_while_it_is_held() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -595,7 +595,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Back-pressure — the `Fail` policy, and the capacity bound it enforces.
+  // Back-pressure under the `Fail` policy, and the capacity bound it enforces.
   // ───────────────────────────────────────────────────────────────────────────
 
   #[test]
@@ -610,9 +610,9 @@ mod threaded {
     assert_eq!(producer.push(3), Err(RingError::Full));
     assert_eq!(producer.free_capacity(), 0);
 
-    // The two published records are untouched — this is what distinguishes the
-    // `Fail` policy from `DropOldest`, and it is the exactly-once clause of
-    // `docs/invariant/001_single_consumer_total_order.md` at the overflow edge.
+    // The two published records are untouched. That is what distinguishes the
+    // `Fail` policy from `DropOldest`, and it is the exactly-once contract at
+    // the overflow edge.
     let mut batch = consumer.drain();
     assert_eq!(batch.len(), 2);
     assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(1));
@@ -638,7 +638,7 @@ mod threaded {
 
   /// The batch holds the slots until it is dropped, not until it is read.
   ///
-  /// This is what makes `COMMIT`'s `Release` meaningful: were the cursor
+  /// This is what makes `COMMIT`'s `Release` meaningful. Were the cursor
   /// advanced at scan time, a producer could overwrite a slot the caller was
   /// still reading through `get`.
   #[test]
@@ -688,10 +688,10 @@ mod threaded {
   /// Fix(weak_len_assert_sweep_1633):
   /// Root Cause: the assertion checked only `.len() == 4`, never the batch's
   /// actual contents or their order.
-  /// Why Not Caught: a `start`-offset miscalculation that caps the batch at
-  /// the right length by coincidence — e.g. beginning one slot early or late,
-  /// or wrapping into a stale/already-taken slot — would still report `len()
-  /// == 4` and pass silently.
+  /// Why Not Caught: a `start`-offset miscalculation could cap the batch at
+  /// the right length by coincidence, for example by beginning one slot early
+  /// or late, or by wrapping into a stale/already-taken slot. It would still
+  /// report `len() == 4` and pass silently.
   /// Fix Applied: drain each slot's value via `get(offset).and_then(
   /// TypedSlot::get).copied()` (the same non-consuming read idiom
   /// `ring_spsc`'s `get_and_iter_agree_at_every_offset` test uses) and assert
@@ -701,7 +701,7 @@ mod threaded {
   /// any collection-returning API, especially one whose whole contract (as
   /// this test's own name states) is about *which* elements are returned,
   /// not merely how many.
-  /// Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn` — a
+  /// Pitfall: `TypedSlot::get` is declared `pub const fn`, not `pub fn`, so a
   /// plain `grep "pub fn"` sweep for its API silently misses it.
   fn drain_up_to_more_than_capacity_is_capped_rather_than_scanning_past_the_ring() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -722,14 +722,14 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Laps — the property the stamp's width buys.
+  // Laps, the property the stamp's width buys.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// A stamp from the previous lap is not mistaken for this lap's publication.
   ///
   /// The reason the stamp is a full `Seq` rather than a ready flag. Slot `i`
-  /// carries sequences `i`, `i + capacity`, `i + 2·capacity`, … — each lap a
-  /// different value — so a stale stamp fails the drain's equality test for the
+  /// carries sequences `i`, `i + capacity`, `i + 2·capacity`, …, a different
+  /// value each lap. So a stale stamp fails the drain's equality test for the
   /// same reason a never-written one does, with no clearing step on the
   /// consumer's hot path.
   #[test]
@@ -791,7 +791,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Record accounting — the class of defect no test above can see.
+  // Record accounting, the class of defect no test above can see.
   // ───────────────────────────────────────────────────────────────────────────
 
   static DROPPED: AtomicUsize = AtomicUsize::new(0);
@@ -812,7 +812,7 @@ mod threaded {
   /// to abort. Byte-parity checks that the right values arrived; it says nothing
   /// about what happened to the storage they arrived in.
   ///
-  /// Two laps at capacity two: the second lap's `set` replaces the first lap's
+  /// Two laps at capacity two. The second lap's `set` replaces the first lap's
   /// records, which must destroy exactly the two the consumer left behind.
   #[test]
   fn every_record_written_is_destroyed_exactly_once() {
@@ -826,7 +826,7 @@ mod threaded {
       for _ in 0..2 {
         producer.push(Tracked).expect("room");
         producer.push(Tracked).expect("room");
-        // Drained but not taken: the records stay in their slots.
+        // Drained but not taken, so the records stay in their slots.
         drop(consumer.drain());
       }
 
@@ -886,7 +886,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Surface details.
+  // Public API details.
   // ───────────────────────────────────────────────────────────────────────────
 
   #[test]
@@ -906,7 +906,7 @@ mod threaded {
   #[test]
   fn a_config_supplies_the_capacity_and_its_other_fields_are_deliberately_unread() {
     // `with_producers` is the field a ring might be tempted to trust. It is
-    // not read: the claim is a compare-exchange, correct for any number of
+    // not read. The claim is a compare-exchange, correct for any number of
     // producers because of its shape rather than because it was told one.
     let config = RingConfig::new(8).expect("a power of two").with_producers(64);
     let ring: Ring<TypedSlot<u8>> = Ring::with_config(&config);
@@ -966,9 +966,9 @@ mod threaded {
 
   #[test]
   fn the_orderings_are_the_ones_the_publication_invariant_names() {
-    // `docs/invariant/002_publication_ordering.md` states these as contract, in
-    // one place, rather than at each use. This is the assertion that the
-    // constants have not drifted from it.
+    // The publication-ordering invariant states these as contract, in one
+    // place, rather than at each use. This is the assertion that the constants
+    // have not drifted from it.
     assert_eq!(PUBLISH, Ordering::Release);
     assert_eq!(OBSERVE, Ordering::Acquire);
     assert_eq!(COMMIT, Ordering::Release);
@@ -990,10 +990,10 @@ mod threaded {
 
   /// A producer can read back what it wrote before publishing it.
   ///
-  /// `Reserved` derefs both ways. The mutable half is how a payload is written
-  /// and the half every other test exercises; the shared half is what lets a
-  /// producer building a record incrementally check its own work — reading a
-  /// slot nobody else may touch, since it is claimed and unstamped.
+  /// `Reserved` derefs both ways. The mutable half is how a payload is written,
+  /// and every other test exercises it. The shared half lets a producer that
+  /// builds a record incrementally check its own work. It reads a slot nobody
+  /// else may touch, since the slot is claimed and unstamped.
   #[test]
   fn a_claimed_slot_is_readable_through_the_guard_before_it_is_published() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -1029,10 +1029,10 @@ mod threaded {
   ///
   /// `Producer` is `Copy`, so `clone` is never reached implicitly. It exists
   /// because `Clone` is `Copy`'s supertrait, and a caller writing generic code
-  /// over `T : Clone` would find it — so it is tested rather than assumed
-  /// correct by virtue of being trivial.
+  /// over `T : Clone` would find it. So it is tested rather than assumed
+  /// correct for being trivial.
   ///
-  /// `clone_on_copy` is allowed rather than obeyed: obeying it would delete the
+  /// `clone_on_copy` is allowed rather than obeyed. Obeying it would delete the
   /// only call site the explicit impl has, which is the thing under test.
   #[test]
   #[allow(clippy::clone_on_copy)]
@@ -1075,7 +1075,7 @@ mod threaded {
   /// threads and one `Mutex< Vec< u64 > >` (`received`) with its consumer
   /// thread, and used to acquire both with
   /// `.expect( "no panic while holding the lock" )`. `std::sync::Mutex`
-  /// poisons on *any* panic while a guard is held, by *any* thread — a panic
+  /// poisons on *any* panic while a guard is held, by *any* thread. A panic
   /// in one producer's tiny critical section (an allocator failure inside
   /// `Vec::extend`, say) would have poisoned `granted` and turned every other
   /// still-running producer's own `.expect()` into a panic too, each with the
@@ -1091,25 +1091,25 @@ mod threaded {
   /// `.unwrap_or_else( std::sync::PoisonError::into_inner )` instead of
   /// `.expect(...)`, recovering the stale-but-valid guard rather than
   /// panicking. This does not change whether a real panic still fails the
-  /// test — `std::thread::scope` re-panics once every spawned thread is
-  /// joined regardless of what any lock did — it only stops sibling threads
-  /// from adding confusing poisoned-lock panics on top of the real one. This
-  /// test reproduces the identical shape (`Mutex< Vec< Seq > >`, the same
-  /// `granted` element type) with a lock-then-panic thread standing in for a
-  /// producer, and a locker that runs after it standing in for a sibling
-  /// producer, to prove the idiom actually recovers.
+  /// test, because `std::thread::scope` re-panics once every spawned thread
+  /// is joined, regardless of what any lock did. It only stops sibling
+  /// threads from adding confusing poisoned-lock panics on top of the real
+  /// one. This test reproduces the identical shape (`Mutex< Vec< Seq > >`,
+  /// the same `granted` element type) with a lock-then-panic thread standing
+  /// in for a producer, and a locker that runs after it standing in for a
+  /// sibling producer, to prove the idiom recovers.
   ///
   /// Prevention: the guarded critical section in both the real test and here
-  /// never runs anything but `Vec::extend` on plain `Copy` elements — no
-  /// user callback, no `Drop` impl that could itself panic — so there is no
-  /// half-established invariant poisoning could ever be protecting;
-  /// recovering is unconditionally safe for this shape of lock.
+  /// never runs anything but `Vec::extend` on plain `Copy` elements. There is
+  /// no user callback and no `Drop` impl that could itself panic, so there is
+  /// no half-established invariant poisoning could ever be protecting.
+  /// Recovering is unconditionally safe for this shape of lock.
   ///
-  /// Pitfall: a `Mutex` local to one test function still has real, live
-  /// sibling threads racing on it for the duration of that function's own
-  /// `thread::scope` block — "it cannot outlive the test" says nothing about
-  /// whether it can poison a sibling thread *during* the test, which is
-  /// exactly the window this defect class targets.
+  /// Pitfall: a `Mutex` local to one test function still has live sibling
+  /// threads racing on it for the duration of that function's own
+  /// `thread::scope` block. "It cannot outlive the test" says nothing about
+  /// whether it can poison a sibling thread *during* the test, and that is
+  /// the window this defect class targets.
   #[test]
   fn a_sibling_producer_recovers_a_lock_poisoned_by_another_producers_panic() {
     // Mirrors `granted`'s own type from the parity test above exactly.
@@ -1139,9 +1139,9 @@ mod threaded {
       "a panic while holding the lock must poison it for every sibling"
     );
 
-    // The bug: the pre-fix `.expect( "no panic while holding the lock" )`
-    // would panic here too, cascading one producer's unrelated panic into a
-    // completely different, still-healthy sibling's own access.
+    // The bug. The pre-fix `.expect( "no panic while holding the lock" )`
+    // would panic here too, so one producer's unrelated panic would cascade
+    // into a different, still-healthy sibling's own access.
     let old_pattern_would_panic = std::panic::catch_unwind(|| {
       drop(granted.lock().expect("no panic while holding the lock"));
     });
@@ -1166,19 +1166,20 @@ mod threaded {
 /// `loom` models of the publication protocol.
 ///
 /// Compiled only under `RUSTFLAGS="--cfg loom"`; an ordinary build never sees
-/// this module and never pays for it. The seam that makes it work is
-/// `ring_atomic`'s — it swaps `AtomicSeq` for an instrumented one under the same
-/// cfg, so what loom explores is this crate's own stamp protocol rather than a
-/// re-implementation of it.
+/// this module and never pays for it. `ring_atomic` makes it work. It swaps
+/// `AtomicSeq` for an instrumented one under the same cfg, so what loom
+/// explores is this crate's own stamp protocol rather than a re-implementation
+/// of it.
 ///
 /// # Why the assertion is over a separate atomic
 ///
 /// A slot's payload lives behind an `UnsafeCell`, which is plain memory loom
 /// does not model. A model asserting "the drained record carried the right
-/// value" would therefore pass identically whether the publish released or not
-/// — a green check that was never capable of being red. So the payload here is
-/// a loom `AtomicUsize` stored *before* the publish and loaded *after* the
-/// drain: the thing whose visibility is checked is something loom can see.
+/// value" would therefore pass identically whether the publish released or
+/// not. That is a green check that was never capable of being red. So the
+/// payload here is a loom `AtomicUsize` stored *before* the publish and loaded
+/// *after* the drain, which makes the thing whose visibility is checked
+/// something loom can see.
 /// `ring_publish/tests/handshake_test.rs` establishes the shape.
 #[cfg(loom)]
 mod exhaustive {
@@ -1193,8 +1194,8 @@ mod exhaustive {
   ///
   /// `loom::thread::spawn` requires `'static` closures, so nothing a model
   /// spawns may borrow a local. The ring and its ends are therefore leaked
-  /// rather than scoped — one leak per execution, which is what loom's own
-  /// harness expects and why its models are kept to two slots.
+  /// rather than scoped. That is one leak per execution, which is what loom's
+  /// own test runner expects and why its models are kept to two slots.
   fn leaked_ends() -> &'static mut Ends<'static, TypedSlot<u8>> {
     let capacity = Capacity::new(2).expect("a power of two");
     let ring: &'static mut Ring<TypedSlot<u8>> = Box::leak(Box::new(Ring::new(capacity)));
@@ -1204,8 +1205,7 @@ mod exhaustive {
 
   /// A drained record never precedes the write that came before its publish.
   ///
-  /// Pair 1 of `docs/invariant/002_publication_ordering.md`. Weakening
-  /// `PUBLISH` from `Release` to `Relaxed` must fail this model — that
+  /// Weakening `PUBLISH` from `Release` to `Relaxed` must fail this model. That
   /// mutation is step 1 of `tests/manual/readme.md`'s M9, and a model that
   /// still passes under it is checking nothing.
   #[test]
@@ -1235,7 +1235,7 @@ mod exhaustive {
     });
   }
 
-  /// The consumer never sees further than what was actually published.
+  /// The consumer never sees further than what was published.
   ///
   /// Two producers publishing in either order; the drain must never report
   /// more records than were published, whichever interleaving loom picks.

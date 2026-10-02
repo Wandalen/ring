@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Run ring_bench's comparison example — the family's own benchmark harness.
+#@ purpose: Run ring_bench's comparison example, the family's own benchmark.
 #@ tags: verb, bench
 set -euo pipefail
 

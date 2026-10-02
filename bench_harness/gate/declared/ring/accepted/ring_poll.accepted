@@ -1,11 +1,11 @@
 # Eleven survivors from one retry loop, all of them unobservable.
 #
-# `ring_poll` retries without parking: a budget of N means up to N attempts,
-# with a `spin_loop` hint between them. Single-threaded — which is what every
-# test in this crate is — nothing changes between attempts, so a repeated
-# attempt can only find the answer the previous one found. That is not a gap in
-# the tests; it is the crate's own stated design. Its doc says so directly: the
-# budget "buys time for *another thread* to drain, not for this one to try
+# `ring_poll` retries without parking. A budget of N means up to N attempts,
+# with a `spin_loop` hint between them. Every test in this crate is
+# single-threaded, and in a single thread nothing changes between attempts, so a
+# repeated attempt can only find the answer the previous one found. That is the
+# crate's own stated design, not a gap in the tests. Its doc says so directly:
+# the budget "buys time for *another thread* to drain, not for this one to try
 # harder."
 #
 # Nine of the eleven mutate a condition that guards nothing but the hint:
@@ -20,20 +20,20 @@
 # separate the mutants from the original. They are unkillable by construction,
 # not by omission.
 #
-# The other two make the loop spend one extra attempt — `push_within` at 271 and
+# The other two make the loop spend one extra attempt: `push_within` at 271 and
 # `recv_within` at 387. The extra attempt is invisible for a reason specific to
 # each: `try_push` hands the record back on refusal, and `try_recv` on an empty
 # ring changes nothing at all. Both leave the state exactly as they found it, so
 # attempt N+1 returns what attempt N returned.
 #
-# That reasoning is confirmed rather than asserted: both were reinstated on
+# That reasoning is confirmed, not only asserted. Both were reinstated on
 # 2026-08-30 and the suite stayed green, which is the same evidence the survey
 # produced and the opposite of what the three fixed survivors produced.
 #
 # NOT accepted, and deliberately absent: 269, 273 and 277, all in
 # `push_batch_within`, which looked identical to these and are not. That
-# function's failed attempts are destructive — `try_push_batch` pulls a record
-# before it can know there is room, so a refusal eats it — which makes the
+# function's failed attempts are destructive. `try_push_batch` pulls a record
+# before it can know there is room, so a refusal eats it, and that makes the
 # attempt count observable in the caller's iterator. They are held by
 # `mutant/S7`, `S8` and `S9`. The difference between this file and those three
 # is one API detail: `try_push` gives the record back, `try_push_batch` does

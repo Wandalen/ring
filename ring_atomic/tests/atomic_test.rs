@@ -1,36 +1,35 @@
 //! The sequence cell, and the counting shim two acceptance criteria need.
 //!
-//! `ring_atomic` is claimed jointly with feature 170's handshake, which is
-//! stage S4's — so this file deliberately does **not** cite that feature path:
-//! citing it here would make the family's feature gate report 170 claimed
-//! before a single line of the handshake exists.
+//! `ring_atomic` is claimed jointly with the claim/publish handshake feature,
+//! so this file deliberately does **not** cite that feature path. Citing it
+//! here would make the family's feature gate report the handshake claimed
+//! before a single line of it exists.
 //!
-//! What it supplies is the instrument two S2 criteria are stated in terms
-//! of. It claims neither — each is about its own crate's operation and is
+//! What it supplies is the instrument two acceptance criteria are stated in
+//! terms of. It claims neither. Each is about its own crate's operation and is
 //! asserted there, against the real API:
 //!
-//! - `docs/feature/175_thread_local_buffer_and_flush_into.md` — "accumulates N
+//! - `docs/feature/175_thread_local_buffer_and_flush_into.md`: "accumulates N
 //!   items with **zero** atomic operations", claimed by
 //!   `ring_tls/tests/tls_test.rs` through a real `TlsBuffer`
-//! - `docs/feature/177_batch_claim_and_batch_drain.md` — "a claim of 64 slots
+//! - `docs/feature/177_batch_claim_and_batch_drain.md`: "a claim of 64 slots
 //!   issues **one** fence, not 64", claimed by
 //!   `ring_batch/tests/batch_test.rs` through a real `claim`
 //!
 //! Both criteria name the shim in their own text, so both are only as sound
-//! as it is — and that soundness is establishable only here. Both are
+//! as it is, and only this file can establish that soundness. Both are
 //! negative claims about traffic, and neither is observable from outside an
 //! `AtomicU64`. `CountingSeq` makes them observable. The tests below are
-//! therefore in two halves: the first establishes that `CountingSeq` behaves
-//! identically to `AtomicSeq` — without which every assertion made against it
-//! is worthless — and the second establishes that its counts are actually
-//! right. Where that second half restates 175's and 177's numbers it does so
-//! at the level of the primitive; the criteria themselves belong to the
-//! crates above.
+//! therefore in two halves. The first establishes that `CountingSeq` behaves
+//! identically to `AtomicSeq`; without that, every assertion made against it
+//! is worthless. The second establishes that its counts are right. Where that
+//! second half restates the two criteria's numbers it does so at the level of
+//! the cell; the criteria themselves belong to the crates above.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate, a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -183,8 +182,8 @@ fn each_operation_increments_exactly_its_own_counter() {
 #[test]
 fn a_failed_compare_exchange_still_counts() {
   // It cost the same fence whether or not it won. A shim that only counted
-  // winners would under-report a contended claim, which is precisely the
-  // measurement the shim exists for.
+  // winners would under-report a contended claim, which is the measurement
+  // the shim exists for.
   let cell = CountingSeq::new(Seq(1));
   let outcome = cell.compare_exchange(Seq(99), Seq(100), Ordering::AcqRel, Ordering::Acquire);
 
@@ -216,7 +215,7 @@ fn total_is_the_sum_of_the_four_and_not_an_independent_counter() {
 
 #[test]
 fn one_fetch_add_buys_a_whole_batch() {
-  // Feature 177's criterion, at the level of the primitive: 64 slots, one
+  // The batch-claim criterion, at the level of the cell: 64 slots, one
   // operation. `ring_batch` asserts the same thing through its own `claim`.
   let cell = CountingSeq::default();
   let first = cell.fetch_add(64, Ordering::AcqRel);
@@ -228,8 +227,9 @@ fn one_fetch_add_buys_a_whole_batch() {
 
 #[test]
 fn a_cell_never_touched_counts_zero() {
-  // Feature 175's criterion, at the level of the primitive: the shim reports
-  // zero for code that did nothing, so a zero elsewhere means something.
+  // The thread-local buffer criterion, at the level of the cell. The shim
+  // reports zero for code that did nothing, so a zero elsewhere means
+  // something.
   let cell = CountingSeq::default();
   let mut staged: Vec<u32> = Vec::with_capacity(64);
   for i in 0..64 {
@@ -256,7 +256,7 @@ fn resetting_the_counts_leaves_the_sequence_alone() {
 
 #[test]
 fn the_counting_cell_is_the_production_cell_plus_bookkeeping() {
-  // The load-bearing test of this file. Every assertion made against
+  // The most important test in this file. Every assertion made against
   // CountingSeq elsewhere is a statement about production only if the two
   // cells agree on every operation. Drive an identical script through both and
   // compare at every step.
@@ -286,7 +286,7 @@ fn the_counting_cell_is_the_production_cell_plus_bookkeeping() {
 #[test]
 fn counts_are_exact_under_contention() {
   // The bookkeeping is itself atomic, so a concurrent run must not lose
-  // increments — a shim that under-counted would turn a real regression into
+  // increments. A shim that under-counted would turn a real regression into
   // a passing "one operation" assertion.
   const THREADS: usize = 4;
   const EACH: usize = 10_000;
@@ -328,7 +328,7 @@ fn a_cell_drives_through_the_trait_alone() {
 #[test]
 fn op_counts_are_comparable_and_printable() {
   // Comparable so a test can assert a whole shape at once rather than four
-  // fields; printable so a failure says what was actually counted.
+  // fields; printable so a failure says what was counted.
   let a = OpCounts::default();
   let b = OpCounts {
     loads: 1,
@@ -350,13 +350,13 @@ fn op_counts_are_comparable_and_printable() {
 /// value shaped exactly like a legitimate claim of a huge range.
 /// Why Not Caught: the word *monotonic* did not appear in the crate that owns
 /// every operation the family's monotonicity claims are about, and no test went
-/// near the boundary — counting to `u64::MAX` is unreachable, so the state read
+/// near the boundary. Counting to `u64::MAX` is unreachable, so the state read
 /// as unreachable rather than as one call away for anyone seeding a cursor.
 /// Fix Applied: `SeqCell::fetch_add` gained a `# Monotonicity` section stating
 /// that monotonicity is the caller's, not the method's; this test records what
-/// the boundary actually does.
-/// Prevention: the behaviour is now pinned, so a future runtime check — or its
-/// removal — changes a test rather than passing unnoticed.
+/// happens at the boundary.
+/// Prevention: the behaviour is now pinned, so adding a future runtime check, or
+/// removing one, changes a test rather than passing unnoticed.
 /// Pitfall: an unreachable-by-counting state is still reachable in one call by
 /// whoever seeds the value.
 #[test]
@@ -366,7 +366,7 @@ fn fetch_add_wraps_at_the_top_of_u64() {
   assert_eq!(cell.fetch_add(2, Ordering::AcqRel), Seq(u64::MAX - 2));
   assert_eq!(cell.load(Ordering::Acquire), Seq(u64::MAX));
 
-  // One more, and it is Seq::ZERO — the value a fresh ring reports.
+  // One more, and it is Seq::ZERO, the value a fresh ring reports.
   assert_eq!(cell.fetch_add(1, Ordering::AcqRel), Seq(u64::MAX));
   assert_eq!(
     cell.load(Ordering::Acquire),
@@ -383,7 +383,7 @@ fn fetch_add_wraps_at_the_top_of_u64() {
     "advancing by u64::MAX moved the cursor back one"
   );
 
-  // The counting cell wraps identically — it is the same atomic underneath.
+  // The counting cell wraps identically, because it is the same atomic underneath.
   let shim = CountingSeq::new(Seq(u64::MAX));
   assert_eq!(shim.fetch_add(1, Ordering::AcqRel), Seq(u64::MAX));
   assert_eq!(shim.load(Ordering::Acquire), Seq::ZERO);
@@ -399,19 +399,19 @@ fn fetch_add_wraps_at_the_top_of_u64() {
 /// sums them into `total`, so `loads + stores + fetch_adds + compare_exchanges
 /// == total` holds for a torn struct exactly as strongly as for a clean one.
 /// Why Not Caught: the relation is the only cross-check the type offers, and it
-/// is derived from the readings it would have to audit — a caller reaching for
+/// is derived from the readings it would have to audit. A caller reaching for
 /// it to detect tearing gets a certificate of soundness instead.
 /// Fix Applied: `OpCounts` gained a `# Not a Coherent Observation` section
 /// naming the second consequence explicitly; this test pins that the relation
 /// is arithmetic rather than evidentiary.
 /// Prevention: if `total` ever becomes an independently-maintained counter, the
-/// hand-built case below stops holding and this test goes red — which is the
+/// hand-built case below stops holding and this test goes red. That is the
 /// signal that the relation has become evidence.
 /// Pitfall: an invariant that holds by construction proves the construction,
 /// not the data.
 #[test]
 fn total_is_derived_from_the_same_four_reads() {
-  // A cell driven to a known shape: the relation holds, as it must.
+  // A cell driven to a known shape. The relation holds, as it must.
   let cell = CountingSeq::default();
   cell.load(Ordering::Relaxed);
   cell.store(Seq(3), Ordering::Release);
@@ -424,8 +424,8 @@ fn total_is_derived_from_the_same_four_reads() {
     measured.total,
   );
 
-  // And a struct nobody measured — four numbers picked out of the air, summed
-  // by hand — satisfies the identical relation. That is the whole point: the
+  // And a struct nobody measured, four numbers picked out of the air and summed
+  // by hand, satisfies the identical relation. That is the whole point. The
   // check passes without any reading behind it, so passing it is not evidence
   // that a reading happened, let alone that four happened at one instant.
   let invented = OpCounts {
@@ -441,8 +441,8 @@ fn total_is_derived_from_the_same_four_reads() {
     "the consistency check certifies a struct that was never observed",
   );
 
-  // The field is public and unvalidated, so a wrong total is representable too
-  // — the relation is a convention this type does not enforce.
+  // The field is public and unvalidated, so a wrong total is representable too.
+  // The relation is a convention this type does not enforce.
   let inconsistent = OpCounts {
     loads: 1,
     stores: 0,
@@ -460,17 +460,17 @@ fn total_is_derived_from_the_same_four_reads() {
 /// Both cells, and the object form of the trait, are `Sync`.
 ///
 /// Root Cause: `SeqCell` had no supertrait. Both implementors are `Sync` by
-/// auto-derivation from the atomics inside them, so nothing had failed — but
-/// `&dyn SeqCell` was not `Sync`, making the object form unusable for the one
-/// thing the crate exists for, and three generic `C : SeqCell` bounds in
-/// `ring_batch` and `ring_tls` relied on a property none of them asked for.
+/// auto-derivation from the atomics inside them, so nothing had failed. But
+/// `&dyn SeqCell` was not `Sync`, which made the object form unusable for the
+/// one thing the crate exists for. Three generic `C : SeqCell` bounds in
+/// `ring_batch` and `ring_tls` also relied on a property none of them asked for.
 /// Why Not Caught: a property satisfied by accident is indistinguishable from
 /// one that was required, right up until an implementor arrives without it.
 /// Fix Applied: `pub trait SeqCell : Sync`. This test asserts the property at
-/// the three places that depend on it — both concrete cells and the `dyn` form.
+/// the three places that depend on it: both concrete cells and the `dyn` form.
 /// Prevention: a `!Sync` implementor now fails at its own `impl`, naming this
 /// trait, rather than at a distant use site naming a `Cell< u64 >`.
-/// Pitfall: object safety is not object *usability* — check what the `dyn` form
+/// Pitfall: object safety is not object *usability*. Check what the `dyn` form
 /// auto-implements, not only that it compiles.
 #[test]
 fn both_cells_and_the_object_form_are_sync() {
@@ -480,8 +480,8 @@ fn both_cells_and_the_object_form_are_sync() {
   requires_sync::<CountingSeq>();
   requires_sync::<dyn SeqCell>();
 
-  // Not a compile-time formality: two threads genuinely share one cell through
-  // the object form, which is what `&dyn SeqCell` could not do before.
+  // Not a compile-time formality. Two threads share one cell through the
+  // object form, which is what `&dyn SeqCell` could not do before.
   let cell = AtomicSeq::default();
   let shared: &dyn SeqCell = &cell;
 
@@ -501,13 +501,13 @@ fn both_cells_and_the_object_form_are_sync() {
 /// A type outside this crate implements `SeqCell` and drives through it.
 ///
 /// Root Cause: only the crate's own two types implemented the trait, so nothing
-/// exercised it as a trait — every bound was satisfied by the same two impls a
+/// exercised it as a trait. Every bound was satisfied by the same two impls a
 /// reader could see, and the supertrait, the `#[ must_use ]` and the ordering
 /// arguments were all untested as *requirements on an implementor*.
 /// Why Not Caught: a trait with exactly as many implementors as it has intended
 /// ones looks fully covered; the gap only shows when a third arrives.
-/// Fix Applied: this test defines one — a cell that saturates instead of
-/// wrapping — and drives it through the same generic function the real cells go
+/// Fix Applied: this test defines one, a cell that saturates instead of
+/// wrapping, and drives it through the same generic function the real cells go
 /// through.
 /// Prevention: the trait is now used as a trait. A change that makes it
 /// unimplementable from outside (a private supertrait, a sealed marker, a method
@@ -517,7 +517,7 @@ fn both_cells_and_the_object_form_are_sync() {
 fn a_third_type_implements_the_trait_and_drives_through_it() {
   use core::sync::atomic::AtomicU64;
 
-  /// A cell that clamps at the top instead of wrapping — the behaviour
+  /// A cell that clamps at the top instead of wrapping, the behaviour
   /// `fetch_add_wraps_at_the_top_of_u64` shows the real cells do not have.
   #[derive(Debug, Default)]
   struct SaturatingSeq(AtomicU64);
@@ -575,8 +575,8 @@ fn a_third_type_implements_the_trait_and_drives_through_it() {
   assert_eq!(claim(&real, 5), Seq(u64::MAX));
   assert_eq!(real.load(Ordering::Acquire), Seq(4), "the crate's own cell wraps");
 
-  // And the supertrait applies to the outside type too — it had to be `Sync`
-  // to write the `impl` at all, which is the enforcement AT7 asked for.
+  // And the supertrait applies to the outside type too. It had to be `Sync` to
+  // write the `impl` at all, which is what the supertrait enforces.
   const fn requires_sync<T: Sync>() {}
   requires_sync::<SaturatingSeq>();
 }

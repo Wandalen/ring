@@ -332,6 +332,17 @@ impl<'a, T: Send> Producer<'a, T> {
   /// Returning the value rather than a unit error makes a refusal recoverable
   /// without a copy.
   ///
+  /// # Pitfall: `Ok` does not mean kept under `DropNewest`
+  ///
+  /// **Trap.** Counting each `Ok(())` as a record the ring holds.
+  ///
+  /// **Failure.** Under [`OverflowPolicy::DropNewest`], the default, the
+  /// discarded records count too. A publisher tallying `Ok`s reports throughput
+  /// it did not achieve, and only a consumer-side count shows the gap.
+  ///
+  /// **Mitigation.** Choose [`OverflowPolicy::Fail`] when a lost record matters.
+  /// Under it `Ok` does mean kept. Otherwise count on the consumer side.
+  ///
   /// ```
   /// use ring_config::RingConfig;
   /// use ring_core::Ring;
@@ -404,7 +415,7 @@ impl<'a, T: Send> Producer<'a, T> {
   /// the iterator, and not in the count. Under [`OverflowPolicy::DropNewest`] a
   /// full ring never refuses. `try_push` reports a discarded record as `Ok(())`,
   /// so this drains the whole iterator and returns its length, counting every
-  /// record the ring discarded.
+  /// record the ring discarded. An endless iterator never returns.
   ///
   /// **Mitigation.** To keep a refused record, push one at a time with
   /// [`Self::try_push`], which returns it in the `Err`. To learn how many records
@@ -540,8 +551,11 @@ impl<T: Send> Consumer<'_, T> {
 
   /// Move everything currently published into `out`, and report how many.
   ///
-  /// Bounded by what was published when the call began, not by what arrives
-  /// during it. Otherwise it would not terminate under a live producer.
+  /// Bounded, so it terminates under a live producer. At SPSC and crossbeam the
+  /// bound is what was published when the call began. At MPSC there is no
+  /// snapshot. [`ring_mpsc::Consumer::drain`] scans forward at most one capacity
+  /// and stops at the first slot a producer has claimed but not yet published,
+  /// so records published past it wait for the next call.
   ///
   /// ```
   /// use ring_config::RingConfig;

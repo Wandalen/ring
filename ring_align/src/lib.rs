@@ -3,21 +3,19 @@
 //! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
-//! `docs/feature/169_padded_cursor.md` states the problem this crate exists to
-//! solve. A producer cursor and a consumer cursor that share a cache line make
-//! every write by either invalidate the other's cached copy, so two cores
-//! contend on a line neither is sharing data through. The fix is to give each
-//! its own line. This crate holds the constant and the wrapper;
-//! `ring_cursor` holds the cursors that use them.
+//! The padded-cursor feature states the problem this crate exists to solve. A
+//! producer cursor and a consumer cursor that share a cache line make every
+//! write by either invalidate the other's cached copy, so two cores contend on
+//! a line neither is sharing data through. The fix is to give each its own
+//! line. This crate holds the constant and the wrapper; `ring_cursor` holds the
+//! cursors that use them.
 //!
 //! No `unsafe` is needed for any of it, because `#[ repr( align( 64 ) ) ]` is a
 //! safe attribute. So this crate compiles under the workspace-wide
 //! `unsafe-code = "deny"`, like most of the family. It once held an entry in
 //! `ring/bench_harness/gate/declared/ring/unsafe_allowlist.txt` permitting an
-//! opt-out it never took.
-//! [decision 123](../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
-//! removed it, on the ground that a permission nobody exercises is a bound
-//! looser than the code actually is.
+//! opt-out it never took. The entry was removed, on the ground that a
+//! permission nobody exercises is a bound looser than the code actually is.
 
 #![deny(missing_docs)]
 
@@ -36,10 +34,10 @@ pub const CACHE_LINE: usize = 64;
 // `on_distinct_lines` below computes `a / CACHE_LINE` as a line index. That
 // equals the true line index only because lines are naturally aligned, which
 // holds only when `CACHE_LINE` is a power of two. Every value this family has
-// used (64, 128) is one, and nothing checked it until now (-> docs/algorithm/001
-// AL1). `ring_types::Capacity::new` asserts the analogous precondition for
-// its own number. This is the compile-time form, since a `pub const` needs no
-// runtime `Result`.
+// used (64, 128) is one, and nothing checked it until now.
+// `ring_types::Capacity::new` asserts the analogous precondition for its own
+// number. This is the compile-time form, since a `pub const` needs no runtime
+// `Result`.
 const _: () = assert!(
   CACHE_LINE.is_power_of_two(),
   "CACHE_LINE must be a power of two: on_distinct_lines divides by it to compute a line index"

@@ -11,12 +11,12 @@
 //!
 //! # What each group covers
 //!
-//! | Group | Invariant | Doc instance |
-//! |---|---|---|
-//! | `check` | D1, D2 | `docs/invariant/001` V1, V2 |
-//! | `Watch` | D3 | `docs/invariant/001` V3, `docs/state_machine/001` |
-//! | The measurement | none | `docs/pitfall/001`, which pins what is *not* detected without this crate |
-//! | `check_ends` | Two readings of one ring | `docs/invariant/001`'s `ReadingsDisagree` |
+//! | Group | Invariant |
+//! |---|---|
+//! | `check` | D1, D2 |
+//! | `Watch` | D3 |
+//! | The measurement | none. It pins what is *not* detected without this crate |
+//! | `check_ends` | Two readings of one ring |
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -42,9 +42,9 @@ fn cap(n: usize) -> Capacity {
 /// A pair with both cursors placed where the caller asks.
 ///
 /// This is how the suite corrupts a pair, deliberately not hidden behind
-/// anything. `store` is the same public method a producer publishes with, which
-/// is precisely `docs/invariant/001`'s E1 gap. The family cannot distinguish
-/// publishing from corrupting, because they are the same call.
+/// anything. `store` is the same public method a producer publishes with. The
+/// family cannot distinguish publishing from corrupting, because they are the
+/// same call.
 fn pair_at(capacity: usize, producer: u64, consumer: u64) -> CursorPair {
   let pair = CursorPair::new(cap(capacity));
   pair.producer().store(Seq(producer), Ordering::Release);
@@ -56,7 +56,7 @@ fn pair_at(capacity: usize, producer: u64, consumer: u64) -> CursorPair {
 // check: D1 and D2
 // ---------------------------------------------------------------------------
 
-/// V1: a consumer that has read past what the producer published.
+/// A consumer that has read past what the producer published.
 ///
 /// The violation this crate exists for. Nothing else in the family reports it;
 /// see `the_arithmetic_reports_an_empty_ring_for_a_consumer_ahead_cursor` below
@@ -85,7 +85,7 @@ fn a_consumer_level_with_its_producer_is_not_a_violation() {
   assert!(check(&pair_at(8, 5, 5)).is_ok(), "a fully drained ring was called corrupt");
 }
 
-/// V2: a producer more than a full lap ahead.
+/// A producer more than a full lap ahead.
 #[test]
 fn a_producer_more_than_a_lap_ahead_is_caught() {
   let pair = pair_at(8, 30, 0);
@@ -158,12 +158,12 @@ fn checking_leaves_both_cursors_where_they_were() {
 }
 
 // ---------------------------------------------------------------------------
-// The measurement: docs/pitfall/001
+// The measurement
 // ---------------------------------------------------------------------------
 
 /// The family reports a D1-corrupted ring as empty, healthy, and claimable.
 ///
-/// `docs/pitfall/001`'s measurement, re-taken as an assertion. This is the test
+/// The crate's founding measurement, re-taken as an assertion. This is the test
 /// that makes the crate's existence falsifiable. It pins the three readings a
 /// caller would otherwise trust, so a future change to
 /// `ring_types::Seq::distance_to` that stopped the masking would fail *here* and
@@ -192,8 +192,8 @@ fn the_arithmetic_reports_an_empty_ring_for_a_consumer_ahead_cursor() {
 
 /// D2 degrades in the opposite direction, visible and declining to claim.
 ///
-/// The other half of the pitfall's asymmetry table. Both corruptions are equally
-/// wrong; only one of them lies about it.
+/// The other half of the asymmetry. Both corruptions are equally wrong; only
+/// one of them lies about it.
 #[test]
 fn the_arithmetic_reports_a_lapped_ring_as_full_and_unclaimable() {
   let lapped = pair_at(8, 30, 0);
@@ -207,7 +207,7 @@ fn the_arithmetic_reports_a_lapped_ring_as_full_and_unclaimable() {
 // Watch: D3
 // ---------------------------------------------------------------------------
 
-/// V3: a cursor that goes backwards.
+/// A cursor that goes backwards.
 #[test]
 fn a_cursor_that_goes_backwards_is_caught() {
   let pair = pair_at(8, 5, 1);
@@ -251,8 +251,8 @@ fn a_backwards_consumer_is_named_as_the_consumer() {
 
 /// A single observation cannot see D3, which is why `Watch` exists at all.
 ///
-/// `docs/pitfall/001`'s P3, stated as a test. A pair reset to `(0, 0)` is a
-/// valid pair; `check` passes it, correctly, and `Watch` does not.
+/// A pair reset to `(0, 0)` is a valid pair; `check` passes it, correctly, and
+/// `Watch` does not.
 /// If this ever started failing, `Watch` would be redundant and `check` would
 /// have grown state it should not have.
 ///
@@ -307,12 +307,12 @@ fn a_failed_observation_leaves_the_baseline_alone() {
   assert!(watch.observe(&pair).is_err(), "the second look went quiet");
 }
 
-/// DB38, T6: a watch that reported a violation observes cleanly once the ring
-/// recovers, and does not latch.
+/// A watch that reported a violation observes cleanly once the ring recovers,
+/// and does not latch.
 ///
 /// The state machine has six transitions; this is the one the suite reached
-/// hardest for in prose (`docs/decisions/002` defers latching to a caller on
-/// the strength of it) and tested least. No other test performs a failing
+/// hardest for in prose (`docs/decisions/001_a_watch_does_not_latch.md` defers
+/// latching to a caller on the strength of it) and tested least. No other test performs a failing
 /// observation followed by a passing one. Without this test, a change that made
 /// `Watch` absorbing (report the first violation forever, ignoring further
 /// reality) would pass every other test in this file, including
@@ -392,7 +392,7 @@ fn a_watch_still_catches_the_stateless_violations() {
   );
 }
 
-/// DB6: a forked baseline is now something you have to ask for.
+/// A forked baseline is now something you have to ask for.
 ///
 /// `Watch` was `Copy`, so `let w2 = w1;` produced a second independent baseline
 /// and read, at the call site, exactly like a move. This is that fork written
@@ -432,7 +432,7 @@ fn a_cloned_watch_forks_the_baseline() {
   );
 }
 
-/// DB5: `observe` accepts a foreign pair, and answers about neither ring.
+/// `observe` accepts a foreign pair, and answers about neither ring.
 ///
 /// A `Watch` holds three scalars and no identity, so nothing stops a second
 /// ring's pair being passed to it. Every comparison still runs and the result is
@@ -441,9 +441,9 @@ fn a_cloned_watch_forks_the_baseline() {
 /// cached capacity, D1 against the *second* ring's own two cursors.
 ///
 /// The behaviour is wrong, and this test does not assert otherwise. It pins
-/// what it currently is, because the finding's second half was that the
-/// behaviour was unobserved as well as unprevented, and an exposure nothing
-/// exercises is one that changes shape without anyone noticing.
+/// what it currently is, because the behaviour was unobserved as well as
+/// unprevented, and an exposure nothing exercises is one that changes shape
+/// without anyone noticing.
 #[test]
 fn observing_a_foreign_pair_answers_about_neither_ring() {
   let watched = pair_at(8, 20, 15);
@@ -473,7 +473,7 @@ fn observing_a_foreign_pair_answers_about_neither_ring() {
 
 /// A real ring's two ends agree, at rest and in flight.
 ///
-/// DB51: the capacity is read off the ring rather than re-typed as a literal,
+/// The capacity is read off the ring rather than re-typed as a literal,
 /// which is the only shape a downstream caller should copy. `Ring::capacity`
 /// takes `&self` and `Ring::ends` takes `&mut self`, so the binding has to be
 /// made *before* the split; after it, the number is unreachable for as long as
@@ -513,9 +513,9 @@ fn the_two_ends_of_a_live_ring_agree() {
 /// backpressure sits in every day: `free_capacity() == 0` with nothing corrupt.
 /// That boundary is exactly where `ring_spsc::Producer::free_capacity`'s
 /// `capacity - occupancy` would underflow if `occupancy` ever exceeded
-/// `capacity` (`docs/invariant/002`'s DB35). So a genuinely-full ring is the
-/// legitimate state that sits closest to the corrupt one, and is worth pinning
-/// on its own rather than trusting the partly-filled case to stand in for it.
+/// `capacity`. So a genuinely-full ring is the legitimate state that sits
+/// closest to the corrupt one, and is worth pinning on its own rather than
+/// trusting the partly-filled case to stand in for it.
 #[test]
 fn check_ends_on_a_genuinely_full_ring() {
   let config = RingConfig::new(16).expect("a valid size");
@@ -546,8 +546,7 @@ fn check_ends_on_a_genuinely_full_ring() {
 /// report for it.
 ///
 /// This is the one call site that keeps its literal, because passing the wrong
-/// number by hand is precisely what it asserts about. Every other site derives
-/// (DB51).
+/// number by hand is precisely what it asserts about. Every other site derives.
 #[test]
 fn a_ring_measured_against_the_wrong_capacity_disagrees() {
   let config = RingConfig::new(16).expect("a valid size");
@@ -567,8 +566,8 @@ fn a_ring_measured_against_the_wrong_capacity_disagrees() {
 
 /// `check_ends`' arithmetic passes a D1-corrupted ring, and `check` does not.
 ///
-/// `docs/integration/001`'s J4, as a fact in the suite rather than a caveat in
-/// prose. `check_ends` compares two *derived* readings, and those are exactly
+/// "Do not read a pass here as evidence against D1", as a fact in the suite
+/// rather than a caveat in prose. `check_ends` compares two *derived* readings, and those are exactly
 /// the readings the saturating arithmetic masks. On a D1 pair they are
 /// `pending 0` and `free 8` against a capacity of 8, which sums correctly and
 /// passes.
@@ -656,12 +655,13 @@ fn a_violation_reports_the_numbers_it_was_derived_from() {
   }
 }
 
-/// DB28: a lap report whose own cursors contradict it says so, rather than
+/// A lap report whose own cursors contradict it says so, rather than
 /// rendering a distance of zero.
 ///
 /// `Violation`'s fields are public and the enum is deliberately closed rather
-/// than `#[ non_exhaustive ]` (DB4), so a caller can build this variant directly
-/// and reach the formatter without passing `check_seqs`' guard. The distance was
+/// than `#[ non_exhaustive ]` (`docs/decisions/002_violation_stays_a_closed_enum.md`),
+/// so a caller can build this variant directly and reach the formatter without
+/// passing `check_seqs`' guard. The distance was
 /// computed `saturating_sub`, which absorbed the contradiction into
 /// *"is 0 ahead of"*, a sentence that reads as a measurement, in the crate whose
 /// founding measurement is that saturating arithmetic reports health it cannot
@@ -682,15 +682,15 @@ fn a_lap_report_that_contradicts_itself_does_not_fabricate_a_distance() {
   );
 }
 
-/// DB27: the claim in the D1 message is the sentence readers of this crate rely on most,
+/// The claim in the D1 message is the sentence readers of this crate rely on most,
 /// and this is what holds it to the arithmetic.
 ///
 /// `ConsumerAheadOfProducer` renders as *"... the ring reads as empty and permits
-/// a claim"*. That clause says more than the violation does. It is
-/// `pitfall/001`'s measurement compiled into a string literal, in a crate that
-/// does not depend on `ring_seqno` and had no test asserting it. If the family's
-/// saturating arithmetic stopped behaving that way, the pitfall would be
-/// re-measured and this sentence would not.
+/// a claim"*. That clause says more than the violation does. It is the crate's
+/// founding measurement compiled into a string literal, in a crate that does
+/// not depend on `ring_seqno` and had no test asserting it. If the family's
+/// saturating arithmetic stopped behaving that way, the measurement would be
+/// re-taken and this sentence would not.
 ///
 /// So the two halves are asserted together: the arithmetic on a D1 pair, and the
 /// message that describes it. A change to either without the other now fails

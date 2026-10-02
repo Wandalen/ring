@@ -6,8 +6,7 @@
 //! isolation and what makes the family's dependency forest acyclic by
 //! construction.
 //!
-//! The "no ring logic" in the description is a rule, not a summary.
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5 rules that this
+//! The "no ring logic" in the description is a rule, not a summary. This
 //! crate owns the *discriminants* of [`WaitKind`] and [`OverflowPolicy`] while
 //! `ring_wait` and `ring_overflow` own the handlers that act on them. A
 //! behaviour that dispatches on a policy does not belong here.
@@ -19,9 +18,9 @@
 //! | `policy` | [`WaitKind`] and [`OverflowPolicy`], the two configuration enums |
 //! | `error` | [`RingError`], the one error type the family returns |
 //!
-//! Features delivered here: `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
-//! (the vocabulary half), `docs/feature/173_wait_kind_and_strategies.md` and
-//! `docs/feature/174_overflow_policy_enum_and_handlers.md` (the enum halves).
+//! Features delivered here: the vocabulary half of the sequence-to-slot-index
+//! and power-of-two-capacity feature, and the enum halves of the wait-kind and
+//! overflow-policy features.
 
 #![no_std]
 #![deny(missing_docs)]

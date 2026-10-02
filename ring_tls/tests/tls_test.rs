@@ -463,7 +463,7 @@ fn several_threads_flushing_never_receive_overlapping_sequences() {
 
 #[test]
 fn a_threads_own_items_stay_contiguous_within_each_flush() {
-  // Hard problem 118: a system's own writes survive the merge in order. Between
+  // A system's own writes survive the merge in order. Between
   // threads the interleaving is arbitrary; within one flush it is not.
   const THREADS: usize = 4;
   const FLUSHES: usize = 100;

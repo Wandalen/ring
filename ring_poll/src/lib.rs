@@ -5,10 +5,10 @@
 //!
 //! # What this crate is for
 //!
-//! [Feature 183](../../../docs/feature/183_try_only_operations_on_the_tick_path.md)
-//! asks that the operations reachable from inside a system be exclusively the
-//! fallible, non-parking ones, and that the restriction be *"enforced by what
-//! is exposed, not by a rule in a document"*.
+//! The feature for try-only operations on the tick path asks that the
+//! operations reachable from inside a system be exclusively the fallible,
+//! non-parking ones, and that the restriction be *"enforced by what is
+//! exposed, not by a rule in a document"*.
 //!
 //! Half of that is already true without this crate. `ring_core::Producer` and
 //! `ring_core::Consumer` have no parking operation on them at all. The parking
@@ -17,8 +17,7 @@
 //!
 //! 1. **What stops a tick-path crate from adding `ring_wait` to its manifest?**
 //!    Nothing in the language. The enforcement available is a dependency-graph
-//!    property, and this crate asserts it. See [`PARKING_CRATES`] and
-//!    `docs/invariant/001`.
+//!    property, and this crate asserts it. See [`PARKING_CRATES`].
 //! 2. **Why would anyone reach for the parking version in the first place?**
 //!    Because try-only is tedious to write by hand. Every helper below exists
 //!    to make the non-parking spelling the short one, on the theory that a
@@ -28,8 +27,7 @@
 //!
 //! *Non-parking is necessary and not sufficient.* [`Budget::new`] lets a caller
 //! ask for a million attempts; that never deadlocks and will still blow a frame
-//! budget. The default is [`Budget::once`] for that reason, and
-//! `docs/pitfall/001` states the trap rather than implying it away.
+//! budget. The default is [`Budget::once`] for that reason.
 
 #![deny(missing_docs)]
 
@@ -38,7 +36,8 @@ use ring_core::{Consumer, Producer};
 /// The family crates that declare `ring_wait` as a direct dependency.
 ///
 /// Crates that reach a parking operation only transitively are not listed;
-/// `docs/api/002` covers the two that reach it through an intermediate crate.
+/// the second table below covers the two that reach it through an intermediate
+/// crate.
 ///
 /// This roster is part of the public API rather than a constant inside a test,
 /// so adding a crate to it is a visible API change rather than a quiet edit to
@@ -217,9 +216,8 @@ impl Progress {
   // Root cause: `Progress::of` is a public, unconstrained constructor over any
   // `usize`, so nothing this crate controls bounds `then`'s two operands. Only
   // `Tick`'s own private, ring-traffic-driven counter had been checked against
-  // overflow (`docs/data_structure/002` PL12). That counter's "impractical to
-  // reach" reasoning does not transfer to a public constructor one direct call
-  // away from the same class of bug.
+  // overflow. That counter's "impractical to reach" reasoning does not transfer
+  // to a public constructor one direct call away from the same class of bug.
   // Pitfall: a public constructor wrapping a raw integer puts arithmetic on its
   // output outside any bound the defining crate controls. Audit every site that
   // combines two of its values, not only the crate's own internal accumulators.
@@ -249,7 +247,7 @@ impl Progress {
 ///
 /// **Under `OverflowPolicy::DropNewest` this returns `Ok` on the first attempt
 /// even when the ring is full**, having discarded the record. The policy does
-/// that, not this function. See `docs/pitfall/002`.
+/// that, not this function.
 ///
 /// ```
 /// use ring_config::RingConfig;
@@ -281,7 +279,7 @@ pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: B
         attempt += 1;
         if attempt < budget.attempts() {
           // A pause hint, and nothing more. Yielding here would be the parking
-          // this crate exists to keep off the tick path. See `docs/invariant/001`.
+          // this crate exists to keep off the tick path.
           core::hint::spin_loop();
         }
       }

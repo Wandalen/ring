@@ -2,17 +2,14 @@
 //!
 //! Claims the handler half of
 //! `docs/feature/174_overflow_policy_enum_and_handlers.md`; the enum half lives
-//! in `ring_types` per `docs/decision/121_workstream_008_contract_gaps_ruled.md`
-//! § 5, and is claimed by that crate's own tests.
+//! in `ring_types`, and is claimed by that crate's own tests.
 //!
-//! The acceptance criterion filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` is
-//! negative: **exactly three discriminants, and no overwrite variant**. That
-//! absence is what makes a successful publish mean something. Under every
-//! policy here, a publish reporting success kept the item. A fourth variant that
-//! overwrote unread data would silently break every consumer written against
-//! the other three, so the exhaustiveness assertions below are the ones that
-//! matter, not decoration.
+//! The acceptance criterion is negative: **exactly three discriminants, and no
+//! overwrite variant**. That absence is what makes a successful publish mean
+//! something. Under every policy here, a publish reporting success kept the
+//! item. A fourth variant that overwrote unread data would silently break every
+//! consumer written against the other three, so the exhaustiveness assertions
+//! below are the ones that matter, not decoration.
 
 use ring_overflow::{Resolution, resolve, would_resolve};
 use ring_stats::RingStats;

@@ -1,7 +1,6 @@
 //! Tests for `ring_stats`, the counters a run is judged by.
 //!
-//! Claims `docs/feature/185_ring_stats.md`. Its acceptance criterion, filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`, is that a
+//! Claims `docs/feature/185_ring_stats.md`. Its acceptance criterion is that a
 //! drop is *counted*, not silently absorbed. A benchmark whose throughput number
 //! came partly from discarded work is a wrong number, and the only way to tell
 //! the two apart afterwards is a counter incremented at the moment of the drop.

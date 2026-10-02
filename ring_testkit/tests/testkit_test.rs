@@ -1,6 +1,6 @@
 //! The scripted-fixture half of `docs/feature/188_loom_and_testkit_helpers.md`.
 //!
-//! Feature 188 asks for two things: a model checker exploring interleavings
+//! The feature asks for two things: a model checker exploring interleavings
 //! exhaustively, and fixtures driving a ring through a scripted sequence of
 //! claims and drains. This file covers the second and asserts the first is
 //! reachable; the model itself is `tests/exhaustive_test.rs`, which only
@@ -496,7 +496,7 @@ fn leak_ends_produces_ends_that_can_be_moved_onto_spawned_threads() {
   assert_eq!(draining.join().expect("the drain thread"), Some(7));
 }
 
-// ── the boundaries the findings named ─────────────────────────────────────
+// ── boundary cases ────────────────────────────────────────────────────────
 
 /// `vanished()` answers the healthy `0` for a state no run can produce, and
 /// `audit` is what tells that zero from the real one.
@@ -505,7 +505,7 @@ fn leak_ends_produces_ends_that_can_be_moved_onto_spawned_threads() {
 /// clamps to `0`, which is the same reading a ring that destroyed nothing
 /// gives. Nothing in the returned struct distinguishes them.
 /// `Anomaly::Overdelivered` is the distinction, and it lives on the other
-/// method. → `docs/data_structure/002` TK11.
+/// method.
 #[test]
 fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
   let outcome = Outcome {
@@ -535,7 +535,7 @@ fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
 /// Run twice on one and the second `Outcome` describes six records in a ring
 /// that accepted three. Every field of it is plausible on its own, the set of
 /// them is impossible, and `vanished()` reports the healthy `0` throughout.
-/// This is the second of TK11's two established routes to that state, and
+/// This is the second of the two established routes to that state, and
 /// unlike the hand-built `Outcome` above it needs no cooperation from the
 /// caller beyond a mistake the contract already names.
 #[test]
@@ -561,7 +561,7 @@ fn a_script_run_twice_on_one_ring_produces_an_outcome_that_fails_its_audit() {
 /// Producer A minted 0, 1, 2 and producer B minted 100, 101; the ring delivered
 /// them in claim order. That is a correct delivery and not an ascending one, so
 /// `audit_received`, the function whose stated reason for existing is the
-/// concurrent case, reports it as an anomaly. → `docs/algorithm/002` TK3.
+/// concurrent case, reports it as an anomaly.
 #[test]
 fn interleaved_producers_pass_only_the_unordered_audit() {
   let delivered = [0, 100, 1, 101, 2];
@@ -597,10 +597,9 @@ fn the_unordered_audit_keeps_the_two_failures_a_ring_can_produce() {
 
 /// A `Many` count far above the ring's capacity is executed in full.
 ///
-/// Nothing clamps it. The termination argument calls each step "bounded by a
-/// constant in the step itself"; the constant is whichever number the caller
-/// wrote, and a ring that refuses everything after the fourth record still
-/// receives all thousand offers. → `docs/data_structure/001` TK10.
+/// Nothing clamps it. Each step is bounded by a constant in the step itself;
+/// the constant is whichever number the caller wrote, and a ring that refuses
+/// everything after the fourth record still receives all thousand offers.
 #[test]
 fn a_many_count_far_above_capacity_is_executed_in_full() {
   let outcome = Script::new(0).then(Step::PushMany(1000)).run(&mut failing_ring(4));

@@ -6,10 +6,10 @@
 //!
 //! # These tests can see an ordering bug, and that was measured rather than assumed
 //!
-//! `docs/invariant/002_publication_ordering.md` says a green suite is not
-//! evidence for the publication ordering, because on x86-64 a `Relaxed` publish
-//! is unobservable. The hardware supplies the ordering the code failed to ask
-//! for. That reasoning is right, but its premise does not hold here. This
+//! The publication-ordering invariant says a green suite is not evidence for
+//! the publication ordering, because on x86-64 a `Relaxed` publish is
+//! unobservable. The hardware supplies the ordering the code failed to ask for.
+//! That reasoning is right, but its premise does not hold here. This
 //! workspace's host is `aarch64-unknown-linux-gnu` (ARM Neoverse-N1), which is
 //! weakly ordered. Check it with `rustc -vV | grep host`.
 //!
@@ -72,7 +72,7 @@ mod threaded {
   const PATIENCE: std::time::Duration = std::time::Duration::from_secs(30);
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Feature 172's reached-test.
+  // The reached-test.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// Four producers, 25 000 items each, exchanged with byte-parity.
@@ -429,7 +429,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // Decision 123 ruling 4, on the shape the soundness argument rests on.
+  // The shape the soundness argument in `docs/workaround/readme.md` rests on.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// The producer is shareable and the consumer is not.
@@ -462,11 +462,10 @@ mod threaded {
 
   /// The claim cursor and the consumer cursor do not share a cache line.
   ///
-  /// This is seam I2 of `docs/integration/001_family_dependency_seam.md`. This
-  /// crate states the padding as a contract and `ring_cursor` implements it. A
-  /// sibling change dropping the alignment would put the single most contended
-  /// write in the crate on the same line as the consumer's commit, and break
-  /// nothing that compiles.
+  /// This crate states the padding as a contract and `ring_cursor` implements
+  /// it. A sibling change dropping the alignment would put the single most
+  /// contended write in the crate on the same line as the consumer's commit,
+  /// and break nothing that compiles.
   #[test]
   fn the_claim_cursor_and_the_consumer_cursor_are_on_distinct_cache_lines() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(8));
@@ -477,7 +476,7 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
-  // The published watermark is seam I6, and total order rests on it.
+  // Total order rests on the published watermark.
   // ───────────────────────────────────────────────────────────────────────────
 
   /// A gap below a published sequence hides everything above it.
@@ -553,11 +552,11 @@ mod threaded {
   /// An unwritten claim publishes an empty record, not a torn one.
   ///
   /// `Reserved`'s `Drop` publishes unconditionally, which is what makes the
-  /// publish impossible to skip. `docs/api/001_producer_publish_surface.md`
-  /// objects that a guard therefore publishes a partially-written slot on a
-  /// panic between claim and write. It does not. The consumer that drained the
-  /// slot left it `Default`, so the observable result is one empty record:
-  /// defined, drainable, and distinguishable from a written one.
+  /// publish impossible to skip. One objection is that a guard therefore
+  /// publishes a partially-written slot on a panic between claim and write. It
+  /// does not. The consumer that drained the slot left it `Default`, so the
+  /// observable result is one empty record: defined, drainable, and
+  /// distinguishable from a written one.
   #[test]
   fn a_claim_dropped_without_a_write_publishes_an_empty_record() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -609,8 +608,8 @@ mod threaded {
     assert_eq!(producer.free_capacity(), 0);
 
     // The two published records are untouched. That is what distinguishes the
-    // `Fail` policy from `DropOldest`, and it is the exactly-once clause of
-    // `docs/invariant/001_single_consumer_total_order.md` at the overflow edge.
+    // `Fail` policy from `DropOldest`, and it is the exactly-once contract at
+    // the overflow edge.
     let mut batch = consumer.drain();
     assert_eq!(batch.len(), 2);
     assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(1));
@@ -964,9 +963,9 @@ mod threaded {
 
   #[test]
   fn the_orderings_are_the_ones_the_publication_invariant_names() {
-    // `docs/invariant/002_publication_ordering.md` states these as contract, in
-    // one place, rather than at each use. This is the assertion that the
-    // constants have not drifted from it.
+    // The publication-ordering invariant states these as contract, in one
+    // place, rather than at each use. This is the assertion that the constants
+    // have not drifted from it.
     assert_eq!(PUBLISH, Ordering::Release);
     assert_eq!(OBSERVE, Ordering::Acquire);
     assert_eq!(COMMIT, Ordering::Release);
@@ -1203,8 +1202,7 @@ mod exhaustive {
 
   /// A drained record never precedes the write that came before its publish.
   ///
-  /// Pair 1 of `docs/invariant/002_publication_ordering.md`. Weakening
-  /// `PUBLISH` from `Release` to `Relaxed` must fail this model. That
+  /// Weakening `PUBLISH` from `Release` to `Relaxed` must fail this model. That
   /// mutation is step 1 of `tests/manual/readme.md`'s M9, and a model that
   /// still passes under it is checking nothing.
   #[test]

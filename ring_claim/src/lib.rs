@@ -11,15 +11,13 @@
 //! crate's behalf. Declaring it here as well would be a dependency carried for
 //! the shape of the forest rather than for a call.
 //!
-//! Claiming is the first half of
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`. A producer
-//! takes exclusive ownership of a range of sequences, writes into the slots
-//! they index, and only then publishes. `ring_publish` is the second half.
+//! Claiming is the first half of the claim/publish handshake. A producer takes
+//! exclusive ownership of a range of sequences, writes into the slots they
+//! index, and only then publishes. `ring_publish` is the second half.
 //!
-//! `docs/feature/172_multi_producer_claim.md` requires multi-producer
-//! exclusivity. No two producers may ever be granted the same sequence, and
-//! that requirement is why this crate exists instead of being two lines inside
-//! `ring_publish`.
+//! Multi-producer claiming requires exclusivity. No two producers may ever be
+//! granted the same sequence, and that requirement is why this crate exists
+//! instead of being two lines inside `ring_publish`.
 //!
 //! ## Why claiming never waits
 //!
@@ -44,9 +42,9 @@
 //! There is deliberately no `Drop` impl that "releases" the claim, because
 //! releasing is not possible. Another producer may already have claimed the
 //! range beyond it, so rewinding the cursor would hand out sequences twice, the
-//! one thing `docs/feature/172` forbids outright. The type is `#[must_use]` so
-//! the compiler objects to the common accident. This section states the
-//! invariant for the uncommon one.
+//! one thing multi-producer claiming forbids outright. The type is
+//! `#[must_use]` so the compiler objects to the common accident. This section
+//! states the invariant for the uncommon one.
 //!
 //! ## Why the CAS loop is not `fetch_add`
 //!
@@ -199,9 +197,9 @@ impl Claim {
 
   /// Whether this range shares any sequence with `other`.
   ///
-  /// This is the property `docs/feature/172_multi_producer_claim.md` forbids
-  /// across producers. It is public so a test can assert it directly instead
-  /// of reconstructing the comparison at every call site.
+  /// This is the property multi-producer claiming forbids across producers. It
+  /// is public so a test can assert it directly instead of reconstructing the
+  /// comparison at every call site.
   ///
   /// ```
   /// use ring_claim::Claim;
@@ -322,8 +320,7 @@ impl<'a> Claimer<'a> {
   ///
   /// This is *claimed*, not published, so a slot counted here may still be
   /// mid-write. `ring_publish` tracks the published frontier separately, and
-  /// `docs/feature/170_claim_publish_available_commit_handshake.md` forbids
-  /// conflating the two.
+  /// the claim/publish handshake forbids conflating the two.
   ///
   /// ```
   /// use ring_claim::Claimer;

@@ -6,11 +6,11 @@
 //!
 //! This is the one place the family's measurement is shown to a human. The
 //! library deliberately prints nothing. Every quantity is a field with an
-//! accessor, so the suite can assert on values rather than on captured stdout
-//! (`docs/pattern/001`). That leaves the report exercised only by substring
-//! assertions, and the first time someone read it end-to-end it exposed four
-//! documentation errors (`tests/manual/readme.md` B1). This example exists so
-//! that reading is a command rather than a throwaway probe.
+//! accessor, so the suite can assert on values rather than on captured stdout.
+//! That leaves the report exercised only by substring assertions, and the first
+//! time someone read it end-to-end it exposed four documentation errors
+//! (`tests/manual/readme.md` B1). This example exists so that reading is a
+//! command rather than a throwaway probe.
 //!
 //! Without `--all-features` the off-the-shelf candidate is absent and the
 //! comparison has five rows instead of six.

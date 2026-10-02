@@ -1,22 +1,20 @@
 //! Composed ring over an SPSC, MPSC, or crossbeam backend behind one API.
 //!
 //! One of the ring family's 33 crates, which implement the concurrency write-path. This is the
-//! **composition point**. `docs/decision/121_workstream_008_contract_gaps_ruled.md`
-//! § 7 rules that feature 187's crossbeam backend belongs here, behind a cargo
-//! feature, alongside the selection between [`ring_spsc`] (feature 171) and
-//! [`ring_mpsc`] (feature 172).
+//! **composition point**. The crossbeam backend belongs here, behind a cargo
+//! feature, alongside the selection between [`ring_spsc`] and [`ring_mpsc`]
+//! (-> `docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md`).
 //!
-//! Fix(decision_121_link_pointed_at_docsrs_not_the_ruling): this citation used
-//! to be a rustdoc reference link, `[decision 121]: https://docs.rs/ring_core`.
-//! That link was dead by construction, since `publish = false` means this crate
-//! is never on docs.rs, and even a live link there would land on this crate's
-//! own docs rather than on decision 121's text. Root cause: the link target was
-//! never filled in past a placeholder at the commit that introduced it. Pitfall:
-//! a doc-comment citation that *looks* like a working hyperlink is checked far
-//! less often than prose, because it reads as already verified. Five sibling
-//! crates (`ring_wait`, `ring_overflow`, `ring_types`, `ring_bench`,
-//! `ring_seqno`) cite this exact document as plain backtick text instead of a
-//! link. That is the family's convention, and this citation now matches it.
+//! Fix(decision_121_link_pointed_at_docsrs_not_the_ruling): an earlier citation
+//! here was a rustdoc reference link to `https://docs.rs/ring_core`. That link
+//! was dead by construction, since `publish = false` means this crate is never
+//! on docs.rs, and even a live link there would land on this crate's own docs
+//! rather than on the cited ruling. Root cause: the link target was never
+//! filled in past a placeholder at the commit that introduced it. Pitfall: a
+//! doc-comment citation that *looks* like a working hyperlink is checked far
+//! less often than prose, because it reads as already verified. The family
+//! cites documents as plain backtick text instead of a link, and this citation
+//! now matches it.
 //!
 //! # The API is value-shaped, and that is forced rather than chosen
 //!
@@ -56,8 +54,8 @@
 //! publish reaches it through a method here. A counter added in this crate
 //! would break that assertion with nothing in `ring_spsc`'s own dependency tree
 //! to blame. There is accordingly no `AtomicUsize` anywhere below, and no
-//! statistics. Instrumentation belongs in `ring_stats` (feature 185), which is
-//! deliberately not a dependency.
+//! statistics. Instrumentation belongs in `ring_stats`, which is deliberately
+//! not a dependency.
 //!
 //! ```
 //! use ring_config::RingConfig;
@@ -102,7 +100,7 @@ pub enum Backend {
   Spsc,
   /// [`ring_mpsc`]: many producers, advisory `free_capacity`.
   Mpsc,
-  /// `crossbeam_queue::ArrayQueue`, feature 187's interim backend.
+  /// `crossbeam_queue::ArrayQueue`, the interim backend.
   #[cfg(feature = "crossbeam")]
   Crossbeam,
 }
@@ -178,9 +176,10 @@ impl<T: Send> Ring<T> {
   /// Build a ring on the crossbeam backend, whatever the configuration's
   /// producer count says.
   ///
-  /// This is feature 187's entry point. It accepts `OverflowPolicy::DropOldest`
-  /// where [`new`](Self::new) refuses it, because `ArrayQueue::force_push` does
-  /// exactly that, the one capability the in-house rings deliberately lack.
+  /// This is the crossbeam backend's entry point. It accepts
+  /// `OverflowPolicy::DropOldest` where [`new`](Self::new) refuses it, because
+  /// `ArrayQueue::force_push` does exactly that, the one capability the
+  /// in-house rings deliberately lack.
   ///
   /// # Errors
   ///

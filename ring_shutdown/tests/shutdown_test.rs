@@ -61,7 +61,7 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
 
 // ── The reached-test ──────────────────────────────────────────────────────
 
-/// Feature 184's reached-test: close stops publication, drain recovers what
+/// The feature's reached-test: close stops publication, drain recovers what
 /// was published, and reset leaves a ring the next run cannot tell from new.
 ///
 /// The last clause carries the feature's stated purpose ("dirty tests"), so

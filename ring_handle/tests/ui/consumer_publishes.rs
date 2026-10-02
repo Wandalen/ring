@@ -1,7 +1,7 @@
 //! Must not compile: the draining end cannot publish.
 //!
-//! Feature 179's second compile-fail case, and V2 of
-//! `docs/invariant/001_capability_follows_the_handle.md`.
+//! The second compile-fail case of the acceptance criterion, and a breach of
+//! the rule that capability follows the handle.
 
 use ring_config::RingConfig;
 use ring_core::Ring;

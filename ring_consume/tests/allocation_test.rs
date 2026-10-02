@@ -2,31 +2,29 @@
 //!
 //! ## Why this file exists
 //!
-//! `docs/non_functional_requirement/001` recorded, as CN34, that every
+//! A requirements document once recorded, as a finding, that every
 //! barrier-consulting read here cost one heap allocation. `available`,
 //! `available_up_to` and `commit_available` each charged one per call, on every
-//! poll of an idle ring. `docs/workaround/002` named the site, a `Vec` two
-//! crates down whose only job was to change a slice's element type. Both
-//! findings were declined, on the ground that fixing them would invalidate
-//! quoted evidence in sibling crates nobody in those passes owned.
+//! poll of an idle ring. A second document named the site, a `Vec` two crates
+//! down whose only job was to change a slice's element type. Both findings were
+//! declined, on the ground that fixing them would invalidate quoted evidence in
+//! sibling crates nobody in those passes owned.
 //!
-//! Commit `b7e075ca` removed it anyway, from the other direction, and every
-//! number in those documents became false at once. Nothing detected that,
-//! because the measurement was a scratch binary pasted into a document, run
-//! once, and deleted by its own last line.
+//! A later commit removed it anyway, from the other direction, and every number
+//! in those documents became false at once. Nothing detected that, because the
+//! measurement was a scratch binary pasted into a document, run once, and
+//! deleted by its own last line.
 //!
 //! This file is the standing form of that probe. It measures the same six call
-//! shapes CN34's table lists, in the same order.
+//! shapes that finding's table lists, in the same order.
 //!
 //! ## Why the two empty-barrier rows are kept
 //!
 //! They read zero before the fix and zero after. `frontier()` returns `None`
 //! without reaching the fold when there are no dependencies, so an empty
 //! barrier never allocated even when every other row did. That is how the cost
-//! stayed invisible, and it is the subject of
-//! `docs/pitfall/002_the_empty_barrier_is_the_case_nobody_measured.md`. They are
-//! kept and labelled so the next reader sees that two of the six rows can
-//! distinguish nothing.
+//! stayed invisible. They are kept and labelled so the next reader sees that
+//! two of the six rows can distinguish nothing.
 //!
 //! ## Why one `#[ test ]`, and why a control arm
 //!
@@ -39,13 +37,11 @@
 // family, and those panic the moment they are touched outside a
 // model closure that instruments them.
 #![cfg(not(loom))]
-// A counting allocator cannot be written in safe Rust, because `GlobalAlloc`
-// is an unsafe trait by construction. The workspace denies `unsafe_code`, and
-// the two crates that override it do so in `src/lib.rs`
-// (`ring_store/docs/integration/002_every_unsafe_block_in_the_family.md`
-// measures exactly that set, and this file is not in it). The allowance here
-// is test-only, covers one wrapper that forwards to `std::alloc::System`
-// unchanged, and adds no unsafe code to any shipped crate.
+// A counting allocator cannot be written in safe Rust, because `GlobalAlloc` is
+// an unsafe trait by construction. The workspace denies `unsafe_code`, and the
+// two crates that override it do so in `src/lib.rs`. This file is not one of
+// them. The allowance here is test-only, covers one wrapper that forwards to
+// `std::alloc::System` unchanged, and adds no unsafe code to any shipped crate.
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -125,7 +121,7 @@ fn no_read_of_the_available_range_allocates() {
   );
   drop(buffer);
 
-  // CN34's rows, in the order its table lists them. `position()` never
+  // The finding's rows, in the order its table lists them. `position()` never
   // consulted the barrier and so never allocated; the three that follow did.
   let (calls, bytes, _) = measure(|| {
     for _ in 0..1000 {

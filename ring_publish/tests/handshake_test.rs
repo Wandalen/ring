@@ -1,8 +1,7 @@
 //! The claim → publish → available → commit handshake, end to end.
 //!
 //! This is the reached-test for
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as: a
+//! `docs/feature/170_claim_publish_available_commit_handshake.md`, stated as: a
 //! slot claimed but not published is never returned by `available()`; after
 //! publish it is; `commit()` advances the consumer cursor and never past
 //! `available()`, asserted over every interleaving of one claim and one drain
@@ -378,7 +377,7 @@ mod threaded {
 
   #[test]
   fn a_stalled_consumer_stops_the_producer_after_exactly_one_lap() {
-    // Feature 170's half of what 178 asserts from the gating side. With the
+    // The handshake's half of what the gating side asserts. With the
     // handshake wired, back-pressure is a property of the whole loop rather
     // than of `GatingSet` alone.
     let capacity = cap(8);
@@ -549,12 +548,11 @@ mod threaded {
   /// One dropped claim kills the ring, and every signal keeps reporting health
   /// until the terminal state is an ordinary-looking `Full`.
   ///
-  /// CL44 in `ring_claim/docs/pitfall/001_dropping_a_claim.md` describes this
-  /// but could not host a reproduction. `ring_claim` has no dependency, normal
-  /// or dev, on `ring_publish`, so its suite can never observe a publication
-  /// that fails to arrive. This file can, and `ring_claim` is one of its four
-  /// dev-dependencies for that reason. The assertions below are that
-  /// finding's table, row for row.
+  /// `ring_claim` cannot host a reproduction of this. It has no dependency,
+  /// normal or dev, on `ring_publish`, so its suite can never observe a
+  /// publication that fails to arrive. This file can, and `ring_claim` is one
+  /// of its four dev-dependencies for that reason. The assertions below walk
+  /// through it row by row.
   ///
   /// Note what is *not* asserted. Nothing here is a defect in either crate.
   /// Every call answers correctly for its own question. The finding is that no

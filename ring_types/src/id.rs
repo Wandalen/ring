@@ -1,10 +1,9 @@
 //! The ring family's two position types: a sequence number that counts
 //! publications for the lifetime of a ring, and the slot index derived from it.
 //!
-//! They are separate types on purpose. `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
-//! makes the point. Keeping the sequence apart from the slot is what lets a
-//! gate compare two positions that are a full lap apart, which is impossible
-//! once both have been folded into `0..capacity`.
+//! They are separate types on purpose. Keeping the sequence apart from the slot
+//! is what lets a gate compare two positions that are a full lap apart, which
+//! is impossible once both have been folded into `0..capacity`.
 
 /// A publication's ordinal in a ring's whole history, counting from zero.
 ///

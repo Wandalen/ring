@@ -1,10 +1,9 @@
 //! `ring_spsc`: one producer, one consumer, one array between them.
 //!
 //! This file carries the reached-test for `docs/feature/171_spsc_ring_api.md`,
-//! stated in `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`
-//! as one sentence with four clauses: one producer and one consumer exchange
-//! 100 000 items with **byte-parity** between what was written and what was
-//! read, **in order**, with **zero loss** and **no lock in the path**.
+//! stated as one sentence with four clauses: one producer and one consumer
+//! exchange 100 000 items with **byte-parity** between what was written and
+//! what was read, **in order**, with **zero loss** and **no lock in the path**.
 //!
 //! ## The four clauses are four different failures
 //!
@@ -170,7 +169,8 @@ mod threaded {
 
   // ── the invariant the unsafe rests on ──────────────────────────────────────
 
-  /// Decision 123 ruling 4, with the shape asserted and not only described.
+  /// The ends' `Send` and `!Sync` rule from `docs/workaround/readme.md`, with
+  /// the shape asserted and not only described.
   ///
   /// The soundness argument in `Ring::slot_mut` says "the caller must be the
   /// producer end", and it is worth nothing if a second producer is
@@ -255,11 +255,10 @@ mod threaded {
 
   #[test]
   fn free_capacity_is_actionable_rather_than_advisory() {
-    // The SPSC-specific contract from `docs/api/001_producer_surface.md`. With
-    // one producer nothing can take the reported space between the check and the
-    // push, so a reported `n` guarantees exactly `n` successes and then a
-    // failure. On a multi-producer ring the same call is a hint, which is the
-    // pitfall instance's whole subject.
+    // The SPSC-specific contract. With one producer nothing can take the
+    // reported space between the check and the push, so a reported `n`
+    // guarantees exactly `n` successes and then a failure. On a multi-producer
+    // ring the same call is a hint.
     const CAPACITY: usize = 8;
 
     let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(CAPACITY));
@@ -672,15 +671,13 @@ mod threaded {
 
   #[test]
   fn a_departed_producer_leaves_the_published_tail_drainable() {
-    // `docs/lifecycle/002_producer_consumer_pairing.md`'s cleanup requirement 3
-    // says one end going away does not invalidate the other, and neither case panics.
+    // One end going away does not invalidate the other, and neither case panics.
     //
     // This models "going away" as the end being moved onto a thread that then
-    // finishes, which is the actual Q3 → Q4 transition, not as a `drop` call.
-    // Neither end has a `Drop` impl, by design. Requirement 3 rules that
-    // detecting counterpart death belongs to feature 184 at `ring_shutdown`, not
-    // to a destructor, so a `drop( producer )` here would be a no-op dressed up
-    // as an event.
+    // finishes, not as a `drop` call. Neither end has a `Drop` impl, by design.
+    // Detecting counterpart death belongs to `ring_shutdown`, not to a
+    // destructor, so a `drop( producer )` here would be a no-op dressed up as
+    // an event.
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
     let (producer, mut consumer) = ring.split();
 
@@ -914,11 +911,8 @@ mod threaded {
 /// once per distinct interleaving, so an assertion inside it is an assertion
 /// about all of them rather than about the one the scheduler happened to pick.
 ///
-/// This is what `docs/state_machine/001_slot_state_without_holes.md`'s
-/// invariant 3, `docs/type/001_producer_cursor.md`'s V6, and
-/// `docs/non_functional_requirement/001_correctness_floor_for_the_family.md`'s
-/// A3 all name, and it is the only form of test that can catch a missing
-/// `Release` on the publish or a missing `Acquire` on the peer read.
+/// This is the only form of test that can catch a missing `Release` on the
+/// publish or a missing `Acquire` on the peer read.
 ///
 /// # The payload cannot be the slot, and finding that out was the point
 ///
@@ -1034,33 +1028,33 @@ mod exhaustive {
     });
   }
 
-  /// Regression test for the `free_capacity` underflow, and the reachability
-  /// question `ring_debug/docs/invariant/002` DB35 left unresolved.
+  /// Regression test for the `free_capacity` underflow, and a reachability
+  /// question `ring_debug` left unresolved.
   ///
   /// # Root Cause
   ///
   /// `Producer::claim` (`src/lib.rs`) performs two independent, unfenced
   /// `Relaxed` loads of the producer cursor: one inside `is_full`'s
-  /// `occupancy()` call, and a separate second read afterward to compute
-  /// `seq`. Nothing between them forces the second read to see no more than
-  /// the first validated against. Take the one precondition violation
-  /// `docs/invariant/001` already documents as unenforceable ("Silent"), two
-  /// racing bit-copies of one `Producer`. Racer A's `is_full` sees the
-  /// producer cursor at 0 (not full). Racer B's entire claim-and-publish then
-  /// lands (cursor now 1), and only *then* does A's own re-read execute,
-  /// observing B's already-published 1 and computing its own `seq` from it.
-  /// A's publish then drives the cursor to 2 against a capacity of 1. That is
-  /// D2, reached through nothing but this crate's own public API.
+  /// `occupancy()` call, and a separate second read afterward to compute `seq`.
+  /// Nothing between them forces the second read to see no more than the first
+  /// validated against. Take the one precondition violation already documented
+  /// as unenforceable ("Silent"), two racing bit-copies of one `Producer`.
+  /// Racer A's `is_full` sees the producer cursor at 0 (not full). Racer B's
+  /// entire claim-and-publish then lands (cursor now 1), and only *then* does
+  /// A's own re-read execute, observing B's already-published 1 and computing
+  /// its own `seq` from it. A's publish then drives the cursor to 2 against a
+  /// capacity of 1. That is the producer lapping the consumer, reached through
+  /// nothing but this crate's own public API.
   ///
   /// # Why Not Caught
   ///
-  /// `ring_debug/docs/invariant/002` DB35 reasoned D2 is "unreachable from
-  /// any live `ring_core::Ring` a test can build". That claim was scoped to
+  /// `ring_debug` reasoned the lapped state is "unreachable from any live
+  /// `ring_core::Ring` a test can build". That claim was scoped to
   /// `ring_core`'s composition and never tested against `ring_spsc`'s own
   /// direct API. An `std::thread` stress test tried that direct question
   /// first, with 2 to 128 racing bit-copies of one `Producer` hammering
   /// `try_push` for up to ~11.6 million combined attempts against a starved
-  /// consumer, and never reproduced D2. That was evidence but not proof. An
+  /// consumer, and never reproduced it. That was evidence but not proof. An
   /// interleaving the OS scheduler did not produce in one run is not an
   /// impossible one, and that is the gap probabilistic racing leaves
   /// open. `loom`'s exhaustive search closes that gap and proves the
@@ -1077,39 +1071,39 @@ mod exhaustive {
   ///
   /// # Prevention
   ///
-  /// This crate cannot prevent the precondition violation itself.
-  /// Enforcement is structural, above this crate, per `docs/invariant/001`.
-  /// This test asserts what the crate *can* still guarantee once D2 is
-  /// reached anyway, namely that `free_capacity` degrades to a safe, sane
-  /// answer rather than panicking (`-D warnings` dev builds) or wrapping to a
-  /// near-`usize::MAX` value a caller could mistake for real headroom
-  /// (release builds, since the workspace sets no `overflow-checks`
-  /// anywhere). Running under `loom` re-checks every future change against
-  /// every interleaving of this exact shape, instead of sampling it the way
-  /// the discarded `std::thread` stress test did.
+  /// This crate cannot prevent the precondition violation itself. Enforcement
+  /// is structural, above this crate. This test asserts what the crate *can*
+  /// still guarantee once the lapped state is reached anyway, namely that
+  /// `free_capacity` degrades to a safe, sane answer rather than panicking
+  /// (`-D warnings` dev builds) or wrapping to a near-`usize::MAX` value a
+  /// caller could mistake for real headroom (release builds, since the
+  /// workspace sets no `overflow-checks` anywhere). Running under `loom`
+  /// re-checks every future change against every interleaving of this exact
+  /// shape, instead of sampling it the way the discarded `std::thread` stress
+  /// test did.
   ///
   /// # Pitfall
   ///
   /// A probabilistic stress test that fails to reproduce a race is evidence
   /// bounded by its own sample size, never proof of impossibility. Treating
-  /// "millions of attempts found nothing" as "unreachable" would have left
-  /// this exact bug undiscovered, as `ring_debug`'s own DB35 reasoning
-  /// left it. Where a crate already carries `loom` infrastructure
-  /// for its ordering claims, a reachability question about a *documented*
-  /// precondition violation belongs there too, not only in an OS-thread
-  /// stress test that can only ever report what it happened to observe.
+  /// "millions of attempts found nothing" as "unreachable" would have left this
+  /// exact bug undiscovered, as `ring_debug`'s own reasoning left it. Where a
+  /// crate already carries `loom` infrastructure for its ordering claims, a
+  /// reachability question about a *documented* precondition violation belongs
+  /// there too, not only in an OS-thread stress test that can only ever report
+  /// what it happened to observe.
   #[test]
   #[allow(unsafe_code)]
   fn free_capacity_degrades_safely_even_when_a_precondition_violation_reaches_d2() {
     loom::model(|| {
       let (producer, _consumer) = leaked_ring(1).split();
 
-      // SAFETY: a deliberate, contained violation of `docs/invariant/001`'s
-      // single-producer precondition, made only to ask `loom` whether the
-      // violation's documented consequence (D2 lapping) is reachable through
-      // this crate's own API, and to check `free_capacity`'s behaviour if so.
-      // It does not claim this bit-copy is sound for any other purpose. Both
-      // copies share one `&'static Ring`, which outlives both racer threads.
+      // SAFETY: a deliberate, contained violation of the single-producer
+      // precondition, made only to ask `loom` whether the violation's
+      // documented consequence (lapping) is reachable through this crate's own
+      // API, and to check `free_capacity`'s behaviour if so. It does not claim
+      // this bit-copy is sound for any other purpose. Both copies share one
+      // `&'static Ring`, which outlives both racer threads.
       let p1 = producer;
       let p2 = unsafe { std::ptr::read(&p1) };
 
@@ -1126,10 +1120,11 @@ mod exhaustive {
       let p1_after = first.join().expect("the first racer");
       second.join().expect("the second racer");
 
-      // The racers land on 1 (the safe outcome) or past it (D2, which loom
-      // does reach for this interleaving). Either way, `free_capacity` must
-      // answer with a small, sane number a caller could act on safely, never
-      // panic and never wrap past the ring's true capacity.
+      // The racers land on 1 (the safe outcome) or past it (the lapped state,
+      // which loom does reach for this interleaving). Either way,
+      // `free_capacity` must answer with a small, sane number a caller could
+      // act on safely, never panic and never wrap past the ring's true
+      // capacity.
       let reported = p1_after.free_capacity();
       assert!(
         reported <= 1,

@@ -37,8 +37,8 @@ impl Parity {
   // Root cause: `matches!` over a single named variant is exhaustive over
   //   nothing. It answers every variant it was not told about with the same
   //   default, and compiles cleanly however many variants `Parity` gains. Same
-  //   shape as `DispatchStrategy`'s coordination predicates and
-  //   this crate's own `Accumulator::is_order_independent` fix just above.
+  //   shape as this crate's own `Accumulator::is_order_independent` fix just
+  //   above.
   // Pitfall: a caller gating "did the tables agree?" on this predicate would
   //   treat a new kind of disagreement as agreement. The error is silent, and
   //   it hides a real divergence from the oracle's own caller.
@@ -69,7 +69,7 @@ impl Parity {
 
 /// The byte-parity oracle, bound to the semantics it compares under.
 ///
-/// Workstream 008's smoke test is *"all patterns produce byte-identical final
+/// The family's smoke test is *"all patterns produce byte-identical final
 /// tables"*, and that claim is only meaningful once the fold rule is named.
 /// Two write paths that disagree under [`Accumulator::Set`] may agree under
 /// [`Accumulator::Delta`], and vice versa. So the semantics is a constructor

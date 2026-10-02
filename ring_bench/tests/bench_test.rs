@@ -2,9 +2,8 @@
 //!
 //! Claims `docs/feature/186_ring_benchmark_harness.md`, which asks for one
 //! workload run against every candidate write path, with the comparison as the
-//! deliverable. This suite also claims feature 185's counters
-//! (`docs/feature/185_ring_stats.md`), in the diagnosis role
-//! `docs/hard_problem/126_measured_write_path_verdicts.md` assigns them. They
+//! deliverable. This suite also claims the `ring_stats` counters
+//! (`docs/feature/185_ring_stats.md`), in their diagnosis role. They
 //! turn a result into something readable rather than a single number.
 //!
 //! # What this suite deliberately never asserts
@@ -16,10 +15,10 @@
 //! received, dropped. Those counts are deterministic, and they are what makes a
 //! timing number mean anything.
 //!
-//! **That policy has a price, and on 2026-08-29 it was measured rather than
-//! estimated.** `bench_harness/gate/mutant_survey.sh` broke this crate 180 ways
-//! and three mutations survived the whole suite. All three are timing-only, and
-//! none can be defended without breaking the rule above:
+//! **That policy has a price, and it was measured rather than estimated.**
+//! `bench_harness/gate/mutant_survey.sh` broke this crate 180 ways and three
+//! mutations survived the whole suite. All three are timing-only, and none can
+//! be defended without breaking the rule above:
 //!
 //! - `write_nanos()` can return a constant. Its own doc comment says never to
 //!   assert on it, so nothing does, so nothing notices.
@@ -196,13 +195,14 @@ fn every_candidate_declares_a_name_and_a_ceiling() {
     }
   }
 
-  // Fix(BN41): these are a transcription check, not a guard against the ceiling
-  // going stale. `producer_ceiling` is a hand-written `match` over literals.
-  // `ring_handle`, the crate that imposes the `1` on `ContractRing`,
-  // `TlsOverRing` and `OffTheShelf`, is not a dependency of this crate at all.
-  // If that door widened, nothing here would notice, and correcting the
-  // literals afterwards would mean editing this test, which is the opposite of
-  // what a guard does. What these lines do catch is a local edit to the `match`.
+  // Fix(ceiling_literals_are_a_transcription_check): these are a transcription
+  // check, not a guard against the ceiling going stale. `producer_ceiling` is a
+  // hand-written `match` over literals. `ring_handle`, the crate that imposes
+  // the `1` on `ContractRing`, `TlsOverRing` and `OffTheShelf`, is not a
+  // dependency of this crate at all. If that door widened, nothing here would
+  // notice, and correcting the literals afterwards would mean editing this
+  // test, which is the opposite of what a guard does. What these lines do catch
+  // is a local edit to the `match`.
   //
   // Root cause: a value owned by another crate, transcribed by hand, cannot be
   // asserted against its source by a suite that does not depend on that source.
@@ -213,9 +213,10 @@ fn every_candidate_declares_a_name_and_a_ceiling() {
   assert_eq!(Candidate::ContractRing.producer_ceiling(), Some(1));
   assert_eq!(Candidate::TlsOverRing.producer_ceiling(), Some(1));
   assert_eq!(Candidate::DirectSpsc.producer_ceiling(), Some(1));
-  // Fix(BN41): the sixth. `OffTheShelf`'s `1` has the same off-crate owner as
-  // the other two and had no literal of its own, only the generic loop above,
-  // whose `None` branch a widened ceiling would pass.
+  // Fix(ceiling_literals_are_a_transcription_check): the sixth. `OffTheShelf`'s
+  // `1` has the same off-crate owner as the other two and had no literal of its
+  // own, only the generic loop above, whose `None` branch a widened ceiling
+  // would pass.
   #[cfg(feature = "crossbeam")]
   assert_eq!(Candidate::OffTheShelf.producer_ceiling(), Some(1));
 
@@ -231,7 +232,7 @@ fn every_candidate_declares_a_name_and_a_ceiling() {
 /// `DirectMpsc` is the *same ring in the same configuration*, reached two
 /// levels lower, and it runs.
 ///
-/// Feature 186 (`docs/feature/186_ring_benchmark_harness.md`) requires the
+/// The feature (`docs/feature/186_ring_benchmark_harness.md`) requires the
 /// candidates be compared "under the same producer counts". Through one door
 /// they cannot be, and this test asserts where the door stops.
 #[test]
@@ -388,13 +389,13 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
   // loses records to refusals it declines to retry, and never to a silent
   // discard.
   //
-  // Fix(BN8, BN9): this used to assert `reported() == 0`. The staged candidate
-  // kept nothing at all because `Workload::batch()` returned an unclamped 32
-  // against a 16-slot ring, so the very first `free_capacity` check failed, the
-  // buffer stayed full, and every later `append` was refused. That permanent
-  // stall read as a measurement. With `batch()` now read through the
-  // config it is the clamped 16, one flush fits exactly, and the candidate
-  // measures one batch instead of nothing.
+  // Fix(workload_batch_was_unclamped): this used to assert `reported() == 0`.
+  // The staged candidate kept nothing at all because `Workload::batch()`
+  // returned an unclamped 32 against a 16-slot ring, so the very first
+  // `free_capacity` check failed, the buffer stayed full, and every later
+  // `append` was refused. That permanent stall read as a measurement. With
+  // `batch()` now read through the config it is the clamped 16, one flush fits
+  // exactly, and the candidate measures one batch instead of nothing.
   let staged = run(Candidate::TlsOverRing, &workload).unwrap();
   assert_eq!(staged.reported(), 16, "one full batch fits the ring exactly and is published");
   assert_eq!(staged.received(), 16, "and is drained — the flush was accepted, not refused");
@@ -418,9 +419,8 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
 /// It would also have reported it as *fast*, and correctly, because discarding
 /// is the cheapest thing a queue can do. So the failure mode is the harness
 /// recommending the candidate that threw the workload away, not just a wrong
-/// number in a column. That is the verdict `docs/hard_problem/126_measured_write_path_verdicts.md`
-/// exists to make trustworthy, which is why this test asserts it rather than
-/// noting it.
+/// number in a column. That is the verdict this crate exists to make
+/// trustworthy, which is why this test asserts it rather than noting it.
 #[test]
 fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
   let workload = cramped();
@@ -454,8 +454,8 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
     through_the_factory.dropped() as u64,
     "240 records the ring never took, not 0",
   );
-  // Structural, not measured (BN11). `in_flight` is `claimed - published` and
-  // `run` hands both the same expression, so this reads 0 for every mapping that
+  // Structural, not measured. `in_flight` is `claimed - published` and `run`
+  // hands both the same expression, so this reads 0 for every mapping that
   // keeps them equal. That includes the wrong one that maps `reported` through
   // both. It was tried, and it left this line green while the three assertions
   // above caught it. The 240-leak reading needs `claimed` and `published` to
@@ -578,9 +578,9 @@ fn a_comparison_lists_refusals_rather_than_shortening_the_table() {
 
 /// The same workload twice produces the same everything except the duration.
 ///
-/// This is the reproducibility half of feature 186's criterion, and the point
-/// is where it stops. The counts are exact across runs, the refusal list is
-/// exact, and the *eligible set*, meaning the candidates that kept the whole
+/// This is the reproducibility half of the requirement's criterion, and the
+/// point is where it stops. The counts are exact across runs, the refusal list
+/// is exact, and the *eligible set*, meaning the candidates that kept the whole
 /// workload, is exact. No test here or anywhere asserts which of those eligible
 /// candidates came out fastest, because it is the one output of this crate that
 /// legitimately varies with machine load.
@@ -618,7 +618,7 @@ fn a_comparison_of_the_same_workload_repeats_its_counts() {
   assert!(second.fastest().is_none());
 }
 
-/// Feature 185's counters carry the run's own totals, written after the clock.
+/// The counters carry the run's own totals, written after the clock.
 ///
 /// Incrementing an atomic per record would instrument the very loop under
 /// measurement, so every counter is written once, from totals, outside the
@@ -659,7 +659,7 @@ fn the_counters_are_the_runs_own_totals() {
   // line pins the mapping's consequence and cannot fail by itself. The
   // assertion that guards the mapping is in
   // `a_dropnewest_ring_reports_successes_it_did_not_keep`, on the one candidate
-  // where `reported` and `received` differ (BN11).
+  // where `reported` and `received` differ.
   assert_eq!(stats.in_flight(), 0);
 
   // Never recorded. No candidate blocks, so there is no wait to time. Asserting
@@ -704,8 +704,9 @@ fn a_policy_refusal_names_the_crate_that_refused() {
     }
   ));
 
-  // Fix(BN25): the two assertions above are variant tags, and this test's name
-  // is a claim about what a reader sees. These two check that claim.
+  // Fix(relayed_refusals_dropped_the_candidate): the two assertions above are
+  // variant tags, and this test's name is a claim about what a reader sees.
+  // These two check that claim.
   assert!(
     built.to_string().starts_with("contract_ring: "),
     "a relayed refusal renders without its candidate: {built}",
@@ -723,12 +724,11 @@ fn a_policy_refusal_names_the_crate_that_refused() {
 /// `RingConfig` that `ring_factory::build` rejects outright produces a working
 /// ring one level down, with the policy silently absent.
 ///
-/// This is `ring_factory`'s `docs/decisions` Pending 8, with the divergence
-/// measured rather than described. Pending 8 says "its *name* claims more than
-/// it does, and it is the one construction path that reads as compliance while
-/// bypassing the factory". The pending records three candidate answers. This
-/// test is the evidence any of them needs, and it belongs here because this is
-/// the first crate that reaches both doors with one config.
+/// This divergence was an open question about `with_config`, measured here
+/// rather than described. Its *name* claims more than it does, and it is the
+/// one construction path that reads as compliance while bypassing the factory.
+/// This test is the evidence any answer needs, and it belongs here because this
+/// is the first crate that reaches both doors with one config.
 #[test]
 fn the_direct_doors_ignore_the_policy_the_contract_door_refuses() {
   let evicting = Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest))
@@ -815,10 +815,11 @@ fn the_report_names_every_candidate_and_every_refusal() {
   assert!(parallel_report.contains("refused: contract_ring"));
   assert!(parallel_report.contains("4 producer(s) x 256 records"));
 
-  // Fix(BN25): "every refusal" in this test's name used to be one refusal,
-  // `ProducerCeiling`, the only variant that carried a name. A `DropOldest`
-  // workload refuses two candidates through two relaying variants, and both
-  // lines must now carry a candidate for the report to be keyed on names.
+  // Fix(relayed_refusals_dropped_the_candidate): "every refusal" in this test's
+  // name used to be one refusal, `ProducerCeiling`, the only variant that
+  // carried a name. A `DropOldest` workload refuses two candidates through two
+  // relaying variants, and both lines must now carry a candidate for the report
+  // to be keyed on names.
   let evicting = Comparison::run(
     Workload::new(RingConfig::new(64).unwrap().with_overflow(OverflowPolicy::DropOldest))
       .with_records_per_producer(32)
@@ -839,7 +840,7 @@ fn the_report_names_every_candidate_and_every_refusal() {
 ///
 /// **Why Not Caught.** Order is the list's meaning here, and nothing
 /// type-checks an order. `Comparison::fastest` breaks a tie by taking the first
-/// minimum, so declaration order decides the verdict (BN50).
+/// minimum, so declaration order decides the verdict.
 ///
 /// **Fix Applied.** This test spells out the expected names and their order, so
 /// the assertion compares the declaration against an independent copy rather
@@ -968,8 +969,8 @@ fn the_batch_reported_is_the_batch_the_config_carries() {
 /// # Root Cause
 ///
 /// `Outcome::dropped` and `Outcome::silently_discarded` were bare `usize`
-/// subtractions. The invariant's Violation Consequences argued that a violation
-/// would be loud because release panics on underflow. That holds only where
+/// subtractions. The ordering invariant argued that a violation would be loud
+/// because release panics on underflow. That holds only where
 /// `overflow-checks = true`, which this workspace sets nowhere. In release the
 /// subtraction wrapped instead.
 ///
@@ -1020,25 +1021,26 @@ fn both_ordering_subtractions_are_guarded_unconditionally() {
 }
 
 /// The subtraction feeding `record_drop` is guarded before it runs, matching
-/// the two `Outcome` accessors BN22 already guards.
+/// the two `Outcome` accessors already guarded.
 ///
 /// # Root Cause
 ///
 /// `run`'s own `stats.record_drop( ..., ( offered - received ) as u64 )`
 /// computes the identical `offered - received` subtraction as
-/// `Outcome::dropped`, but it runs *before* `Outcome` exists. BN22's guard
-/// sits on the two accessor methods that expose the subtraction after the
+/// `Outcome::dropped`, but it runs *before* `Outcome` exists. The accessor
+/// guard sits on the two accessor methods that expose the subtraction after the
 /// fact, and cannot cover a computation that happens earlier on the same
 /// values.
 ///
 /// # Why Not Caught
 ///
-/// BN22's own fix and its test (`both_ordering_subtractions_are_guarded_unconditionally`)
-/// scoped the search to `Outcome`'s two accessor methods, the site the finding
-/// named, without re-checking every other place the same expression appears in
-/// this crate. The invariant holds for every real run (no test can construct a
-/// violating `Outcome`, same as BN22), so nothing exercises either call site at
-/// runtime. Only a source-level check catches the asymmetry.
+/// The accessor fix and its test
+/// (`both_ordering_subtractions_are_guarded_unconditionally`) scoped the search
+/// to `Outcome`'s two accessor methods, the site the defect was found at,
+/// without re-checking every other place the same expression appears in this
+/// crate. The invariant holds for every real run (no test can construct a
+/// violating `Outcome`, same as for the accessors), so nothing exercises either
+/// call site at runtime. Only a source-level check catches the asymmetry.
 ///
 /// # Fix Applied
 ///
@@ -1058,9 +1060,9 @@ fn both_ordering_subtractions_are_guarded_unconditionally() {
 /// # Pitfall
 ///
 /// `Outcome`'s fields are private and `run` is the only constructor, so, as
-/// with BN22, no suite can build a violating value to make either guard fire.
-/// This test pins presence and ordering, not triggering, like
-/// `both_ordering_subtractions_are_guarded_unconditionally`.
+/// with the accessor guards, no suite can build a violating value to make
+/// either guard fire. This test pins presence and ordering, not triggering,
+/// like `both_ordering_subtractions_are_guarded_unconditionally`.
 #[test]
 fn the_record_drop_input_is_guarded_before_the_subtraction_runs() {
   let source = include_str!("../src/lib.rs");
@@ -1165,13 +1167,12 @@ fn the_accumulator_axis_defaults_to_set_and_one_cell() {
 
 /// Every candidate agrees on the `Delta` table for the same workload.
 ///
-/// This is the pass criterion `docs/spike/023_smoke_ring_write_path.md` states
-/// as "byte-identical final tables", made concrete at the one producer count
-/// every candidate (all four named paths, five or six concrete variants) can
-/// run.
+/// This is the pass criterion of "byte-identical final tables", made concrete
+/// at the one producer count every candidate (all four named paths, five or six
+/// concrete variants) can run.
 ///
-/// `docs/decision/121_workstream_008_contract_gaps_ruled.md` ruling 3 requires
-/// every candidate measured under both accumulator semantics, not only `Set`.
+/// Every candidate must be measured under both accumulator semantics, not only
+/// `Set`.
 /// This is the `Delta` half at the widest eligible producer count. See
 /// `delta_sums_correctly_across_many_producers_without_a_lock` for the
 /// multi-producer case, which only the two unbounded candidates can run.
@@ -1202,14 +1203,14 @@ fn every_candidate_agrees_on_the_delta_table_at_one_producer() {
 /// `Set` keeps only the last write once a cell is shared, which is why `Delta`
 /// is necessary rather than a stylistic alternative.
 ///
-/// Same workload as `every_candidate_agrees_on_the_delta_table_at_one_producer`,
-/// `Set` semantics instead. Every one of producer 0's 256 records carries the
-/// same delta (`+1`, since producer 0 is even), so `Set`'s last-write-wins
-/// overwrite lands on `1` regardless of which of the 256 writes physically
-/// happened last. It does not land on `256`, which is what arrived.
-/// `docs/decision/050_deferred_mutation_accumulator_scope.md` says `Set` is
-/// safe for idempotent overwrites and unsafe the moment a destination
-/// accumulates more than one write it needed to keep.
+/// Same workload as
+/// `every_candidate_agrees_on_the_delta_table_at_one_producer`, `Set` semantics
+/// instead. Every one of producer 0's 256 records carries the same delta (`+1`,
+/// since producer 0 is even), so `Set`'s last-write-wins overwrite lands on `1`
+/// regardless of which of the 256 writes physically happened last. It does not
+/// land on `256`, which is what arrived. `Set` is safe for idempotent
+/// overwrites and unsafe the moment a destination accumulates more than one
+/// write it needed to keep.
 #[test]
 fn set_semantics_keeps_only_the_last_write_when_one_cell_is_shared() {
   let workload = roomy().with_cells(1).unwrap();
@@ -1241,21 +1242,19 @@ fn set_semantics_keeps_only_the_last_write_when_one_cell_is_shared() {
 
 /// `Delta` sums correctly across many producers with no lock between them.
 ///
-/// This is the measured case for
-/// `docs/hard_problem/117_many_producers_few_consumers_without_locks.md`
-/// (contention among producers with no serializing lock) and the correctness
-/// half of `docs/hard_problem/120_false_sharing_between_cursors.md` (the
-/// shared producer cursor `DirectMpsc` claims through is the kind of hot,
-/// contended atomic false sharing would sit on). This crate never asserts on
-/// timing; see the module documentation. So this test asserts the property
-/// false sharing would not corrupt even if present. The algorithm stays
-/// correct under contention, and only its speed would suffer.
+/// This is the measured case for contention among producers with no serializing
+/// lock, and the correctness half of false sharing between cursors (the shared
+/// producer cursor `DirectMpsc` claims through is the kind of hot, contended
+/// atomic false sharing would sit on). This crate never asserts on timing; see
+/// the module documentation. So this test asserts the property false sharing
+/// would not corrupt even if present. The algorithm stays correct under
+/// contention, and only its speed would suffer.
 ///
 /// Five producers, split three-even (`+1` each) and two-odd (`-1` each). This
-/// mirrors `docs/decision/050`'s fee-and-payout Wallet, where the final
-/// balance is correct regardless of which side's write physically lands last.
-/// Net delta is `+1` per record, so 100 records per producer nets `100`
-/// regardless of how five threads interleaved to produce it.
+/// mirrors a fee-and-payout wallet, where the final balance is correct
+/// regardless of which side's write physically lands last. Net delta is `+1`
+/// per record, so 100 records per producer nets `100` regardless of how five
+/// threads interleaved to produce it.
 #[test]
 fn delta_sums_correctly_across_many_producers_without_a_lock() {
   let workload = Workload::new(RingConfig::new(4096).unwrap())
@@ -1291,16 +1290,14 @@ fn delta_sums_correctly_across_many_producers_without_a_lock() {
 /// A drained record that decodes outside its producer range would be caught
 /// instead of being folded silently into a total that only looks plausible.
 ///
-/// The measured case for
-/// `docs/hard_problem/129_gating_so_the_producer_never_laps.md` (torn or
-/// overlapping reads). `destination_of` asserts, unconditionally, that every
-/// drained record decodes to a producer inside `0..producers()` before its
-/// delta is folded into any table. Every test in this file that reads
-/// `outcome.table()` already exercises that guard on every drained record, so
-/// a torn value would fail loudly there, not only here. This test
-/// names the property and exercises it on the fixtures most likely to stress
-/// it: heavy overflow (many records never land) and multiple producers (many
-/// records interleave), crossed with both semantics.
+/// The measured case for torn or overlapping reads. `destination_of` asserts,
+/// unconditionally, that every drained record decodes to a producer inside
+/// `0..producers()` before its delta is folded into any table. Every test in
+/// this file that reads `outcome.table()` already exercises that guard on every
+/// drained record, so a torn value would fail loudly there, not only here. This
+/// test names the property and exercises it on the fixtures most likely to
+/// stress it: heavy overflow (many records never land) and multiple producers
+/// (many records interleave), crossed with both semantics.
 #[test]
 fn every_drained_record_decodes_to_a_producer_the_workload_describes() {
   let overflow = cramped().with_cells(1).unwrap();
@@ -1335,16 +1332,14 @@ fn every_drained_record_decodes_to_a_producer_the_workload_describes() {
 
 /// The overflow gap never reaches the accumulator table.
 ///
-/// The measured case for
-/// `docs/hard_problem/123_explicit_overflow_policy.md`, on what a producer that
-/// outruns a consumer should do and what a harness must not do with the
-/// records that get dropped. `ContractRing` and `OffTheShelf` report `Ok` for
-/// 256 records into a 16-slot `DropNewest` ring and keep 16, which is
-/// `docs/pitfall/003_ok_is_not_kept_and_the_verdict_inverts.md`'s trap. If the
-/// table folded `reported` instead of `received` it would count 256 phantom
-/// writes the ring never took. It folds `received`, so the table is exactly as
-/// correct as the drain that fed it, regardless of how the drop policy
-/// discarded the other 240.
+/// The measured case for what a producer that outruns a consumer should do and
+/// what a harness must not do with the records that get dropped. `ContractRing`
+/// and `OffTheShelf` report `Ok` for 256 records into a 16-slot `DropNewest`
+/// ring and keep 16, which is the "Ok is not kept" trap. If the table folded
+/// `reported` instead of `received` it would count 256 phantom writes the ring
+/// never took. It folds `received`, so the table is exactly as correct as the
+/// drain that fed it, regardless of how the drop policy discarded the other
+/// 240.
 #[test]
 fn the_overflow_gap_never_reaches_the_accumulator_table() {
   let workload = cramped().with_semantics(AccumulatorSemantics::Delta).with_cells(1).unwrap();

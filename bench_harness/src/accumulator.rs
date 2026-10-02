@@ -33,9 +33,8 @@ impl Write {
 
 /// How a sequence of [`Write`]s folds into the table an oracle compares.
 ///
-/// `docs/decision/050_deferred_mutation_accumulator_scope.md` rules on this. It
-/// scopes last-write-wins to structural changes and idempotent overwrites, and
-/// requires accumulation-style writes to be summed instead. The distinction is
+/// Last-write-wins applies only to structural changes and idempotent
+/// overwrites. Accumulation-style writes are summed instead. The distinction is
 /// not a matter of preference. For an accumulation, a deterministic overwrite
 /// loses an update exactly as surely as an arbitrary one does.
 ///
@@ -90,10 +89,10 @@ impl Accumulator {
   // Fix(accumulator_order_independence_not_exhaustive): was `matches!( self, Self::Delta )`,
   // which classifies silently instead of refusing to compile. A third variant would
   // compile straight into `false` with no signal. `fold`'s own exhaustive match just
-  // below, by contrast, forces a decision. `Accumulator::ALL` and the T12 test in
-  // `tests/oracle_test.rs` only cover variants a developer remembers to add to `ALL`, so
-  // they are not a substitute for this. Same shape as `DispatchStrategy`'s
-  // `matches!`-based coordination predicates silently misclassifying a new strategy.
+  // below, by contrast, forces a decision. `Accumulator::ALL` and
+  // `the_order_independence_flag_matches_the_fold` in `tests/oracle_test.rs` only
+  // cover variants a developer remembers to add to `ALL`, so they are not a
+  // substitute for this.
   #[must_use]
   pub const fn is_order_independent(self) -> bool {
     match self {

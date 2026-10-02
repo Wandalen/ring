@@ -4,11 +4,10 @@
 //! Depends on `ring_types` and `ring_cursor`.
 //!
 //! `ring_types::WaitKind` holds the four discriminants; this crate holds the
-//! four handlers. That split is ruled by
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5, and it is why
-//! `ring_types` can say "no ring logic" and mean it. A `WaitKind` is a
-//! configuration value that travels through a `RingConfig` and into a struct
-//! field without dragging a thread parking implementation behind it.
+//! four handlers. That split is why `ring_types` can say "no ring logic" and
+//! mean it. A `WaitKind` is a configuration value that travels through a
+//! `RingConfig` and into a struct field without dragging a thread parking
+//! implementation behind it.
 //!
 //! ## What a wait strategy is
 //!
@@ -30,11 +29,11 @@
 //!
 //! ## Why `WaitKind::None` is the variant that matters
 //!
-//! `docs/feature/173_wait_kind_and_strategies.md` requires all four, but names
-//! `None` as the one the tick path cannot do without. A tick has a deadline; a
-//! strategy that might block has already missed it. [`wait_until`] under `None`
-//! evaluates the predicate exactly once and returns. That is no wait at all,
-//! rather than a wait with a very short timeout, and
+//! The wait-kind feature requires all four, but names `None` as the one the
+//! tick path cannot do without. A tick has a deadline; a strategy that might
+//! block has already missed it. [`wait_until`] under `None` evaluates the
+//! predicate exactly once and returns. That is no wait at all, rather than a
+//! wait with a very short timeout, and
 //! [`ring_types::WaitKind::is_non_blocking`] is true for exactly that variant.
 //!
 //! ## Why every wait is bounded

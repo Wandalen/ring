@@ -2,11 +2,10 @@
 //!
 //! Claims the folding half of
 //! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`. Its
-//! acceptance criterion, filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`, is exact:
-//! `Index::of( seq, cap )` equals `seq % cap` for every `seq` in `0..4*cap` and
-//! every power-of-two `cap` in `2..=1024`, computed by mask not division, and a
-//! non-power-of-two capacity is rejected at construction.
+//! acceptance criterion is exact: `Index::of( seq, cap )` equals `seq % cap`
+//! for every `seq` in `0..4*cap` and every power-of-two `cap` in `2..=1024`,
+//! computed by mask not division, and a non-power-of-two capacity is rejected
+//! at construction.
 //!
 //! All four clauses are asserted below.
 
@@ -138,12 +137,12 @@ fn an_oversized_run_repeats_slots() {
   assert_eq!(produced[1], produced[5]);
 }
 
-/// IX18: `Seq( u64::MAX )` is not a hypothetical input. `ring_mpsc::UNSTAMPED`
+/// `Seq( u64::MAX )` is not a hypothetical input. `ring_mpsc::UNSTAMPED`
 /// reserves exactly that value and a caller can hand it to `run` directly.
 /// `run` adds before it folds, so this is reachable in one step rather than
 /// after `2^64` publications. Pins the debug-build behaviour `run`'s own
 /// `# Panics` section now documents, so the boundary is an asserted fact
-/// rather than only a fact demonstrated in `docs/pitfall/001`'s probe output.
+/// rather than only a fact demonstrated in a probe's output.
 #[test]
 #[should_panic(expected = "attempt to add with overflow")]
 fn run_overflows_at_the_top_of_the_sequence_space() {

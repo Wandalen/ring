@@ -11,9 +11,6 @@
 //! - `docs/feature/174_overflow_policy_enum_and_handlers.md`: the three
 //!   `OverflowPolicy` discriminants, and specifically the *absence* of an
 //!   overwrite-unread variant. The handlers are `ring_overflow`'s half.
-//!
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5 rules the
-//! split between discriminant and handler.
 
 use ring_types::{Capacity, OverflowPolicy, RingError, Seq, SlotIndex, WaitKind};
 
@@ -39,9 +36,10 @@ fn seq_advances() {
   assert_eq!(Seq(3).next(), Seq(3).advanced_by(1));
 }
 
-/// Feature 167's central claim is that the sequence never wraps. Asserted at the
-/// one place it could be. A `u64` counting publications does not reach its ceiling
-/// in any reachable workload, and the type deliberately offers no wrapping op.
+/// The sequence-to-slot-index feature's central claim is that the sequence never
+/// wraps. Asserted at the one place it could be. A `u64` counting publications
+/// does not reach its ceiling in any reachable workload, and the type
+/// deliberately offers no wrapping op.
 #[test]
 fn seq_does_not_wrap_within_any_reachable_workload() {
   // At one publication per nanosecond, far beyond any real ring, a u64
@@ -122,9 +120,9 @@ fn capacity_compares_by_slot_count() {
 
 // ---- WaitKind -------------------------------------------------------------
 
-/// Feature 173 requires exactly four strategies. `ALL` is asserted to have
-/// length four *and* to contain each named variant, so adding a fifth without
-/// updating the feature fails here.
+/// The wait-kind feature requires exactly four strategies. `ALL` is asserted
+/// to have length four *and* to contain each named variant, so adding a fifth
+/// without updating the feature fails here.
 #[test]
 fn wait_kind_has_exactly_four_variants() {
   assert_eq!(WaitKind::ALL.len(), 4);
@@ -140,8 +138,8 @@ fn wait_kind_has_exactly_four_variants() {
   }
 }
 
-/// Feature 173 singles out the non-blocking strategy as the one the tick path
-/// needs. Exactly one variant qualifies.
+/// The wait-kind feature singles out the non-blocking strategy as the one the
+/// tick path needs. Exactly one variant qualifies.
 #[test]
 fn exactly_one_wait_kind_is_non_blocking() {
   let non_blocking: Vec<_> = WaitKind::ALL.iter().filter(|w| w.is_non_blocking()).collect();
@@ -157,18 +155,15 @@ fn wait_kind_defaults_to_spin() {
 
 // ---- OverflowPolicy -------------------------------------------------------
 
-/// Feature 174's key negative claim is that no variant overwrites
-/// unread data. Asserted by enumerating the whole set and matching
+/// The overflow-policy feature's key negative claim is that no variant
+/// overwrites unread data. Asserted by enumerating the whole set and matching
 /// exhaustively, the only way to state an absence in Rust.
 ///
-/// The per-variant `contains` loop closes T6 of
-/// `docs/non_functional_requirement/002_the_enum_sets_are_closed_and_asserted.md`,
-/// which stood recorded as **Not met** with its own fix named as three
-/// transposed lines. The exhaustive `match` below catches the enum *growing*
-/// past this array; until this loop, nothing caught the array *decaying* while
-/// the enum stood still. Both prior checks pass for any three-element array,
-/// because the length is 3 whatever it holds and the `match` is exhaustive over
-/// the enum rather than over the roster.
+/// The per-variant `contains` loop closes a gap. The exhaustive `match` below
+/// catches the enum *growing* past this array; until this loop, nothing caught
+/// the array *decaying* while the enum stood still. Both prior checks pass for
+/// any three-element array, because the length is 3 whatever it holds and the
+/// `match` is exhaustive over the enum rather than over the roster.
 ///
 /// Measured before adding it, by rewriting `ALL` two ways and running
 /// `ring_types`, `ring_stats` and `ring_overflow` against each. Dropping

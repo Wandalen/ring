@@ -3,11 +3,11 @@
 //! Tier 3 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_seqno`, `ring_atomic`, `ring_align`.
 //!
-//! `docs/feature/169_padded_cursor.md` states the whole subject. A producer
-//! cursor and a consumer cursor that land on one cache line make every write by
-//! either invalidate the other's cached copy, so two cores contend on a line
-//! neither is sharing data through. Throughput then falls as core count rises,
-//! which is the opposite of what adding cores is for.
+//! The padded-cursor feature states the whole subject. A producer cursor and a
+//! consumer cursor that land on one cache line make every write by either
+//! invalidate the other's cached copy, so two cores contend on a line neither
+//! is sharing data through. Throughput then falls as core count rises, which is
+//! the opposite of what adding cores is for.
 //!
 //! ## The padding is the crate, and it is one attribute
 //!

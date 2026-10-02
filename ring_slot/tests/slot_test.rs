@@ -54,10 +54,10 @@ fn setting_over_a_value_returns_the_displaced_one() {
   assert_eq!(slot.get(), Some(&3));
 }
 
-/// `TypedSlot::clear` runs the payload's destructor; `BytesSlot::clear` cannot,
-/// and the asymmetry is the whole content of `lifecycle/002` SL31. Counting
-/// drops is the only way to see it, because every API-visible effect of the two
-/// `clear`s is identical. That sameness is what makes the difference a trap.
+/// `TypedSlot::clear` runs the payload's destructor; `BytesSlot::clear` cannot.
+/// Counting drops is the only way to see that asymmetry, because every
+/// API-visible effect of the two `clear`s is identical. That sameness is what
+/// makes the difference a trap.
 #[test]
 fn clearing_a_typed_slot_runs_the_payloads_destructor() {
   use core::sync::atomic::{AtomicUsize, Ordering};
@@ -87,11 +87,11 @@ fn clearing_a_typed_slot_runs_the_payloads_destructor() {
 /// The other half of that asymmetry, pinned structurally rather than by
 /// observation. A `BytesSlot`'s payload is inline in the slot, so there is no
 /// allocation for `clear` to release and no destructor for it to run. `clear`
-/// sets a length and leaves the array untouched, the residue `lifecycle/002` SL32
-/// describes. Nothing safe can read it back, which is the point of the
+/// sets a length and leaves the array untouched, so the old bytes stay behind as
+/// residue. Nothing safe can read it back, which is the point of the
 /// hand-written `Debug` and `PartialEq`, so its lifetime is established from the
 /// type's layout and from the crate's own field census instead. See
-/// `pitfall/002` SL43.
+/// `docs/decisions/001_bytes_slot_marks_occupancy_with_a_length.md`.
 #[test]
 fn a_byte_slots_payload_is_inline_so_clear_has_no_allocation_to_release() {
   use core::mem::size_of;
@@ -343,7 +343,7 @@ fn the_inherent_and_trait_emptiness_agree() {
 /// would get wrong. The first fixture pair is written once each from empty, so
 /// their tails coincide and it could not distinguish the two relations; the
 /// second is the case that can, and the one this test's name promises. See
-/// `pitfall/001` SL41 and SL42.
+/// `docs/decisions/001_bytes_slot_marks_occupancy_with_a_length.md`.
 #[test]
 fn slots_compare_by_payload_not_by_tail() {
   let mut written_once = BytesSlot::<8>::empty();
@@ -388,9 +388,10 @@ fn slots_with_different_payloads_are_not_equal() {
 /// A cleared slot is equal to a fresh one, and prints as one. Both were false
 /// while `Debug` and `PartialEq` were derived. The array still held the payload
 /// after `clear` moved the length, so a cleared slot compared unequal to a
-/// fresh one and printed the bytes it no longer held. See `pitfall/002` SL43
-/// and SL44. The residue is still in memory; it is no longer reachable
-/// through any public API this type has.
+/// fresh one and printed the bytes it no longer held. See
+/// `docs/decisions/001_bytes_slot_marks_occupancy_with_a_length.md`. The residue
+/// is still in memory; it is no longer reachable through any public API this
+/// type has.
 #[test]
 fn a_cleared_slot_is_indistinguishable_from_a_fresh_one() {
   let mut cleared = BytesSlot::<8>::empty();
@@ -416,7 +417,7 @@ fn a_cleared_slot_is_indistinguishable_from_a_fresh_one() {
 /// narrowing the ring to payloads that happen to be `Default`. This test does
 /// not run anything. `NotDefault` deliberately has no `Default` impl, so the
 /// file stops compiling if the hand-written impl is ever replaced by the
-/// derive. See `non_functional_requirement/002` SL36.
+/// derive.
 #[test]
 fn a_slot_is_default_for_a_payload_that_is_not() {
   struct NotDefault(#[allow(dead_code)] u32);

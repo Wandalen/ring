@@ -8,11 +8,10 @@
 //! advance and a contiguity test; it computes no distances, no free slots and
 //! no minimum. The same over-declaration was found and removed in `ring_claim`.
 //!
-//! This is the second half of
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`. Its
-//! reached-test runs the whole handshake under `loom` and lives in this crate's
-//! `tests/handshake_test.rs`, because publication is the point at which claim,
-//! publish, available and commit become observable together.
+//! This is the second half of the claim, publish, available and commit
+//! handshake. Its reached-test runs the whole handshake under `loom` and lives
+//! in this crate's `tests/handshake_test.rs`, because publication is the point
+//! at which claim, publish, available and commit become observable together.
 //!
 //! ## The published cursor is not the claimed cursor
 //!
@@ -35,7 +34,7 @@
 //! per-slot availability in a bitmap. Either would let producer B's publication
 //! proceed while producer A is still writing. That works, and it is what a
 //! high-contention multi-producer ring eventually needs. It is deliberately not
-//! here, because it is `ring_mpsc`'s problem at S5, and putting it in this crate
+//! here, because it is `ring_mpsc`'s problem, and putting it in this crate
 //! would make the crate untestable without a second producer.
 //!
 //! ## Why a plain spin, and not a `WaitKind`
@@ -201,8 +200,8 @@ impl Publisher {
 
   /// Whether `seq` has been published and is therefore readable.
   ///
-  /// Feature 170 is graded on this consumer-facing question. A slot claimed but
-  /// not published must answer `false`.
+  /// The handshake feature is graded on this consumer-facing question. A slot
+  /// claimed but not published must answer `false`.
   ///
   /// ```
   /// use ring_publish::Publisher;

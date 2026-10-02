@@ -20,9 +20,9 @@
 //!
 //! # What is deliberately not here
 //!
-//! No `is_closed`, and no test for it. Liveness is `ring_shutdown`'s (feature
-//! 184, stage S6), and a handle-local copy of the flag is the failure that
-//! crate exists to prevent. So this crate has no flag to test.
+//! No `is_closed`, and no test for it. Liveness is `ring_shutdown`'s, and a
+//! handle-local copy of the flag is the failure that crate exists to prevent.
+//! So this crate has no flag to test.
 //!
 //! No `loom` model. This crate contains no atomic of its own. Every ordering
 //! question belongs to a backend, and each backend models its own
@@ -72,7 +72,7 @@ fn ring_on<T: Send>(backend: Backend, slots: usize, overflow: OverflowPolicy) ->
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Feature 187's reached-test.
+// The optional crossbeam backend's reached-test.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The same program, run against every backend, produces the same result.
@@ -192,11 +192,12 @@ fn the_producer_count_selects_between_spsc_and_mpsc() {
 
 /// Every backend hands back the capacity it was configured with.
 ///
-/// Fix(TY20): the crossbeam arm of `Ring::capacity` used to rebuild a
-/// `Capacity` from `ArrayQueue::capacity` and `expect` the result, which put
-/// this crate's only fallible validation inside an infallible accessor. The
-/// variant now carries the validated value, and this test is what holds the
-/// three backends to one answer rather than a comment claiming they agree.
+/// Fix(crossbeam_capacity_was_revalidated_in_an_accessor): the crossbeam arm of
+/// `Ring::capacity` used to rebuild a `Capacity` from `ArrayQueue::capacity`
+/// and `expect` the result, which put this crate's only fallible validation
+/// inside an infallible accessor. The variant now carries the validated value,
+/// and this test is what holds the three backends to one answer rather than a
+/// comment claiming they agree.
 ///
 /// The backends come from [`every_backend`] and only the crossbeam *arm* is
 /// gated, which is the point. This test used to carry
@@ -231,10 +232,10 @@ fn every_backend_reports_the_capacity_it_was_configured_with() {
 
 /// The crossbeam backend is chosen by its constructor, not by the config.
 ///
-/// Feature 187 calls the swap "a build flag rather than a rewrite". A config
-/// field would make it a *runtime* choice, which would mean shipping crossbeam
-/// in every build that might want it. That is the opposite of an optional
-/// dependency.
+/// The optional-backend feature calls the swap "a build flag rather than a
+/// rewrite". A config field would make it a *runtime* choice, which would mean
+/// shipping crossbeam in every build that might want it. That is the opposite
+/// of an optional dependency.
 #[cfg(feature = "crossbeam")]
 #[test]
 fn the_crossbeam_backend_ignores_the_producer_count() {

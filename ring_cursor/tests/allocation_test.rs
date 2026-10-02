@@ -39,12 +39,10 @@
 // model closure that instruments them.
 #![cfg(not(loom))]
 // A counting allocator cannot be written in safe Rust. `GlobalAlloc` is an
-// unsafe trait by construction. The workspace denies `unsafe_code`, and the
-// two crates that override it do so in `src/lib.rs`
-// (`ring_store/docs/integration/002_every_unsafe_block_in_the_family.md`
-// measures exactly that set, and this file is not in it). The allowance here
-// is test-only, covers one wrapper that forwards to `std::alloc::System`
-// unchanged, and adds no unsafe code to any shipped crate.
+// unsafe trait by construction. The workspace denies `unsafe_code`, and the two
+// crates that override it do so in `src/lib.rs`. This file is not one of them.
+// The allowance here is test-only, covers one wrapper that forwards to
+// `std::alloc::System` unchanged, and adds no unsafe code to any shipped crate.
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};

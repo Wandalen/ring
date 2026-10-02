@@ -1,9 +1,9 @@
 //! Must not compile: a handle cannot be *shared* between threads, only moved.
 //!
-//! Q5 of `docs/non_functional_requirement/002_send_without_sync.md`. `Send`
-//! and `Sync` answer two different questions and the requirement wants both
-//! answered deliberately: `Send` is asserted present in
-//! `handle_test.rs::both_handles_are_send`, `Sync` is asserted absent here.
+//! `Send` and `Sync` answer two different questions and the
+//! requirement wants both answered deliberately: `Send` is asserted
+//! present in `handle_test.rs::both_handles_are_send`, `Sync` is
+//! asserted absent here.
 //!
 //! # Where the absence comes from
 //!

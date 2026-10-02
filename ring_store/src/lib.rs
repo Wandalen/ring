@@ -3,12 +3,12 @@
 //! Tier 2 of the 33 crates that implement the ring family's concurrency write path.
 //! Depends on `ring_types`, `ring_slot` and `ring_index`.
 //!
-//! `docs/feature/168_ring_buffer_storage.md` defines this crate by what it
+//! The ring-buffer-storage feature defines this crate by what it
 //! *refuses* to hold: "the buffer itself, and nothing else — a fixed allocation
 //! of slots addressed by slot index. It holds no cursors, enforces no ordering,
 //! and knows nothing about producers or consumers."
 //!
-//! That refusal is the whole design. Hard problem 125 asks how several rings
+//! That refusal is the whole design. The hard problem is how several rings
 //! with different protocols share one storage type, and the answer is that
 //! storage holds nothing that would differ between them. The moment a cursor
 //! lands here, the buffer stops being shareable. An SPSC ring and an MPSC ring
@@ -29,9 +29,9 @@ use ring_types::{Capacity, Seq, SlotIndex};
 /// A fixed array of slots, addressed by index.
 ///
 /// Generic over the slot shape rather than the payload, so one buffer type
-/// serves both `ring_slot::TypedSlot` and `ring_slot::BytesSlot`. Feature 182's
-/// constraint that "both use the same claim, gating and drain" reaches down to
-/// storage too.
+/// serves both `ring_slot::TypedSlot` and `ring_slot::BytesSlot`. The slot
+/// feature's constraint that "both use the same claim, gating and drain"
+/// reaches down to storage too.
 ///
 /// ```
 /// use ring_store::Buffer;
@@ -49,11 +49,12 @@ use ring_types::{Capacity, Seq, SlotIndex};
 ///
 /// `{ :? }` on a `Buffer` walks the full allocation. That is megabytes of output
 /// for a realistic ring, and for `BytesSlot` it includes bytes a `clear` has
-/// already logically discarded (`ring_slot`'s own pitfall/002 SL44). `ring_spsc`
-/// and `ring_mpsc` both avoid this by giving their own ring type a hand-written
-/// `Debug` that prints cursor positions only, never slot contents. A type that
-/// embeds a `Buffer` and derives `Debug` in turn inherits this cost and this
-/// leak silently (-> docs/type/001 BF47).
+/// already logically discarded
+/// (`ring_slot/docs/decisions/001_bytes_slot_marks_occupancy_with_a_length.md`).
+/// `ring_spsc` and `ring_mpsc` both avoid this by giving their own ring type a
+/// hand-written `Debug` that prints cursor positions only, never slot contents.
+/// A type that embeds a `Buffer` and derives `Debug` in turn inherits this cost
+/// and this leak silently.
 #[derive(Debug)]
 pub struct Buffer<S> {
   slots: Box<[S]>,
@@ -215,11 +216,10 @@ impl<S> Buffer<S> {
   /// An ordinary shared borrow, as far as this crate is concerned. `ring_mpsc`
   /// and `ring_spsc` read more into it. With `S = UnsafeCell< T >` both call
   /// this under a claim guaranteeing no other caller holds the same `seq`, then
-  /// `unsafe { &mut *at( seq ).get() }` the result into a `&mut T` (-> BF5 in
-  /// `docs/integration/002_every_unsafe_block_in_the_family.md`). This function
-  /// grants nothing beyond the one shared borrow it returns. The exclusivity
-  /// that makes the consumers' unsafe deref sound is a contract they hold, and
-  /// this crate neither enforces it nor sees it.
+  /// `unsafe { &mut *at( seq ).get() }` the result into a `&mut T`. This
+  /// function grants nothing beyond the one shared borrow it returns. The
+  /// exclusivity that makes the consumers' unsafe deref sound is a contract
+  /// they hold, and this crate neither enforces it nor sees it.
   ///
   /// ```
   /// use ring_store::Buffer;

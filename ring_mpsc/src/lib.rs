@@ -14,17 +14,14 @@
 //! `ring_publish` exists and is deliberately **not** used here. Its own module
 //! documentation says why, about this crate by name: publishing to the highest
 //! contiguous point "is what a high-contention multi-producer ring eventually
-//! needs; it is deliberately not here, because it is `ring_mpsc`'s problem at
-//! S5". Its `Publisher::publish` spins until the *predecessor* producer has
+//! needs; it is deliberately not here, because it is `ring_mpsc`'s problem".
+//! Its `Publisher::publish` spins until the *predecessor* producer has
 //! published, which makes one producer's progress depend on another's. That is
 //! the one coupling the contended-claim feature exists to remove.
 //!
 //! So publication is a `Release` store into `stamps[ seq & mask ]`, and a slot
 //! is published exactly when its stamp equals the sequence addressing it. No
 //! producer waits for another to publish; the consumer pays a scan instead.
-//! [decision 124](../../../docs/decision/124_ring_mpsc_publication_stamped_not_cursor.md)
-//! records the ruling and the three cross-crate assumptions that were measured
-//! against their siblings' sources and found unmet on the way to it.
 //!
 //! # Why the stamp needs no sentinel
 //!
@@ -48,9 +45,9 @@
 //! not remove the loop. A `fetch_add` claim on a *bounded* ring hands out
 //! sequences past the consumer's tail and then has to undo them, and there is
 //! no wait-free undo. **Wait-freedom and bounded capacity are exclusive at the
-//! claim.** This crate takes bounded capacity, which is the property
-//! `docs/non_functional_requirement/002_bounded_capacity_backpressure.md`
-//! requires and the mechanism it replaces does not have.
+//! claim.** This crate takes bounded capacity, which is the property the
+//! backpressure requirement asks for and the mechanism it replaces does not
+//! have.
 //!
 //! Only the claim is contended, and that is the point of separating it out.
 //! The payload write happens through
@@ -60,20 +57,19 @@
 //! # The unsafe, and where its argument lives
 //!
 //! Producers write slots while the consumer reads slots, through shared
-//! references to one allocation.
-//! [decision 123](../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
-//! rules that the `unsafe` belongs here rather than in `ring_store` or
-//! `ring_slot`, because the invariant making it sound is stated entirely in
-//! terms of cursors and stamps those crates do not hold. The argument is in
-//! `Ring::slot`'s and `Ring::slot_mut`'s safety sections, and the shape it
-//! rests on is asserted in `tests/mpsc_test.rs` rather than only described.
+//! references to one allocation. `docs/workaround/readme.md` records that the
+//! `unsafe` belongs here rather than in `ring_store` or `ring_slot`, because
+//! the invariant making it sound is stated entirely in terms of cursors and
+//! stamps those crates do not hold. The argument is in `Ring::slot`'s and
+//! `Ring::slot_mut`'s safety sections, and the shape it rests on is asserted in
+//! `tests/mpsc_test.rs` rather than only described.
 //!
 //! # What the type system refuses
 //!
-//! Decision 123 ruling 4 requires a test of the *shape* the soundness argument
-//! rests on. Here that shape is an asymmetry. [`Producer`] is `Copy` and
-//! `Sync`, which is what "multi-producer" means. [`Consumer`] is neither,
-//! because the drain's read-scan-then-commit is not re-entrant.
+//! The soundness argument needs a test of the *shape* it rests on. Here that
+//! shape is an asymmetry. [`Producer`] is `Copy` and `Sync`, which is what
+//! "multi-producer" means. [`Consumer`] is neither, because the drain's
+//! read-scan-then-commit is not re-entrant.
 //!
 //! These are `compile_fail` doc tests rather than integration tests because
 //! rustdoc collects doc tests from the library target only; the same blocks in
@@ -115,7 +111,7 @@
 //! Nor by holding two [`Ends`] from one ring at once. `ends` takes `&mut self`,
 //! so a second call cannot borrow while the first is still live. [`Ring`]'s
 //! `unsafe impl Sync` argument rests on that fact
-//! (→ [`../docs/workaround/002`](../docs/workaround/002_an_unsafe_impl_sync_the_compiler_cannot_derive.md)):
+//! (→ `docs/workaround/readme.md`):
 //!
 //! ```compile_fail
 //! use ring_mpsc::Ring;
@@ -180,10 +176,10 @@
 //! assert_eq!( seen, vec![ 0, 1, 2, 3 ] );
 //! ```
 //!
-//! Acceptance is binary and lives in a test, not here. Feature 172 is Reached
-//! when `tests/mpsc_test.rs` has four producers exchange 100 000 items with
-//! byte-parity, no sequence granted twice, and each producer's own items in its
-//! issue order, and when that file cites `docs/feature/172_` textually. That
+//! Acceptance is binary and lives in a test, not here. The crate's feature is
+//! Reached when `tests/mpsc_test.rs` has four producers exchange 100 000 items
+//! with byte-parity, no sequence granted twice, and each producer's own items
+//! in its issue order, and when that file cites the feature textually. That
 //! citation is the only crate→feature edge the family records.
 
 #![deny(missing_docs)]
@@ -227,7 +223,7 @@ pub const UNSTAMPED: Seq = Seq(u64::MAX);
 /// slot before this store is visible to a consumer that observes the stamp.
 /// Weakening it to `Relaxed` produces a ring that works on x86, where the
 /// hardware supplies the ordering the code failed to ask for, and races on
-/// aarch64. This is `docs/invariant/002_publication_ordering.md`'s Pair 1.
+/// aarch64.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
@@ -252,15 +248,14 @@ pub const OBSERVE: Ordering = Ordering::Acquire;
 /// The ordering the consumer releases drained slots with.
 ///
 /// `Release`, paired with the producers' [`ring_cursor::GATING`] read of the
-/// same cursor inside [`ring_claim::Claimer::claim`]'s headroom check. This is
-/// `docs/invariant/002_publication_ordering.md`'s Pair 2. The consumer's
-/// payload reads precede this store in program order and must not sink below
-/// it, or a producer that observes the advance overwrites a slot still being
-/// read.
+/// same cursor inside [`ring_claim::Claimer::claim`]'s headroom check. The
+/// consumer's payload reads precede this store in program order and must not
+/// sink below it, or a producer that observes the advance overwrites a slot
+/// still being read.
 ///
 /// The external design corpus gets this one wrong, and this crate diverges from
-/// it on purpose. Message 663 advances the read cursor `Relaxed`, justified as
-/// "the Mutator is the only one who changes tail". Sole-writership answers a
+/// it on purpose. It advances the read cursor `Relaxed`, justified as "the
+/// Mutator is the only one who changes tail". Sole-writership answers a
 /// different question than reclamation ordering asks.
 ///
 /// ```
@@ -324,7 +319,7 @@ pub struct Ring<S> {
   ///
   /// `ring_store` still knows nothing of this crate. It stores whatever
   /// element type it is given, and every `unsafe` stays here, which is the
-  /// whole point of decision 123.
+  /// whole point of the opt-out in `docs/workaround/readme.md`.
   slots: Buffer<UnsafeCell<S>>,
   /// One stamp per slot, holding the sequence whose payload currently occupies
   /// it. Unpadded on purpose. [`PaddedCursor`] would make this array 64 times
@@ -382,10 +377,9 @@ impl<S: Slot + Default> Ring<S> {
   /// This reads only the capacity. A config's wait strategy and overflow policy
   /// describe what a *caller* does when the ring is full, and this crate never
   /// waits and never drops. It reports [`RingError::Full`] and lets the caller
-  /// choose, which is the one of
-  /// `docs/non_functional_requirement/002_bounded_capacity_backpressure.md`'s
-  /// three policies that preserves the exactly-once contract without
-  /// surrendering producer progress.
+  /// choose, which is the one of the three backpressure policies that
+  /// preserves the exactly-once contract without surrendering producer
+  /// progress.
   ///
   /// It does not read `producers` either. A ring that trusted it would be
   /// trusting a number no caller can be held to; the claim is correct for any
@@ -466,7 +460,7 @@ impl<S> Ring<S> {
   /// than at the highest stamped sequence.** The two differ under out-of-order
   /// publication: producer B stamping before producer A leaves A's sequence
   /// unpublished below B's. Only the first-gap watermark preserves the total
-  /// order `docs/invariant/001_single_consumer_total_order.md` states.
+  /// order.
   ///
   /// Scanning from the consumer's position bounds the walk by the ring's
   /// capacity, because a producer more than `capacity` ahead could not have
@@ -506,9 +500,7 @@ impl<S> Ring<S> {
   ///
   /// **Do not weaken the comparison below.** `stamp != UNSTAMPED` and
   /// `stamp >= end` both read a stale stamp from the previous lap as
-  /// published. See
-  /// `docs/pitfall/002_a_stale_stamp_reads_as_unpublished_not_as_wrong.md`.
-  /// Only equality is correct.
+  /// published. See `docs/workaround/readme.md`. Only equality is correct.
   fn contiguous_end(&self, from: Seq, max: usize) -> Seq {
     let mut end = from;
 
@@ -731,11 +723,10 @@ impl<'a, S> Producer<'a, S> {
   /// # Errors
   ///
   /// [`RingError::Full`] when no slot is free. That is back-pressure, so a retry
-  /// loop should keep going. This is the *fail* policy of
-  /// `docs/non_functional_requirement/002_bounded_capacity_backpressure.md`'s
-  /// three. Block and overwrite are not implemented, because both are
-  /// per-priority-class decisions that instance explicitly declines to resolve,
-  /// and overwrite also violates the exactly-once contract.
+  /// loop should keep going. This is the *fail* policy of the three
+  /// backpressure policies. Block and overwrite are not implemented, because
+  /// both are per-priority-class decisions that are deliberately left
+  /// unresolved, and overwrite also violates the exactly-once contract.
   ///
   /// ```
   /// use ring_mpsc::Ring;
@@ -818,11 +809,10 @@ impl<'a, S> Producer<'a, S> {
   /// Whether the claim cursor and the consumer cursor occupy different cache
   /// lines.
   ///
-  /// `docs/integration/001_family_dependency_seam.md`'s seam I2 states padding
-  /// as a contract this crate depends on but `ring_cursor` implements. This
-  /// crate asserts it here rather than trusting it, because a sibling change
-  /// that dropped the alignment would cost this crate a contended line on its
-  /// hottest path and break nothing that compiles.
+  /// Padding is a contract this crate depends on but `ring_cursor` implements.
+  /// This crate asserts it here rather than trusting it, because a sibling
+  /// change that dropped the alignment would cost this crate a contended line
+  /// on its hottest path and break nothing that compiles.
   ///
   /// The two cursors are in different allocations, one in the ring's gating
   /// set and one in the claimer. So this is a check on `PaddedCursor`'s
@@ -1063,8 +1053,7 @@ impl<'a, S> Consumer<'a, S> {
   /// At most `max` published, undrained records.
   ///
   /// For a consumer that wants a bounded amount of work per tick rather than
-  /// whatever accumulated. `docs/pitfall/001_spinning_consumer_owns_a_core.md`
-  /// is about that cadence.
+  /// whatever accumulated.
   ///
   /// ```
   /// use ring_mpsc::Ring;

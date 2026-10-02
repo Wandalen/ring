@@ -42,9 +42,8 @@ fn laps_are_relative_not_absolute() {
 
 /// A backward pair reads zero rather than an enormous number. But that zero
 /// is not an obviously-wrong value. It is the same reading `may_claim` treats
-/// as "room to publish" (see `docs/decisions/002_saturating_rather_than_signed.md`),
-/// so a caller that swapped its arguments here gets a plausible, permissive
-/// answer, not a visibly broken one.
+/// as "room to publish", so a caller that swapped its arguments here gets a
+/// plausible, permissive answer, not a visibly broken one.
 #[test]
 fn laps_backward_read_zero() {
   assert_eq!(laps_between(Seq(100), Seq(4), cap(8)), 0);
@@ -134,10 +133,10 @@ fn positions_many_laps_apart_stay_comparable() {
   assert_eq!(free_slots(producer, consumer, c), 0);
 }
 
-/// SQ2: the one edge the boundary lattice left unpinned, `may_claim` against
+/// The one edge the boundary lattice left unpinned, `may_claim` against
 /// `laps_between == 0`. It is swept across the same positions as
 /// `free_slots_agrees_with_may_claim_across_two_laps`, in the argument order a
-/// caller has to reverse to state it (`algorithm/001` SQ2).
+/// caller has to reverse to state it.
 #[test]
 fn laps_between_zero_agrees_with_may_claim_across_two_laps() {
   let c = cap(8);

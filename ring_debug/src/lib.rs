@@ -12,7 +12,7 @@
 //! A ring whose consumer cursor has run ahead of its producer reports
 //! `free_slots = capacity`, `pending = 0`, and `may_claim = true`: the exact
 //! readings of a new, empty ring, including the one a producer acts on. This is
-//! measured, not inferred, in `docs/pitfall/001_saturating_arithmetic_reports_health.md`.
+//! measured, not inferred.
 //!
 //! Nothing here runs unless called. These are checks for a test, a debug build,
 //! or an investigation, deliberately absent from the claim path.
@@ -431,9 +431,8 @@ impl Watch {
 /// **It cannot detect a consumer ahead of its producer.** Both readings derive
 /// from the saturating arithmetic that masks that state, so a D1-corrupted ring
 /// satisfies this check exactly as a healthy one does. This is measured, and
-/// `check_ends_cannot_see_the_corruption_check_can` pins it. See
-/// `docs/integration/001`, whose J4 is precisely "do not read a pass here as
-/// evidence against D1".
+/// `check_ends_cannot_see_the_corruption_check_can` pins it. Do not read a
+/// pass here as evidence against D1.
 ///
 /// **Quiescent means quiescent.** Both readings are separate atomic loads, so
 /// on a ring being written concurrently they are two snapshots of two moments

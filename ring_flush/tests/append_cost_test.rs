@@ -1,13 +1,13 @@
-//! C2 of `docs/non_functional_requirement/002_the_decision_costs_nothing_on_the_append_path.md`,
-//! as close to "the append path allocates nothing" as this crate can get.
+//! As close a test of "the append path allocates nothing" as this crate can
+//! get.
 //!
 //! # Why this is a proxy and not the measurement
 //!
-//! C2 as specified wants a counting global allocator. That is not available
-//! here, and the obstacle is structural rather than incidental: `GlobalAlloc`
-//! is an unsafe trait, the workspace sets `unsafe-code = "deny"`, and gate G6
-//! confines the opt-out to `ring_spsc`, `ring_mpsc` and `ring_core`, three
-//! declared crates that each justify it in their own
+//! The requirement as specified wants a counting global allocator. That is
+//! not available here, and the obstacle is structural rather than incidental:
+//! `GlobalAlloc` is an unsafe trait, the workspace sets `unsafe-code = "deny"`,
+//! and gate G6 confines the opt-out to `ring_spsc`, `ring_mpsc` and
+//! `ring_core`, three declared crates that each justify it in their own
 //! `docs/workaround/readme.md`.
 //!
 //! **G6 scans `src/` only, so an `#![allow(unsafe_code)]` in this file would
@@ -28,11 +28,10 @@
 //! | `append` allocates per record (boxing, a temporary `Vec`) | **No**, needs the real allocator |
 //! | An unobserved driver allocates for its absent log | Partly, via the absence of growth, not directly |
 //!
-//! Recorded as a proxy in the instance rather than as a discharge of C2. The
-//! real measurement belongs in `ring_testkit` (feature 188), which is the one
-//! place a counting allocator could be justified once for every crate that
-//! needs one. That is option three of the instance's own table, now forced by G6
-//! rather than merely preferred.
+//! This is a proxy rather than a discharge of the requirement. The real
+//! measurement belongs in `ring_testkit`, which is the one place a counting
+//! allocator could be justified once for every crate that needs one. G6 now
+//! forces that choice rather than merely preferring it.
 //!
 //! # What this file *does* discharge outright
 //!
@@ -61,13 +60,13 @@ fn ring(slots: usize) -> Ring<u32> {
 
 /// The staging buffer does not grow across `N` appends, for any policy.
 ///
-/// The proxy for C2. Capacity is read before and after; a `Vec` that did not
-/// reallocate reports the same number.
+/// The proxy for the allocation requirement. Capacity is read before and
+/// after; a `Vec` that did not reallocate reports the same number.
 #[test]
 fn appending_never_grows_the_staging_buffer() {
   const N: u32 = 512;
 
-  // `OnBatch( N )` rather than anything larger, because N2 caps the batch size at the
+  // `OnBatch( N )` rather than anything larger, because validation caps the batch size at the
   // buffer's capacity, so `OnBatch( 600 )` against a 512-record buffer is
   // rejected at binding. That is correct, and it is `an_unusable_batch_size_is_refused_at_binding`'s
   // job to say so. The batch still never fires here, because nothing drives.
@@ -145,9 +144,8 @@ fn a_drive_that_does_not_fire_changes_nothing() {
 
 /// A driver given no log never acquires one, however much it flushes.
 ///
-/// [`docs/decisions/readme.md`]'s Pending 2 as an assertion rather than as
-/// prose. The claim that dissolved the pending decision is that an unobserved
-/// driver pays nothing for the instrument it was not given. Exact, because `log()`
+/// The claim that an unobserved driver pays nothing for the instrument it was
+/// not given, as an assertion rather than as prose. Exact, because `log()`
 /// returning `None` is not a proxy for anything.
 #[test]
 fn an_unobserved_driver_never_acquires_a_log() {

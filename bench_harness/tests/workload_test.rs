@@ -1,13 +1,13 @@
-//! Determinism of the seeded workload, covering Test Matrix rows T01–T03, T10, T13, T14.
+//! Determinism of the seeded workload.
 //!
-//! The three rows are deliberately not independent. A generator that returns a
-//! constant satisfies T01 alone, and T03 exists to refute exactly that reading.
-//! It asserts two seeds disagree, so T01's agreement is evidence of
-//! reproducibility rather than of a stuck generator. T02 then separates
-//! "reproducible at one producer count" from "reproducible across them". This
-//! crate needs the second, because a candidate is benched at several producer
-//! counts and the comparison is only meaningful if it saw the same items each
-//! time.
+//! The first three tests are deliberately not independent. A generator that
+//! returns a constant satisfies the same-seed test alone, and the different-seeds
+//! test exists to refute exactly that reading. It asserts two seeds disagree, so
+//! the same-seed agreement is evidence of reproducibility rather than of a stuck
+//! generator. The producer-count test then separates "reproducible at one
+//! producer count" from "reproducible across them". This crate needs the
+//! second, because a candidate is benched at several producer counts and the
+//! comparison is only meaningful if it saw the same items each time.
 
 use bench_harness::{Item, PayloadArchetype, Workload};
 
@@ -25,7 +25,7 @@ fn indices(items: &[Item]) -> Vec<u64> {
   items.iter().map(|item| item.index).collect()
 }
 
-/// T01: the same seed produces a byte-identical sequence on two separate runs.
+/// The same seed produces a byte-identical sequence on two separate runs.
 ///
 /// Constructed twice rather than cloned, so the assertion covers the generator
 /// rather than the copy.
@@ -40,7 +40,7 @@ fn the_same_seed_produces_the_same_sequence_on_two_separate_runs() {
   }
 }
 
-/// T02: one producer and eight produce the same multiset of items.
+/// One producer and eight produce the same multiset of items.
 ///
 /// Asserts the stronger of the two available readings. The weaker one is that
 /// the two producer counts agree with each other. The stronger one is that each
@@ -101,10 +101,11 @@ fn every_producer_count_partitions_the_same_multiset() {
   );
 }
 
-/// T03: two different seeds produce different sequences.
+/// Two different seeds produce different sequences.
 ///
-/// This is the anti-faking check for T01. Without it, a generator returning a
-/// constant would pass every determinism assertion in this file.
+/// This is the anti-faking check for the same-seed test. Without it, a
+/// generator returning a constant would pass every determinism assertion in
+/// this file.
 #[test]
 fn two_different_seeds_produce_different_sequences() {
   for archetype in ARCHETYPES {
@@ -124,7 +125,7 @@ fn two_different_seeds_produce_different_sequences() {
   }
 }
 
-/// T10: a workload reports the configuration it is actually running, not the
+/// A workload reports the configuration it is actually running, not the
 /// one it was asked for.
 ///
 /// The accessors exist so a result can be labelled with what produced it, and
@@ -157,9 +158,9 @@ fn a_workload_reports_its_effective_configuration() {
   assert_eq!(clamped.items_for(0).len(), 8, "the clamped config did not deal every item");
 }
 
-/// T13: the seed can be recovered by unmixing any item.
+/// The seed can be recovered by unmixing any item.
 ///
-/// Added after the 2026-08-29 mutation survey found T01–T03 all survive
+/// Added after a mutation survey found the first three tests all survive
 /// replacing `^` with `|` or `&`. Those three assert the sequence is
 /// *reproducible* and *seed-dependent*, and every bitwise operator satisfies
 /// both, so nothing pinned the mixing operation itself. The generator behind
@@ -185,13 +186,13 @@ fn the_seed_is_recoverable_from_any_item() {
   }
 }
 
-/// T14: `Mixed` carries `1 + index % 8` significant bytes and zero padding
+/// `Mixed` carries `1 + index % 8` significant bytes and zero padding
 /// beyond them.
 ///
 /// Added after the same survey found `1 + ( index % 8 )` could become
-/// `1 * ( index % 8 )` with every test still green. T01–T03 compare `Mixed`
-/// sequences only against other `Mixed` sequences, so a width schedule that
-/// changed consistently was invisible to all of them.
+/// `1 * ( index % 8 )` with every test still green. The first three tests
+/// compare `Mixed` sequences only against other `Mixed` sequences, so a width
+/// schedule that changed consistently was invisible to all of them.
 ///
 /// Pinned against the `Uniform` payload for the same index rather than against
 /// captured bytes. The significant prefix must agree with the full record,

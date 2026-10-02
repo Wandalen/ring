@@ -1,8 +1,7 @@
 //! `ring_gating` tests for the producer half of the sequence barrier.
 //!
 //! This file carries half the reached-test for
-//! `docs/feature/178_sequence_barrier_and_gating_set.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as:
+//! `docs/feature/178_sequence_barrier_and_gating_set.md`, which states that
 //! `ring_gating` refuses a claim that would advance past the gating minimum,
 //! and a producer never overwrites an uncommitted slot, asserted over a full
 //! lap with a deliberately stalled consumer. (`ring_barrier`'s own file carries
@@ -54,7 +53,7 @@ fn set_at(capacity: usize, positions: &[u64]) -> GatingSet {
   set
 }
 
-// ── feature 178: refusing a claim past the minimum ─────────────────────────
+// ── refusing a claim past the minimum ──────────────────────────────────────
 
 #[test]
 fn a_stalled_consumer_stops_the_producer_at_exactly_one_lap() {
@@ -351,8 +350,7 @@ fn the_set_remembers_its_capacity() {
 /// empty-set arm (`map_or`'s default, `self.capacity.get()`) and the
 /// `free_slots` arm (`saturating_sub` against `capacity`) are bounded by
 /// `capacity` regardless of what the consumer thread does. The race was real;
-/// the assertion could not fail (`docs/non_functional_requirement/002`
-/// GT40).
+/// the assertion could not fail.
 ///
 /// Why Not Caught: The test's name and its own doc comment state the real
 /// property ("must never report more room than existed"), so it reads as
@@ -361,13 +359,13 @@ fn the_set_remembers_its_capacity() {
 /// reports `CAPACITY` itself still satisfies `<=`, and a swapped argument or a
 /// `Relaxed` read that reports a stale-but-still-in-bounds value passes too.
 ///
-/// Fix Applied: Added the two assertions `docs/non_functional_requirement/002`
-/// itself names as closing the gap. (1) `<=` tightened to `<`. This producer
-/// never reaches `CAPACITY`, so the inclusive-boundary bug is now caught
-/// deterministically. (2) A property assertion comparing the gate's reading
-/// against a cursor load taken immediately after it. Consumers only advance,
-/// so `headroom` must never exceed the position the cursor has reached by the
-/// time it is re-read. This is the over-report check the name promised.
+/// Fix Applied: Added the two assertions that close the gap. (1) `<=` tightened
+/// to `<`. This producer never reaches `CAPACITY`, so the inclusive-boundary
+/// bug is now caught deterministically. (2) A property assertion comparing the
+/// gate's reading against a cursor load taken immediately after it. Consumers
+/// only advance, so `headroom` must never exceed the position the cursor has
+/// reached by the time it is re-read. This is the over-report check the name
+/// promised.
 ///
 /// Prevention: When a concurrent test's only assertion is a static bound
 /// derivable from the callee's own signature (a `usize` capped by the
@@ -410,7 +408,7 @@ fn a_gate_read_concurrently_with_a_consumer_never_over_reports_room() {
   });
 }
 
-/// GT26: `docs/invariant/002`'s manual check M2 is the only thing that would
+/// The manual check M2 in `tests/manual/readme.md` is the only thing that would
 /// notice a future direct cursor read naming an ordering here. Being manual,
 /// it only fires if someone remembers to run it. This automates M2's
 /// own recipe (`grep -vE "^[[:space:]]*(///|//!)" src/lib.rs | grep -oE

@@ -2,15 +2,13 @@
 //! ring is empty, and what a producer does when it is full.
 //!
 //! Only the discriminants live here. The handlers that act on them are
-//! `ring_wait` and `ring_overflow` respectively. That is the split
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5 rules, and the
-//! reason this crate's own description ends "no ring logic".
+//! `ring_wait` and `ring_overflow` respectively. That split is the reason this
+//! crate's own description ends "no ring logic".
 
 /// What a consumer does when it asks for items and the ring has none.
 ///
-/// `docs/feature/173_wait_kind_and_strategies.md` requires all four, and
-/// requires [`WaitKind::None`] specifically, because the tick path cannot afford
-/// any of the other three.
+/// The wait-kind feature requires all four, and requires [`WaitKind::None`]
+/// specifically, because the tick path cannot afford any of the other three.
 ///
 /// ```
 /// use ring_types::WaitKind;
@@ -44,10 +42,8 @@ impl WaitKind {
   /// plus `wait_kind_has_exactly_four_variants` in `tests/types_test.rs`. What
   /// the assertions here do carry is this array's own shape: length,
   /// membership, and no dropped or duplicated entry. That is the half a runtime
-  /// check can reach.
-  /// `docs/non_functional_requirement/002_the_enum_sets_are_closed_and_asserted.md`
-  /// separates the two. It names reading this declaration alone as the reason
-  /// the distinction has to be stated here rather than only there.
+  /// check can reach. The distinction is stated here because someone reading
+  /// this declaration alone would otherwise not see it.
   ///
   /// ```
   /// use ring_types::WaitKind;
@@ -86,10 +82,9 @@ impl WaitKind {
 
 /// What a producer does when the ring has no free slot.
 ///
-/// `docs/feature/174_overflow_policy_enum_and_handlers.md` is explicit that
-/// there is **no variant that overwrites unread data**. That absence is the
-/// feature. A publish that reports success has kept the item, under every
-/// policy here.
+/// The overflow-policy feature is explicit that there is **no variant that
+/// overwrites unread data**. That absence is the feature. A publish that
+/// reports success has kept the item, under every policy here.
 ///
 /// ```
 /// use ring_types::OverflowPolicy;

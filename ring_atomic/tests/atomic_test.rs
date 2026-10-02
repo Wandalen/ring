@@ -1,12 +1,12 @@
 //! The sequence cell, and the counting shim two acceptance criteria need.
 //!
-//! `ring_atomic` is claimed jointly with feature 170's handshake, which is
-//! stage S4's. So this file deliberately does **not** cite that feature path.
-//! Citing it here would make the family's feature gate report 170 claimed
-//! before a single line of the handshake exists.
+//! `ring_atomic` is claimed jointly with the claim/publish handshake feature,
+//! so this file deliberately does **not** cite that feature path. Citing it
+//! here would make the family's feature gate report the handshake claimed
+//! before a single line of it exists.
 //!
-//! What it supplies is the instrument two S2 criteria are stated in terms
-//! of. It claims neither. Each is about its own crate's operation and is
+//! What it supplies is the instrument two acceptance criteria are stated in
+//! terms of. It claims neither. Each is about its own crate's operation and is
 //! asserted there, against the real API:
 //!
 //! - `docs/feature/175_thread_local_buffer_and_flush_into.md`: "accumulates N
@@ -23,8 +23,8 @@
 //! therefore in two halves. The first establishes that `CountingSeq` behaves
 //! identically to `AtomicSeq`; without that, every assertion made against it
 //! is worthless. The second establishes that its counts are right. Where that
-//! second half restates 175's and 177's numbers it does so at the level of the
-//! cell; the criteria themselves belong to the crates above.
+//! second half restates the two criteria's numbers it does so at the level of
+//! the cell; the criteria themselves belong to the crates above.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -215,7 +215,7 @@ fn total_is_the_sum_of_the_four_and_not_an_independent_counter() {
 
 #[test]
 fn one_fetch_add_buys_a_whole_batch() {
-  // Feature 177's criterion, at the level of the cell: 64 slots, one
+  // The batch-claim criterion, at the level of the cell: 64 slots, one
   // operation. `ring_batch` asserts the same thing through its own `claim`.
   let cell = CountingSeq::default();
   let first = cell.fetch_add(64, Ordering::AcqRel);
@@ -227,8 +227,9 @@ fn one_fetch_add_buys_a_whole_batch() {
 
 #[test]
 fn a_cell_never_touched_counts_zero() {
-  // Feature 175's criterion, at the level of the cell. The shim reports zero
-  // for code that did nothing, so a zero elsewhere means something.
+  // The thread-local buffer criterion, at the level of the cell. The shim
+  // reports zero for code that did nothing, so a zero elsewhere means
+  // something.
   let cell = CountingSeq::default();
   let mut staged: Vec<u32> = Vec::with_capacity(64);
   for i in 0..64 {
@@ -574,8 +575,8 @@ fn a_third_type_implements_the_trait_and_drives_through_it() {
   assert_eq!(claim(&real, 5), Seq(u64::MAX));
   assert_eq!(real.load(Ordering::Acquire), Seq(4), "the crate's own cell wraps");
 
-  // And the supertrait applies to the outside type too. It had to be `Sync`
-  // to write the `impl` at all, which is the enforcement AT7 asked for.
+  // And the supertrait applies to the outside type too. It had to be `Sync` to
+  // write the `impl` at all, which is what the supertrait enforces.
   const fn requires_sync<T: Sync>() {}
   requires_sync::<SaturatingSeq>();
 }

@@ -5,12 +5,11 @@
 //!
 //! # What this crate adds
 //!
-//! [Feature 179](../../../docs/feature/179_producer_and_consumer_handles.md)
-//! asks for the ring's two ends as two separate values, with capability
-//! following ownership. `ring_core` already partitions the capabilities. Its
-//! `Producer` cannot drain and its `Consumer` cannot publish, so this crate is
-//! not where that split is invented. This crate adds four things that
-//! `ring_core` does not do, each of them a *narrowing*:
+//! The requirement is the ring's two ends as two separate values, with
+//! capability following ownership. `ring_core` already partitions the
+//! capabilities. Its `Producer` cannot drain and its `Consumer` cannot publish,
+//! so this crate is not where that split is invented. This crate adds four
+//! things that `ring_core` does not do, each of them a *narrowing*:
 //!
 //! | Added | Why `ring_core` does not have it |
 //! |---|---|
@@ -19,22 +18,22 @@
 //! | [`Consumer::drain`] | A drain whose bound is fixed at call time, so it terminates under a live producer |
 //! | Nothing reaches the backend | No `Deref`, no `inner()`, no public field, on any of the three types |
 //!
-//! The overlap with `ring_core` is real, and `docs/decisions/001` documents it
-//! rather than minimising it.
+//! The overlap with `ring_core` is real, and
+//! `docs/decisions/001_handles_are_a_narrowing_layer_over_ring_core.md`
+//! documents it rather than minimising it.
 //!
 //! # Two things the pre-implementation spec asked for that are not here
 //!
 //! **`is_closed()` on both handles.** It would need a `ring_shutdown`
 //! dependency, and `ring_shutdown` depends on `ring_wait`. That would put a
-//! parking operation within reach of the tick path and break
-//! [feature 183](../../../docs/feature/183_try_only_operations_on_the_tick_path.md),
-//! asserted in `ring_poll`'s suite. Two features in tension, resolved by
-//! measurement; see `docs/decisions/002`.
+//! parking operation within reach of the tick path and break the rule that
+//! the tick path only tries, asserted in `ring_poll`'s suite. Two requirements
+//! in tension, resolved by measurement; see
+//! `docs/decisions/002_handles_have_no_is_closed.md`.
 //!
 //! **`&self` receivers.** `&mut self` is what makes "exactly one producer"
 //! hold. A shared `&Producer` could be used from two threads at once, which is
 //! the cardinality violation `ring_spsc` cannot otherwise detect.
-//! Recorded in `docs/invariant/001`.
 
 #![deny(missing_docs)]
 
@@ -42,9 +41,9 @@ use ring_core::Ring;
 
 /// A ring that has been given up, and can now only be split.
 ///
-/// Taking the ring **by value** is the whole mechanism of
-/// `docs/algorithm/001`. Afterwards there is no route to the ring except
-/// through this value, and this value offers exactly one operation.
+/// Taking the ring **by value** is the whole mechanism. Afterwards there is no
+/// route to the ring except through this value, and this value offers exactly
+/// one operation.
 ///
 /// ```
 /// use ring_config::RingConfig;
@@ -106,8 +105,6 @@ impl<'a, T: Send> Ends<'a, T> {
 /// The publishing end. Cannot drain, cannot be cloned, cannot reach the ring.
 ///
 /// The absences are the contract; the present methods are ordinary forwarding.
-/// See `docs/api/001` for the full absent-operations table and what each
-/// addition would cost.
 #[derive(Debug)]
 pub struct Producer<'a, T> {
   inner: ring_core::Producer<'a, T>,
@@ -118,9 +115,7 @@ impl<T: Send> Producer<'_, T> {
   ///
   /// Never blocks. On a full ring the ring's own `OverflowPolicy` decides:
   /// `Fail` returns the record, and `DropNewest` discards it and reports success,
-  /// so an `Ok` is not by itself evidence the record was kept. That trap is
-  /// documented once, at
-  /// [`ring_shutdown/docs/pitfall/002`](../../../ring_shutdown/docs/pitfall/002_ok_does_not_mean_kept_under_drop_newest.md).
+  /// so an `Ok` is not by itself evidence the record was kept.
   ///
   /// # Errors
   ///
@@ -141,7 +136,8 @@ impl<T: Send> Producer<'_, T> {
   ///
   /// Binding at SPSC cardinality, where this is the only producer; advisory at
   /// MPSC, where another producer may take the room first. One signature, two
-  /// contracts, selected by a config field. See `docs/api/001`.
+  /// contracts, selected by a config field. See
+  /// `ring_core/docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md`.
   #[must_use]
   pub fn free_capacity(&self) -> usize {
     self.inner.free_capacity()
@@ -160,7 +156,7 @@ impl<T: Send> Producer<'_, T> {
 ///
 /// Because there is exactly one of these, whoever holds it *is* the consume
 /// point. That makes where this value lives a correctness question and
-/// not only a design one. See `docs/lifecycle/002`.
+/// not only a design one.
 #[derive(Debug)]
 pub struct Consumer<'a, T> {
   inner: ring_core::Consumer<'a, T>,

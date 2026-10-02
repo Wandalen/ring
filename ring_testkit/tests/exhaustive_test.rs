@@ -1,6 +1,6 @@
 //! The exhaustive half of `docs/feature/188_loom_and_testkit_helpers.md`.
 //!
-//! This is the half of feature 188 that asks for "a model checker that explores
+//! This is the half that asks for "a model checker that explores
 //! interleavings exhaustively rather than sampling whichever one the scheduler
 //! produced".
 //! `tests/testkit_test.rs` runs one script many times and gets the same answer;

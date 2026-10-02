@@ -196,7 +196,7 @@ fn is_empty_and_all_empty_disagree_on_a_freshly_built_buffer() {
   // (never true, since a `Capacity` cannot be zero), and `all_empty` asks
   // whether every slot holds nothing (true here, as nothing has been written).
   // Elsewhere in this suite each is asserted alone. This pins the disagreement
-  // itself, on the one buffer, in one place (-> docs/pitfall/001 BF38).
+  // itself, on the one buffer, in one place.
   let buffer: Buffer<TypedSlot<u8>> = Buffer::new(cap(4));
   assert!(!buffer.is_empty(), "is_empty asks about slot count, which is never zero");
   assert!(buffer.all_empty(), "all_empty asks about slot contents, which start empty");
@@ -204,8 +204,9 @@ fn is_empty_and_all_empty_disagree_on_a_freshly_built_buffer() {
 
 #[test]
 fn the_same_buffer_type_serves_both_slot_shapes() {
-  // Feature 182's "both use the same claim, gating and drain" reaching down to
-  // storage: one `Buffer` definition, two unrelated slot shapes, no branch.
+  // The slot feature's "both use the same claim, gating and drain" reaching
+  // down to storage: one `Buffer` definition, two unrelated slot shapes, no
+  // branch.
   let mut typed: Buffer<TypedSlot<u32>> = Buffer::new(cap(4));
   let mut bytes: Buffer<BytesSlot<8>> = Buffer::new(cap(4));
 

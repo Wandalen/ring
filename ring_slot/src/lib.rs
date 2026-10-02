@@ -3,8 +3,8 @@
 //! Tier 1 of the ring family's 33 crates, the concurrency write-path implementation.
 //! Depends on `ring_types`.
 //!
-//! `docs/feature/182_typed_slot_and_bytes_slot.md` asks for two slot shapes over
-//! one ring: a typed slot for traffic whose shape is known at compile time, and
+//! The typed-slot-and-bytes-slot feature asks for two slot shapes over one
+//! ring: a typed slot for traffic whose shape is known at compile time, and
 //! a bytes slot for traffic that arrives from outside and is decoded later.
 //! The reason for both is a cost asymmetry. Force everything through bytes, and
 //! in-process command traffic pays an encoding cost for nothing. Type the ring,

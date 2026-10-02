@@ -3,7 +3,7 @@
 //! Tier 1 of the ring family's 33 crates, the concurrency write-path implementation.
 //! Depends on `ring_types`.
 //!
-//! `docs/feature/185_ring_stats.md` asks for counters cheap enough to leave on
+//! The ring-stats feature asks for counters cheap enough to leave on
 //! permanently, because they are the only thing that distinguishes a ring under
 //! mild pressure from one quietly discarding traffic. Without them, a drop is
 //! invisible until something downstream fails to reconcile, and by then there is
@@ -283,12 +283,12 @@ impl RingStats {
   /// Record nanoseconds spent waiting for space or data.
   ///
   /// **No crate calls this.** `wait_nanos` is the fourth of the four counters
-  /// `docs/feature/185_ring_stats.md` asks for. `ring_wait`, the crate that
-  /// spins, yields and sleeps, declares `ring_types` and `ring_cursor` in its
-  /// manifest, not `ring_stats`. The edge that would let the waiting crate
-  /// report its waiting does not exist, so [`RingStats::wait_nanos`] reads zero
-  /// in every configuration this workspace can be built in. Zero is also the
-  /// legitimate reading for "nothing waited", and nothing distinguishes the two.
+  /// the ring-stats feature asks for. `ring_wait`, the crate that spins, yields
+  /// and sleeps, declares `ring_types` and `ring_cursor` in its manifest, not
+  /// `ring_stats`. The edge that would let the waiting crate report its waiting
+  /// does not exist, so [`RingStats::wait_nanos`] reads zero in every
+  /// configuration this workspace can be built in. Zero is also the legitimate
+  /// reading for "nothing waited", and nothing distinguishes the two.
   ///
   /// ```
   /// use ring_stats::RingStats;
@@ -463,9 +463,8 @@ impl RingStats {
   /// Reset every counter to zero.
   ///
   /// Named for `ring_shutdown`'s reset, so a recycled ring would not carry the
-  /// previous world's numbers, per
-  /// `docs/feature/184_close_reset_and_drain_all.md`. But `ring_shutdown` does
-  /// not declare this crate as a dependency, so that call does not exist yet.
+  /// previous world's numbers. But `ring_shutdown` does not declare this crate
+  /// as a dependency, so that call does not exist yet.
   /// Today only this crate's own tests and doctest exercise it.
   ///
   /// ```

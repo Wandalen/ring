@@ -3,10 +3,10 @@
 //! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_wait`.
 //!
-//! `docs/feature/178_sequence_barrier_and_gating_set.md` names two halves, and
-//! this is the consumer's. `ring_gating` asks *how far may the producer
-//! advance*; this crate asks *how far may this consumer read*. They read the
-//! same kind of cursors and they are not the same question.
+//! The sequence barrier has two halves, and this is the consumer's.
+//! `ring_gating` asks *how far may the producer advance*; this crate asks *how
+//! far may this consumer read*. They read the same kind of cursors and they are
+//! not the same question.
 //!
 //! ## Why this is not `ring_gating` with the sign flipped
 //!

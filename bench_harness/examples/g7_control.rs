@@ -6,9 +6,9 @@
 //! differing is exactly the unfalsifiable shape it was added to close, one level
 //! up. So this fixture exists to be failed, deliberately, on demand.
 //!
-//! Selected by `--mode`, seeded by `--seed`. One mode per row of task 153's Test
-//! Matrix, and each mode breaks exactly one property so the gate's message can be
-//! checked against a known cause rather than against whatever it happens to say:
+//! Selected by `--mode`, seeded by `--seed`. Each mode breaks exactly one
+//! property so the gate's message can be checked against a known cause rather
+//! than against whatever it happens to say:
 //!
 //! | mode      | varies with seed | stable run to run | debug == release | native == musl |
 //! |-----------|------------------|-------------------|------------------|----------------|

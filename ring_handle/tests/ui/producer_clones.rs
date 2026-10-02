@@ -1,9 +1,9 @@
 //! Must not compile: there is no second producer.
 //!
-//! V3 of `docs/invariant/001_capability_follows_the_handle.md`, and **not part
-//! of feature 179's stated acceptance criterion**. The acceptance table names
-//! two cases and this is a third. It is here because V3 is the violation with
-//! the worst consequence. Two producers against an SPSC ring is a data race,
+//! A breach of the rule that capability follows the handle, and **not part
+//! of the stated acceptance criterion**. The criterion names two cases and
+//! this is a third. It is here because this is the violation with the worst
+//! consequence. Two producers against an SPSC ring is a data race,
 //! and `ring_spsc`'s correctness argument assumes it cannot happen.
 //!
 //! # The receiver must stay owned

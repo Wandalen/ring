@@ -5,8 +5,6 @@
 //! sharing a line make every write by either invalidate the other's cached copy.
 //! A test can decide the structural assertion, 64-byte size and alignment. The
 //! throughput claim the feature also makes needs a number nobody has stated yet.
-//! That is why `docs/plan/008_ring_write_path_staged.md` splits stage S3 out and
-//! applies scale-invariance recursion inside it.
 //!
 //! The cursor type that consumes these wrappers is `ring_cursor`; this crate
 //! owns only the constant and the wrapper.
@@ -22,12 +20,13 @@ fn cache_line_is_sixty_four() {
 /// The direction of a future change to `CACHE_LINE` matters, and before this
 /// test nothing said so.
 ///
-/// Raising it (-> docs/decisions/001 E1) only spends memory. Lowering it
-/// silently defeats every guarantee in this crate, because `on_distinct_lines`
-/// stays calibrated to the same wrong number it divides by (-> docs/pitfall/001,
-/// docs/decisions/001 AL14). Pinned as a floor rather than an exact value,
-/// because `cache_line_is_sixty_four` above already pins the value. So a
-/// deliberate raise still passes and only a decrease trips this.
+/// Raising it only spends memory. Lowering it silently defeats every guarantee
+/// in this crate, because `on_distinct_lines` stays calibrated to the same
+/// wrong number it divides by
+/// (-> `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
+/// Pinned as a floor rather than an exact value, because
+/// `cache_line_is_sixty_four` above already pins the value. So a deliberate
+/// raise still passes and only a decrease trips this.
 #[test]
 fn cache_line_must_not_shrink_below_the_current_known_minimum() {
   // `core::hint::black_box` defeats the compiler's constant-folding of

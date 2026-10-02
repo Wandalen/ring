@@ -5,9 +5,8 @@
 //! One of the five crates on the family's export Contract, and the only one
 //! that is a *verb*. `ring_handle` and `ring_tls` are things a consumer holds,
 //! `ring_types` is vocabulary, `ring_flush` is a decision they make. This crate
-//! is the door. Under decision/121 § 4, features 171 (SPSC), 172 (MPSC) and
-//! 181 (registry) are reached *through* it rather than by importing
-//! `ring_spsc`, `ring_mpsc` or `ring_registry` directly.
+//! is the door. SPSC, MPSC and the registry are reached *through* it rather
+//! than by importing `ring_spsc`, `ring_mpsc` or `ring_registry` directly.
 //!
 //! ```
 //! use ring_factory::{ Factory, RingConfig };
@@ -31,10 +30,11 @@
 //! which `ring_handle`'s own doc comment names as the reason its two-step shape
 //! exists.
 //!
-//! `docs/data_structure/002` foresaw this as shape D2 and scored its cost
-//! **severe**, because the only two owners it could see were bad ones: the
-//! factory holds the ring (making it stateful, against `invariant/001`) or the
-//! caller supplies storage (a second argument, against the one-argument API).
+//! The pre-implementation design foresaw this and scored its cost **severe**,
+//! because the only two owners it could see were bad ones: the factory holds
+//! the ring (making it stateful, against the rule that a config alone
+//! determines the ring) or the caller supplies storage (a second argument,
+//! against the one-argument API).
 //! `ring_handle` shipped a third that neither candidate anticipated. `Split< T >`
 //! owns the ring and is an ordinary value, so **the owner is the return value.**
 //! The factory allocates it and gives it away. One argument in, one owned value
@@ -70,10 +70,10 @@
 //!
 //! The two are deliberately separate functions rather than one that inspects
 //! the policy and routes. Routing would make the same `RingConfig` produce a
-//! different backend depending on whether a cargo feature was enabled, and
-//! `docs/invariant/001` is the rule that a config alone determines the ring.
-//! Feature 187 is a build-time opt-in, so it gets a door of its own and
-//! `docs/invariant/001` stays true of `build` without a proviso.
+//! different backend depending on whether a cargo feature was enabled, and the
+//! crate's rule is that a config alone determines the ring. The crossbeam
+//! backend is a build-time opt-in, so it gets a door of its own and that rule
+//! stays true of `build` without a proviso.
 //!
 //! # Two fields that cannot be honoured to the precision the record expresses
 //!
@@ -85,11 +85,10 @@
 //! path is a compare-exchange rather than something told a count.
 //!
 //! **The acceptance criterion therefore grades the corrected value, not the
-//! requested one.** Feature 180 asks that observable behaviour match every
+//! requested one.** The criterion asks that observable behaviour match every
 //! field. Two of the five are clamped before `build` is reachable, and the
 //! request is stored nowhere. The sharpest case changes the *backend*: a
 //! manifest field left empty clamps to one producer and selects SPSC.
-//! → `docs/pitfall/001`.
 
 #![deny(missing_docs)]
 
@@ -104,10 +103,11 @@ use ring_types::RingError;
 
 /// A ring that is not yet built, and the only supported way to build one.
 ///
-/// **It has no fields**, which is `docs/invariant/001` made structural. Every
-/// input to a build arrives in the `RingConfig` argument, so a field would be a
-/// second input the invariant forbids. Write it as a literal, `Factory.build(
-/// cfg )`, since there is deliberately no `Default` impl to conjure one from.
+/// **It has no fields**, which makes "a config alone determines the ring"
+/// structural. Every input to a build arrives in the `RingConfig` argument, so
+/// a field would be a second input the invariant forbids. Write it as a
+/// literal, `Factory.build( cfg )`, since there is deliberately no `Default`
+/// impl to conjure one from.
 ///
 /// It is a type rather than a free function because it is one of five names on
 /// the family's export Contract, and a consumer needs a noun to import and to
@@ -202,12 +202,13 @@ impl Factory {
     }
   }
 
-  /// Build a ring on the crossbeam backend, feature 187's door.
+  /// Build a ring on the crossbeam backend, through a door of its own.
   ///
   /// **Outside the one-door promise, deliberately.** [`build`](Self::build)
   /// selects a backend from the configuration alone; this one selects crossbeam
-  /// whatever the configuration says, because feature 187 is a build-time
-  /// opt-in for consumers not blocked on the in-house ring being finished.
+  /// whatever the configuration says, because the crossbeam backend is a
+  /// build-time opt-in for consumers not blocked on the in-house ring being
+  /// finished.
   /// Folding it into `build` would make one config produce different rings on
   /// different feature flags.
   ///
@@ -221,8 +222,9 @@ impl Factory {
   /// are interchangeable at a call site, which is the point of a swappable
   /// backend. That means **at a call site fixed ahead of time**, never inside a
   /// wrapper that reads `cfg` and picks between them at runtime. Such a wrapper
-  /// would reintroduce exactly the second input `docs/invariant/001` forbids,
-  /// and nothing in either signature stops anyone from writing it.
+  /// would reintroduce exactly the second input that "a config alone determines
+  /// the ring" forbids, and nothing in either signature stops anyone from
+  /// writing it.
   #[cfg(feature = "crossbeam")]
   pub fn build_crossbeam<S: Send>(&self, cfg: RingConfig) -> Result<Split<S>, BuildError> {
     let ring = Ring::new_crossbeam(&cfg).map_err(BuildError::Unsupported)?;

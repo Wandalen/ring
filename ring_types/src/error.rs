@@ -1,11 +1,11 @@
 //! The one error type the ring path returns.
 //!
 //! There is one enum rather than one per crate because a consumer uses only the
-//! five exported crates (`docs/decision/121_workstream_008_contract_gaps_ruled.md` § 4)
-//! and never names the 28 internal crates. Per-crate error types would have to
-//! be converted into a shared one at that boundary anyway. This is that shared
-//! one, declared once at tier 0. `ring_bench`, `ring_factory`, `ring_flush` and
-//! `ring_registry` are off the ring path and declare their own.
+//! five exported crates and never names the 28 internal crates. Per-crate
+//! error types would have to be converted into a shared one at that boundary
+//! anyway. This is that shared one, declared once at tier 0. `ring_bench`,
+//! `ring_factory`, `ring_flush` and `ring_registry` are off the ring path and
+//! declare their own.
 //!
 //! No `error_tools`, `thiserror` or `anyhow`. `ring_types` deliberately has no
 //! dependencies at all, so that the family's tier 0 compiles in isolation.
@@ -31,9 +31,9 @@ use core::fmt;
 /// path, a message or a name, would fail to compile three crates away, in a
 /// crate this one has never heard of.
 ///
-/// Fix(BN26): the coupling used to be recorded on neither side. Keep new
-/// variants `Copy` (carry a numeric or `Copy` payload, or none) unless the
-/// same commit also changes `ring_bench`.
+/// Fix(copy_derive_pins_other_crates_errors): the coupling used to be recorded
+/// on neither side. Keep new variants `Copy` (carry a numeric or `Copy`
+/// payload, or none) unless the same commit also changes `ring_bench`.
 ///
 /// Root cause: `#[ non_exhaustive ]` announces that variants may be added and
 /// says nothing about which traits must keep holding when they are.
@@ -101,7 +101,7 @@ impl RingError {
   //   one construct that does not care, since a variant it was not told about
   //   silently falls through the pattern to `false` rather than failing to compile.
   // Pitfall: `RingError` growing is not hypothetical for this type in particular.
-  //   The enum's own doc section exists because it already happened once (`BN26`).
+  //   The enum's own doc section exists because it already happened once.
   //   A predicate whose default answer flips the caller's response (retry vs. fix)
   //   is the wrong place to let that growth go unnoticed.
   #[must_use]

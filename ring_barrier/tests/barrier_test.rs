@@ -1,8 +1,7 @@
 //! Tests for `ring_barrier`, the consumer half of the sequence barrier.
 //!
 //! This file carries half the reached-test for
-//! `docs/feature/178_sequence_barrier_and_gating_set.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as:
+//! `docs/feature/178_sequence_barrier_and_gating_set.md`, which states that
 //! `ring_barrier` returns the minimum across a gating set of 1, 2 and 3
 //! cursors. (`ring_gating`'s own file carries the refuses-a-claim and
 //! stalled-consumer halves.)
@@ -64,7 +63,7 @@ fn deps_zeroed(count: usize) -> Vec<PaddedCursor> {
   deps_at(&vec![0u64; count])
 }
 
-// ── feature 178: the minimum across 1, 2 and 3 cursors ─────────────────────
+// ── the minimum across 1, 2 and 3 cursors ──────────────────────────────────
 
 #[test]
 fn the_frontier_of_one_cursor_is_that_cursor() {

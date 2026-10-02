@@ -2,8 +2,9 @@
 //!
 //! One of the 33 crates in the ring family's concurrency write-path
 //! implementation. This is the last of them, and the only one whose output is
-//! a *number* rather than a type. Feature 186 asks for one workload run against
-//! every candidate write path, and says that "the comparison is the deliverable".
+//! a *number* rather than a type. The requirement asks for one workload run
+//! against every candidate write path, and says that "the comparison is the
+//! deliverable".
 //!
 //! ```
 //! use ring_bench::{ Comparison, Workload };
@@ -57,10 +58,9 @@
 //! exactly when that gap is open, and a `false` is a fact about the policy
 //! rather than a failure of the run.
 //!
-//! `ring_shutdown/docs/pitfall/002` names this trap ("Ok does not mean kept
-//! under `DropNewest`"), and this crate is where it was paid for. The trap
-//! corrupts a *verdict*, not a record, and the verdict is what this crate
-//! exists to produce. See `docs/pitfall/003`.
+//! The trap is "Ok does not mean kept under `DropNewest`", and this crate is
+//! where it was paid for. The trap corrupts a *verdict*, not a record, and the
+//! verdict is what this crate exists to produce.
 //!
 //! # The Contract door imposes a producer ceiling the data structures do not
 //!
@@ -79,19 +79,20 @@
 //! `ring_core::Producer::try_clone` is the operation that would, and
 //! `ring_handle` deliberately does not re-expose it.
 //!
-//! So no single door satisfies feature 186's "under the same producer counts".
-//! [`Candidate::DirectMpsc`] exists to make the gap measurable. It is the same
-//! ring as `ContractRing` in a multi-producer configuration, reached two levels
-//! lower, and it has no ceiling. See `docs/pitfall/001`.
+//! So no single door satisfies the requirement's "under the same producer
+//! counts". [`Candidate::DirectMpsc`] exists to make the gap measurable. It is
+//! the same ring as `ContractRing` in a multi-producer configuration, reached
+//! two levels lower, and it has no ceiling. See
+//! `docs/decisions/001_the_in_house_ring_is_three_candidates.md`.
 //!
 //! # The counters are recorded outside the timed region
 //!
-//! Feature 185's [`RingStats`] turns a result into a diagnosis rather than a
-//! bare number, and incrementing an atomic once per record would change the
-//! thing being measured. Every counter here is therefore written **once, from
-//! totals, after the clock stops**. The cost is that a run reports no
-//! intra-run distribution; the benefit is that the number it reports measures
-//! the write path and not the instrumentation. See `docs/pitfall/002`.
+//! [`RingStats`] turns a result into a diagnosis rather than a bare number, and
+//! incrementing an atomic once per record would change the thing being
+//! measured. Every counter here is therefore written **once, from totals, after
+//! the clock stops**. The cost is that a run reports no intra-run distribution;
+//! the benefit is that the number it reports measures the write path and not
+//! the instrumentation.
 
 #![deny(missing_docs)]
 
@@ -120,7 +121,6 @@ pub type Record = u64;
 /// How a repeated write to the same accumulator cell resolves against an
 /// earlier one.
 ///
-/// `docs/decision/050_deferred_mutation_accumulator_scope.md` names both.
 /// **`Set`** is last-write-wins. It is safe for structural changes and
 /// idempotent overwrites, and unsafe the moment two producers land in the same
 /// cell within one measured window, because the second write erases the first
@@ -129,11 +129,10 @@ pub type Record = u64;
 /// lands last. That makes it safe for any destination more than one producer
 /// writes into, because summation is commutative and overwriting is not.
 ///
-/// `ring_bench` measured only `Set` before this axis existed. Every
-/// candidate's write to a slot was a plain overwrite, unnamed as such because
-/// there was nothing to name it against.
-/// `docs/decision/121_workstream_008_contract_gaps_ruled.md` ruling 3 requires
-/// both semantics measured against every candidate; see [`Workload::with_semantics`].
+/// `ring_bench` measured only `Set` before this axis existed. Every candidate's
+/// write to a slot was a plain overwrite, unnamed as such because there was
+/// nothing to name it against. Both semantics must be measured against every
+/// candidate; see [`Workload::with_semantics`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AccumulatorSemantics {
   /// Last write wins. What every candidate measured before this axis existed.
@@ -263,7 +262,7 @@ impl Workload {
   /// and the staged candidate binds it as its [`FlushPolicy::OnBatch`]
   /// trigger. `DirectSpsc` and `DirectMpsc` push one record per call and do
   /// not read this field at all. They receive it through [`Workload::config`],
-  /// but the backends they construct from read only its capacity (→ BN28).
+  /// but the backends they construct from read only its capacity.
   ///
   /// # Errors
   ///
@@ -283,7 +282,7 @@ impl Workload {
   /// producer its own, collision-free destination, and `cells < producers`
   /// forces two or more producers to land in the same cell within one run.
   /// The second shape is the one [`AccumulatorSemantics::Set`] gets wrong and
-  /// [`AccumulatorSemantics::Delta`] gets right, per `docs/decision/050`.
+  /// [`AccumulatorSemantics::Delta`] gets right.
   ///
   /// # Errors
   ///
@@ -345,11 +344,12 @@ impl Workload {
   /// after clamping to the capacity, and is the same number every candidate
   /// publishes with.
   ///
-  /// Fix(BN8, BN9): this used to return an unclamped `Workload` field, so a
-  /// workload built with `capacity 16` and `with_batch( 32 )` reported a batch
-  /// of 32 while its own config carried 16. That is a pair `RingConfig` refuses
-  /// to hold, and it was printed in [`Comparison::report`]'s header line and
-  /// driven into every candidate's publish loop.
+  /// Fix(workload_batch_was_unclamped): this used to return an unclamped
+  /// `Workload` field, so a workload built with `capacity 16` and
+  /// `with_batch( 32 )` reported a batch of 32 while its own config carried 16.
+  /// That is a pair `RingConfig` refuses to hold, and it was printed in
+  /// [`Comparison::report`]'s header line and driven into every candidate's
+  /// publish loop.
   ///
   /// Root cause: two fields held the same quantity and only one of them went
   /// through validation.
@@ -389,12 +389,13 @@ impl Workload {
 
 /// One write path under comparison.
 ///
-/// Feature 186 names four: a mutex-guarded queue, an off-the-shelf concurrent
-/// queue, the in-house ring, and thread-local staging over that ring. "The
-/// in-house ring" is three variants here rather than one. The three doors onto
-/// it do not admit the same producer counts, and the feature also requires the
-/// candidates be run "under the same producer counts". A single variant would
-/// have had to pick one door and quietly drop the requirement.
+/// The requirement names four: a mutex-guarded queue, an off-the-shelf
+/// concurrent queue, the in-house ring, and thread-local staging over that
+/// ring. "The in-house ring" is three variants here rather than one. The three
+/// doors onto it do not admit the same producer counts, and the requirement
+/// also asks for the candidates to be run "under the same producer counts". A
+/// single variant would have had to pick one door and quietly drop the
+/// requirement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Candidate {
   /// `Mutex< VecDeque< Record > >`, the baseline every other candidate has to
@@ -402,8 +403,8 @@ pub enum Candidate {
   /// it competes under the same back-pressure as the rings rather than
   /// absorbing the whole load.
   MutexQueue,
-  /// The in-house ring reached the way the workstream Contract says to reach
-  /// it: `ring_factory::build`, returning a `ring_handle::Split`.
+  /// The in-house ring reached the way the Contract says to reach it:
+  /// `ring_factory::build`, returning a `ring_handle::Split`.
   ContractRing,
   /// Thread-local staging over the in-house ring: `ring_tls::TlsBuffer`
   /// accumulating, `ring_flush::Flusher` publishing on a batch policy.
@@ -425,7 +426,7 @@ impl Candidate {
   /// Every candidate, in a fixed order.
   ///
   /// The order decides ties. [`Comparison::fastest`] breaks a tie by taking the
-  /// first minimum, so the candidate declared first wins a tie (BN50).
+  /// first minimum, so the candidate declared first wins a tie.
   /// `the_candidate_list_matches_a_copy_written_outside_the_declaration` pins
   /// this list's contents and order against a copy written in the suite, so
   /// reordering either `cfg` arm fails that test instead of silently changing a
@@ -441,7 +442,7 @@ impl Candidate {
   ];
 
   /// Every candidate, in a fixed order. The order decides a tie in
-  /// [`Comparison::fastest`]; see the crossbeam-gated copy above (BN50).
+  /// [`Comparison::fastest`]; see the crossbeam-gated copy above.
   #[cfg(not(feature = "crossbeam"))]
   pub const ALL: &'static [Self] = &[
     Self::MutexQueue,
@@ -507,12 +508,11 @@ impl Candidate {
 ///
 /// One cell per [`Workload::cells`], built once per run by replaying every
 /// received record through the workload's active [`AccumulatorSemantics`].
-/// Comparing two tables built from the same workload is
-/// `docs/spike/023_smoke_ring_write_path.md`'s pass criterion: byte-identical
-/// final tables regardless of which candidate produced them or what order its
-/// records arrived in. `Delta` semantics guarantees that property by
-/// construction (sum is commutative), and `Set` semantics does not (last write
-/// wins, and "last" depends on scheduling).
+/// Comparing two tables built from the same workload is the pass criterion:
+/// byte-identical final tables regardless of which candidate produced them or
+/// what order its records arrived in. `Delta` semantics guarantees that
+/// property by construction (sum is commutative), and `Set` semantics does not
+/// (last write wins, and "last" depends on scheduling).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccumulatorTable {
   cells: Vec<i64>,
@@ -541,10 +541,10 @@ impl AccumulatorTable {
 ///
 /// [`Workload::records_of`] hands out disjoint per-producer ranges, so the
 /// producer that wrote a record is recoverable from the record's own value,
-/// with no side channel. The sign alternates by producer index, mirroring
-/// `docs/decision/050`'s fee/payout pair. An odd-indexed producer subtracts and
-/// an even-indexed one adds, so a `cells() < producers()` workload has a
-/// correct total that only `Delta` semantics reconstructs.
+/// with no side channel. The sign alternates by producer index, mirroring a
+/// fee/payout pair. An odd-indexed producer subtracts and an even-indexed one
+/// adds, so a `cells() < producers()` workload has a correct total that only
+/// `Delta` semantics reconstructs.
 ///
 /// # Panics
 ///
@@ -552,7 +552,7 @@ impl AccumulatorTable {
 /// genuine drained value always decodes inside that range, because
 /// `records_of` never hands out anything else. A value that decodes outside
 /// it did not come from a real write. This is this crate's measured stand-in
-/// for a torn read (`docs/hard_problem/129_gating_so_the_producer_never_laps.md`).
+/// for a torn read.
 /// Every table built by [`run`] passes every drained record through this
 /// check, so a torn or corrupted value is caught here instead of being folded
 /// silently into a total that only looks plausible.
@@ -644,11 +644,12 @@ impl Outcome {
   /// crate's ordering invariant. The panic is unconditional rather than a
   /// debug-build overflow check, so it fires in release too.
   ///
-  /// Fix(BN22): the invariant's Violation Consequences argued a violation would
-  /// be loud because "release panics on integer underflow". That is true only of
-  /// a project setting `overflow-checks = true`, which nothing in this workspace
-  /// does. In release the subtraction wrapped to `18446744073709551360`, the
-  /// value the same paragraph offered as the counterfactual.
+  /// Fix(ordering_subtractions_wrapped_in_release): the ordering invariant
+  /// argued a violation would be loud because "release panics on integer
+  /// underflow". That is true only of a project setting
+  /// `overflow-checks = true`, which nothing in this workspace does. In release
+  /// the subtraction wrapped to `18446744073709551360`, the value the same
+  /// argument offered as the counterfactual.
   ///
   /// Root cause: a claim about a build profile read as a claim about the
   /// language, and no test runs in release to contradict it.
@@ -670,7 +671,7 @@ impl Outcome {
   ///
   /// If `received` exceeds `reported`. That breaks the second half of the
   /// ordering invariant. The panic is unconditional, for the reason given on
-  /// [`dropped`](Self::dropped) (BN22).
+  /// [`dropped`](Self::dropped).
   #[must_use]
   pub const fn silently_discarded(&self) -> usize {
     assert!(self.received <= self.reported, "received exceeded reported");
@@ -686,8 +687,8 @@ impl Outcome {
     self.write_nanos
   }
 
-  /// Feature 185's counters for this run, written once from totals after the
-  /// clock stopped.
+  /// The counters for this run, written once from totals after the clock
+  /// stopped.
   #[must_use]
   pub const fn stats(&self) -> &RingStats {
     &self.stats
@@ -730,12 +731,13 @@ impl Outcome {
 
 /// Why a candidate could not be run.
 ///
-/// Every variant names the candidate. Fix(BN25): the three that relay a
-/// refusal from `ring_factory`, `ring_core` or `ring_flush` used to be tuple
-/// variants carrying only the inner error, so `Display` forwarded to a message
-/// with no candidate on it. Those are the cases a reader most needs the name
-/// for, because the same `RingConfig` is offered to all five candidates and
-/// only one of them refused it.
+/// Every variant names the candidate.
+/// Fix(relayed_refusals_dropped_the_candidate): the three that relay a refusal
+/// from `ring_factory`, `ring_core` or `ring_flush` used to be tuple variants
+/// carrying only the inner error, so `Display` forwarded to a message with no
+/// candidate on it. Those are the cases a reader most needs the name for,
+/// because the same `RingConfig` is offered to all five candidates and only one
+/// of them refused it.
 ///
 /// Root cause: relaying an error verbatim discards the context the relay had
 /// and the source did not.
@@ -753,10 +755,11 @@ impl Outcome {
 ///
 /// `RingError` is `#[ non_exhaustive ]`, an explicit reservation that variants
 /// may be added. A variant carrying a `String` would be an unremarkable
-/// addition there and
-/// would break this derive. Fix(BN26): `both_halves_of_the_copy_coupling_are_named`
-/// pins the conjunction so the break lands on a named test rather than on a
-/// derive expansion, and `ring_types::RingError`'s own docs now name this crate.
+/// addition there and would break this derive.
+/// Fix(copy_derive_pins_other_crates_errors):
+/// `both_halves_of_the_copy_coupling_are_named` pins the conjunction so the
+/// break lands on a named test rather than on a derive expansion, and
+/// `ring_types::RingError`'s own docs now name this crate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RunError {
   /// The candidate cannot be driven by this many producers.
@@ -862,11 +865,11 @@ pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunErro
   // abandoned) rather than "the workload offered more than the ring could
   // hold", which is not a leak and is already reported as `dropped`.
   //
-  // Fix(BN11): that zero is *structural*, not measured. `in_flight` is
-  // `claimed - published` and both are this same expression, so no run of this
-  // harness can make it nonzero. The two assertions on it in the suite pin the
-  // mapping's consequence and cannot fail on their own. The check that can
-  // fail, and so guards the mapping, is the expression-level one in
+  // Fix(in_flight_zero_is_structural): that zero is *structural*, not measured.
+  // `in_flight` is `claimed - published` and both are this same expression, so
+  // no run of this harness can make it nonzero. The two assertions on it in the
+  // suite pin the mapping's consequence and cannot fail on their own. The check
+  // that can fail, and so guards the mapping, is the expression-level one in
   // `a_dropnewest_ring_reports_successes_it_did_not_keep`, which runs the one
   // candidate where `reported` and `received` differ and asserts all three
   // counters against `received`.
@@ -878,13 +881,13 @@ pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunErro
   stats.record_claim(received as u64);
   stats.record_publish(received as u64);
   stats.record_consume(received as u64);
-  // Fix(BN53): this feeds `record_drop` from the same `offered - received`
-  // subtraction as `Outcome::dropped` (-> BN22), but runs before `Outcome`
-  // exists. BN22's guard sits on the two accessor methods that expose the
-  // subtraction afterward, and cannot cover a computation that happens
-  // earlier on the same values. Unguarded, a violation here would silently
-  // wrap to a near-`u64::MAX` stat instead of panicking, which is the failure
-  // mode BN22 named and fixed one call site over.
+  // Fix(record_drop_input_was_unguarded): this feeds `record_drop` from the
+  // same `offered - received` subtraction as `Outcome::dropped`, but runs
+  // before `Outcome` exists. The guard on `Outcome` sits on the two accessor
+  // methods that expose the subtraction afterward, and cannot cover a
+  // computation that happens earlier on the same values. Unguarded, a violation
+  // here would silently wrap to a near-`u64::MAX` stat instead of panicking,
+  // which is the failure mode the accessor guards fixed one call site over.
   //
   // Root cause: the guard was added to the two accessors that expose the
   // subtraction, not to the earlier internal computation that performs the
@@ -1160,7 +1163,7 @@ fn run_off_the_shelf(workload: &Workload) -> Result<(usize, Vec<Record>, u128), 
 
 /// Every candidate, run against one workload.
 ///
-/// The deliverable of feature 186. A candidate the workload's producer count
+/// The crate's deliverable. A candidate the workload's producer count
 /// excludes appears in [`refusals`](Self::refusals) with the reason instead of
 /// being silently omitted. So a report at four producers says which paths
 /// could not be reached rather than showing a shorter table.
@@ -1249,13 +1252,14 @@ impl Comparison {
   ///
   /// # Ties
   ///
-  /// Fix(BN50): a tie goes to whichever candidate appears **first** in
-  /// [`Candidate::ALL`], because `min_by_key` returns the first minimum and the
-  /// iteration follows that list. `MutexQueue` is declared first, so on a clock
-  /// too coarse to separate two paths the control wins by default. That is the
-  /// least interesting outcome the harness can report, and the one it reports
-  /// on a tie. Nothing here detects that a tie happened. A caller that needs to
-  /// know must compare `write_nanos()` across the eligible outcomes itself.
+  /// Fix(fastest_tie_follows_declaration_order): a tie goes to whichever
+  /// candidate appears **first** in [`Candidate::ALL`], because `min_by_key`
+  /// returns the first minimum and the iteration follows that list.
+  /// `MutexQueue` is declared first, so on a clock too coarse to separate two
+  /// paths the control wins by default. That is the least interesting outcome
+  /// the harness can report, and the one it reports on a tie. Nothing here
+  /// detects that a tie happened. A caller that needs to know must compare
+  /// `write_nanos()` across the eligible outcomes itself.
   ///
   /// Root cause: `Candidate::ALL`'s declaration order silently doubles as this
   /// method's tie-break rule.

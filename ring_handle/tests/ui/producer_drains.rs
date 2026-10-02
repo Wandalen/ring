@@ -1,7 +1,7 @@
 //! Must not compile: the publishing end has no drain.
 //!
-//! Feature 179's first compile-fail case, and V1 of
-//! `docs/invariant/001_capability_follows_the_handle.md`. If this file ever
+//! The first compile-fail case of the acceptance criterion, and a breach of
+//! the rule that capability follows the handle. If this file ever
 //! compiles, a drain-shaped method has appeared on `Producer` and the
 //! capability partition is no longer a partition.
 

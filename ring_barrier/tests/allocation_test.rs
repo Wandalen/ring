@@ -2,13 +2,12 @@
 //!
 //! ## Why this file exists
 //!
-//! `docs/non_functional_requirement/001` used to open with a table of
-//! allocation counts measured by hand, in a scratch binary, against a
-//! `ring_cursor::slowest` that collected cursor positions into a `Vec` before
-//! folding them. Every row above zero in that table came from that one
-//! `collect()`, one crate down. When it was removed the table became false in
-//! every row at once, and nothing detected it. The numbers lived only in
-//! prose, and prose does not run.
+//! The allocation requirement used to open with a table of allocation counts
+//! measured by hand, in a scratch binary, against a `ring_cursor::slowest` that
+//! collected cursor positions into a `Vec` before folding them. Every row above
+//! zero in that table came from that one `collect()`, one crate down. When it
+//! was removed the table became false in every row at once, and nothing
+//! detected it. The numbers lived only in prose, and prose does not run.
 //!
 //! This file replaces the scratch binary. The table it now backs is the same
 //! table, measured the same way, by something that fails when the answer
@@ -38,11 +37,9 @@
 #![cfg(not(loom))]
 // A counting allocator cannot be written in safe Rust, because `GlobalAlloc` is
 // an unsafe trait by construction. The workspace denies `unsafe_code`, and the
-// two crates that override it do so in `src/lib.rs`
-// (`ring_store/docs/integration/002_every_unsafe_block_in_the_family.md`
-// measures exactly that set, and this file is not in it). The allowance here
-// is test-only, covers one wrapper that forwards to `std::alloc::System`
-// unchanged, and adds no unsafe code to any shipped crate.
+// two crates that override it do so in `src/lib.rs`. This file is not one of
+// them. The allowance here is test-only, covers one wrapper that forwards to
+// `std::alloc::System` unchanged, and adds no unsafe code to any shipped crate.
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
@@ -164,8 +161,7 @@ fn every_barrier_operation_allocates_nothing() {
   assert_eq!((calls, bytes), (0, 0), "frontier() ×1000");
 
   // The two `wait_for` rows. The old table showed them as 2 and 10 000,
-  // because `wait_for` reads the frontier once per spin plus once on success
-  // ( `docs/algorithm/002_wait_for_asks_twice.md` ).
+  // because `wait_for` reads the frontier once per spin plus once on success.
   let (calls, bytes, answer) = measure(|| Barrier::over(&one).wait_for(Seq::ZERO, 1, WaitKind::None, 1));
   assert_eq!(answer, Ok(Seq(6)), "satisfied on the first look");
   assert_eq!((calls, bytes), (0, 0), "wait_for( …, None, 1 ), satisfied at once");

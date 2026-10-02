@@ -3,9 +3,8 @@
 //! Tier 1 of the 33 crates that implement the ring family's concurrency write path.
 //! Depends on `ring_types` and `ring_stats`.
 //!
-//! `docs/feature/174_overflow_policy_enum_and_handlers.md` splits into an enum
-//! and a set of handlers; `docs/decision/121_workstream_008_contract_gaps_ruled.md`
-//! § 5 puts the enum in `ring_types` and the handlers here. This crate is the
+//! The overflow-policy feature splits into an enum and a set of handlers. The
+//! enum lives in `ring_types` and the handlers live here. This crate is the
 //! handlers. Given a full ring and a policy, they decide what happens and record it.
 //!
 //! The feature's own emphasis is on what is *absent*. There is deliberately no

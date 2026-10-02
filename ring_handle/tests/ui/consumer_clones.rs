@@ -1,7 +1,7 @@
 //! Must not compile: there is no second consumer.
 //!
-//! C5 of `docs/type/002_consumer.md`, and the mirror of
-//! [`producer_clones`](producer_clones.rs). Also outside feature 179's stated
+//! The mirror of
+//! [`producer_clones`](producer_clones.rs). Also outside the stated
 //! two-case criterion.
 //!
 //! Two consumers is the same class of defect as two producers, and "it's only

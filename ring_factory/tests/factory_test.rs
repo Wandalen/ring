@@ -9,11 +9,11 @@
 //!
 //! | Concern | Where |
 //! |---|---|
-//! | Feature 180's criterion, honestly scoped | `only_two_of_five_config_fields_are_observable_through_the_factory` and the two field tests around it |
-//! | `docs/type/002` V1: which variant reaches which path | `the_unnamed_path_can_never_return_name_taken`, `both_paths_relay_the_same_refusal` |
-//! | `docs/type/002` V2: a refusal leaves the registered ring untouched | `a_refusal_drops_nothing_that_was_already_registered` |
-//! | `docs/invariant/001`: configuration fully determines the ring | `two_rings_from_one_config_behave_identically` |
-//! | `docs/decisions` Pendings 3 and 4: the Contract's re-exports | `the_contract_surface_is_reachable_without_naming_a_non_contract_crate` |
+//! | The feature's criterion, honestly scoped | `only_two_of_five_config_fields_are_observable_through_the_factory` and the two field tests around it |
+//! | Which variant reaches which path | `the_unnamed_path_can_never_return_name_taken`, `both_paths_relay_the_same_refusal` |
+//! | A refusal leaves the registered ring untouched | `a_refusal_drops_nothing_that_was_already_registered` |
+//! | Configuration fully determines the ring | `two_rings_from_one_config_behave_identically` |
+//! | The Contract's re-exports | `the_contract_surface_is_reachable_without_naming_a_non_contract_crate` |
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -31,7 +31,7 @@ use ring_handle::Split;
 use ring_types::{OverflowPolicy, RingError, WaitKind};
 
 // ---------------------------------------------------------------------------
-// Feature 180's criterion, and its honest scope
+// The feature's criterion, and its honest scope
 // ---------------------------------------------------------------------------
 
 /// The criterion's real extent is **two of five fields**, and each of the other
@@ -146,7 +146,7 @@ fn the_overflow_policy_reaches_the_built_ring() {
 // The two refusals
 // ---------------------------------------------------------------------------
 
-/// `docs/type/002` V1's first half: `NameTaken` is unreachable from `build`.
+/// `NameTaken` is unreachable from `build`.
 ///
 /// Asserted structurally rather than by exhaustion. `build` returns on exactly
 /// two paths, and neither can name a name it was never given.
@@ -163,12 +163,11 @@ fn the_unnamed_path_can_never_return_name_taken() {
   }
 }
 
-/// V1's second half: `Unsupported` reaches **both** paths, because it originates
+/// `Unsupported` reaches **both** paths, because it originates
 /// one crate down and neither can avoid it.
 ///
 /// That asymmetry is what makes it worth a test. A suite that checked only
-/// `build_named` would pass while `build` panicked, which is exactly what
-/// `docs/type/002`'s test note warns about.
+/// `build_named` would pass while `build` panicked.
 #[test]
 fn both_paths_relay_the_same_refusal() {
   let evicting = RingConfig::new(8)
@@ -208,7 +207,7 @@ fn the_policy_refusal_matches_the_backend_that_makes_it() {
 }
 
 // ---------------------------------------------------------------------------
-// Naming, and V2
+// Naming, and what a refusal leaves untouched
 // ---------------------------------------------------------------------------
 
 /// The registering path's happy case, end to end through the re-exported
@@ -225,10 +224,10 @@ fn a_named_build_is_retrievable_by_that_name_and_by_no_other() {
   assert_eq!(registry.len(), 1);
 }
 
-/// `docs/type/002` V2, restricted to the half that can be observed.
+/// The refusal guarantee, restricted to the half that can be observed.
 ///
-/// V2 has two clauses and only one of them is testable from here. **"The
-/// refused build's own ring is destroyed" is not.** That ring is empty by
+/// The guarantee has two clauses and only one of them is testable from here.
+/// **"The refused build's own ring is destroyed" is not.** That ring is empty by
 /// construction, so no record-drop counter can see it die, and there is no
 /// allocation hook in this suite to watch its buffer. It is guaranteed
 /// structurally instead. `_refused` is an ordinary binding that goes out of
@@ -300,8 +299,8 @@ fn a_refusal_drops_nothing_that_was_already_registered() {
 /// merely its name.
 ///
 /// `len() == 1` says a name is still occupied. This says the ring behind it is
-/// the original one, with the original records in it. That is the property
-/// `ring_registry`'s own pitfall/001 exists about, checked here from the door.
+/// the original one, with the original records in it. That is a
+/// `ring_registry` property, checked here from the door.
 #[test]
 fn a_refused_registration_leaves_the_original_ring_intact() {
   let cfg = RingConfig::new(8).expect("a power of two");
@@ -361,7 +360,7 @@ fn a_removed_name_can_be_built_into_again() {
 }
 
 // ---------------------------------------------------------------------------
-// invariant/001: configuration fully determines the ring
+// Configuration fully determines the ring
 // ---------------------------------------------------------------------------
 
 /// Two builds from one config are indistinguishable.
@@ -373,7 +372,7 @@ fn a_removed_name_can_be_built_into_again() {
 /// no backend discriminant for `wait`, `batch` or `producers`, so this would
 /// pass just as cleanly if `build` silently ignored those three fields. It
 /// proves determinism in `capacity` and `overflow` only, the two fields this
-/// crate's public API can observe (`docs/invariant/001` FC22).
+/// crate's public API can observe.
 #[test]
 fn two_rings_from_one_config_behave_identically() {
   let cfg = RingConfig::new(4)
@@ -383,9 +382,8 @@ fn two_rings_from_one_config_behave_identically() {
   assert_eq!(observable_profile(cfg), observable_profile(cfg));
 }
 
-/// Two `Factory` values are interchangeable, per `docs/type/001`'s second
-/// validation row. That row would stop holding if the factory ever gained a
-/// registry field.
+/// Two `Factory` values are interchangeable. That would stop holding if the
+/// factory ever gained a registry field.
 #[test]
 fn two_factories_build_identically() {
   let cfg = RingConfig::new(4)
@@ -425,7 +423,7 @@ fn a_ring_outlives_the_factory_that_built_it() {
 // The Contract API
 // ---------------------------------------------------------------------------
 
-/// `docs/decisions` Pendings 3 and 4, closed and asserted.
+/// The Contract's re-exports of `Registry` and `RingConfig`, asserted.
 ///
 /// Every type needed to call this crate's two functions and to retrieve what
 /// they built is nameable through `ring_factory` or another Contract crate.
@@ -434,9 +432,9 @@ fn a_ring_outlives_the_factory_that_built_it() {
 /// control test above.
 #[test]
 fn the_contract_surface_is_reachable_without_naming_a_non_contract_crate() {
-  // `RingConfig` is `ring_config`'s and is re-exported here, per Pending 4.
+  // `RingConfig` is `ring_config`'s and is re-exported here.
   let cfg: RingConfig = RingConfig::new(8).expect("a power of two");
-  // `Registry` is `ring_registry`'s and is re-exported here, per Pending 3.
+  // `Registry` is `ring_registry`'s and is re-exported here.
   let mut registry: Registry<u32> = Registry::new();
 
   Factory.build_named(cfg, "events", &mut registry).expect("a free name");
@@ -459,7 +457,7 @@ fn both_refusals_render_distinctly() {
 }
 
 // ---------------------------------------------------------------------------
-// Feature 187's door
+// The crossbeam door
 // ---------------------------------------------------------------------------
 
 /// The crossbeam backend accepts the policy the in-house ones refuse.

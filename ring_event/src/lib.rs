@@ -4,12 +4,12 @@
 //! write-path.
 //! Depends on `ring_types` and `ring_slot`.
 //!
-//! `docs/feature/182_typed_slot_and_bytes_slot.md` asks for something stronger
-//! than two slot shapes that both work: "`TypedSlot<T>` and `BytesSlot` both
-//! round-trip through the **identical** claim/publish/drain path." Two shapes
-//! each with their own write call satisfies the first reading and not the
-//! second. With two write calls the paths would only resemble one another, and
-//! a divergence between them would be a change nobody's test would notice.
+//! The typed-and-bytes-slot feature asks for something stronger than two slot
+//! shapes that both work: "`TypedSlot<T>` and `BytesSlot` both round-trip
+//! through the **identical** claim/publish/drain path." Two shapes each with
+//! their own write call satisfies the first reading and not the second. With
+//! two write calls the paths would only resemble one another, and a divergence
+//! between them would be a change nobody's test would notice.
 //!
 //! This crate makes the two shapes share one path. [`Fill`] is the write half,
 //! where a payload knows how to enter a slot. [`Peek`] is the read half, where a
@@ -19,8 +19,8 @@
 //! crate that assembles a ring, calls neither today.** It reaches
 //! `TypedSlot::set`/`TypedSlot::take` directly, so this crate's one path is
 //! declared but not yet the one production rings execute. Neither function
-//! can tell the two slot shapes apart, which is exactly the property feature
-//! 182 is asking for, once something calls them.
+//! can tell the two slot shapes apart, which is exactly the property that
+//! feature is asking for, once something calls them.
 //!
 //! ## Why the read half is a GAT
 //!
@@ -104,8 +104,8 @@ pub trait Peek {
   /// The slot's contents, or `None` when nothing was published into it.
   ///
   /// `None` is not an error. A claimed-but-unpublished slot is the state
-  /// feature 170's handshake is built to keep a consumer out of, and this is
-  /// how a drain observes it.
+  /// the claim/publish handshake is built to keep a consumer out of, and this
+  /// is how a drain observes it.
   ///
   /// # A `BytesSlot` cannot distinguish empty from zero-length
   ///

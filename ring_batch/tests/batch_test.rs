@@ -299,11 +299,11 @@ fn a_gated_claim_of_zero_always_succeeds_even_on_a_full_ring() {
 fn concurrent_batch_claims_never_overlap() {
   // Disjointness of returned sequences is real, and free of charge from
   // fetch_add's own atomicity, but it is blind to this crate's actual race. A
-  // claim can be disjoint from every other claim and still point at a slot
-  // the consumer has not released yet (-> BA23, pitfall/001). Every claim
-  // taken by every thread is collected and checked pairwise-disjoint by
-  // sequence. That is stronger than checking the claims' ranges, because it
-  // catches an off-by-one at either end.
+  // claim can be disjoint from every other claim and still point at a slot the
+  // consumer has not released yet. Every claim taken by every thread is
+  // collected and checked pairwise-disjoint by sequence. That is stronger than
+  // checking the claims' ranges, because it catches an off-by-one at either
+  // end.
   const THREADS: usize = 4;
   const BATCHES: usize = 500;
   const SIZE: usize = 8;
@@ -343,8 +343,8 @@ fn concurrent_batch_claims_never_overlap() {
 
 #[test]
 fn a_threads_own_batches_stay_in_its_issue_order() {
-  // Hard problem 118's requirement: whatever the interleaving between threads,
-  // one thread's own claims come back ascending.
+  // A system's own writes must survive the merge in order. Whatever the
+  // interleaving between threads, one thread's own claims come back ascending.
   const THREADS: usize = 4;
   const BATCHES: usize = 250;
 

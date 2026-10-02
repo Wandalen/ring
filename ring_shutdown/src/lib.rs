@@ -3,11 +3,11 @@
 //! One of the ring family's 33 crates, which together implement the concurrency write-path.
 //! Depends on `ring_cursor`, `ring_wait`, `ring_core`, `ring_types`.
 //!
-//! `docs/feature/184_close_reset_and_drain_all.md` asks for three operations:
-//! close, drain-all, and reset. None of them is hard alone. The hard part is
-//! that **drain-all only terminates because close came first.** A drain loop
-//! against an open ring with a live producer never ends; the same loop after a
-//! close ends as soon as the in-flight publishes land.
+//! The family's shutdown feature asks for three operations: close, drain-all,
+//! and reset. None of them is hard alone. The hard part is that **drain-all
+//! only terminates because close came first.** A drain loop against an open
+//! ring with a live producer never ends; the same loop after a close ends as
+//! soon as the in-flight publishes land.
 //!
 //! So this crate enforces the ordering with *types*. [`Shutdown::close`]
 //! returns a [`Stopped`] token, and `drain_all` and `discard_all` are methods
@@ -21,14 +21,14 @@
 //! though, publishes into a closed ring without complaint. That is the one
 //! guarantee this crate makes by convention rather than by construction, and it is
 //! why `drain_all` terminates *eventually* rather than *immediately*. See
-//! `docs/pitfall/001_close_is_advisory_to_an_unguarded_producer.md`.
+//! `docs/decisions/001_stopped_tokens_and_into_inner_wait_for_a_real_caller.md`.
 //!
-//! Acceptance is binary and lives in a test. Feature 184 is Reached when a
+//! Acceptance is binary and lives in a test. The feature is Reached when a
 //! closed ring refuses a guarded push, a drain after close recovers every
 //! record that was published, and a reset ring accepts a full capacity again
 //! and delivers it in order. It also requires `tests/shutdown_test.rs` to cite
-//! `docs/feature/184_` textually, which is the only crate→feature edge the
-//! family records.
+//! the feature textually, which is the only crate→feature edge the family
+//! records.
 
 #![deny(missing_docs)]
 
@@ -173,8 +173,7 @@ impl<'a> Stopped<'a> {
   /// is closed now and not that this is the only proof outstanding. What makes
   /// a token prove a *current* fact is scarcity, and a `&self` constructor
   /// cannot supply scarcity. See
-  /// `docs/pattern/002_a_proof_token_must_be_scarce.md`, which states the rule
-  /// `docs/pattern/001_proof_token_orders_two_operations.md` is missing.
+  /// `docs/decisions/001_stopped_tokens_and_into_inner_wait_for_a_real_caller.md`.
   #[must_use]
   pub const fn shutdown(&self) -> &'a Shutdown {
     self.shutdown
@@ -225,10 +224,9 @@ impl<'a> Stopped<'a> {
   /// [`Stopped::drain_all`] terminates because publication has stopped, and
   /// that holds for every *guarded* producer. A caller holding a raw
   /// `ring_core::Producer` can publish into a closed ring. Refusing that
-  /// publish is the one guarantee this crate makes by convention rather than
-  /// by construction, and against such a producer the unbounded loop does not
-  /// end. `docs/pitfall/001_close_is_advisory_to_an_unguarded_producer.md`
-  /// calls this situation the expensive one, because a hang is indistinguishable
+  /// publish is the one guarantee this crate makes by convention rather than by
+  /// construction, and against such a producer the unbounded loop does not end.
+  /// This situation is the expensive one, because a hang is indistinguishable
   /// from a slow drain forever. A budget turns the hang into a return value.
   ///
   /// Records already moved stay in `out` whichever way this returns, so a
@@ -514,8 +512,8 @@ impl Wake {
 
 /// Wait until the ring closes.
 ///
-/// The waiter-join half of feature 184: a thread parked on a ring's progress
-/// needs a second reason to give up, or teardown blocks on it forever.
+/// The waiter-join half of the shutdown feature: a thread parked on a ring's
+/// progress needs a second reason to give up, or teardown blocks on it forever.
 ///
 /// # Errors
 ///

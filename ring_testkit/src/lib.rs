@@ -49,17 +49,15 @@
 //!
 //! [`Outcome::vanished`] is the two together: accepted, minus delivered, minus
 //! still held. Four records went in, were reported accepted, and are nowhere.
-//! → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md`.
 //!
 //! # What it does not do
 //!
 //! It does not contain a model checker. `loom` is the family's model checker
 //! and it is already a `cfg(loom)` dev-dependency of `ring_atomic`,
 //! `ring_publish`, `ring_spsc` and `ring_mpsc`. What this crate contributes to
-//! that half of feature 188 is [`leak`], which is the one line every loom test
-//! over a borrow-based ring has to write, and [`audit_received`], which is the
+//! model checking is [`leak`], which is the one line every loom test over a
+//! borrow-based ring has to write, and [`audit_received`], which is the
 //! assertion worth making inside `loom::model`.
-//! → `docs/integration/001_the_three_edges_and_the_one_that_is_missing.md`.
 //!
 //! # Under `--cfg loom`
 //!
@@ -71,8 +69,6 @@
 //! `ring_atomic`, four crates down. Under the cfg, loom's atomics panic when
 //! touched outside a `loom::model`, so [`Script::run`] panics on a ring built
 //! anywhere else, from a crate that mentions neither loom nor the cfg.
-//! → `docs/non_functional_requirement/002_what_a_fixture_owes_its_consumers.md`
-//!   TK36.
 //!
 //! The doc examples in this crate are where that becomes visible. Three of the
 //! five construct a `ring_core::Ring` outside a model, so under the cfg they
@@ -80,7 +76,6 @@
 //! how the 24 test files in the family facing the same problem opt out.
 //! Nothing checks it either, because the one stage that sets the cfg runs
 //! clippy, and clippy does not run doctests.
-//! → `docs/decisions/002_the_model_lives_in_tests.md` TK16.
 
 #![deny(missing_docs)]
 
@@ -98,13 +93,12 @@ use ring_tls::TlsBuffer;
 /// # The `Many` counts carry no ceiling
 ///
 /// `PushMany`, `RecvMany` and `StageMany` hold a bare `usize`, and
-/// [`Script::run`] applies no `min`, clamp or assertion to it. The termination
-/// argument in `docs/algorithm/` calls each step "bounded by a constant in the
-/// step itself"; that constant is whichever number the caller wrote, so
-/// `PushMany( usize::MAX )` mints for as long as the process lives. Only
-/// `RecvMany` stops early, and only because an empty ring ends its loop. The
-/// other two run their count out against a ring that refuses every record.
-/// → `docs/data_structure/001_the_script_as_a_flat_step_list.md` TK10.
+/// [`Script::run`] applies no `min`, clamp or assertion to it. Each step is
+/// bounded by a constant in the step itself, and that constant is whichever
+/// number the caller wrote, so `PushMany( usize::MAX )` mints for as long as
+/// the process lives. Only `RecvMany` stops early, and only because an empty
+/// ring ends its loop. The other two run their count out against a ring that
+/// refuses every record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
   /// Mint one record and offer it to the ring.
@@ -132,7 +126,6 @@ pub enum Step {
   /// one. So reopening an *open* ring closes and reopens it. The close is
   /// invisible in a single-threaded script and a refusal window in a concurrent
   /// one.
-  /// → `docs/pitfall/002_reopening_closes_first.md`.
   Reopen,
   /// Close, then take every record still in the ring.
   DrainAll,
@@ -199,8 +192,6 @@ impl Outcome {
   /// answers [`Anomaly::Overdelivered`] for exactly that case, so
   /// `vanished() == 0` means "nothing was destroyed" only for an `Outcome`
   /// that audits clean.
-  /// → `docs/data_structure/002_nine_counters_and_a_number_that_is_two_things.md`
-  ///   TK11.
   #[must_use]
   pub fn vanished(&self) -> usize {
     self.accepted.saturating_sub(self.received.len() + self.in_ring_at_end)
@@ -221,7 +212,6 @@ impl Outcome {
   /// means the packaged verdict is not the whole reading. A caller who takes
   /// `audit()` and never calls `vanished()` learns nothing about the records
   /// the ring destroyed.
-  /// → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md` TK41.
   ///
   /// # Errors
   ///
@@ -280,13 +270,11 @@ impl Outcome {
 /// # Not Exhaustive
 ///
 /// A run has more properties than this enum has variants, and the fourth
-/// arrived after the first three. `Overdelivered` came from
-/// `docs/data_structure/002` TK11, which found that [`Outcome::vanished`]
-/// answers `0`, the healthy reading, for the one state that makes it
-/// meaningless. Adding it was a breaking change to any exhaustive `match`,
-/// which is the cost `docs/item/002` TK27 predicted while this enum had no
-/// room attribute. The attribute is here so the next one is additive.
-/// → `docs/item/002_what_the_crate_does_not_declare.md` TK27.
+/// arrived after the first three. `Overdelivered` came from the finding that
+/// [`Outcome::vanished`] answers `0`, the healthy reading, for the one state
+/// that makes it meaningless. Adding it was a breaking change to any
+/// exhaustive `match`, which is the cost predicted while this enum had no room
+/// attribute. The attribute is here so the next one is additive.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Anomaly {
@@ -351,9 +339,9 @@ impl core::error::Error for Anomaly {}
 /// between a `Stage`/`StageMany` and the `Flush` that empties it. See
 /// [`Outcome::published`]. This walks `received` against `published` instead
 /// of against raw values, so it judges a record by where it was actually
-/// offered rather than by the number stamped on it at mint time. R2
-/// (provenance) is unchanged from [`audit_received`]; only R3 (ascent) is
-/// re-based onto `published`.
+/// offered rather than by the number stamped on it at mint time. The
+/// provenance check is unchanged from [`audit_received`]; only the ascent
+/// check is re-based onto `published`.
 fn audit_delivery_order(received: &[u32], minted: u32, published: &[u32]) -> Result<(), Anomaly> {
   for &value in received {
     if value >= minted {
@@ -391,7 +379,6 @@ fn audit_delivery_order(received: &[u32], minted: u32, published: &[u32]) -> Res
 /// for existing is the concurrent case. Use [`audit_received_unordered`] for a model with
 /// more than one producer; it keeps the two checks a ring can actually fail
 /// and drops the one only a single producer guarantees.
-/// → `docs/algorithm/002_the_four_passes_of_an_audit.md` TK3.
 ///
 /// # Errors
 ///
@@ -595,7 +582,6 @@ impl Script {
   /// feature, which this crate neither enables nor names in its manifest. A
   /// caller who enables it can hand `run` an evicting ring and get an
   /// `Outcome` shaped like any other.
-  /// → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md` TK42.
   #[must_use = "the Outcome is the measurement — `script.run( &mut ring );` as a statement drives the ring and discards everything it observed"]
   #[allow(
     clippy::too_many_lines,
@@ -661,7 +647,7 @@ impl Script {
           // for the whole batch, and it cannot be used here. It claims against a
           // `SeqCell`, and a `ring_core::Ring` exposes no cursor at all. So the
           // staged records go in one at a time, which is the only join the two
-          // crates have. → `docs/pitfall/003_the_amortised_flush_has_no_ring.md`.
+          // crates have.
           //
           // Collected first because `drain()` borrows `staging` for the loop,
           // and the guard's push cannot run while that borrow is live.

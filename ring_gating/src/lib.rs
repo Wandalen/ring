@@ -3,11 +3,10 @@
 //! Tier 4 of the ring family's 33 crates, which together implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_seqno`.
 //!
-//! `docs/feature/178_sequence_barrier_and_gating_set.md` names the two halves.
-//! This crate is the producer's half. Given a set of consumer cursors, it answers
-//! how far a producer may advance without landing on a slot one of them has not
-//! finished with. `ring_barrier` is the consumer's half, and reads the same
-//! minimum from the other side.
+//! The sequence barrier has two halves. This crate is the producer's half.
+//! Given a set of consumer cursors, it answers how far a producer may advance
+//! without landing on a slot one of them has not finished with. `ring_barrier`
+//! is the consumer's half, and reads the same minimum from the other side.
 //!
 //! ## Why the slowest consumer, and only the slowest
 //!

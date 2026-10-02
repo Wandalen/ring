@@ -1,8 +1,7 @@
 //! `ring_cursor`'s padded cursor and the pair it comes in.
 //!
 //! This file carries the reached-test for `docs/feature/169_padded_cursor.md`,
-//! stated in `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`
-//! as three clauses: `align_of::<PaddedCursor>() == 64`,
+//! which has three clauses: `align_of::<PaddedCursor>() == 64`,
 //! `size_of::<PaddedCursor>() == 64`, and two `PaddedCursor` values in one
 //! struct sitting at least 64 bytes apart.
 //!
@@ -23,12 +22,12 @@
 //!
 //! ## What is not asserted here, and why
 //!
-//! That the padding *makes anything faster*. That is feature 186's job and
-//! `ring_bench`'s file. A padded-versus-unpadded verdict is a measurement under
-//! contention, not a unit test, and asserting a timing here would produce a
-//! test that fails on a loaded CI box for reasons that have nothing to do with
-//! the code. What this file establishes is that the layout the measurement will
-//! be taken on is the layout claimed.
+//! That the padding *makes anything faster*. That is `ring_bench`'s job. A
+//! padded-versus-unpadded verdict is a measurement under contention, not a unit
+//! test, and asserting a timing here would produce a test that fails on a
+//! loaded CI box for reasons that have nothing to do with the code. What this
+//! file establishes is that the layout the measurement will be taken on is the
+//! layout claimed.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -49,7 +48,7 @@ fn cap(slots: usize) -> Capacity {
   Capacity::new(slots).expect("test capacities are powers of two")
 }
 
-// ── feature 169: the three-clause reached-test ─────────────────────────────
+// ── the three-clause reached-test ──────────────────────────────────────────
 
 #[test]
 fn a_padded_cursor_occupies_exactly_one_cache_line() {
@@ -190,8 +189,9 @@ fn free_slots_falls_as_the_producer_advances() {
 
 #[test]
 fn exactly_one_lap_ahead_is_full_and_one_less_is_not() {
-  // The off-by-one feature 178 calls a lap bug. At a distance of exactly
-  // `capacity` the next claim lands on the slot the consumer is currently on.
+  // The off-by-one the sequence-barrier feature calls a lap bug. At a distance
+  // of exactly `capacity` the next claim lands on the slot the consumer is
+  // currently on.
   let pair = CursorPair::new(cap(4));
 
   pair.producer().store(Seq(3), Ordering::Release);
@@ -318,15 +318,17 @@ fn two_threads_advancing_two_cursors_do_not_lose_writes() {
   std::thread::scope(|scope| {
     scope.spawn(|| {
       for _ in 0..PER_THREAD {
-        // Fix(AT5): the claim is deliberately discarded. This loop counts advances
-        // and does not consume the ranges they hand out.
+        // Fix(counting_loops_discard_their_claims): the claim is deliberately
+        // discarded. This loop counts advances and does not consume the ranges they
+        // hand out.
         let _ = pair.producer().fetch_add(1, Ordering::AcqRel);
       }
     });
     scope.spawn(|| {
       for _ in 0..PER_THREAD {
-        // Fix(AT5): the claim is deliberately discarded. This loop counts advances
-        // and does not consume the ranges they hand out.
+        // Fix(counting_loops_discard_their_claims): the claim is deliberately
+        // discarded. This loop counts advances and does not consume the ranges they
+        // hand out.
         let _ = pair.consumer().fetch_add(1, Ordering::AcqRel);
       }
     });
@@ -348,8 +350,9 @@ fn many_producers_on_one_cursor_lose_nothing() {
     for _ in 0..THREADS {
       scope.spawn(|| {
         for _ in 0..PER_THREAD {
-          // Fix(AT5): the claim is deliberately discarded. This loop counts advances
-          // and does not consume the ranges they hand out.
+          // Fix(counting_loops_discard_their_claims): the claim is deliberately
+          // discarded. This loop counts advances and does not consume the ranges they
+          // hand out.
           let _ = cursor.fetch_add(1, Ordering::AcqRel);
         }
       });

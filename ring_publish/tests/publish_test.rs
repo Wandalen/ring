@@ -1,6 +1,6 @@
 //! `Publisher`'s own methods, tested at the boundaries.
 //!
-//! Separate from `handshake_test.rs`, which is feature 170's reached-test and
+//! Separate from `handshake_test.rs`, which is the handshake's reached-test and
 //! exercises this crate only as one of four participants. That test answers
 //! "does the handshake hold"; this one answers "does each operation do what its
 //! contract says". The two fail for different reasons. A `try_publish` that

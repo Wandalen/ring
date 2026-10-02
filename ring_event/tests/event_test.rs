@@ -108,7 +108,7 @@ fn an_unpublished_typed_slot_reads_as_nothing() {
 
 #[test]
 fn an_unpublished_bytes_slot_reads_as_nothing_rather_than_as_an_empty_payload() {
-  // The distinction feature 170's handshake rests on: "nobody has published
+  // The distinction the claim/publish handshake rests on: "nobody has published
   // here" and "somebody published nothing" are different states, and a drain
   // must be able to tell them apart.
   let slot = BytesSlot::<8>::empty();
@@ -170,7 +170,7 @@ fn a_typed_publish_cannot_fail() {
 /// as "remove" gets a ring every slot of which reports occupied after a full
 /// pass, with no compile error and no runtime error to say so. That is why the
 /// third call exists and why the function's own documentation opens by denying
-/// its name. See `lifecycle/001` SL29.
+/// its name.
 #[test]
 fn draining_reads_the_slot_without_emptying_it() {
   let mut typed = TypedSlot::empty();
@@ -211,10 +211,10 @@ fn recycling_empties_either_shape_through_the_same_call() {
   assert_eq!(drain_from(&typed), None);
   assert_eq!(drain_from(&bytes), None);
 
-  // EV12: pin recycle's "identical path" claim at the value level too, not
-  // only through `drain_from`/`is_empty`. A recycled byte slot must compare
-  // and print exactly as a fresh one, through the shape's own `PartialEq`/
-  // `Debug`, the same functions a caller would inspect.
+  // Pin recycle's "identical path" claim at the value level too, not only
+  // through `drain_from`/`is_empty`. A recycled byte slot must compare and
+  // print exactly as a fresh one, through the shape's own `PartialEq`/`Debug`,
+  // the same functions a caller would inspect.
   assert_eq!(bytes, BytesSlot::<8>::empty(), "a recycled byte slot equals a fresh one");
 }
 

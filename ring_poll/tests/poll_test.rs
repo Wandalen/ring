@@ -67,14 +67,14 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
 
 // ── The reached-test ──────────────────────────────────────────────────────
 
-/// Feature 183's reached-test asserts that the crates from which a parking
+/// The feature's reached-test asserts that the crates from which a parking
 /// operation is reachable are exactly the three declared, and that no tick-path
 /// crate is among them.
 ///
 /// The assertion runs against the manifests on disk rather than against
 /// [`PARKING_CRATES`] alone, so the roster cannot drift away from the graph it
 /// describes. Adding `ring_wait` to `ring_handle` fails here. That is the exact
-/// mistake feature 183 exists to prevent, and `ring_handle`'s own green suite
+/// mistake the feature exists to prevent, and `ring_handle`'s own green suite
 /// would not notice it.
 #[test]
 fn the_tick_path_cannot_reach_a_parking_operation() {
@@ -319,11 +319,11 @@ fn progress_sums_across_the_steps_of_one_tick() {
 ///
 /// Why Not Caught: every existing test summed small literal counts
 /// (`progress_sums_across_the_steps_of_one_tick` uses `2`, `3`, `1`). The
-/// crate's one previously-known raw-`+=` overflow risk (`Tick::moved`,
-/// `docs/data_structure/002` PL12) is a private field reachable only through
-/// real ring traffic, and that doc dismissed it as impractical to reach. That
-/// holds for `Tick::moved` but not for `Progress::of`, a public constructor one
-/// direct call away from the same class of bug with no ring involved at all.
+/// crate's one previously-known raw-`+=` overflow risk (`Tick::moved`) is a
+/// private field reachable only through real ring traffic, and was dismissed
+/// as impractical to reach. That holds for `Tick::moved` but not for
+/// `Progress::of`, a public constructor one direct call away from the same
+/// class of bug with no ring involved at all.
 ///
 /// Fix Applied: `then` now composes with `saturating_add` instead of `+`, so
 /// the sum floors at `usize::MAX`. That is still `Progress::Made`, never a
@@ -394,8 +394,8 @@ fn a_multi_attempt_budget_spends_every_attempt_before_giving_up() {
 /// Under the default policy a full push reports success and keeps nothing.
 ///
 /// This is `OverflowPolicy::DropNewest`'s behaviour, and every helper here passes
-/// it through. `docs/pitfall/002` records it. It was first found in
-/// `ring_shutdown`, whose `Refusal::Full` arm is unreachable for the same reason.
+/// it through. It was first found in `ring_shutdown`, whose `Refusal::Full` arm
+/// is unreachable for the same reason.
 #[test]
 fn push_within_under_drop_newest_reports_success_and_keeps_nothing() {
   let mut ring = ring(2);

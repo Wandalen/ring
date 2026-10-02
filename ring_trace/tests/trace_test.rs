@@ -1,10 +1,8 @@
 //! One entry per operation when enabled; zero when not.
 //!
 //! Claims the `ring_trace` clause of `docs/feature/185_ring_stats.md`. Its
-//! acceptance criterion, filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`, reads
-//! in part: "`ring_trace` records one entry per sequence operation when
-//! enabled and zero when not."
+//! acceptance criterion reads in part: "`ring_trace` records one entry per
+//! sequence operation when enabled and zero when not."
 //!
 //! Two numbers, both literal. The `zero` half is the one that matters most.
 //! The ring family's whole output is a measured comparison between candidate
@@ -137,7 +135,7 @@ fn entries_come_back_in_the_order_recorded() {
 #[test]
 fn a_batch_is_one_entry_carrying_its_count_not_n_entries() {
   // A trace that expanded a batch claim into 64 entries would contradict the
-  // thing it is evidence of, feature 177's "one operation, not 64".
+  // thing it is evidence of, that a batch claim is "one operation, not 64".
   let trace = Trace::enabled();
   trace.record(TraceOp::Claim, Seq(8), 64);
 
@@ -352,15 +350,14 @@ fn a_disabled_trace_stays_empty_under_contention() {
   assert_eq!(trace.len(), 0, "8000 calls, zero entries");
 }
 
-// -------------------------------------------------------------------- TR41
+// ------------------------------------------- the top of the sequence space
 
 #[test]
 fn end_saturates_instead_of_reading_backwards_at_the_top_of_u64() {
   // `ring_mpsc::UNSTAMPED` is `Seq( u64::MAX )`, the one sequence the family
   // publishes by name. `end()` used to compute this with a bare `+`, which
   // wraps to `0` in release and panics under debug assertions. Either way the
-  // rendered line misleads or kills the diagnostic reading it (`pitfall/001`
-  // TR41).
+  // rendered line misleads or kills the diagnostic reading it.
   let entry = TraceEntry {
     op: TraceOp::Publish,
     seq: Seq(u64::MAX),

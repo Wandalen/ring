@@ -363,11 +363,10 @@ fn the_error_names_the_taken_name() {
   assert!(caller().is_err(), "RegistryError does not satisfy Error");
 }
 
-/// `get_mut` is E5's uncovered path. Assignment through the borrow replaces
-/// the ring in place, and nothing in the registry refuses it the way `E2`
-/// refuses a second `register` under the same name.
-///
-/// → `docs/invariant/001_one_name_one_ring.md`, E5.
+/// `get_mut` is the path "one name, one ring" leaves uncovered. Assignment
+/// through the borrow replaces the ring in place, and nothing in the registry
+/// refuses it the way the registry refuses a second `register` under the same
+/// name.
 #[test]
 fn assigning_through_get_mut_drops_the_ring_it_replaces() {
   static DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -393,8 +392,8 @@ fn assigning_through_get_mut_drops_the_ring_it_replaces() {
 
   assert_eq!(DROPS.load(Ordering::SeqCst), 0, "nothing dropped on the way in");
 
-  // No refusal, no return value, no `remove`. E1/E2's protection covers
-  // `register`, not this.
+  // No refusal, no return value, no `remove`. The one-name-one-ring protection
+  // covers `register`, not this.
   *registry.get_mut("events").unwrap() = ring::<Counted>(16);
 
   assert_eq!(

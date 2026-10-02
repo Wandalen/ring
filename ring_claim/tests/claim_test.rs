@@ -6,7 +6,7 @@
 //! because the handshake is only observable once publishing exists.
 //! `docs/feature/172_multi_producer_claim.md` requires that no two producers
 //! are ever granted the same sequence. This file asserts that directly, and
-//! `ring_mpsc/tests/mpsc_test.rs` asserts it again end-to-end at S5.
+//! `ring_mpsc/tests/mpsc_test.rs` asserts it again end-to-end.
 //!
 //! ## What a sequential test cannot show
 //!
@@ -93,8 +93,8 @@ fn sequences_yields_exactly_the_range() {
 #[test]
 fn adjacent_claims_do_not_overlap() {
   // The boundary case exclusivity turns on. Two producers handed consecutive
-  // ranges must not be reported as colliding, or the property test that
-  // guards feature 172 would fail on correct behaviour.
+  // ranges must not be reported as colliding, or the property test that guards
+  // multi-producer exclusivity would fail on correct behaviour.
   let first = Claim::new(Seq(0), 4);
   let second = Claim::new(Seq(4), 4);
 
@@ -291,7 +291,7 @@ fn the_producer_cursor_occupies_its_own_cache_line() {
   assert_eq!(core::mem::size_of::<ring_cursor::PaddedCursor>(), 64);
 }
 
-// ── feature 172: exclusivity under contention ──────────────────────────────
+// ── exclusivity under contention ───────────────────────────────────────────
 
 #[test]
 fn no_two_producers_are_ever_granted_the_same_sequence() {
@@ -409,9 +409,9 @@ fn claim_up_to_under_contention_loses_no_sequences_either() {
 
 #[test]
 fn each_producers_own_claims_stay_in_issue_order() {
-  // Feature 172's third clause. The test deliberately does not assert global
-  // order across producers. Nothing promises it, and asserting it would fail
-  // correct implementations.
+  // The multi-producer claim feature's third clause. The test deliberately does
+  // not assert global order across producers. Nothing promises it, and
+  // asserting it would fail correct implementations.
   const PRODUCERS: usize = 3;
   const CLAIMS_EACH: usize = 1_000;
 
@@ -510,12 +510,12 @@ fn no_grant_ever_passes_the_limit_under_contention() {
 /// Writing through `Claimer::cursor()` defeats both properties this crate
 /// exists to hold, in safe code, from outside the crate.
 ///
-/// CL33 in `docs/lifecycle/002_the_claimer_over_a_rings_life.md` recorded that
-/// `cursor()` returns a `&PaddedCursor`, that `PaddedCursor : SeqCell` is a
-/// public trait, and that every `SeqCell` method takes `&self`. Any caller
-/// holding the accessor's result can therefore reach `store` and `fetch_add`.
-/// This test is that finding as executable evidence. It asserts the hazard is
-/// *real*, not that the crate is broken, so it is expected to keep passing.
+/// An earlier finding recorded that `cursor()` returns a `&PaddedCursor`, that
+/// `PaddedCursor : SeqCell` is a public trait, and that every `SeqCell` method
+/// takes `&self`. Any caller holding the accessor's result can therefore reach
+/// `store` and `fetch_add`. This test is that finding as executable evidence.
+/// It asserts the hazard is *real*, not that the crate is broken, so it is
+/// expected to keep passing.
 ///
 /// It pins the boundary the manual `§ C2` check cannot see. `§ C2` greps
 /// this crate's own source for exactly two atomic mutations, both
@@ -547,13 +547,12 @@ fn writing_through_the_cursor_accessor_defeats_the_gate() {
 
 /// `Claim`'s two predicates answer at compile time.
 ///
-/// CL52 in `docs/workaround/001_two_const_functions_the_compiler_refuses.md`
-/// recorded that `contains` and `overlaps` were the two of `Claim`'s seven
-/// methods that were not `const`, and that nothing about them required it.
-/// Both compared `Seq` values through `PartialOrd`, which a `const fn` cannot
-/// call, when the raw `u64` comparison underneath is const-callable.
-/// `sequences`, three lines above `overlaps`, already showed this by reaching
-/// through the newtype's public field.
+/// An earlier finding recorded that `contains` and `overlaps` were the two of
+/// `Claim`'s seven methods that were not `const`, and that nothing about them
+/// required it. Both compared `Seq` values through `PartialOrd`, which a
+/// `const fn` cannot call, when the raw `u64` comparison underneath is
+/// const-callable. `sequences`, three lines above `overlaps`, already showed
+/// this by reaching through the newtype's public field.
 ///
 /// They now compare `.0` directly. This test pins that at compile time. If
 /// either method loses `const`, these `const` bindings fail to build, which
@@ -588,16 +587,12 @@ fn claim_predicates_answer_in_a_const_context() {
 /// The four routes by which a bound `Claim` fails to reach a `publish`, all
 /// compiled here by name.
 ///
-/// CL43 in `docs/pitfall/001_dropping_a_claim.md` claims that none of the four
-/// warns. The `#[ must_use ]` on `Claim` fires on an unused *value*, and every
-/// one of these uses the value before losing it. That claim used to rest on a
-/// recipe that ran `cargo build` over the workspace and counted warnings, which
-/// compiled none of the four and so measured nothing. This file compiles them
-/// instead, so the crate's own `-D warnings` build is the measurement. If any
-/// route did warn, this file would not build.
-///
-/// The routes are numbered to match the finding's own listing, and the recipe
-/// under CL43 counts these four markers to prove it is still reading them.
+/// None of the four warns. The `#[ must_use ]` on `Claim` fires on an unused
+/// *value*, and every one of these uses the value before losing it. That claim
+/// used to rest on a recipe that ran `cargo build` over the workspace and
+/// counted warnings, which compiled none of the four and so measured nothing.
+/// This file compiles them instead, so the crate's own `-D warnings` build is
+/// the measurement. If any route did warn, this file would not build.
 #[test]
 fn none_of_the_four_abandonment_routes_warns() {
   let consumers = GatingSet::new(cap(8), 1);
@@ -638,6 +633,6 @@ fn none_of_the_four_abandonment_routes_warns() {
   assert_eq!(reached, 1, "route 4 dropped the first iteration's claim");
 
   // Four sequences claimed across the four routes, none of them published,
-  // and the cursor has no idea. CL44 shows the ring dying in this state.
+  // and the cursor has no idea.
   assert_eq!(claimer.claimed(), Seq(5), "five claims, five sequences, zero publications");
 }

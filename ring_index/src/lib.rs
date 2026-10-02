@@ -3,7 +3,7 @@
 //! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
-//! This is the half of `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`
+//! This is the half of the sequence-to-slot-index and power-of-two-capacity feature
 //! that folds. Given a [`ring_types::Seq`] and a [`ring_types::Capacity`], the fold produces
 //! the [`ring_types::SlotIndex`] it addresses. The feature's whole reason for
 //! constraining capacity to a power of two is that this fold is then a bitmask
@@ -78,7 +78,7 @@ pub fn aliases(a: Seq, b: Seq, capacity: Capacity) -> bool {
 ///
 /// A batch claim is contiguous in sequence space, so its slots wrap at most
 /// once. That is what preserves a staged buffer's relative order when it
-/// lands, per `docs/feature/177_batch_claim_and_batch_drain.md`.
+/// lands.
 ///
 /// That guarantee belongs to the caller's batch claim, not to this function:
 /// `run` neither clamps nor deduplicates, so a `count` larger than `capacity`

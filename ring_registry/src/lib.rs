@@ -31,11 +31,12 @@
 //! **It is generic over one record type.** A registry holding rings of
 //! different `T` would need type erasure and downcasting at every retrieval,
 //! and nothing asks for it. `ring_factory`, the only consumer, builds one ring
-//! at a time. → `docs/decisions/readme.md` Pending 1.
+//! at a time.
+//! → `docs/decisions/001_the_registry_stays_minimal_until_a_consumer_asks.md`.
 //!
 //! **It offers no shared retrieval.** Everything a caller can do with a ring
 //! needs `&mut`, so retrieval is `get_mut` and there is no immutable `get`.
-//! → `docs/api/001_the_registry_surface.md`.
+//! → `docs/decisions/001_the_registry_stays_minimal_until_a_consumer_asks.md`.
 
 #![deny(missing_docs)]
 
@@ -119,8 +120,8 @@ impl<T> Registry<T> {
   /// estimate. This method refuses both of the remedies the lint suggests:
   ///
   /// - *Shrink the payload.* The payload **is** the point. Dropping the
-  ///   `Split< T >` from the error is exactly the data loss
-  ///   `docs/pitfall/001` exists to prevent, one step removed. The ring would
+  ///   `Split< T >` from the error is exactly the data loss the refusal
+  ///   exists to prevent, one step removed. The ring would
   ///   be destroyed by a failed registration instead of by a successful one.
   /// - *Box it.* That allocates on the failure path, to fix a size the caller
   ///   already pays on the success path anyway. `register` takes the same
@@ -129,13 +130,12 @@ impl<T> Registry<T> {
   ///
   /// A third option, outside the lint's own suggestions, is refused too.
   /// `large-error-threshold` in `clippy.toml` would silence it crate-wide, which
-  /// draws the same objection `docs/decisions/readme.md` Closed 2 raises against
-  /// a crate-wide `allow`.
+  /// draws the same objection as a crate-wide `allow`.
   ///
   /// The cost is that every caller's `Result` is that wide, including on the
   /// `Ok` path. `register` is a setup-time call, once per ring and never in a
   /// loop, so the width is paid where it does not matter.
-  /// → `docs/decisions/readme.md` Closed 2.
+  /// → `docs/decisions/001_the_registry_stays_minimal_until_a_consumer_asks.md`.
   ///
   /// # The clone on the occupied arm
   ///
@@ -143,7 +143,6 @@ impl<T> Registry<T> {
   /// `OccupiedEntry` has no `into_key`. The clone measured
   /// **22–23 ns, 43–44% of the arm**. The only method that yields the key by
   /// value is `remove_entry`, which deletes the ring this method must not destroy.
-  /// → `docs/workaround/001`.
   #[allow(
     clippy::result_large_err,
     reason = "the large payload is the caller's ring, handed back rather than destroyed"

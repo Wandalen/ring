@@ -5,7 +5,7 @@
 //! that `RingConfig` carries capacity, wait kind, overflow policy, producer
 //! count and batch size, and that each field is *observable* one at a time.
 //! The factory half, which asserts a built ring's behaviour matches each field,
-//! is `ring_factory`'s and lands at stage S7.
+//! is `ring_factory`'s.
 //!
 //! The clamping behaviour below is the part worth testing hardest. A builder
 //! that silently corrects an impossible value is only safe if the correction is
@@ -102,12 +102,11 @@ fn setters_commute() {
 /// `setters_commute` above proves order-independence only where neither clamp
 /// fires.
 ///
-/// `docs/invariant/002` (RC24) names that as the easy half, since it exercises
-/// the one setter with a cross-field read (`with_batch`, against `capacity`)
-/// only on the path where that read has no visible effect. This is the
-/// interesting half. Every one of the 4! = 24 orderings of the four setters,
-/// with `with_producers` and `with_batch` both given values that actually
-/// clamp, must still land on the same record.
+/// That is the easy half, since it exercises the one setter with a cross-field
+/// read (`with_batch`, against `capacity`) only on the path where that read has
+/// no visible effect. This is the interesting half. Every one of the 4! = 24
+/// orderings of the four setters, with `with_producers` and `with_batch` both
+/// given values that actually clamp, must still land on the same record.
 #[test]
 fn setters_commute_when_both_clamps_fire() {
   #[derive(Clone, Copy)]
@@ -220,7 +219,7 @@ fn multi_producer_is_derived_from_the_count() {
   assert!(cfg.with_producers(64).is_multi_producer());
 }
 
-/// Tick-safety is exactly non-blocking waiting, the constraint feature 183
+/// Tick-safety is exactly non-blocking waiting, the constraint the tick path
 /// puts on what a system may reach.
 #[test]
 fn tick_safety_is_exactly_non_blocking_waiting() {

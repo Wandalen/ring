@@ -29,27 +29,26 @@
 //!
 //! # What the implementation settled
 //!
-//! Building answered three questions the pre-implementation instances left
-//! open, and each answer is recorded where its question was asked.
+//! Building answered three questions the pre-implementation design left open.
 //!
-//! | Question | Settled as | Recorded in |
-//! |---|---|---|
-//! | The flush log's compilation boundary | An opt-in [`FlushLog`] the [`Flusher`] owns, with no cargo feature and no `cfg` | `docs/data_structure/002_the_flush_log.md` |
-//! | How a record reaches the buffer at all | [`Flusher::append`], absent from both API instances | `docs/api/001_the_policy_surface.md` |
-//! | `ConfigError::AlreadyBound` | Unreachable. `new` takes the buffer by value, so ownership enforces N3 | `docs/type/001_flush_policy.md` |
+//! | Question | Settled as |
+//! |---|---|
+//! | The flush log's compilation boundary | An opt-in [`FlushLog`] the [`Flusher`] owns, with no cargo feature and no `cfg` |
+//! | How a record reaches the buffer at all | [`Flusher::append`], absent from the pre-implementation API |
+//! | `ConfigError::AlreadyBound` | Unreachable. `new` takes the buffer by value, so ownership enforces one policy per buffer |
 //!
 //! # The `ring_tls` API this crate is built on
 //!
 //! `ring_tls`'s pre-implementation API specified `seal`/`drain`/`reset` as
 //! three calls, and what was built is `flush_into`, which fuses claim and drain
 //! and empties the buffer whether or not the records land. That shape cannot
-//! satisfy this crate's O3/O4, because a rejected batch would already be gone.
-//! `TlsBuffer::drain` was added there so the check can happen before the buffer
-//! is touched (→ `docs/algorithm/002_sequencing_seal_drain_reset.md`).
+//! satisfy this crate's ordering obligations, because a rejected batch would
+//! already be gone. `TlsBuffer::drain` was added there so the check can happen
+//! before the buffer is touched.
 //!
-//! Feature 176 is Reached when each of the three policies fires at exactly its
-//! stated trigger and at no other point, asserted by a scripted sequence
-//! against a recorded flush log in `tests/flush_test.rs`.
+//! The flush-policy feature is Reached when each of the three policies fires
+//! at exactly its stated trigger and at no other point, asserted by a scripted
+//! sequence against a recorded flush log in `tests/flush_test.rs`.
 
 #![deny(missing_docs)]
 
@@ -71,7 +70,7 @@ use ring_types::RingError;
 /// Withheld deliberately, and it is the most likely trait to be added by
 /// mistake. A default policy is a policy nobody chose, applied wherever someone
 /// wrote `..Default::default()`. That one derive would recreate exactly the
-/// "publication point nobody designed" state feature 176 exists to prevent.
+/// "publication point nobody designed" state this crate exists to prevent.
 ///
 /// ```
 /// use ring_flush::FlushPolicy;
@@ -166,8 +165,7 @@ pub enum ConfigError {
 // error type on that Contract implementing neither trait. `ring_types::RingError`
 // and `ring_factory::BuildError` both implement them, so a consumer could not render a
 // binding refusal or fold it into a `Box< dyn Error >` alongside the other two.
-// Found by `ring_bench`, which is the first crate to hold all three at once;
-// see that crate's `docs/integration/001`.
+// Found by `ring_bench`, which is the first crate to hold all three at once.
 impl core::fmt::Display for ConfigError {
   fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
     match self {
@@ -226,7 +224,7 @@ impl FlushEntry {
 ///
 /// # Why this exists
 ///
-/// Feature 176's criterion is partly negative: each policy fires at its trigger
+/// The acceptance criterion is partly negative: each policy fires at its trigger
 /// **and at no other point**. Proving a flush happened needs no log, since the
 /// ring shows it. Proving no *other* flush happened requires a record of every
 /// flush that did. You cannot observe an absence; you can only enumerate the
@@ -236,7 +234,7 @@ impl FlushEntry {
 ///
 /// A log the driver always maintains would allocate on the flush path in
 /// production and grow without bound in a long-running process, so the
-/// pre-implementation instance weighed `cfg(test)` (invisible to integration
+/// pre-implementation design weighed `cfg(test)` (invisible to integration
 /// tests), `cfg(debug_assertions)` (coarse), a `flush-log` cargo feature (the
 /// acceptance criterion then holds only under a non-default feature), and a
 /// caller-supplied sink (a generic parameter on an exported type).
@@ -252,10 +250,10 @@ impl FlushEntry {
 /// Entries carry the [`FlushOutcome`] the drive call returned, written inside
 /// that call rather than beside it, so a flush that produced an outcome and no
 /// entry is unrepresentable and an entry that disagrees with its outcome is
-/// unrepresentable too. That is stronger than the acceptance row asks for. The
-/// row mandates a log and asserts against it, but requires nothing of its
-/// completeness, and a flush path that bypassed logging would satisfy every
-/// assertion while proving nothing.
+/// unrepresentable too. That is stronger than the acceptance criterion asks
+/// for. The criterion mandates a log and asserts against it, but requires
+/// nothing of its completeness, and a flush path that bypassed logging would
+/// satisfy every assertion while proving nothing.
 ///
 /// **A `NotTriggered` call is not logged, and that is the design.** The log
 /// records firings; `is_empty()` is then the assertion that discharges "and at
@@ -434,10 +432,10 @@ impl<'a, T: Send> Flusher<'a, T> {
   ///
   /// **The companion to [`Flusher::staged`], and the reason both are needed.**
   /// An `OnBarrier` caller has no trigger of its own between announcements, so
-  /// its buffer can fill and start refusing appends
-  /// (`docs/algorithm/001`'s option 2). `capacity() - staged()` is how many
-  /// more records it may stage before that happens. It is the one number that lets
-  /// a caller drive early instead of discovering the refusal from an `Err`.
+  /// its buffer can fill and start refusing appends. `capacity() - staged()` is
+  /// how many more records it may stage before that happens. It is the one
+  /// number that lets a caller drive early instead of discovering the refusal
+  /// from an `Err`.
   ///
   /// Advisory in the same way `staged` is: an append on the owning thread can
   /// consume the headroom between the read and the use.

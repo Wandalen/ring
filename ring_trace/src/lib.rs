@@ -3,10 +3,9 @@
 //! Tier 2 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
-//! Claims `docs/feature/185_ring_stats.md`. Its acceptance criterion, filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`, is a
-//! pair of numbers: `ring_trace` "records one entry per sequence operation
-//! when enabled and **zero when not**." Both halves are assertions, and the
+//! Claims the ring-stats feature. Its acceptance criterion is a pair of
+//! numbers: `ring_trace` "records one entry per sequence operation when
+//! enabled and **zero when not**." Both halves are assertions, and the
 //! second is the harder one. A trace that costs something when disabled is a
 //! trace nobody leaves compiled in, and the family's whole output is a measured
 //! comparison that an always-on trace would distort.
@@ -18,17 +17,17 @@
 //! order. A trace answers "which operations, in what order" and grows without
 //! bound. "Order" here is the order producers reached the log's lock, which
 //! is operation order for one producer and an interleaving for more, not
-//! reconstructed sequence order under contention (→ `docs/invariant/002`).
+//! reconstructed sequence order under contention.
 //! Unbounded is not abstract. One producer recording as fast as it can has
 //! been measured to grow the log at roughly 667 MiB/s of live entries. That is
 //! this machine's figure, so trust its order of magnitude rather than its exact
-//! number (→ `docs/lifecycle/001`).
+//! number.
 //! They are not two implementations of one thing. `ring_stats` is
 //! always on and cheap, `ring_trace` is off by default and expensive, and a
 //! diagnosis usually starts at the counter and only then reaches for the log.
 //! "Expensive" measured: roughly 7× the disabled cost per call uncontended,
 //! and 30–40× under four producers sharing one trace. Trust this machine's
-//! ratio, not its nanoseconds (→ `docs/decisions/002`).
+//! ratio, not its nanoseconds.
 //!
 //! ## Why a `Mutex` is the right cost here
 //!
@@ -115,9 +114,9 @@ impl fmt::Display for TraceOp {
 /// One recorded operation.
 ///
 /// `count` is what makes the log readable against a batch. A claim of 64 is one
-/// entry saying 64, not 64 entries, because feature 177's whole point is that
-/// it *was* one operation. A trace that expanded it would contradict the thing
-/// it is meant to be evidence of.
+/// entry saying 64, not 64 entries, because the whole point of a batch claim is
+/// that it *was* one operation. A trace that expanded it would contradict the
+/// thing it is meant to be evidence of.
 ///
 /// `count` is a `usize`, not a narrower `u32`, though every count is bounded by
 /// a ring's [`Capacity`](ring_types::Capacity), a `usize` newtype with no
@@ -149,7 +148,7 @@ impl TraceEntry {
   /// Saturates rather than wrapping. A bare `+` here would print a range that
   /// reads backwards, or panic under debug assertions, the moment a caller
   /// traces the one `Seq` the family publishes by name,
-  /// `ring_mpsc::UNSTAMPED` (`Seq(u64::MAX)`). See `pitfall/001` TR41.
+  /// `ring_mpsc::UNSTAMPED` (`Seq(u64::MAX)`).
   #[must_use]
   pub const fn end(&self) -> Seq {
     Seq(self.seq.0.saturating_add(self.count as u64))
@@ -234,7 +233,7 @@ impl Trace {
   ///
   /// Carries `#[ inline ]` so the disabled path, a single `bool` read and a
   /// return, can be inlined into cross-crate call sites instead of paying for
-  /// an un-inlined call on every producer/consumer step (→ `algorithm/001`).
+  /// an un-inlined call on every producer/consumer step.
   #[inline]
   pub fn record(&self, op: TraceOp, seq: Seq, count: usize) {
     if !self.enabled {
@@ -254,15 +253,15 @@ impl Trace {
   /// statements, so the poisoning this recovers from cannot occur.
   /// A future method that hands out the guard itself, or takes a callback to
   /// invoke under the lock, would change that and needs its own reachability
-  /// argument before it can rely on the same recovery. See `pitfall/002` TR43.
+  /// argument before it can rely on the same recovery.
   fn entries_guard(&self) -> std::sync::MutexGuard<'_, Vec<TraceEntry>> {
     self.entries.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
   }
 
   /// How many entries have been recorded.
   ///
-  /// Zero forever on a disabled trace. This is the second half of feature 185's
-  /// `ring_trace` clause, readable without draining the log.
+  /// Zero forever on a disabled trace. This is the second half of the ring-stats
+  /// feature's `ring_trace` clause, readable without draining the log.
   #[must_use]
   pub fn len(&self) -> usize {
     self.entries_guard().len()
@@ -301,7 +300,7 @@ impl Trace {
   /// `record` takes, unlike [`len`](Self::len), which is a field read. Do not
   /// poll this in a loop alongside a producer whose timing matters. A single
   /// scanning reader has been measured to cut a producer's throughput by two
-  /// orders of magnitude at a 100,000-entry log (→ `docs/algorithm/002`).
+  /// orders of magnitude at a 100,000-entry log.
   ///
   /// ```
   /// use ring_trace::{ Trace, TraceOp };
@@ -324,7 +323,7 @@ impl Trace {
   /// sharing this trace has no signal that its entries are gone. Only the owner,
   /// or someone who can prove exclusivity (e.g. via `Arc::get_mut`), can obtain
   /// the receiver `clear` takes, so a second holder of `&Trace` cannot silently
-  /// erase another's work. See `api/002` TR7.
+  /// erase another's work.
   ///
   /// ```
   /// use ring_trace::{ Trace, TraceOp };

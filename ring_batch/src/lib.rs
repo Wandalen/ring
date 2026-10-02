@@ -3,10 +3,9 @@
 //! Tier 2 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_seqno`, `ring_atomic` and `ring_index`.
 //!
-//! `docs/feature/177_batch_claim_and_batch_drain.md` states the claim this crate
-//! has to make true: "the memory fences that make the handshake correct are paid
-//! per operation, not per item, so a batch of sixty-four costs roughly what a
-//! single item costs."
+//! The batch feature states the claim this crate has to make true: "the memory
+//! fences that make the handshake correct are paid per operation, not per item,
+//! so a batch of sixty-four costs roughly what a single item costs."
 //!
 //! Measured, the claim holds and improves with more producers. But below
 //! roughly eight items there is nothing to amortise. A batch of one costs the
@@ -21,8 +20,8 @@
 //!    item costs" is otherwise a claim nobody checks.
 //! 2. **Contiguous.** The sequences a claim returns are consecutive, which is
 //!    what preserves a thread-local buffer's internal order when it lands.
-//!    That is hard problem 118's requirement that a system's own writes survive the
-//!    merge in order.
+//!    That is the requirement that a system's own writes survive the merge in
+//!    order.
 //!
 //! A [`BatchClaim`] is a *range*, not a buffer. It says which sequences the
 //! caller owns; what goes in them is `ring_store`'s and `ring_event`'s
@@ -101,7 +100,7 @@ impl BatchClaim {
 
   /// One past the last sequence owned, as a property of this claim alone.
   /// Under contention the cell itself will usually have moved past it by
-  /// the time this is read, sometimes by a large margin (-> BA28).
+  /// the time this is read, sometimes by a large margin.
   ///
   /// # Panics
   ///
@@ -111,8 +110,7 @@ impl BatchClaim {
   /// public, `const`, and takes both fields unvalidated. In a release build
   /// the addition wraps instead of panicking, and every method routing
   /// through `end` (`contains`, `sequences`, `overlaps`) then answers as
-  /// though the claim were empty, including for its own `start`
-  /// (-> docs/pitfall/002 BA44).
+  /// though the claim were empty, including for its own `start`.
   ///
   /// ```
   /// use ring_batch::BatchClaim;
@@ -180,7 +178,7 @@ impl BatchClaim {
 
 /// Claim `count` contiguous sequences from `cursor`, in one atomic operation.
 ///
-/// This is the amortisation feature 177 is about. The cost is one `fetch_add`
+/// This is the amortisation the batch feature is about. The cost is one `fetch_add`
 /// whether `count` is 1 or 64. The ordering is the caller's.
 /// `ring_atomic`'s module documentation explains why this crate does not pick one.
 ///
@@ -248,8 +246,8 @@ pub fn claim<C: SeqCell>(cursor: &C, count: usize, order: Ordering) -> BatchClai
 /// this signature stops the same cell from being passed as both. Doing so
 /// makes `free_slots` see zero in-flight sequences on every call, so the gate
 /// always reports the whole capacity free and never returns
-/// [`RingError::Full`] (-> docs/type/001 BA46). `producer` and `consumer`
-/// must be the two distinct ends of one ring.
+/// [`RingError::Full`]. `producer` and `consumer` must be the two distinct ends
+/// of one ring.
 ///
 /// # Errors
 ///
@@ -317,8 +315,8 @@ pub fn claim_gated<P: SeqCell, C: SeqCell>(
 /// The sequences of `claim`, paired with the slot each addresses, in issue
 /// order.
 ///
-/// The drain side of feature 177. Returning the pair rather than just the slot
-/// index keeps the sequence available to the consumer, which needs it to
+/// The drain side of the batch feature. Returning the pair rather than just the
+/// slot index keeps the sequence available to the consumer, which needs it to
 /// advance its own cursor and to detect that it has been lapped.
 ///
 /// ```

@@ -1,4 +1,4 @@
-//! Feature 176's claiming test, for `docs/feature/176_flush_policy.md`.
+//! The claiming test for `docs/feature/176_flush_policy.md`.
 //!
 //! The criterion covers three policies, `OnFull`, `OnBarrier` and
 //! `OnBatch( n )`. Each fires at exactly its stated trigger **and at no other
@@ -6,12 +6,12 @@
 //!
 //! # Why half these tests assert an absence
 //!
-//! This is the only row among the acceptance table's twenty-two whose criterion
-//! is negative in the temporal sense: not "the output is correct" but "no event
-//! occurred outside this set." `ring_handle`'s row is negative too, but its
-//! negatives are compile-time absences a compiler proves. These are runtime
-//! non-events, and the only proof available is enumeration: record every
-//! flush, then find the set complete.
+//! This is the only criterion among the family's features that is negative in
+//! the temporal sense: not "the output is correct" but "no event occurred
+//! outside this set." `ring_handle`'s is negative too, but its negatives are
+//! compile-time absences a compiler proves. These are runtime non-events, and
+//! the only proof available is enumeration: record every flush, then find the
+//! set complete.
 //!
 //! So each policy gets a pair: one test that it fires when it should, and one
 //! that it does not fire when the *other two* policies' conditions hold. The
@@ -78,8 +78,8 @@ macro_rules! flusher {
 
 // ---------------------------------------------------------------- OnFull
 
-/// M1 for `OnFull`: it fires when the buffer cannot accept another record, and
-/// the entry names `Full` as the cause.
+/// `OnFull` fires when the buffer cannot accept another record, and the entry
+/// names `Full` as the cause.
 #[test]
 fn on_full_fires_when_the_buffer_is_full() {
   let mut r = ring(16);
@@ -109,7 +109,7 @@ fn on_full_fires_when_the_buffer_is_full() {
   assert_eq!(landed, vec![0, 1, 2, 3], "staging order survived the flush");
 }
 
-/// M2 for `OnFull`: the other two policies' conditions do not fire it.
+/// The other two policies' conditions do not fire `OnFull`.
 ///
 /// A barrier is announced repeatedly and far more records than any batch size
 /// pass through, all below capacity. Zero entries.
@@ -133,8 +133,7 @@ fn on_full_ignores_barriers_and_counts() {
 
 // -------------------------------------------------------------- OnBarrier
 
-/// M1 for `OnBarrier`: it fires on an announcement, and only through
-/// `drive_at_barrier`.
+/// `OnBarrier` fires on an announcement, and only through `drive_at_barrier`.
 #[test]
 fn on_barrier_fires_only_when_a_barrier_is_announced() {
   let mut r = ring(16);
@@ -156,7 +155,8 @@ fn on_barrier_fires_only_when_a_barrier_is_announced() {
   assert_eq!(landed, vec![10, 11]);
 }
 
-/// M2 for `OnBarrier`: **the measurement the whole design rests on.**
+/// The other two policies' conditions do not fire `OnBarrier`. **This is the
+/// measurement the whole design rests on.**
 ///
 /// Fill the buffer to capacity, drive repeatedly, never announce. If
 /// `OnBarrier` had degenerated into flush-on-every-drive, or had quietly
@@ -200,7 +200,7 @@ fn on_barrier_never_fires_without_an_announcement() {
 
 // --------------------------------------------------------------- OnBatch
 
-/// M1 and M5 for `OnBatch( n )`: nothing at `n - 1`, exactly one at `n`.
+/// `OnBatch( n )` fires nothing at `n - 1`, and exactly one flush at `n`.
 #[test]
 fn on_batch_fires_at_the_boundary_and_not_before() {
   let mut r = ring(16);
@@ -225,7 +225,7 @@ fn on_batch_fires_at_the_boundary_and_not_before() {
   assert_eq!(landed, vec![0, 1, 2]);
 }
 
-/// M2 for `OnBatch`: a barrier does not fire it, however often announced.
+/// A barrier does not fire `OnBatch`, however often announced.
 ///
 /// **Fullness is deliberately not part of this test, and the reason is a
 /// finding rather than an omission.** An `OnBatch( n )` policy cannot observe a
@@ -290,15 +290,14 @@ fn the_batch_trigger_arrives_no_later_than_the_buffer_fills() {
   }
 }
 
-/// Overshoot, P4 of [`docs/state_machine/002`].
+/// Overshoot.
 ///
 /// The trigger is `staged >= n`, not `staged == n`, and the two differ whenever
 /// the caller appends several records between drives. A batch of `2n` publishes
 /// as **one** flush of `2n` records, not two of `n`.
 ///
-/// This is also `docs/integration/001`'s E3, from the other side. The claim
-/// width `ring_tls` sees is whatever accumulated, so an `OnBatch( n )` policy
-/// does not bound it. `n` sets a floor on batch size, never a ceiling.
+/// The claim width `ring_tls` sees is whatever accumulated, so an `OnBatch( n )`
+/// policy does not bound it. `n` sets a floor on batch size, never a ceiling.
 #[test]
 fn an_overshooting_batch_publishes_everything_staged_in_one_claim() {
   let mut r = ring(32);
@@ -327,14 +326,14 @@ fn an_overshooting_batch_publishes_everything_staged_in_one_claim() {
   assert_eq!(landed, vec![0, 1, 2, 3, 4, 5, 6, 7]);
 }
 
-/// P6 of [`docs/state_machine/002`]: a rejected flush leaves the policy armed.
+/// A rejected flush leaves the policy armed.
 ///
 /// The failure this excludes is a driver that treats "I tried" as "I fired":
 /// clearing its trigger on a `Rejected` outcome, so the records stay staged
 /// and nothing ever retries them. Structurally it cannot happen here, since the
 /// trigger is a pure function of the buffer and a rejection leaves the buffer
-/// untouched. But that is an argument about the implementation, and P6 asks
-/// for a measurement.
+/// untouched. But that is an argument about the implementation, not a
+/// measurement.
 ///
 /// Distinct from [`a_refused_final_drain_keeps_the_records`], which retries
 /// `drain_final`. `drain_final` ignores the policy, so it cannot show the
@@ -398,11 +397,11 @@ fn a_rejected_flush_leaves_the_policy_armed() {
   );
 }
 
-/// Dropping a driver with records staged publishes **nothing**. This is Z5 of
-/// [`docs/integration/002`], and the crate's one documented way to lose data.
+/// Dropping a driver with records staged publishes **nothing**. This is the
+/// crate's one documented way to lose data.
 ///
-/// Z5 asked for a compile-time check that no `Drop` impl exists. That is the
-/// wrong instrument twice over: `mem::needs_drop` is true for a `Flusher`
+/// A compile-time check that no `Drop` impl exists would be the wrong
+/// instrument twice over: `mem::needs_drop` is true for a `Flusher`
 /// regardless, because the optional log owns a `Vec`, and a `Drop` impl that
 /// existed but published nothing would be harmless. What matters is the
 /// behaviour, so that is what this asserts.
@@ -410,7 +409,7 @@ fn a_rejected_flush_leaves_the_policy_armed() {
 /// The result is a *hazard*, not a guarantee, and it is deliberate.
 /// Rust has no linear types, so nothing can force the final drain. A `Drop`
 /// impl that flushed would publish at a point nobody chose, which is the exact failure
-/// [`docs/invariant/002`] exists to exclude. It would also need a producer that
+/// this crate exists to exclude. It would also need a producer that
 /// might refuse, with no caller left to hear about it.
 #[test]
 fn dropping_a_driver_with_records_staged_publishes_nothing() {
@@ -470,7 +469,7 @@ fn batches_are_consecutive_not_cumulative() {
 
 // ------------------------------------------------------- outcomes and log
 
-/// M3: every entry's cause matches the configured policy's trigger.
+/// Every entry's cause matches the configured policy's trigger.
 ///
 /// Asserted across all three policies in one place, because the failure this
 /// catches is a flush firing for the wrong reason, which is only visible when
@@ -499,7 +498,7 @@ fn every_entry_names_its_own_policys_trigger() {
   }
 }
 
-/// M4: the log entry and the returned outcome agree on every drive call.
+/// The log entry and the returned outcome agree on every drive call.
 ///
 /// Guaranteed by construction, because the entry carries the outcome. The test is here
 /// because "by construction" is a claim about the code as it stands, and a
@@ -743,12 +742,12 @@ fn a_refused_final_drain_keeps_the_records() {
   assert_eq!(flusher.staged(), 4);
 }
 
-/// What happens to an append after `drain_final`, which is Pending 5 of
-/// [`docs/decisions/readme.md`], pinned rather than left to discovery.
+/// What happens to an append after `drain_final`, pinned rather than left to
+/// discovery.
 ///
-/// That instance called L5 → L3 "unspecified" and named that the one answer
-/// definitely wrong, because callers will find the behaviour by experiment and
-/// depend on whatever they find. So this is the experiment, written down.
+/// Leaving it unspecified is the one answer definitely wrong, because callers
+/// will find the behaviour by experiment and depend on whatever they find. So
+/// this is the experiment, written down.
 ///
 /// **The flusher is reusable.** `drain_final` empties the buffer and publishes;
 /// it does not poison, close, or consume the driver. Appends after it are
@@ -756,9 +755,11 @@ fn a_refused_final_drain_keeps_the_records() {
 /// normally. `drain_final` is a forced flush with a distinguishing cause, not a
 /// terminal operation.
 ///
-/// This is a *recorded default*, not a ruling. Pending 4's consuming signature
-/// would make L5 unrepresentable and is still open; if it is ever taken, this
-/// test is the thing that has to change, which is the point of having it.
+/// This is a *recorded default*, not a ruling. The consuming signature weighed
+/// in `docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md`
+/// would make an append after the final drain unrepresentable; if it is ever
+/// taken, this test is the thing that has to change, which is the point of
+/// having it.
 #[test]
 fn a_driver_still_works_after_a_final_drain() {
   let mut r = ring(16);
@@ -789,8 +790,9 @@ fn a_driver_still_works_after_a_final_drain() {
 /// A second `drain_final` on an already-drained driver is a no-op that says so.
 ///
 /// The companion to the test above. `drain_final` is once-only "by convention"
-/// (Pending 4), so what a redundant second call does is exactly the kind of
-/// thing a caller retrying under uncertainty will hit. It reports
+/// (`docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md`), so what a
+/// redundant second call does is exactly the kind of thing a caller retrying
+/// under uncertainty will hit. It reports
 /// `TriggeredEmpty`, not `Flushed { count : 0 }`, which would claim a
 /// publication that did not happen, and not `NotTriggered`, which is reserved
 /// for a policy that declined.
@@ -947,9 +949,8 @@ fn the_policy_is_a_value() {
     "a discriminant plus one usize — a payload was added"
   );
 
-  // C4 of `docs/non_functional_requirement/002`: nothing runs when a policy
-  // goes out of scope. The instance asked for a trybuild case; this is the
-  // same guarantee for one line and no build dependency, and it is strictly
+  // Nothing runs when a policy goes out of scope. This gives the guarantee a
+  // trybuild case would, for one line and no build dependency, and it is strictly
   // stronger, because it also rejects a variant carrying a payload that *itself* has a
   // `Drop` impl, which a check for `impl Drop for FlushPolicy` would miss.
   assert!(!core::mem::needs_drop::<FlushPolicy>(), "a policy acquired drop glue");
@@ -980,8 +981,8 @@ fn appending_never_publishes() {
 
 /// A driver may cross threads only by being moved, never by being shared.
 ///
-/// [`docs/pitfall/001`]'s F4 as a compile-time fact rather than a warning. The
-/// pitfall's concern was that a barrier signal arriving on another thread would
+/// The cross-thread seal concern, as a compile-time fact rather than a warning.
+/// The concern was that a barrier signal arriving on another thread would
 /// force a cross-thread seal, needing a different mechanism than the one
 /// `ring_tls` provides. It cannot arise, because `Flusher` owns its buffer and its
 /// producer, and every drive method takes `&mut self`, so another thread can
@@ -1002,8 +1003,8 @@ fn appending_never_publishes() {
 /// `ring_core::ProducerInner` is not `Sync`, so neither is anything holding
 /// one. That is inherited rather than chosen here. If
 /// `ring_core` ever made `Producer` `Sync`, this crate would silently acquire
-/// the shareability F4 depends on being absent, and nothing in this file would
-/// notice. The assertion below would still pass.
+/// the shareability this argument depends on being absent, and nothing in this
+/// file would notice. The assertion below would still pass.
 #[test]
 fn a_driver_is_movable_between_threads_and_never_shared() {
   fn assert_send<T: Send>() {}

@@ -3,9 +3,8 @@
 //! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
-//! The crate's whole subject is a single distinction that
-//! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md` makes and
-//! that is easy to lose: **the sequence does not wrap, the slot index does**.
+//! The crate's whole subject is a single distinction that is easy to lose:
+//! **the sequence does not wrap, the slot index does**.
 //! A ring holds `capacity` slots, so two publications `capacity` apart land on
 //! the same slot, but their [`ring_types::Seq`] values differ by exactly
 //! `capacity`, and that difference is what a gate reads to decide whether the
@@ -16,10 +15,9 @@
 //! The folding itself is `ring_index`'s job, deliberately in another crate so
 //! that no function can accidentally do both.
 //!
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 6 rules the
-//! wording. This crate was described as owning "wrapping arithmetic", which
-//! read as a contradiction of feature 167's "never wraps". What wraps is the
-//! index derived downstream, not the sequence handled here.
+//! This crate was described as owning "wrapping arithmetic", which read as a
+//! contradiction of the requirement that the sequence "never wraps". What wraps
+//! is the index derived downstream, not the sequence handled here.
 
 #![deny(missing_docs)]
 
@@ -34,7 +32,7 @@ use ring_types::{Capacity, Seq};
 /// Takes `( earlier, later, .. )`, the opposite order from [`may_claim`],
 /// [`free_slots`] and [`pending`], which all take the later (producer)
 /// position first. A swapped call still compiles and still returns a
-/// plausible-looking `0` rather than an error (see `api/002` SQ8).
+/// plausible-looking `0` rather than an error.
 ///
 /// ```
 /// use ring_types::{ Capacity, Seq };
@@ -55,8 +53,8 @@ pub fn laps_between(earlier: Seq, later: Seq, capacity: Capacity) -> u64 {
 ///
 /// True exactly while the producer is strictly less than one lap ahead. At
 /// exactly one lap the next claim would land on the consumer's current slot,
-/// so the boundary is exclusive, which guards against the off-by-one that
-/// `docs/feature/178_sequence_barrier_and_gating_set.md` calls a lap bug.
+/// so the boundary is exclusive, which guards against the off-by-one known as
+/// a lap bug.
 ///
 /// ```
 /// use ring_types::{ Capacity, Seq };

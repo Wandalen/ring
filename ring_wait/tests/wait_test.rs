@@ -1,12 +1,11 @@
 //! The four `ring_wait` strategies and the one loop they share.
 //!
 //! This file carries the reached-test for
-//! `docs/feature/173_wait_kind_and_strategies.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as three
-//! clauses: `WaitKind` has exactly the four discriminants `Spin`, `Yield`,
-//! `Park`, `None` in `ring_types`; this crate supplies one handler per
-//! discriminant; and `WaitKind::None` returns without blocking when the ring is
-//! empty, asserted by a bounded-time test.
+//! `docs/feature/173_wait_kind_and_strategies.md`, stated as three clauses:
+//! `WaitKind` has exactly the four discriminants `Spin`, `Yield`, `Park`,
+//! `None` in `ring_types`; this crate supplies one handler per discriminant;
+//! and `WaitKind::None` returns without blocking when the ring is empty,
+//! asserted by a bounded-time test.
 //!
 //! ## The first clause is asserted here as well as in `ring_types`
 //!
@@ -51,7 +50,7 @@ fn cap(slots: usize) -> Capacity {
   Capacity::new(slots).expect("test capacities are powers of two")
 }
 
-// ── feature 173, clause 1: the discriminant set ────────────────────────────
+// ── clause 1: the discriminant set ─────────────────────────────────────────
 
 #[test]
 fn there_are_exactly_four_wait_kinds() {
@@ -63,7 +62,7 @@ fn there_are_exactly_four_wait_kinds() {
   );
 }
 
-// ── feature 173, clause 2: one handler per discriminant ────────────────────
+// ── clause 2: one handler per discriminant ─────────────────────────────────
 
 #[test]
 fn every_discriminant_has_a_handler_that_runs() {
@@ -101,7 +100,7 @@ fn exactly_one_discriminant_is_non_blocking() {
   assert_eq!(non_blocking, vec![WaitKind::None], "the tick path has exactly one option");
 }
 
-// ── feature 173, clause 3: None does not block ─────────────────────────────
+// ── clause 3: None does not block ──────────────────────────────────────────
 
 #[test]
 fn none_returns_immediately_from_an_empty_ring() {
@@ -303,7 +302,7 @@ fn escalation_walks_from_cheapest_latency_to_cheapest_cpu() {
 #[test]
 fn none_never_escalates() {
   // Escalating out of `None` would put a blocking strategy on the tick path,
-  // which is the one thing feature 173 names `None` to prevent.
+  // which is the one thing the feature names `None` to prevent.
   assert_eq!(escalation_hint(WaitKind::None), None);
 }
 

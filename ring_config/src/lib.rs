@@ -3,17 +3,17 @@
 //! Tier 1 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`.
 //!
-//! `docs/feature/180_ring_config_and_factory.md` asks for everything that varies
-//! between rings collected into one value, so that a ring's shape is *data*
-//! rather than a choice of constructor. That matters for two reasons. It keeps
-//! the set of legal configurations enumerable instead of "whatever someone wrote
-//! a constructor for". It also means the manifest language that eventually
+//! The config-and-factory feature asks for everything that varies between rings
+//! collected into one value, so that a ring's shape is *data* rather than a
+//! choice of constructor. That matters for two reasons. It keeps the set of
+//! legal configurations enumerable instead of "whatever someone wrote a
+//! constructor for". It also means the manifest language that eventually
 //! describes channels describes exactly this record with no translation layer.
 //!
 //! This crate holds the record and its validation. `ring_factory` turns one
-//! into a ring. That is the other half of feature 180, kept separate because a
-//! configuration must be constructible and inspectable at tier 1, long before
-//! anything at tier 11 exists to consume it.
+//! into a ring. That is the other half of the same feature, kept separate
+//! because a configuration must be constructible and inspectable at tier 1,
+//! long before anything at tier 11 exists to consume it.
 
 #![deny(missing_docs)]
 
@@ -198,8 +198,7 @@ impl RingConfig {
   /// Whether this configuration needs the contended multi-producer claim.
   ///
   /// A derived reading, and the one a factory branches on. A single-producer
-  /// ring must not pay for a synchronisation it does not need, per
-  /// `docs/feature/172_multi_producer_claim.md`.
+  /// ring must not pay for a synchronisation it does not need.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -213,8 +212,7 @@ impl RingConfig {
 
   /// Whether this configuration is safe to use from inside a tick.
   ///
-  /// True only when waiting cannot park, per
-  /// `docs/feature/183_try_only_operations_on_the_tick_path.md`.
+  /// True only when waiting cannot park.
   ///
   /// ```
   /// use ring_types::WaitKind;

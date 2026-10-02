@@ -3,10 +3,9 @@
 //! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_barrier`, `ring_seqno`.
 //!
-//! This crate holds the consumer's two operations in
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`. One says what
-//! may be read, the other reports that it has been read. The feature's
-//! reached-test wires all four operations together in
+//! This crate holds the consumer's two operations in the claim/publish
+//! handshake. One says what may be read, the other reports that it has been
+//! read. The feature's reached-test wires all four operations together in
 //! `ring_publish/tests/handshake_test.rs`.
 //!
 //! ## Why `available` and `commit` are separate calls
@@ -299,8 +298,8 @@ impl<'a> Consumer<'a> {
   ///
   /// Empty when the consumer has caught up. Never includes a
   /// claimed-but-unpublished slot, because the barrier is built over the
-  /// *published* cursor. That is the whole of feature 170's first clause. It is
-  /// a property of what the barrier was pointed at, not of this function.
+  /// *published* cursor. That is the whole of the handshake's first clause. It
+  /// is a property of what the barrier was pointed at, not of this function.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;

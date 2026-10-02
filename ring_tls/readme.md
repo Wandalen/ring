@@ -1,37 +1,34 @@
 # ring_tls
 
-Per-thread, bump-allocated, zero-lock append log. Every thread appends to its
-own buffer with no atomics and no mutexes; a consolidation step later reads
-each thread's buffer.
+Per-thread, bump-allocated, zero-lock append log.
 
-Depends on [`ring_types`](../ring_types/readme.md) and
-[`ring_slot`](../ring_slot/readme.md). One of the 33 `ring_*` crates that make
-up this family's concurrency write-path. The 33 crates form a dependency forest
-rooted at `ring_types`, acyclic by construction. Build order follows
-[`../Cargo.toml`](../Cargo.toml)'s member list; [`../readme.md`](../readme.md)
-describes the family as a whole. This crate was `bump_log` before the family
-adopted a single prefix.
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
-It carries no *consumer*-side family prefix for the original reason, which is
-that it has no natural single owner. A similar append-discipline mechanism
-already exists independently elsewhere for a different consumer's opcode
-encoding. This crate generalizes only the discipline underneath it:
-bump-allocate, append, reset. It takes on no consumer-specific vocabulary,
-which stays that consumer's own open question to settle.
-
-A consumer's migration onto this crate is still undecided, and that decision
-belongs to the consumer, not to this crate. The buffer layout is settled.
+Every thread owns a `TlsBuffer<T>` and appends to it with no atomics and no
+mutexes. `TlsBuffer::flush_into` then moves all `N` accumulated items into the
+ring as one contiguous claim, so they cost one `fetch_add` between them.
 `TlsBuffer<T>` is a `Vec<T>` reserved once to its own refusal bound, which is
-what makes the accumulation free.
+what makes the accumulation free. The crate does not write to the ring and
+does not decide when to flush. A full buffer refuses the push, and the policy
+that reacts is `ring_flush`'s.
 
-The crate is implemented. It accumulates N items with zero atomic operations
-and lands them with one. [`tests/tls_test.rs`](tests/tls_test.rs) asserts both
-numbers through `ring_atomic::CountingSeq`, and the push path is read by hand
-against [`tests/manual/readme.md`](tests/manual/readme.md). Every line is
-covered.
+[`tests/tls_test.rs`](tests/tls_test.rs) asserts the zero and the one through
+`ring_atomic::CountingSeq`, and a reader checks the push path by hand against
+[`tests/manual/readme.md`](tests/manual/readme.md).
+
+## Decisions
+
+- [A refused `TlsBuffer::push` drops the item, and handing it back waits for the first non-`Copy` payload](docs/decisions/001_a_refused_push_drops_the_item.md)
+
+## Run it
+
+```sh
+cargo nextest run -p ring_tls --all-features
+cargo test --doc -p ring_tls --all-features
+```
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build, described in the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | Scope, related crates, and open trade-offs, indexed in [docs/readme.md](docs/readme.md) |
+| `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |

@@ -2,19 +2,27 @@
 
 Optional sequence-operation trace log.
 
-Depends on [`ring_types`](../ring_types/readme.md).
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
-One of the 33 `ring_*` crates that make up this family's concurrency
-write-path. The 33 crates form a dependency forest rooted at `ring_types`,
-acyclic by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
-member list. [`../readme.md`](../readme.md) describes the family as a whole.
+`Trace` records one `TraceEntry` per sequence operation when enabled, and
+nothing when disabled, which is the default. The enabled flag is fixed at
+construction, and a disabled `Trace::record` returns before it touches the
+lock. `ring_stats` counts operations in constant space and is always on, while
+a trace records which operations ran, in the order producers took its lock,
+and grows without bound.
 
-Implemented. [`tests/trace_test.rs`](tests/trace_test.rs) asserts the
+[`tests/trace_test.rs`](tests/trace_test.rs) asserts the
 behaviour, and a reader checks it by hand against
 [`tests/manual/readme.md`](tests/manual/readme.md). Every line is covered.
+
+## Run it
+
+```sh
+cargo nextest run -p ring_trace --all-features
+cargo test --doc -p ring_trace --all-features
+```
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | Scope, related crates, and open trade-offs. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |

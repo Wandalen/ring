@@ -2,27 +2,35 @@
 
 Cache-line padding constants and alignment wrappers.
 
-Depends on [`ring_types`](../ring_types/readme.md).
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
-One of the 33 `ring_*` crates that make up this family's concurrency
-write-path. The 33 crates form a dependency forest rooted at `ring_types`,
-acyclic by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
-member list. [`../readme.md`](../readme.md) describes the family as a whole.
+It gives a value a cache line of its own, so two cursors written by different
+cores do not contend on one line. `CACHE_LINE` is the line size,
+`CacheAligned<T>` pads a value to whole lines, and `on_distinct_lines` checks
+two addresses. [`tests/align_test.rs`](tests/align_test.rs) asserts the
+behaviour, which is also read by hand against
+[`tests/manual/readme.md`](tests/manual/readme.md).
 
-Implemented. It delivers cache-line padding.
-[`tests/align_test.rs`](tests/align_test.rs) asserts the behaviour, which is also
-read by hand against [`tests/manual/readme.md`](tests/manual/readme.md). Every
-line is covered.
+## Decisions
+
+- [`CACHE_LINE` is one unconditional 64 for every target, raised by hand at port time](docs/decisions/001_cache_line_is_one_unconditional_constant.md)
+
+## Known limitations
+
+- `CacheAligned` pads every wrapped value to a whole 64-byte line, so a wrapped
+  `u64` spends 56 of its 64 bytes on padding. That buys nothing when only one
+  field is wrapped. The 128-byte-line host is covered in the decision above.
+
+## Run it
+
+```sh
+cargo nextest run -p ring_align --all-features
+cargo test --doc -p ring_align --all-features
+```
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | Scope, related crates, and open trade-offs. See [docs/readme.md](docs/readme.md) |
+| `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `align_test.rs` and the manual plan under `manual/` |
-
-Three items and one attribute, with 13 doc definitions over 26 instances behind
-them. The documentation is mostly about consequences rather than mechanics.
-[`docs/readme.md`](docs/readme.md) § Where to Start routes by question.
-[`docs/definition/readme.md`](docs/definition/readme.md) § Findings Recorded,
-Not Fixed lists the findings this crate records against code it does not own.

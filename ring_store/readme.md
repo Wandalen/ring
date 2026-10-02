@@ -2,30 +2,35 @@
 
 Power-of-two slot storage array.
 
-Depends on [`ring_types`](../ring_types/readme.md), [`ring_slot`](../ring_slot/readme.md), [`ring_index`](../ring_index/readme.md).
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
-One of the 33 `ring_*` crates that make up this family's concurrency
-write path. The 33 crates form a dependency forest rooted at `ring_types`,
-acyclic by construction. Build order follows
-[`../Cargo.toml`](../Cargo.toml)'s member list, and
-[`../readme.md`](../readme.md) describes the family as a whole.
+`Buffer<S>` is a ring's slots and nothing else. `Buffer::new` allocates as many
+`Default` slots as its `Capacity`, once. The buffer addresses them by
+`ring_types::SlotIndex` and leaves the fold from a sequence to `ring_index`. It
+holds no cursor and no ordering state.
+An SPSC ring and an MPSC ring want different cursor arrangements, so a buffer
+that owned one would serve only one of them. There is no `unsafe`.
 
-Implemented. [`tests/buffer_test.rs`](tests/buffer_test.rs) asserts the
-behaviour, and a reader checks it by hand against
-[`tests/manual/readme.md`](tests/manual/readme.md). Every line is covered.
+## Decisions
 
-Design documentation is a full typed corpus of 13 doc definitions, 26
-instances and 53 verified findings. A command backs each finding, and its output
-is quoted where it is used. Eight of the findings are about other crates, all
-immediate neighbours. A storage tier reaches nowhere, and everything reaches
-into it: every `unsafe` block in the family dereferences into this array. Start
-at [`docs/readme.md`](docs/readme.md).
-[`docs/definition/readme.md`](docs/definition/readme.md) indexes every finding
-and ranks it by severity.
+- [Ring capacity is a runtime `Capacity` over one heap allocation, while slot width stays a type parameter](docs/decisions/001_capacity_is_a_value_and_width_is_a_type.md)
+
+## Known limitations
+
+- `ring_store::Buffer::is_empty` always returns `false`, because a `Capacity` is
+  never zero. A caller asking whether anything is stored wants
+  `ring_store::Buffer::all_empty`, which sits next to it.
+
+## Run it
+
+```sh
+cargo nextest run -p ring_store --all-features
+cargo test --doc -p ring_store --all-features
+```
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | The design corpus of 13 definitions, 26 instances and 53 findings. See [docs/readme.md](docs/readme.md) |
+| `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `buffer_test.rs` and the manual plan under `manual/` |

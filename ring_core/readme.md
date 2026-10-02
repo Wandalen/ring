@@ -2,12 +2,7 @@
 
 Composed ring over an SPSC, MPSC, or crossbeam backend behind one API.
 
-Depends on [`ring_config`](../ring_config/readme.md), [`ring_mpsc`](../ring_mpsc/readme.md), [`ring_overflow`](../ring_overflow/readme.md), [`ring_slot`](../ring_slot/readme.md), [`ring_spsc`](../ring_spsc/readme.md), [`ring_types`](../ring_types/readme.md), and optionally `crossbeam-queue`.
-
-One of the 33 `ring_*` crates that make up this family's concurrency
-write-path. The 33 crates form a dependency forest rooted at `ring_types`,
-acyclic by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
-member list. [`../readme.md`](../readme.md) describes the family as a whole.
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
 This is the **composition point**. `Ring::new` reads the configuration's
 producer count and builds an [`ring_spsc`](../ring_spsc/readme.md) or
@@ -39,21 +34,40 @@ method here, so a counter added at this layer would break that assertion with
 nothing in `ring_spsc`'s own dependency tree to blame. Instrumentation belongs
 in `ring_stats`, which is deliberately not a dependency.
 
-It is also the family's **only crate with a cargo feature**, which makes it two
-programs rather than one. Both must be built and measured. Running one and
-reporting it as the crate is how a coverage figure comes out 22 points low
-while nothing is untested. `tests/manual/readme.md` C3 and C4 record what that
-cost the gates, which now check both.
+The `crossbeam` feature makes it two programs rather than one, and both must
+be built and measured. Running one and reporting it as the crate is how a
+coverage figure comes out low while nothing is untested. The
+[manual plan](tests/manual/readme.md)'s C3 (both feature configurations are
+built by something) and C4 (the coverage figure depends on the feature set)
+check that the gates cover both.
+
+## Decisions
+
+- [`free_capacity` keeps one `usize` signature on every backend, binding at SPSC and advisory elsewhere](docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md)
+- [`crossbeam-queue`'s `ArrayQueue` is an interim third backend inside `ring_core`, behind the `crossbeam` feature](docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md)
+
+## Known limitations
+
+- `ring_core::Ring` exposes no cursor, and `ring_core::Producer::try_push_batch`
+  pushes one record at a time. So `ring_tls::TlsBuffer::flush_into`, which
+  claims a whole batch with one `fetch_add`, has no caller outside `ring_tls`'s
+  own tests, and `ring_testkit::Script::run` flushes staged records one push at
+  a time. A consumer that stages into a `TlsBuffer` and publishes into a
+  `ring_core::Ring` on a hot path, with the per-batch saving measured, would
+  justify exposing a cursor.
+
+## Run it
 
 ```sh
-cargo nextest run -p ring_core                      # 21 tests, two backends
-cargo nextest run -p ring_core --features crossbeam # 23 tests, three
+cargo nextest run -p ring_core                  # default build: two backends
+cargo nextest run -p ring_core --all-features   # adds the crossbeam backend
+cargo test --doc -p ring_core --all-features
 ```
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | 19 doc instances across 12 definitions. See [docs/readme.md](docs/readme.md) |
+| `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The `Ring`, its three backends, and the ends/producer/consumer handles |
-| `tests/core_test.rs` | The crossbeam backend's reached-test and 21 tests across every backend the build offers |
-| `tests/manual/readme.md` | The nine source readings and mutation checks automation cannot make |
+| `tests/core_test.rs` | One program run against every backend the build offers, and the tests around it |
+| `tests/manual/readme.md` | The source readings and mutation checks automation cannot make |

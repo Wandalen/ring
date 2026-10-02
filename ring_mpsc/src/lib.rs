@@ -52,6 +52,47 @@
 //! [`Reserved`]'s `DerefMut` with no synchronization at all, and the publish is
 //! a single store.
 //!
+//! # Invariant: the one consumer receives every published sequence once, in claim order
+//!
+//! Each published sequence is drained exactly once, and the drained order is
+//! the order the claims were granted, which is the order the compare-exchanges
+//! in [`ring_claim::Claimer::claim`] won. Producers finish writing in any
+//! order. The drain turns that back into claim order by stopping at the first
+//! sequence not yet published (see [`Ring::published_through`]). How the
+//! consumer splits the stream into batches cannot change the order, because
+//! every [`Batch`] walks its range in ascending sequence.
+//!
+//! **Excluded.** The interleaving between producers. It is whatever order their
+//! claims won, so only each producer's own records keep its issue order.
+//!
+//! **Enforced by.** `four_producers_exchange_one_hundred_thousand_items_with_byte_parity`
+//! (every record once, no sequence granted twice, each producer's issue order),
+//! `every_slot_is_reused_across_many_laps_without_loss_or_duplication` and
+//! `the_drain_stops_at_the_first_unpublished_sequence_not_the_highest_published`,
+//! all in `tests/mpsc_test.rs`.
+//!
+//! # Invariant: a payload write happens before its read, and the read before the slot's reuse
+//!
+//! Two happens-before edges, one in each direction, made of the pairings
+//! [`PUBLISH`], [`OBSERVE`] and [`COMMIT`] document. Nothing here uses
+//! `SeqCst`, because nothing needs one order across every atomic in the
+//! process.
+//!
+//! A broken edge is a data race. A broken publish edge shows the consumer the
+//! slot as the previous lap left it, in whole or in part. That is an empty slot
+//! if the consumer took the record, and otherwise some or all of the old
+//! record. An old record seen whole passes any check of the record's shape and
+//! arrives in place of the new one, so a count of records still balances. A
+//! broken commit edge lets a producer overwrite a slot the consumer is still
+//! reading, so the consumer sees part or all of the next lap's record instead.
+//!
+//! **Enforced by.** Not the compiler, which accepts any `Ordering`.
+//! `the_orderings_are_the_ones_the_publication_invariant_names` pins the
+//! ordering constants' values, and the loom models in `tests/mpsc_test.rs`'s
+//! `exhaustive` module check the publish edge under `--cfg loom`.
+//! `docs/workaround/readme.md` records that nothing behavioural checks
+//! `COMMIT`.
+//!
 //! # The unsafe, and where its argument lives
 //!
 //! Producers write slots while the consumer reads slots, through shared
@@ -208,6 +249,12 @@ use ring_types::{Capacity, RingError, Seq};
 /// slot's stamp has never been written, has a value that is not a sequence any
 /// drain will ever look for.
 ///
+/// A zeroed stamp array would not do. Slot 0's first sequence is `Seq( 0 )`,
+/// so a zero stamp there reads as published before any producer has written
+/// it. The first drain then reads slot 0 while its producer may still be
+/// writing it, and commits past record zero, which is never delivered.
+/// `stamps_start_unstamped_and_there_is_exactly_one_per_slot` pins the value.
+///
 /// ```
 /// use ring_types::Seq;
 ///
@@ -267,7 +314,8 @@ pub const COMMIT: Ordering = Ordering::Release;
 ///
 /// `Relaxed` is sound because the consumer cursor has exactly one writer. The
 /// thread performing this load is the thread that performed the store it is
-/// reading back, and program order already sequences the two. Contrast
+/// reading back, and program order already sequences the two. A consumer moved
+/// to another thread stays sound for the reason `ring_spsc::OWN` gives. Contrast
 /// [`ring_cursor::GATING`], which is what the *producers* read that same cursor
 /// with, and where `Acquire` is required.
 ///
@@ -288,6 +336,22 @@ pub const OWN: Ordering = Ordering::Relaxed;
 /// borrow.
 ///
 /// [`ends`]: Self::ends
+///
+/// # Lifecycle: construction and teardown
+///
+/// [`Ring::new`] allocates the slot array and the stamp array, and nothing
+/// allocates after it. Claiming, publishing and draining reuse those slots, so
+/// a full ring cannot grow and refuses instead.
+///
+/// Dropping the ring drops every record still in a slot, drained or not,
+/// because the slot array drops its elements. This crate has no teardown code.
+/// `every_record_written_is_destroyed_exactly_once` counts the drops.
+///
+/// There is no reset. Setting both cursors back to zero would leave stamps from
+/// the old run that equal sequences the new run has not published yet, and the
+/// drain would hand those slots out. Calling [`ends`] a second time is not a
+/// reset either, and is unsound today, as its pitfall explains. Reusing a ring
+/// means building a new one.
 ///
 /// ```
 /// use ring_mpsc::Ring;
@@ -502,9 +566,13 @@ impl<S> Ring<S> {
   /// sequence whose stamp does not. Either no producer wrote it yet, or the
   /// stamp still holds the previous lap's sequence.
   ///
-  /// **Do not weaken the comparison below.** `stamp != UNSTAMPED` and
-  /// `stamp >= end` both read a stale stamp from the previous lap as
-  /// published. See `docs/workaround/readme.md`. Only equality is correct.
+  /// **Do not weaken the comparison below.** Only equality is correct.
+  /// `stamp >= end` reads every unwritten stamp as published, since
+  /// [`UNSTAMPED`] is the largest sequence, so it fails on the first lap.
+  /// `stamp != UNSTAMPED` reads a previous lap's stamp as published and passes
+  /// any test that never wraps the ring.
+  /// `a_stale_stamp_from_the_previous_lap_does_not_read_as_published` catches
+  /// it.
   fn contiguous_end(&self, from: Seq, max: usize) -> Seq {
     let mut end = from;
 
@@ -721,6 +789,15 @@ impl<'a, S> Ends<'a, S> {
 /// `Copy` on purpose. A producer is two shared references, so copying one is
 /// free, and giving each thread its own is the intended use. Contrast
 /// [`Consumer`], which is neither `Copy` nor `Sync`.
+///
+/// # Lifecycle: a producer attaches and detaches without the ring knowing
+///
+/// A `Producer` is a capability to claim, not a registration. Copying one
+/// writes nothing and dropping one writes nothing, so the ring never knows how
+/// many producers exist or whether any are left. A consumer cannot tell a
+/// producer that is quiet from one that is gone. That signal has to come from
+/// outside the ring, and `ring_shutdown`'s close flag is the family's way to
+/// send it.
 #[derive(Debug)]
 pub struct Producer<'a, S> {
   ring: &'a Ring<S>,
@@ -922,6 +999,33 @@ impl<'a, T> Producer<'a, TypedSlot<T>> {
 /// again under the new sequence. Either way the outcome is defined rather than
 /// undefined behaviour. No completion flag is tracked, so the consumer cannot
 /// tell a republished record from a fresh one.
+///
+/// # Pitfall: a held guard stalls every later record
+///
+/// **Trap.** Keeping a `Reserved` alive across slow work after claiming, such
+/// as building the payload, taking a lock or waiting on I/O.
+///
+/// **Failure.** The consumer stops at the first unpublished sequence, so every
+/// record claimed after this one, by any producer, waits for this guard to
+/// drop. [`Consumer::available`] counts only the records before it, so the
+/// consumer cannot tell a slow producer from a quiet ring.
+/// `an_unpublished_claim_blocks_every_later_sequence_while_it_is_held` shows
+/// it.
+///
+/// **Mitigation.** Build the payload first and claim last. [`Producer::push`]
+/// does that for a value that is already built.
+///
+/// # Pitfall: a panic after a partial write publishes the partial record
+///
+/// **Trap.** Writing a record into the slot a piece at a time through the
+/// guard, with code between the pieces that can panic.
+///
+/// **Failure.** Unwinding runs this guard's `Drop`, which publishes the slot.
+/// The consumer receives a record with some parts new and some left from
+/// before, and nothing marks it as incomplete.
+///
+/// **Mitigation.** Build the record completely and move it into the slot in one
+/// write, as [`Producer::push`] does.
 #[derive(Debug)]
 pub struct Reserved<'a, S> {
   ring: &'a Ring<S>,
@@ -1014,6 +1118,10 @@ impl<'a, S> Consumer<'a, S> {
 
   /// How many records are published and undrained right now.
   ///
+  /// A lower bound. Producers only add records and only this end drains them,
+  /// so the reading can go stale only by being too low, and a drain that
+  /// follows finds at least this many.
+  ///
   /// ```
   /// use ring_mpsc::Ring;
   /// use ring_slot::TypedSlot;
@@ -1054,6 +1162,26 @@ impl<'a, S> Consumer<'a, S> {
   /// not released for reuse until the caller is finished reading them, which is
   /// what makes the `Release` on the commit meaningful.
   ///
+  /// # Pitfall: looping on `drain` keeps a core busy
+  ///
+  /// **Trap.** Calling `drain` in a loop until records arrive. Nothing in the
+  /// ring wakes a consumer when a producer publishes, so a loop is the shape the
+  /// API suggests.
+  ///
+  /// **Failure.** On a workload that produces records once per tick or frame,
+  /// the loop occupies a whole core between ticks and finds an empty batch
+  /// almost every time. A throughput benchmark does not show the cost, because
+  /// it measures records per second on a machine where that core was free.
+  ///
+  /// **Mitigation.** Drain once per tick where the workload has one. A
+  /// continuous pipeline with no tick is the opposite case. There polling is
+  /// right, and draining on a tick would delay every record by up to a tick.
+  /// The ring picks neither. `drain` and [`drain_up_to`](Self::drain_up_to)
+  /// always return at once, and a caller that wants to wait can call
+  /// `ring_wait::wait_until` with
+  /// [`WaitKind::Park`](ring_types::WaitKind::Park) and
+  /// `|| !consumer.is_empty()`.
+  ///
   /// ```
   /// use ring_mpsc::Ring;
   /// use ring_slot::TypedSlot;
@@ -1078,6 +1206,23 @@ impl<'a, S> Consumer<'a, S> {
   ///
   /// For a consumer that wants a bounded amount of work per tick rather than
   /// whatever accumulated.
+  ///
+  /// # Algorithm: scan the stamps, commit once
+  ///
+  /// The drain loads the stamps forward from [`position`](Self::position), one
+  /// load per slot, and stops at the first that is not yet published. It hands
+  /// the run out as one [`Batch`], whose `Drop` commits it with a single store
+  /// to the consumer cursor. Finding a run costs a load per record and releasing
+  /// it costs one store per batch. A drain that finds nothing still pays the
+  /// load at the gap and a `COMMIT` store to the consumer cursor, whose line
+  /// every producer's headroom check reads.
+  ///
+  /// Two alternatives were weighed. Tracking publication with a second cursor
+  /// would make each producer wait for the one before it, which the module
+  /// documentation explains this crate exists to avoid. The stamp array already
+  /// is a per-slot availability array. The usual alternative stores a lap
+  /// number or a ready flag there instead of the full sequence, and the module
+  /// documentation explains why this crate stores the sequence.
   ///
   /// ```
   /// use ring_mpsc::Ring;

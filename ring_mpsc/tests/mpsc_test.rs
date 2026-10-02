@@ -6,10 +6,10 @@
 //!
 //! # These tests can see an ordering bug, and that was measured rather than assumed
 //!
-//! The publication-ordering invariant says a green suite is not evidence for
-//! the publication ordering, because on x86-64 a `Relaxed` publish is
-//! unobservable. The hardware supplies the ordering the code failed to ask for.
-//! That reasoning is right, but its premise does not hold here. This
+//! `ring_mpsc::PUBLISH`'s documentation says a `Relaxed` publish works on
+//! x86-64, where the hardware supplies the ordering the code failed to ask
+//! for. So a green suite on x86-64 is no evidence for the publication
+//! ordering. That reasoning is right, but its premise does not hold here. This
 //! workspace's host is `aarch64-unknown-linux-gnu` (ARM Neoverse-N1), which is
 //! weakly ordered. Check it with `rustc -vV | grep host`.
 //!

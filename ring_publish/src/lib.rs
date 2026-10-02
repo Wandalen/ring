@@ -2,8 +2,8 @@
 //!
 //! Part of the ring family's concurrency write path.
 //!
-//! `ring_seqno` was added to this crate's manifest before the implementation
-//! existed and is not among them. Publishing is a cursor
+//! This crate does not depend on `ring_seqno`, though it was in the manifest
+//! before the implementation existed. Publishing is a cursor
 //! advance and a contiguity test; it computes no distances, no free slots and
 //! no minimum. The same over-declaration was found and removed in `ring_claim`.
 //!

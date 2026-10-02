@@ -2,8 +2,8 @@
 //!
 //! Part of the ring family's concurrency write path.
 //!
-//! `ring_seqno` was added to this crate's manifest before the implementation
-//! existed and is not among them. Every piece of sequence arithmetic claiming
+//! This crate does not depend on `ring_seqno`, though it was in the manifest
+//! before the implementation existed. Every piece of sequence arithmetic claiming
 //! needs is either `ring_types::Seq`'s own (`advanced_by`, and the `Ord` that
 //! makes range containment a comparison rather than a subtraction) or already
 //! inside `ring_gating::GatingSet::headroom`, which reaches `ring_seqno` on this

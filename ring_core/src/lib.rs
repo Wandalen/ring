@@ -393,6 +393,23 @@ impl<'a, T: Send> Producer<'a, T> {
   /// cannot offer cheaply. This call leaves the iterator positioned after the
   /// last record it consumed.
   ///
+  /// # Pitfall: the count is not the number of records kept
+  ///
+  /// **Trap.** Reading the return as how many records the ring kept, and the
+  /// iterator as holding every record it did not keep.
+  ///
+  /// **Failure.** Under [`OverflowPolicy::Fail`] the refusal consumes one record
+  /// and drops it, because the loop discards the `Err` that [`Self::try_push`]
+  /// hands it back in. In the example below, record 3 is not in the ring, not in
+  /// the iterator, and not in the count. Under [`OverflowPolicy::DropNewest`] a
+  /// full ring never refuses. `try_push` reports a discarded record as `Ok(())`,
+  /// so this drains the whole iterator and returns its length, counting every
+  /// record the ring discarded.
+  ///
+  /// **Mitigation.** To keep a refused record, push one at a time with
+  /// [`Self::try_push`], which returns it in the `Err`. To learn how many records
+  /// a lossy policy kept, count on the consumer side.
+  ///
   /// ```
   /// use ring_config::RingConfig;
   /// use ring_core::Ring;

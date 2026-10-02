@@ -409,11 +409,14 @@ impl<'a, T: Send> Guarded<'a, T> {
     self.producer.try_push(record).map_err(Refusal::Full)
   }
 
-  /// Publish from `records` until one is refused, returning how many landed.
+  /// Publish from `records` until one is refused, and return the count
+  /// [`Producer::try_push_batch`] returns.
   ///
   /// Stops at the first refusal of either kind. A closed ring accepts nothing,
   /// so this returns `0` without consuming from the iterator. It checks before
-  /// the first read.
+  /// the first read. Past that check this is `Producer::try_push_batch`, and its
+  /// pitfall applies unchanged. The count is not the number of records kept, and
+  /// under `Fail` the refused record is destroyed.
   pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
     if self.shutdown.is_closed() {
       return 0;

@@ -41,8 +41,12 @@ These rules bound it:
 
 Maintainers carry two obligations. `Ring::ends` must keep its `&mut self` receiver, because the `Sync` argument rests
 on there being one consumer, and the only guard is a `compile_fail` doctest that holds two `Ends` at once. The stamp
-test in `Ring::contiguous_end` must stay an equality, because `!= UNSTAMPED` or `>=` would read a previous lap's stamp
-as published.
+test in `Ring::contiguous_end` must stay an equality, because `>=` would read every unwritten stamp as published and
+`!= UNSTAMPED` would read a previous lap's stamp as published.
+
+The `Sync` argument also assumes `Ring::ends` runs once per ring. A second call restarts the claim cursor at zero while
+the consumer cursor and stamps keep their values, so two live claims can address one slot. `Ring::ends` documents this
+as a pitfall, and it stays unsound until the claim cursor carries over between calls.
 
 The bound is `S: Send`, not `S: Sync`. A record is written on a producer's thread and read on the consumer's, so it
 moves between threads and is never shared.

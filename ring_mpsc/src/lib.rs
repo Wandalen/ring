@@ -342,6 +342,12 @@ pub struct Ring<S> {
 // `OBSERVE` load) and the consumer cursor carries the consumer→producer one
 // (`COMMIT` store, `GATING` load). `S : Send` is required because a record is
 // written on a producer's thread and read on the consumer's.
+//
+// The disjointness argument holds only for the first `ends` on a ring. A second
+// call starts a new claim cursor at zero while the consumer cursor and stamps
+// keep their values, so the headroom check no longer keeps two claims off one
+// slot. `Ring::ends` documents it as a pitfall until the claim cursor carries
+// over.
 unsafe impl<S: Send> Sync for Ring<S> {}
 
 impl<S: Slot + Default> Ring<S> {
@@ -537,6 +543,24 @@ impl<S> Ring<S> {
   /// checks headroom against, and a `Ring` holding both would be
   /// self-referential. `&mut self` is what makes the claim cursor unique. Two
   /// `Ends` never name one ring at the same moment.
+  ///
+  /// # Pitfall: a second call restarts the claim cursor at zero
+  ///
+  /// **Trap.** Calling `ends` again once the first [`Ends`] is gone, to run a
+  /// second set of producers against the same ring.
+  ///
+  /// **Failure.** Each call builds a new [`Claimer`], whose cursor starts at
+  /// zero, while the consumer cursor and the stamps keep the first run's
+  /// values. The headroom check measures from the old consumer cursor, so the
+  /// new claimer grants sequences up to a full capacity past it. Two live
+  /// [`Reserved`] guards then address one slot, and safe code holds two
+  /// exclusive references to it, which is undefined behaviour. Records claimed
+  /// below the consumer cursor are never drained. Nothing rejects the second
+  /// call, so this is unsound until the claim cursor carries over between
+  /// calls.
+  ///
+  /// **Mitigation.** Call `ends` once per ring. A second run builds a new
+  /// [`Ring`].
   ///
   /// ```
   /// use ring_mpsc::Ring;

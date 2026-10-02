@@ -18,6 +18,36 @@
 //! granted the same sequence, and that requirement is why this crate exists
 //! instead of being two lines inside `ring_publish`.
 //!
+//! ## Invariant: no two producers hold one sequence
+//!
+//! Only one compare-exchange in [`Claimer::claim`] or [`Claimer::claim_up_to`]
+//! can move the cursor off a given value. Every other caller adopts the
+//! winner's value and computes a disjoint range from it. The gate plays no
+//! part in this. With no consumer registered, exclusivity still holds and
+//! producers simply run past where a consumer would be.
+//!
+//! **Excluded.** An order across producers. Each producer's own claims come
+//! back in increasing order, while two producers' claims interleave however
+//! their exchanges land. Also excluded are writes through [`Claimer::cursor`],
+//! which can grant one range twice, as that accessor documents.
+//!
+//! **Enforced by.** `no_two_producers_are_ever_granted_the_same_sequence`,
+//! `claims_under_contention_lose_no_sequences`,
+//! `claim_up_to_under_contention_loses_no_sequences_either` and
+//! `each_producers_own_claims_stay_in_issue_order`, with no consumer
+//! registered, and `no_grant_ever_passes_the_limit_under_contention` under a
+//! binding gate. No test asserts that claims refused by a binding gate and then
+//! retried leave no hole in the sequence space.
+//!
+//! ## Invariant: a refused claim moves nothing
+//!
+//! A call that returns `Err` leaves [`Claimer::claimed`] where it found it,
+//! because the only write is the exchange on the `Ok` path. That is what makes
+//! retrying on [`RingError::Full`] safe. A claim that moved the cursor and then
+//! failed would leak a slot on every attempt.
+//!
+//! **Enforced by.** `a_failed_claim_advances_nothing`.
+//!
 //! ## Why claiming never waits
 //!
 //! Every function here returns immediately, with `Ok` and a range or with
@@ -41,9 +71,10 @@
 //! There is deliberately no `Drop` impl that "releases" the claim, because
 //! releasing is not possible. Another producer may already have claimed the
 //! range beyond it, so rewinding the cursor would hand out sequences twice, the
-//! one thing multi-producer claiming forbids outright. The type is
-//! `#[must_use]` so the compiler objects to the common accident. This section
-//! states the invariant for the uncommon one.
+//! one thing multi-producer claiming forbids outright. A `Drop` that published
+//! instead would need the ring's publisher, and this crate does not depend on
+//! `ring_publish`. The type is `#[must_use]`, which catches a bare discarded
+//! value and nothing else. [`Claim`]'s pitfall lists the routes it misses.
 //!
 //! ## Why the CAS loop is not `fetch_add`
 //!
@@ -55,7 +86,14 @@
 //! range is already granted.
 //!
 //! The compare-exchange loop re-reads the gate inside the retry, so the
-//! decision to grant and the granting itself are one atomic step.
+//! decision to grant and the granting itself are one atomic step. A granted
+//! range never ends past the consumers' limit as it stood at the grant,
+//! because the gate is read at the value being exchanged.
+//! `no_grant_ever_passes_the_limit_under_contention` checks it.
+//!
+//! The retry has no budget. A failed exchange means a peer's claim landed, so
+//! some producer always makes progress, but one producer can keep losing for
+//! as long as its peers keep winning.
 
 #![deny(missing_docs)]
 
@@ -76,6 +114,27 @@ const CLAIM_SUCCESS: core::sync::atomic::Ordering = core::sync::atomic::Ordering
 /// Half-open: `start..end`, so an empty claim and a one-slot claim are not the
 /// same value, and `end` is directly the sequence the producer cursor now sits
 /// at.
+///
+/// # Pitfall: a dropped claim stops the ring, and the lint rarely says so
+///
+/// **Trap.** Relying on `#[must_use]` to catch a claim that never reaches a
+/// publish. It fires only on a value nobody binds. `let _ = claimer.claim( 4 )`,
+/// an early return or `?` between the claim and the write, an unwind, and a
+/// `continue` past the publish all compile without a warning. A bare
+/// `claimer.claim( 4 );` does warn, but with `Result`'s generic message rather
+/// than this type's, and the compiler suggests `let _ =`, which is the first
+/// route above.
+///
+/// **Failure.** Every later publish waits on the lost range, as
+/// `ring_publish::Publisher::publish` documents, and once the ring fills
+/// [`Claimer::claim`] returns [`RingError::Full`] for good. That is the same
+/// value healthy back-pressure returns, so a retry loop spins instead of
+/// failing. One lost sequence stops the ring as completely as a thousand.
+///
+/// **Mitigation.** Publish on every path out of the scope that holds the claim,
+/// including early returns and unwinds. A stall from a lost claim shows as
+/// `ring_publish`'s published cursor staying behind [`Claimer::claimed`] for
+/// longer than any slot write takes.
 ///
 /// ```
 /// use ring_claim::Claim;
@@ -376,10 +435,16 @@ impl<'a> Claimer<'a> {
   /// That is a configuration error no consumer's progress can fix, so a retry
   /// loop must stop. [`RingError::Full`] when the space is not available
   /// *right now*. That is back-pressure, so a retry loop should keep going.
+  /// `Full` does not say whether the ring was full at the first look or a peer
+  /// took the last room during a retry. Both call for the same wait. One cause
+  /// of `Full` never clears by waiting, and [`Claim`]'s pitfall describes it.
   ///
   /// A `count` of zero always succeeds, even on a full ring, because there is
   /// nothing for back-pressure to block. [`claim_up_to`] treats a zero grant
-  /// as `Full` instead. The two functions disagree here on purpose.
+  /// as `Full` instead. The two functions disagree here on purpose. A zero
+  /// claim is still not free. It runs the compare-exchange, swapping the cursor
+  /// for its own value on the line every producer contends for, while a call
+  /// refused at its first look never reaches it.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -426,6 +491,14 @@ impl<'a> Claimer<'a> {
   /// For a batching producer that would rather write four items now than wait
   /// for room for eight.
   ///
+  /// # Algorithm: the grant shrinks under contention
+  ///
+  /// The width is recomputed on every retry, as `max` capped by the headroom
+  /// at the value the failed exchange returned. A producer that loses the
+  /// exchange asks for whatever is left rather than for the same amount, so a
+  /// retry can grant less than the first attempt would have. [`claim`] keeps
+  /// `count` fixed, so its retry either grants that width or fails.
+  ///
   /// # Errors
   ///
   /// [`RingError::Full`] when not even one slot is free. Never
@@ -435,6 +508,17 @@ impl<'a> Claimer<'a> {
   /// A `max` of zero is also `Full`, since there is no partial success at
   /// zero to report. This differs from [`claim`], which treats a `count`
   /// of zero as always satisfiable.
+  ///
+  /// # Pitfall: an empty batch reads as a full ring
+  ///
+  /// **Trap.** Passing a batch's length as `max` and treating `Full` as
+  /// back-pressure to retry, as [`claim`] documents it.
+  ///
+  /// **Failure.** An empty batch makes `max` zero, and a `max` of zero returns
+  /// `Full` on any ring, an empty one included. The retry loop waits for a
+  /// consumer to free room that is already free, and never exits.
+  ///
+  /// **Mitigation.** Skip the call when there is nothing to write.
   ///
   /// [`claim`]: Self::claim
   ///

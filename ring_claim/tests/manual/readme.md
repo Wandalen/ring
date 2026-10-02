@@ -96,10 +96,11 @@ the only slightly unusual line in the crate, and it earns its place. The plain
 alternative computes `max.min( headroom )` once before the loop and again in the
 retry arm, and two copies of a gate is how one of them stops being updated.
 
-## C4. A claim cannot be silently dropped, and does not release on drop
+## C4. A bare discarded claim warns, and a claim does not release on drop
 
-Two halves of one decision. `#[must_use]` makes the common accident a compiler
-error. The absence of `Drop` is the deliberate part. Releasing is not possible,
+Two halves of one decision. `#[must_use]` turns one accident, a bare discarded
+`Claim`, into a compiler warning. `Claim`'s pitfall lists the ways it misses.
+The absence of `Drop` is the deliberate part. Releasing is not possible,
 because another producer may already hold the range beyond this one, and
 rewinding the cursor to "give back" a claim would grant those sequences twice.
 

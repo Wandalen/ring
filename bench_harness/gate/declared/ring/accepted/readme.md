@@ -36,8 +36,10 @@ asserting that the type system is doing what it does.
 The second kind is a real cost, deliberately paid, and each entry says so
 plainly. `ring_bench`'s are killable by a clock, and a flaky assertion
 inside a benchmark harness discredits the measurement the harness exists to
-produce. `ring_poll`'s are killable by a concurrent fixture where
-another thread drains between attempts. That fixture is a race, not a test.
+produce. Two of `ring_poll`'s, the extra-attempt mutations in `push_within`
+and `recv_within`, are killable by a concurrent fixture where another thread
+drains between attempts. That fixture is a race, not a test. The other nine are
+of the first kind.
 
 Keeping the two apart is what stops this directory becoming a place things go
 to be excused. An entry of the second kind is a standing invitation to revisit;

@@ -18,8 +18,10 @@ behaviour, which is also read by hand against
 ## Known limitations
 
 - `CacheAligned` pads every wrapped value to a whole 64-byte line, so a wrapped
-  `u64` spends 56 of its 64 bytes on padding. That buys nothing when only one
-  field is wrapped. The 128-byte-line host is covered in the decision above.
+  `u64` spends 56 of its 64 bytes on padding. That pays only when another
+  thread writes a neighbouring value. A wrapped value owns its whole line, so
+  wrapping one of two hot fields already puts them on different lines. The
+  128-byte-line host is covered in the decision above.
 
 ## Run it
 

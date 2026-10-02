@@ -1,11 +1,13 @@
-# The doc-corpus standard G14-G17 grade the ring family against.
+# The doc-corpus standard G14-G17 grade a family against. The ring family no
+# longer declares those gates or carries the corpus; this file stays so the
+# gates can still be run by name.
 #
 # Declared here rather than hard-coded in the gates for the same reason crate
 # membership moved out of a glob. A threshold living in the script that
 # checks it cannot be changed without editing the checker, so the standard and
 # the instrument are one artifact and neither can contradict the other visibly.
-# Editing `min_findings` below from 52 to 53 must flip every currently-closed
-# crate to NOT REACHED. If it does not, a gate is reading its own constant.
+# Raising `min_findings` below by one must flip every crate at the floor to NOT
+# REACHED. If it does not, a gate is reading its own constant.
 #
 # Format: `key value`, one per line, comments and blanks stripped by decl_lines.
 
@@ -33,10 +35,8 @@ definition workaround
 
 # ---- minimum counts, per crate ---------------------------------------------
 #
-# Floors, not targets. `ring_types` carries 65 instances against a floor of 26
-# and five closed crates carry 53-56 findings against a floor of 52; a gate that
-# treated these as equalities would report the most complete crates in the family
-# as violations.
+# Floors, not targets. A gate that treated these as equalities would report the
+# most complete crates in the family as violations.
 
 min_definitions 13
 min_instances 26
@@ -48,13 +48,11 @@ min_findings 52
 # matters, because it is how a reader scanning a findings table tells something
 # that can still be acted on from something recorded for the archive. A hybrid
 # such as `n/a — latent hazard` says both at once, and G17 exists to refuse it.
-# Four are live in `ring_publish`'s Module Index.
 #
-# This list was taken from the corpus rather than composed for it. All thirteen
-# strings below appear in the family's 632 declared findings rows, and nothing
-# else does. A tier declared here that nothing uses would be a bar this family
-# never set; a tier used that is not declared here fails 20 crates for the
-# instrument's mistake rather than the corpus'.
+# This list was taken from the corpus rather than composed for it. A tier
+# declared here that nothing uses would be a bar the family never set; a tier
+# used that is not declared here fails crates for the instrument's mistake
+# rather than the corpus'.
 
 tier **latent hazard**
 tier **misleading doc**

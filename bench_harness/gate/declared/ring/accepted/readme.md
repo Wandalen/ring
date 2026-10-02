@@ -20,14 +20,12 @@ accepted nothing, and every survivor it reports is new.
 
 ## Two kinds of acceptance, and only one of them costs anything
 
-The 2026-08-30 sweep raised the count from three entries to twenty-one, which
-was enough to make a distinction visible that three had hidden. The entries are
-not all the same kind of decision:
+The entries are not all the same kind of decision:
 
-| Kind | What it means | Count |
-|---|---|---|
-| **Equivalent mutant** | No input separates the mutation from the original, so no test could kill it however the suite were written | 16 |
-| **Refused test** | The mutation is killable in principle, but only by a test this family has decided not to write | 5 |
+| Kind | What it means |
+|---|---|
+| **Equivalent mutant** | No input separates the mutation from the original, so no test could kill it however the suite were written |
+| **Refused test** | The mutation is killable in principle, but only by a test this family has decided not to write |
 
 The first kind costs nothing. `ring_store`'s `is_empty` cannot return `true`
 because a `Capacity` cannot be zero; `ring_config`'s `>` and `>=` return the
@@ -36,9 +34,9 @@ a bar. There is no bar to lower, and a test written to chase one would be
 asserting that the type system is doing what it does.
 
 The second kind is a real cost, deliberately paid, and each entry says so
-plainly. `ring_bench`'s three are killable by a clock, and a flaky assertion
+plainly. `ring_bench`'s are killable by a clock, and a flaky assertion
 inside a benchmark harness discredits the measurement the harness exists to
-produce. `ring_poll`'s 219 and 309 are killable by a concurrent fixture where
+produce. `ring_poll`'s are killable by a concurrent fixture where
 another thread drains between attempts. That fixture is a race, not a test.
 
 Keeping the two apart is what stops this directory becoming a place things go

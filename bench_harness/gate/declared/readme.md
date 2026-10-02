@@ -12,7 +12,7 @@ gates it declares need of their own. See the tables below.
 | `family.txt` | Which family a bare run grades. One name, overridable with `--family` |
 | `exempt.txt` | Crates deliberately graded by no family, each with the reason it is not gated |
 | `repo_gates.txt` | The family-independent gates `--every` runs once for the whole repository |
-| `ring/` | The 33-crate concurrency write-path family, and the only family this repository declares |
+| `ring/` | The concurrency write-path family, and the only family this repository declares |
 
 `g18_family_coverage.sh` reads `exempt.txt`, and the file is the only way to
 reach G18 without gating a crate. That is why G18 prints its entry count on
@@ -95,9 +95,10 @@ And one more file, in `ring/` for the same reason:
 
 `corpus_standard.txt` is the one declaration here that a gate could plausibly
 have carried itself, and the reason it does not is a falsifiable one. Editing
-`min_findings` from 52 to 53 must flip every currently-closed crate to NOT
-REACHED. It does: 13/33 at standard becomes 5/33. So the thresholds the gates
-enforce are the ones written here, not constants that happen to agree with them.
+`min_findings` by one must flip every crate at the floor to NOT REACHED, and it
+did. So the thresholds the gates enforce are the ones written here, not
+constants that happen to agree with them. The ring family no longer declares
+`g14`-`g17` (see `ring/gates.txt`), so nothing reads this file in a family run.
 
 `corpus_control/` inverts every polarity in this directory. Under
 `run_all.sh --control` a gate REACHES by *finding* the defect seeded for it, and

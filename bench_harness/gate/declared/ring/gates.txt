@@ -11,29 +11,22 @@
 # gate silently dropped from a family is visible in that family's own output.
 #
 # G12 (mutation) is declared here and nowhere else, which inverts the pattern
-# above. G12 is this family's own Next Constraint turned into a gate, not a
-# later family's yardstick applied backwards. This family's plan closed 6/6 with
-# every feature implemented, tested, documented and manually exercised, and
-# named what those six could not see. G1 grades which lines ran, never which
-# values were checked. `ring_bench` B5 measured the gap exactly: 100% line
-# coverage over 298 lines, and the crate's own headline defect reinstated
-# without a single test noticing. The three defects G12 replays were found by
-# hand in the manual rounds of 2026-08-28. Declaring it here turns the most
-# valuable thing those rounds produced from a human habit into a verdict.
-# Replacing the crate-membership glob made the same move for coverage.
+# above. It is this family's own next constraint turned into a gate, not a later
+# family's yardstick applied backwards. G1 grades which lines ran, never which
+# values were checked: `ring_bench` once had full line coverage while its own
+# headline defect could be reinstated without a single test noticing. G12
+# replays recorded defects, which turns what manual rounds found from a human
+# habit into a verdict.
 #
 # A family with no recorded historical defects to replay would leave this gate
 # absent for the ordinary reason that a mutation probe over an empty set is the
 # vacuous pass the gate's own non-vacuity rules exist to refuse.
 #
-# G13 (survey freshness) is declared here for the same reason G12 is, one turn
-# later. It is this family's own Next Constraint turned into a gate. G12 and
+# G13 (survey freshness) is declared here for the same reason G12 is. G12 and
 # `accepted/` between them settle every survivor a sweep finds, but both are
 # claims about a crate at the moment it was swept, and nothing on the board
-# noticed when that moment passed. The 2026-08-30 triage added eleven assertions
-# across eight crates. That is the "tests changed shape" trigger the survey's
-# own readme names, and the re-sweep that confirmed them ran because a person
-# remembered, not because anything asked for it.
+# noticed when that moment passed. Re-sweeping after tests changed shape used to
+# happen only when a person remembered to do it.
 #
 # A family that has never been swept at all would leave this gate absent for the
 # same ordinary reason. It would report NOT REACHED for every crate about a

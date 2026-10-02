@@ -9,8 +9,8 @@
 # Format, whitespace-separated:  <stage> <crates,comma-separated> <features,comma-separated>
 #
 # S9 is the Final Goal and deliberately absent. It is the unscoped run, which is
-# what `run_all.sh` with no argument already does. Adding it here as "all 33 /
-# all 22" would create a second place for that list to drift from reality.
+# what `run_all.sh` with no argument already does. Adding it here as "every
+# crate, every feature" would create a second place for that list to drift.
 #
 # M0 and M1 are also absent, because neither is graded by G1–G6 over a crate set. M0's
 # reached-test is that all six gates report NOT REACHED, and M1's is a corpus

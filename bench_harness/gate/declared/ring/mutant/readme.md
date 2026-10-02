@@ -25,29 +25,24 @@ byte-identically.
 | `s13_tick_lost_subtraction.mutant` | Divides instead of subtracts a `Tick`'s loss count, panicking once a batch moves nothing |
 | `s14_bytesslot_eq_always_true.mutant` | Answers `true` from `BytesSlot::eq` regardless of payload |
 
-**Two provenances, and the id prefix carries which.** B2, B5 and F1 come from
-the manual rounds of 2026-08-28, recorded in `ring_bench/tests/manual/readme.md`
-and `ring_flush/tests/manual/readme.md`. Each was paid for by a wrong answer
-somebody got first. S1 through S14 came from `gate/mutant_survey.sh`, which
-proposed them mechanically before they had cost anyone anything: S1 from a
-single-crate run on 2026-08-29, S2 through S12 from the first sweep of the whole
-family on 2026-08-30, S13 and S14 from the freshness re-sweep on 2026-09-05.
-`S` marks a survey round. Those records are the source;
+**Two provenances, and the id prefix carries which.** `B` and `F` entries come
+from manual test rounds, recorded in `ring_bench/tests/manual/readme.md` and
+`ring_flush/tests/manual/readme.md`. Each was paid for by a wrong answer
+somebody got first. `S` entries came from `gate/mutant_survey.sh`, which
+proposed them mechanically before they had cost anyone anything. Those records
+are the source;
 these files are the executable form of them, and the prose in each explains what
 its round found rather than repeating the mechanism.
 
-Keep the distinction visible, because it is this family's own closing
-constraint. A gate that replays only defects people tripped over cannot defend
-a crate nobody has been unlucky with yet. S1 was the first entry here that did
-not require the bad luck, and the eleven after it are what answering that
-constraint at family scale produced. That is four times as many recorded
-defects as three rounds of human bad luck had found, from crates nobody had
-been unlucky with at all.
+Keep the distinction visible. A gate that replays only defects people tripped
+over cannot defend a crate nobody has been unlucky with yet. The survey entries
+did not require the bad luck, and they outnumber the manual ones several times
+over, from crates nobody had been unlucky with at all.
 
 ## The one-polarity rule
 
-Six of the eleven, S2 through S6 and S11, are one defect in six places, and it
-is the same defect B5 records in a different shape.
+S2 through S6 and S11 are one defect in six places, and it is the same defect
+B5 records in a different shape.
 
 **A predicate or quantity asserted only where it equals its degenerate value is
 indistinguishable from a constant returning that value.** Five crates asserted
@@ -144,17 +139,13 @@ because the obvious sequence is wrong. The survey has already proved the
 mutation survives; that half is measured, not assumed. What remains is to add
 the assertion **while the mutation is still in place**, confirm the suite goes
 red naming the intended test, restore, and confirm green. A fix written
-against an unmutated tree proves only that it compiles. Both survey rounds here
-were verified that way, and the 2026-08-30 round also reinstated the survivors
-it had ruled *unkillable* and confirmed they stayed green. An acceptance is a
+against an unmutated tree proves only that it compiles. A survey round also
+reinstates the survivors it rules *unkillable* and confirms they stay green. An acceptance is a
 claim about what no test can do, and it needs the same evidence as a fix.
 
-Then the whole family was swept a second time, which is what closes the
-round. The by-hand checks above confirm each ruling one at a time, in the shape
-the person doing them expected; the re-sweep confirms all twenty-nine at once,
-mechanically, in the shape the tool finds them: **33 crates, 0 new survivors, 0
-stale acceptances, 0 untrustworthy runs.** Every fix killed its mutation and
-every acceptance still matched exactly, and neither result depended on anyone
-remembering which crates had been touched. Thirty-two minutes on a warm cache is
-a cheap price for removing that dependency, and it is the same reason the first
-sweep was worth running at all.
+Then the whole family is swept a second time, which is what closes the round.
+The by-hand checks above confirm each ruling one at a time, in the shape the
+person doing them expected. The re-sweep confirms all of them at once,
+mechanically, in the shape the tool finds them, and it does not depend on anyone
+remembering which crates were touched. That is worth the tens of minutes a warm
+sweep takes.

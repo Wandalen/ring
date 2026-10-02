@@ -12,7 +12,7 @@ One file per crate, written by the survey and **never edited by hand**. There is
 no per-crate table here on purpose. Unlike `../mutant/` and `../accepted/`,
 whose entries each record a distinct judgement worth reading, every record in
 this directory says the same mechanical thing about a different crate. A table
-listing all 33 would restate the directory listing and go stale on every sweep.
+listing every crate would restate the directory listing and go stale on every sweep.
 
 ## Why a clean run is the only run that records
 

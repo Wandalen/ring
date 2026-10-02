@@ -7,7 +7,7 @@ which is a plan's Final Goal reached-test.
 Every gate pairs its assertion with a **non-vacuity check**, because the
 workspace baseline showed why that is necessary. On the untouched skeletons,
 `cargo tarpaulin` reported *No coverable lines found* and `#![deny(missing_docs)]`
-passed in all 33 crates. Both gates were green before a single line of the
+passed in every crate. Both gates were green before a single line of the
 family existed. A gate that cannot tell "not started" from "finished" measures
 nothing, so each one below also asserts that there is something to measure.
 
@@ -91,10 +91,9 @@ Run it when a crate's tests change shape, not on every gate run. Its output is a
 reading to act on, not a threshold to hold.
 
 **"When a crate's tests change shape" is now G13's job to notice rather than
-yours.** That sentence was advice for as long as it was only a sentence, and it
-failed the first time it was tested. The 2026-08-30 triage added eleven
-assertions across eight crates, and the re-sweep confirming them ran because
-somebody remembered it should. So the survey now writes a
+yours.** As advice it failed the first time it was tested. A triage added
+assertions across several crates, and the re-sweep that confirmed them ran only
+because somebody remembered to run it. So the survey now writes a
 `surveyed/<crate>.surveyed` record on a clean run. The record holds the date
 and a digest of the `src/` and `tests/` it swept, and G13 fails when a digest
 stops matching the crate on disk.
@@ -111,20 +110,16 @@ bash bench_harness/gate/mutant_survey.sh ring_bench        # one crate
 bash bench_harness/gate/mutant_survey.sh --family ring     # the whole family
 ```
 
-**The whole ring family is 39 minutes cold, 32 warm.** The cost was
-overestimated for as long as it was unmeasured. `--in-place` refuses `--jobs`,
-so the sweep is serial and no other work may touch the tree while it runs. That
-reads as expensive until someone times it. The sweep covers 1,160 mutations
-across 33 crates, and 29 of them survive. Sweeping is a scheduling decision, not
-a budget one.
+**A whole-family sweep takes tens of minutes and runs serially.** `--in-place`
+refuses `--jobs`, so no other work may touch the tree while it runs. Sweeping is
+a scheduling decision, not a budget one.
 
-The triage does not shrink. A survivor is not a defect. Of those 29, eleven were
-real and eighteen were mutations no test could ever kill, such as a
+The triage does not shrink. A survivor is not a defect. Many are mutations no
+test could ever kill, such as a
 `free_capacity` that already answers zero for every reachable input, or a
 padding check that is true by the alignment its own crate asserts. The tool
 reports the mutation and stops. Every survivor costs a human read of the
-source, and that half of the bill is the same whether the sweep took forty
-minutes or four.
+source, however fast the sweep runs.
 
 Its exits are 0 (nothing new), 1 (new survivors), 2 (**the tree did not come
 back**; believe it, same as G12's restoration mismatch), and 3 (nothing new,
@@ -135,8 +130,8 @@ but an acceptance in `declared/<family>/accepted/` no longer matches anything).
 It surveys with `--all-features`, because `cargo mutants` runs the suite with
 default features and mutates source text. So a mutation inside a
 `#[ cfg( feature = ... ) ]` body that is off by default compiles as dead code
-and passes every time, however good the tests are. Without the flag, one
-`ring_bench` run reported 22 survivors of which 18 were that artifact.
+and passes every time, however good the tests are. Without the flag, most of
+one `ring_bench` run's survivors were that artifact.
 
 It subtracts the family's accepted survivors, because some things go unnoticed
 on purpose. `ring_bench` refuses to assert on a clock, so timing-only mutations

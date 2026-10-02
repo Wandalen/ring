@@ -172,3 +172,46 @@ That is a small gap and a real one: if a prospective adopter
 (→ [`../integration/002`](../integration/002_prospective_consumer_adoption.md))
 polls `stamps()` per frame, the requirement's "measured before adopted" would
 need a number that does not exist.
+
+### MP55 — The First Comparative Measurement, and the Win It Reports
+
+2026-10-02. The `perf` suite (PR #7's benchmark harness, 12 logical CPUs,
+Windows, QPC clock ~36 ns, scheduler placement — self-consistent within the
+run, not an absolute baseline) measured this crate against `rtrb` 0.4,
+`std::sync::mpsc::sync_channel`, `crossbeam_queue::ArrayQueue` and a bounded
+`Mutex<VecDeque>`, then measured its own **batched claim path**
+(`claim_batch( 32 )` — [Batched Claim-and-Publish](../algorithm/003_batched_claim_and_publish.md))
+against its own per-record path. Both halves of the requirement's shape —
+"beats the replaced mechanism" and "beats the alternatives" — have numbers now:
+
+**Against the replaced mechanism (this crate's own per-record claim):**
+
+| producers → | 1 | 2 | 4 | 8 | 11 |
+|---|---:|---:|---:|---:|---:|
+| per record (`push1_popN`) | 32.5 | 19.0 | 12.3 | 7.3 | 6.2 |
+| batched (`push32_popN`) | **232.2** | **207.8** | **207.3** | **208.2** | **198.0** |
+
+M/s, capacity 1024, higher is better. The batched path is strictly better at
+every producer count — 7.5× at one producer and **26× at eleven** — and its
+spin counters collapsed with it (full spins per record at eleven producers:
+3.43 per record → 0.18). Oversubscribed (24 producers, 12 CPUs): 2.8 M/s per
+record → **61.4 M/s** batched, the best candidate in the run.
+
+**Against the alternatives (the batched path in the same sweep):** it leads
+every candidate from two producers onward — 198–208 M/s against `arrayqueue`'s
+flat ~58, `sync_channel`'s ~38–48, and a `Mutex<VecDeque>` batch that declines
+234 → 57 across the sweep — and the win holds oversubscribed (61.4 vs
+`arrayqueue` 34.6). At one producer `arrayqueue` still leads the per-record
+row (70.7 vs this crate's 32.5): the single-record claim path is unchanged by
+this work and remains the crate's honest weak spot, recorded rather than
+claimed away.
+
+The per-record latency paths measured unchanged within run-to-run noise
+(ping-pong one-way ~103 ns, consistent with the pre-fix run); the latency
+tables on this Windows host are noisy across runs without pinning, and the
+throughput tables — ten flat samples per point — are the stable signal.
+
+Caveat stated plainly: one host, one run, no pinning, no governor control.
+The comparative claim this requirement's threshold needs — batched beats
+per-record at every width, and beats every alternative in the sweep from two
+producers up — is supported; absolute numbers are not portable.

@@ -437,6 +437,6 @@ fn crate_names_no_ordering_in_any_non_doc_line() {
   assert!(
     hits.is_empty(),
     "ring_gating names an ordering or the family's gating-ordering constant in \
-     a non-doc line: {hits:?} — see docs/invariant/002_this_crate_names_no_ordering.md"
+     a non-doc line: {hits:?}. See the crate's \"names no memory ordering\" invariant in src/lib.rs"
   );
 }

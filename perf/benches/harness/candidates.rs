@@ -153,11 +153,12 @@ impl<R: Record> Rx<R> for SpscRx<'_, R> {
   }
 }
 
-/// `ring_mpsc` direct: `push` from copies of one producer; `drain_up_to`, read through
-/// `TypedSlot::get`.
+/// `ring_mpsc` direct: `push`, and `claim_batch`-backed `push_batch` for the batch modes;
+/// `drain_up_to`, read through `TypedSlot::get`.
 ///
-/// One split per ring: a second `Ring::ends` starts a fresh claim cursor at zero under a consumer
-/// cursor that has moved on, and what it pushes is never delivered.
+/// One split per ring. A second `Ring::ends` used to start a fresh claim cursor at zero under a
+/// consumer cursor that had moved on, and what it pushed was never delivered — the cursor moved
+/// into the ring (`ring_mpsc/docs/pitfall/003`), and the second generation continues instead.
 #[derive(Debug)]
 pub struct Mpsc<R = u64>(ring_mpsc::Ring<TypedSlot<R>>);
 
@@ -165,7 +166,7 @@ impl<R: Record> Candidate for Mpsc<R> {
   type Record = R;
 
   const NAME: &'static str = "mpsc";
-  const PUSH_BATCH: bool = false;
+  const PUSH_BATCH: bool = true;
   const MAX_PRODUCERS: usize = usize::MAX;
 
   fn new(slots: usize) -> Self {
@@ -186,6 +187,19 @@ struct MpscTx<'a, R>(ring_mpsc::Producer<'a, TypedSlot<R>>);
 impl<R: Record> Tx<R> for MpscTx<'_, R> {
   fn try_push(&mut self, record: R) -> bool {
     self.0.push(record).is_ok()
+  }
+
+  fn push_batch(&mut self, records: &[R]) -> usize {
+    let Ok(mut guard) = self.0.claim_batch(records.len()) else {
+      return 0;
+    };
+    let granted = guard.len();
+    for (offset, &record) in records.iter().enumerate().take(granted) {
+      guard.slot_mut(offset).expect("within the grant").set(record);
+    }
+    drop(guard);
+
+    granted
   }
 }
 

@@ -415,6 +415,23 @@ impl<'a, T: Send> Producer<'a, T> {
   /// still yields is everything this call did not publish, in order. The call
   /// takes at most one record past what fits.
   ///
+  /// # Invariant: a refused batch push drops no record, on every backend
+  ///
+  /// The refused record, followed by whatever the iterator still yields, is
+  /// everything the call did not publish. The loop is built on
+  /// [`Self::try_push`]'s refusal alone, so it holds wherever `try_push` hands a
+  /// record back and needs nothing of its own from any backend.
+  ///
+  /// **Excluded.** Records an overflow policy discards rather than refuses.
+  /// [`OverflowPolicy::DropNewest`] drops the incoming record and crossbeam's
+  /// [`OverflowPolicy::DropOldest`] evicts the oldest, both inside `try_push`,
+  /// which reports success. The pitfall below covers the count that results.
+  ///
+  /// **Enforced by.** `a_refused_batch_push_drops_no_record_on_every_backend`,
+  /// with a payload that counts its own drops, and
+  /// `a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record`,
+  /// which checks the record and the iterator's position as well as the count.
+  ///
   /// # Pitfall: under `DropNewest` the count is not the number of records kept
   ///
   /// **Trap.** Reading `Ok( n )` as how many records the ring kept, and the

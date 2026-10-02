@@ -18,9 +18,6 @@ error type the ring path returns. The "no ring logic" rule means this crate owns
 
 ## Known limitations
 
-- The summary of `ring_types::RingError::is_transient` says a retry "could succeed without anything else changing".
-  That is false for `RingError::Full` against a stalled consumer. Only the second sentence, which says both
-  conditions clear when a peer makes progress, is right.
 - `ring_types::Capacity` has no `TryFrom<usize>` impl, so the family has no `try_into()` path to it. A non-`const`
   impl that delegates to the `const fn` `Capacity::new` compiles on stable today; only a `const` impl would need
   `const_trait_impl`.

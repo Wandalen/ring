@@ -153,6 +153,11 @@ fi
 # *Documentation : Executable Recipes* requires a control beside every
 # must-be-empty check in this repository. Only the corpus gates honour it. The
 # older gates grade code and have their own non-vacuity pairings.
+#
+# No family declares the corpus gates any more (see declared/ring/gates.txt), so
+# a bare `--control` loads only gates that ignore it and prints their ordinary
+# verdicts under the banner below. Name the corpus gates to run the control:
+# `run_all.sh --control g14 g15 g16 g17 g20 g21`.
 if [ "${1:-}" = "--control" ]; then
   export GATE_CONTROL=1
   shift

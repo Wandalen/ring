@@ -67,9 +67,10 @@ message names. Until then a stage verdict does not cite it. In practice:
 - Each gate carries a second check and the code to scope its own reading, so the scripts are longer than their
   assertions.
 - The proof that a family gate can fail is a reading taken once, when the gate or its pairing check changes. Nothing
-  re-runs it. Only the corpus gates have seeded fixtures (`declared/ring/corpus_control/`, run by
-  `run_all.sh --control`). The gates `declared/ring/gates.txt` lists have none, so an edit that makes a pairing check
-  vacuous again gives no signal.
+  re-runs it. Only the retired corpus gates have seeded fixtures (`declared/ring/corpus_control/`), and they run only
+  when named, as in `run_all.sh --control g14 g15 g16 g17 g20 g21`. A bare `--control` loads the gates
+  `declared/ring/gates.txt` lists, and none of them reads the flag. Those gates have no fixtures, so an edit that
+  makes a pairing check vacuous again gives no signal.
 - Run output does not tell a gate that is vacuous for now, because its subject does not exist yet, from one that is
   vacuous by construction. Both read REACHED. Whoever cites a verdict has to know which gates have been seen failing.
 - G6 reads NOT REACHED for the ring family while `ring_core` stays on `declared/ring/unsafe_allowlist.txt` without

@@ -85,7 +85,7 @@ declares:
 | `mutant/` | Historical defects with the exact edit that reinstates each, and the round that found it | `g12_mutation.sh` |
 | `accepted/` | Survey survivors ruled decisions rather than gaps, so a sweep reports what is new | `mutant_survey.sh` |
 | `surveyed/` | Which crates were last swept clean, and the digest of the code that was swept | `g13_survey_freshness.sh` |
-| `corpus_control/` | One fixture crate per corpus gate, each carrying the single defect that gate must name | `run_all.sh --control` |
+| `corpus_control/` | One fixture crate per corpus gate, each carrying the single defect that gate must name | `run_all.sh --control` with the corpus gates named |
 
 And one more file, in `ring/` for the same reason:
 

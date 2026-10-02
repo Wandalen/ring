@@ -645,11 +645,11 @@ corpus_docs() {
   #   `found` tracking plus a stderr diagnostic mirrors the non-control branch's
   #   own `skipped`-array idiom twelve lines below, which already gets this
   #   right for its own failure reason.
-  # Pitfall: zero live trigger, measured directly, not assumed. `ring` is the
-  #   only family anywhere under declared/ that lists g14, g15, g16, g17, g20 or
-  #   g21 in its gates.txt, and it declares a corpus_control/ fixture directory
-  #   for every one of the six, so this branch's glob always matches on every
-  #   path reachable today. Verified behavior-identical for that live case (and
+  # Pitfall: zero live trigger, measured directly, not assumed. No family under
+  #   declared/ lists g14, g15, g16, g17, g20 or g21 in its gates.txt any more, so
+  #   this branch runs only when those gates are named under `--control`. `ring`
+  #   declares a corpus_control/ fixture directory for every one of the six, so
+  #   this branch's glob always matches on every path reachable today. Verified behavior-identical for that live case (and
   #   for a synthetic ungrateful gate) by running both the old and new loop
   #   bodies side by side against the real declared/ring/corpus_control/ tree:
   #   identical stdout and return code for G14/G15/G16/G17/G20/G21, and the new

@@ -91,8 +91,16 @@ NESTED_ROOTS=( "$REPO/substrate" )
 # requires a directory under `substrate/` to be a workspace, and a family that
 # became an ordinary package would otherwise be handed to `cargo metadata` as a
 # root, where it answers for whichever workspace encloses it instead.
+#
+# `$REPO` and the crate roots take the same guard. In a standalone ring
+# checkout, `$REPO` is the checkout's parent and has no manifest, and the
+# workspace is `$REPO/ring`. Printing `$REPO` unguarded made `cargo metadata`
+# fail there, and G1 with it.
 workspace_roots() {
-  printf '%s\n' "$REPO"
+  local r
+  for r in "$REPO" "${CRATE_ROOTS[@]}"; do
+    grep -qE '^\[workspace\]' "$r/Cargo.toml" 2>/dev/null && printf '%s\n' "$r"
+  done
   find "$REPO/substrate" -mindepth 2 -maxdepth 2 -name Cargo.toml \
     -exec grep -lE '^\[workspace\]' '{}' '+' 2>/dev/null \
     | sed 's|/Cargo\.toml$||' | sort

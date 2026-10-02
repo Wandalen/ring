@@ -22,7 +22,7 @@ bash bench_harness/gate/run_all.sh                  # the declared default famil
 bash bench_harness/gate/run_all.sh --family ring    # another family
 bash bench_harness/gate/run_all.sh g2               # one gate by id
 bash bench_harness/gate/run_all.sh --stage S1       # one stage's own scope
-bash bench_harness/gate/run_all.sh --every          # G18 and G19 plus every family
+bash bench_harness/gate/run_all.sh --every          # G18, G19 and G22 plus every family
 ```
 
 Every run echoes the family and the gate list it loaded, so a gate quietly
@@ -30,12 +30,14 @@ dropped from a family shows up in that family's own output rather than only in
 a diff of its declaration.
 
 `--every` is the whole-repository reading, and the only one of these that is not
-about a single family. It runs G18 and G19 once each, then one block per
-directory under `declared/`. Its status comes from how many blocks came up short,
-not from whichever family happened to run last. Those two are the preamble
-because neither belongs to a family. G18 reads coverage *across* families, and
-G19 reads a document that spans every family this repository could ever declare.
-So neither appears in any `gates.txt`, and neither would otherwise run at all.
+about a single family. It runs every gate `declared/repo_gates.txt` lists once
+each, which today is G18, G19 and G22, then one block per directory under
+`declared/`. Its status comes from how many blocks came up short, not from
+whichever family happened to run last. Those three are the preamble because none
+belongs to a family. G18 reads coverage *across* families, G19 reads a document
+that spans every family this repository could ever declare, and G22 grades the
+shared `exempt.txt`. So none appears in any `gates.txt`, and none would otherwise
+run at all.
 
 This mode exists because that reading used to be assembled by hand: one
 invocation per family, G18 standalone, then arithmetic. A family can be silently
@@ -170,13 +172,13 @@ evidence.**
 | `g10_pinned_math.sh` | No unpinned transcendental on the deterministic path, repo-wide, whether called directly or reached through a math-library helper |
 | `g12_mutation.sh` | Every recorded historical defect, reinstated in place, still turns its crate's suite red |
 | `g13_survey_freshness.sh` | Every crate swept clean, and swept against the source and tests it carries now |
-| `g14_corpus_shape.sh` | The declared doc definitions, the instance and finding floors, and the three counts agreeing |
-| `g15_corpus_recipes.sh` | Every published recipe still prints what its document quotes |
-| `g16_corpus_citations.sh` | Links resolve, cited tests exist, and the two findings tables agree |
-| `g17_corpus_vocabulary.sh` | Tier strings from the declared set; finding ids unique and contiguous |
+| `g14_corpus_shape.sh` | Retired. No family declares it, so it runs only by name. The declared doc definitions, the instance and finding floors, and the three counts agreeing |
+| `g15_corpus_recipes.sh` | Retired. No family declares it, so it runs only by name. Every published recipe still prints what its document quotes |
+| `g16_corpus_citations.sh` | Retired. No family declares it, so it runs only by name. Links resolve, cited tests exist, and the two findings tables agree |
+| `g17_corpus_vocabulary.sh` | Retired. No family declares it, so it runs only by name. Tier strings from the declared set; finding ids unique and contiguous |
 | `g18_family_coverage.sh` | Every crate claimed by exactly one family, or exempted with a reason. Reads across families, so it is in no family's `gates.txt` |
 | `g19_measured_columns.sh` | Every family Overview Table column the Legend calls measured still equals the tree. Reports disagreements and never edits the table. Spans every family, so it is in no family's `gates.txt` |
 | `g22_exemption_expiry.sh` | Every exemption still earned. Fails on one whose crate has crossed the Substance Threshold. Grades the shared `exempt.txt`, so it is in no family's `gates.txt` |
-| `corpus/` | The checkers G14-G17 and G20-G21 run, and the scoreboard that renders their counts. See [corpus/readme.md](corpus/readme.md) |
+| `corpus/` | The checkers the retired gates G14-G17 and G20-G21 run, and the scoreboard that renders their counts. See [corpus/readme.md](corpus/readme.md) |
 | `mutant_survey.sh` | Proposes defect candidates mechanically by reporting mutations the suite failed to notice |
 | `run_all.sh` | Runs every declared gate, or the named subset, and aggregates the verdict |

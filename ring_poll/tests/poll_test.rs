@@ -326,7 +326,7 @@ fn progress_sums_across_the_steps_of_one_tick() {
 /// class of bug with no ring involved at all.
 ///
 /// Fix Applied: `then` now composes with `saturating_add` instead of `+`, so
-/// the sum floors at `usize::MAX`. That is still `Progress::Made`, never a
+/// the sum caps at `usize::MAX`. That is still `Progress::Made`, never a
 /// spurious `Progress::None`.
 ///
 /// Prevention: a type whose entire purpose is ruling out a false-negative

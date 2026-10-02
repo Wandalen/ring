@@ -1067,7 +1067,7 @@ mod exhaustive {
   /// `self.ring.capacity().get() - self.occupancy() as usize` to
   /// `self.ring.capacity().get().saturating_sub( self.occupancy() as usize )`.
   /// See the `Fix(free_capacity_underflow_on_a_precondition_violation)`
-  /// comment on that method, a few dozen lines above in this same file.
+  /// comment on that method in `src/lib.rs`.
   ///
   /// # Prevention
   ///

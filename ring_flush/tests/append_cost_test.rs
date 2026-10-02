@@ -6,9 +6,9 @@
 //! The requirement as specified wants a counting global allocator. That is
 //! not available here, and the obstacle is structural rather than incidental:
 //! `GlobalAlloc` is an unsafe trait, the workspace sets `unsafe-code = "deny"`,
-//! and gate G6 confines the opt-out to `ring_spsc`, `ring_mpsc` and
-//! `ring_core`, three declared crates that each justify it in their own
-//! `docs/workaround/readme.md`.
+//! and gate G6 confines the opt-out to the crates declared in
+//! `bench_harness/gate/declared/ring/unsafe_allowlist.txt`, each of which must
+//! justify it in its own `docs/workaround/readme.md`.
 //!
 //! **G6 scans `src/` only, so an `#![allow(unsafe_code)]` in this file would
 //! pass the gate.** It would also defeat the gate's stated purpose of keeping

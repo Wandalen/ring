@@ -112,8 +112,11 @@ impl RingError {
     }
   }
 
-  /// Whether retrying the same operation later could succeed without anything
-  /// else changing. True for the two conditions a peer's progress clears.
+  /// Whether retrying the same operation later could succeed, if a peer makes
+  /// progress in the meantime. True for the two conditions a peer's progress
+  /// clears. `Full` clears when the consumer drains and `Empty` when a producer
+  /// publishes. Against a stalled peer neither clears, and this method cannot
+  /// tell a stalled peer from a slow one.
   ///
   /// ```
   /// use ring_types::RingError;

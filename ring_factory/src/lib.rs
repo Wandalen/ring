@@ -210,7 +210,8 @@ impl Factory {
   /// build-time opt-in for consumers not blocked on the in-house ring being
   /// finished.
   /// Folding it into `build` would make one config produce different rings on
-  /// different feature flags.
+  /// different feature flags. This door folds into `build` once `RingConfig`
+  /// names a backend.
   ///
   /// It accepts `OverflowPolicy::DropOldest`, which `build` refuses, because
   /// `ArrayQueue::force_push` evicts. Eviction is the one capability the

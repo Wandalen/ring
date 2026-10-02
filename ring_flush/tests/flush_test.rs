@@ -755,11 +755,10 @@ fn a_refused_final_drain_keeps_the_records() {
 /// normally. `drain_final` is a forced flush with a distinguishing cause, not a
 /// terminal operation.
 ///
-/// This is a *recorded default*, not a ruling. The consuming signature weighed
-/// in `docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md`
-/// would make an append after the final drain unrepresentable; if it is ever
-/// taken, this test is the thing that has to change, which is the point of
-/// having it.
+/// `docs/decisions/001_drain_final_keeps_a_mut_self_receiver.md` accepts this
+/// behaviour. The consuming signature that decision weighed and rejected would
+/// make an append after the final drain unrepresentable; if it is ever taken,
+/// this test is the thing that has to change, which is the point of having it.
 #[test]
 fn a_driver_still_works_after_a_final_drain() {
   let mut r = ring(16);
@@ -873,9 +872,10 @@ fn every_type_can_be_printed() {
 ///
 /// Closes a decay gap rather than reproducing a bug. `Flushed` and
 /// `TriggeredEmpty` were already exercised through `count()` elsewhere in this
-/// file (`:114`, `:602`), but `Rejected` and `NotTriggered` were not. So a
-/// regression narrowing the exhaustive match added by
-/// `Fix(flush_entry_count_catchall_not_exhaustive)` back down to a `_ => 0`
+/// file (`on_full_fires_when_the_buffer_is_full`,
+/// `an_empty_trigger_is_recorded_and_is_not_a_non_trigger`), but `Rejected` and
+/// `NotTriggered` were not. So a regression narrowing the exhaustive match
+/// added by `Fix(flush_entry_count_catchall_not_exhaustive)` back down to a `_ => 0`
 /// covering fewer named variants would have had nothing here to catch it for
 /// those two. `NotTriggered` cannot arise from `Flusher::run` (nothing calls
 /// `record` with it), so it is built directly, as `every_type_can_be_printed`

@@ -33,9 +33,10 @@
 //! A candidate could silently stop batching and the comparison would still
 //! read as valid while measuring something other than what it names. The
 //! alternative is a flaky assertion inside a benchmark harness, which is worse.
-//! The third survivor, the closing batch count at `src/lib.rs:726`, is the one
-//! that *was* defendable. It was defended, and G12's `S1` now holds it instead
-//! of this note.
+//! The third survivor, the closing partial-batch commit after
+//! `run_mutex_queue`'s producer loop, is the one that *was* defendable. It was
+//! defended, and G12's `s1_closing_batch_count` mutant now holds it instead of
+//! this note.
 //!
 //! | Claim | Test |
 //! |---|---|

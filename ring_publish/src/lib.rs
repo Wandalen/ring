@@ -31,11 +31,12 @@
 //! finished is told so and must try again.
 //!
 //! The alternative is to publish to the highest contiguous point, or to track
-//! per-slot availability in a bitmap. Either would let producer B's publication
-//! proceed while producer A is still writing. That works, and it is what a
+//! per-slot availability. Either would let producer B's publication proceed
+//! while producer A is still writing. That works, and it is what a
 //! high-contention multi-producer ring eventually needs. It is deliberately not
 //! here, because it is `ring_mpsc`'s problem, and putting it in this crate
-//! would make the crate untestable without a second producer.
+//! would make the crate untestable without a second producer. `ring_mpsc`
+//! tracks availability with a per-slot sequence stamp.
 //!
 //! ## Why a plain spin, and not a `WaitKind`
 //!

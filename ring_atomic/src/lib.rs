@@ -51,8 +51,11 @@
 //! [`CountingSeq::new`] and, downstream, `ring_cursor`'s two are `const` only
 //! in an ordinary build.
 //!
-//! `ring_publish/tests/handshake_test.rs` is what uses it, and is run with
-//! `RUSTFLAGS="--cfg loom" cargo test -p ring_publish --test handshake_test`.
+//! A test that model-checks under it wraps its body in `loom::model` and runs
+//! with `RUSTFLAGS="--cfg loom" cargo test -p <crate> --test <file>`. A test file
+//! that reaches this crate without model-checking carries
+//! `#![cfg(not(loom))]`, because loom's atomics panic when touched outside a
+//! `loom::model`.
 
 #![deny(missing_docs)]
 

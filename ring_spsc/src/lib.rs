@@ -154,7 +154,7 @@
 //! in order, with zero loss and no lock in the path, and cites the feature
 //! textually. That citation is the only crate→feature edge the family records.
 //!
-//! Reasoning honed on this crate is conservative in `ring_mpsc`, not the
+//! Reasoning honed on `ring_mpsc` is conservative in this crate, not the
 //! reverse. A habit formed here, such as treating the producer cursor as a
 //! frontier or a claim as impossible to overtake, is unsafe when carried into
 //! `ring_mpsc`, where more than one producer can be racing the same claim. The
@@ -1021,19 +1021,17 @@ impl<S> Batch<'_, S> {
   ///
   /// Fix(ring_core_citation_pointed_at_docsrs_not_a_real_page): this line used
   /// to read `` `ring_core`: <https://docs.rs/ring_core> ``, a CommonMark
-  /// autolink that was dead by construction. `publish = false` means this
-  /// crate is never on docs.rs, and the address would never resolve to
-  /// `ring_core`'s documentation even if it existed. Root cause: it was left
+  /// autolink to an external page. docs.rs hosts a crate only once a version of
+  /// it is published to crates.io, and rustdoc never checks an external URL, so
+  /// nothing in the build said whether the page existed. Root cause: it was left
   /// over from a draft reference-style link that never got the rest of its
   /// syntax (`[ring_core]: ...` with a matching `[ring_core]` consumer
   /// elsewhere in the comment). Nothing in this comment ever consumed it, and
   /// the paragraph two lines up already cites `ring_core` correctly as plain
   /// backtick text, so the line was dead weight rendered as a live link.
   /// Pitfall: a doc-comment line shaped like a citation reads as
-  /// already-verified and gets checked far less than prose does. `ring_core`'s
-  /// own module documentation carries the identical pattern for an unrelated
-  /// citation (fixed there by citing the target as plain backtick text
-  /// instead of a link), which is the family's actual convention.
+  /// already-verified and gets checked far less than prose does. The family
+  /// cites a target as plain backtick text instead of a link.
   ///
   /// ```
   /// use ring_slot::TypedSlot;

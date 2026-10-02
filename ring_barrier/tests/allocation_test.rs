@@ -9,9 +9,8 @@
 //! was removed the table became false in every row at once, and nothing
 //! detected it. The numbers lived only in prose, and prose does not run.
 //!
-//! This file replaces the scratch binary. The table it now backs is the same
-//! table, measured the same way, by something that fails when the answer
-//! changes.
+//! This file replaces the scratch binary. It measures the same counts the same
+//! way, and it fails when a count changes.
 //!
 //! ## What is measured here that `ring_cursor`'s own file does not cover
 //!

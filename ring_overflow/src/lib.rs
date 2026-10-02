@@ -7,11 +7,11 @@
 //! enum lives in `ring_types` and the handlers live here. This crate is the
 //! handlers. Given a full ring and a policy, they decide what happens and record it.
 //!
-//! The feature's own emphasis is on what is *absent*. There is deliberately no
-//! variant that overwrites unread data. That absence is what makes a successful
-//! publish meaningful. Under every policy here, a publish that reported success
-//! kept the item. [`Resolution`] below makes the alternative outcomes explicit
-//! instead of leaving them to a boolean.
+//! A publish that reports success did not always keep the item. Under
+//! `DropNewest`, `ring_core`'s `try_push` returns `Ok(())` on a full ring and
+//! discards the incoming item. `EvictedOldest` accepts the incoming item by
+//! dropping the oldest unread one. [`Resolution`] below names what happened to
+//! the data in each case instead of leaving it to a boolean.
 
 #![no_std]
 #![deny(missing_docs)]
@@ -62,11 +62,9 @@ pub enum Resolution {
   /// construction with `RingError::PolicyUnsupported`, and which the `crossbeam`
   /// build handles with `force_push` and an early return before reaching the
   /// resolution site. So one of these three exported variants is unconstructible
-  /// in every configuration that ships. `ring_core:337` records that for its
-  /// own `match`, and until now this crate, which owns the type, recorded it
-  /// nowhere. It is kept rather than removed because it is the only value for
-  /// which [`Resolution::accepted_incoming`] is true, and deleting it would
-  /// collapse that predicate to a constant `false`.
+  /// in every configuration that ships. It is kept rather than removed because
+  /// it is the only value for which [`Resolution::accepted_incoming`] is true,
+  /// and deleting it would collapse that predicate to a constant `false`.
   EvictedOldest,
   /// Nothing was published and nothing discarded; the caller got the error.
   Refused,

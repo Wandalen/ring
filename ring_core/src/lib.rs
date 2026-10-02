@@ -5,17 +5,6 @@
 //! feature, alongside the selection between [`ring_spsc`] and [`ring_mpsc`]
 //! (-> `docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md`).
 //!
-//! Fix(decision_121_link_pointed_at_docsrs_not_the_ruling): an earlier citation
-//! here was a rustdoc reference link to `https://docs.rs/ring_core`. That link
-//! was dead by construction, since `publish = false` means this crate is never
-//! on docs.rs, and even a live link there would land on this crate's own docs
-//! rather than on the cited ruling. Root cause: the link target was never
-//! filled in past a placeholder at the commit that introduced it. Pitfall: a
-//! doc-comment citation that *looks* like a working hyperlink is checked far
-//! less often than prose, because it reads as already verified. The family
-//! cites documents as plain backtick text instead of a link, and this citation
-//! now matches it.
-//!
 //! # The API is value-shaped, and that is forced rather than chosen
 //!
 //! The two in-house backends publish through a *slot*: claim a reservation,
@@ -369,6 +358,9 @@ impl<'a, T: Send> Producer<'a, T> {
         match producer.claim() {
           Ok(mut reserved) => {
             let displaced = reserved.set(record);
+            // A release build drops `displaced` here without a signal. If a freshly
+            // claimed slot still held a record, that record is lost. The assert
+            // stays until `ring_slot` offers a reservation type known to be empty.
             debug_assert!(displaced.is_none(), "a claimed slot held a record");
             Ok(())
           }

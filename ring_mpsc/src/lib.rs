@@ -12,9 +12,9 @@
 //! # Publication is a per-slot stamp, and that is this crate's whole addition
 //!
 //! `ring_publish` exists and is deliberately **not** used here. Its own module
-//! documentation says why, about this crate by name: publishing to the highest
-//! contiguous point "is what a high-contention multi-producer ring eventually
-//! needs; it is deliberately not here, because it is `ring_mpsc`'s problem".
+//! documentation says why, about this crate by name: tracking per-slot
+//! availability "is what a high-contention multi-producer ring eventually
+//! needs. It is deliberately not here, because it is `ring_mpsc`'s problem".
 //! Its `Publisher::publish` spins until the *predecessor* producer has
 //! published, which makes one producer's progress depend on another's. That is
 //! the one coupling the contended-claim feature exists to remove.

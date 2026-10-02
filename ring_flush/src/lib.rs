@@ -62,8 +62,8 @@ use ring_types::RingError;
 /// ownership. `OnFull` and `OnBarrier` name conditions determined elsewhere, by the
 /// buffer's capacity and by the consumer's schedule. `OnBatch( n )` names a
 /// condition this crate owns outright, which is why it is the only variant with
-/// a parameter, the only one with state, and the only one that can be
-/// misconfigured.
+/// a parameter and the only one that can be misconfigured. No variant carries
+/// state. Records staged since the last flush is the buffer's own occupancy.
 ///
 /// # No `Default`
 ///

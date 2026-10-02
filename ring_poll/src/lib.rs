@@ -580,7 +580,7 @@ impl Tick {
     outcome
   }
 
-  /// [`drain_up_to`] with this tick's own ceiling, counting what moved.
+  /// [`drain_up_to`] capped at the caller's `max`, counting what moved.
   ///
   /// The ceiling is `max` rather than the budget. A budget bounds *retries of a
   /// failed operation*; a drain limit bounds *successes*. Collapsing the two

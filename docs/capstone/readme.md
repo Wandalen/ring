@@ -18,8 +18,8 @@ This is a real codebase, not a toy: unsafe is `deny`-by-default with a
 [`unsafe_allowlist.txt`](../../bench_harness/gate/declared/ring/unsafe_allowlist.txt)),
 it already runs `loom` model-checking on part of the concurrency-critical
 tier, and it has its own home-grown stage-gate verification suite
-(`bench_harness/gate/`, gates named `g1`...`g22`) enforcing coverage, doc
-freshness, and unsafe-code review. Whatever a topic below adds, wire it in
+(`bench_harness/gate/`, gates named `g1`...`g22`) enforcing coverage, rustdoc
+coverage, and unsafe-code review. Whatever a topic below adds, wire it in
 the same spirit: a gate that can fail, not a claim that sounds true.
 
 **Two things to know before anyone opens an editor:**

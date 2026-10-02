@@ -549,14 +549,17 @@ mod threaded {
     assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(2));
   }
 
-  /// An unwritten claim publishes an empty record, not a torn one.
+  /// An unwritten claim on the first lap publishes an empty record, not a torn
+  /// one.
   ///
   /// `Reserved`'s `Drop` publishes unconditionally, which is what makes the
   /// publish impossible to skip. One objection is that a guard therefore
   /// publishes a partially-written slot on a panic between claim and write. It
-  /// does not. The consumer that drained the slot left it `Default`, so the
-  /// observable result is one empty record: defined, drainable, and
-  /// distinguishable from a written one.
+  /// does not. It publishes the slot as it stands. On the first lap the slot is
+  /// still `Default`, so the observable result is one empty record: defined,
+  /// drainable, and distinguishable from a written one. On a later lap the slot
+  /// holds whatever record the consumer did not take, which this test does not
+  /// cover.
   #[test]
   fn a_claim_dropped_without_a_write_publishes_an_empty_record() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));

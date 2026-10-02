@@ -891,11 +891,13 @@ impl<'a, T> Producer<'a, TypedSlot<T>> {
 /// returns early would stall the ring permanently, since the consumer stops at
 /// the first unpublished sequence and would never pass this one.
 ///
-/// **A guard dropped without a write publishes an empty slot, not a torn one.**
-/// The consumer that drained the slot left it `Default`, so a panic between
-/// claim and write costs one empty record. That is an observable, defined
-/// outcome rather than undefined behaviour. No completion flag is tracked,
-/// because there is nothing for it to prevent.
+/// **A guard dropped without a write publishes the slot as it stands, not a
+/// torn one.** On the first lap that is an empty slot. On a later lap it is
+/// whatever record the previous lap left, if the consumer read it through
+/// `get` rather than taking it, and the consumer then receives that old record
+/// again under the new sequence. Either way the outcome is defined rather than
+/// undefined behaviour. No completion flag is tracked, so the consumer cannot
+/// tell a republished record from a fresh one.
 #[derive(Debug)]
 pub struct Reserved<'a, S> {
   ring: &'a Ring<S>,

@@ -32,6 +32,10 @@ records why, what bounds the unsafe code, and when to delete it.
   sized from `Ring::new`'s argument. The index stays in bounds only because
   `Ring::new` passes the same `Capacity` to both, not for the power-of-two
   reason the comment in `stamp` gives.
+- A `ring_mpsc::Reserved` publishes on drop even if nothing was written
+  through it. An early `?` between `Producer::claim` and the write delivers the
+  slot as it stands. That is empty on the first lap, and otherwise whatever
+  record the previous lap left there if the consumer did not take it.
 
 ## Run it
 

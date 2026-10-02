@@ -38,9 +38,10 @@ a two-record case instead.
   through it. An early `?` between `Producer::claim` and the write delivers the
   slot as it stands. That is empty on the first lap, and otherwise whatever
   record the previous lap left there if the consumer did not take it.
-- `ring_spsc::Producer::free_capacity` is exact, but callers going through
-  `ring_core::Producer::free_capacity` must treat it as advisory because that
-  contract is the same across backends, so the exactness has no consumer.
+- `ring_spsc::Producer::free_capacity` is exact, but no production caller that
+  goes through `ring_core::Producer::free_capacity` checks which backend it
+  holds, so the exactness goes unused. `ring_core` documents the reading as
+  binding at SPSC and lets a caller tell the backends apart with `try_clone`.
 - The `--cfg loom` model in `tests/spsc_test.rs` reaches loom's instrumented
   atomics only through `ring_cursor`'s dependency on `ring_atomic`, which
   `ring_spsc/Cargo.toml` never names. Removing that edge from `ring_cursor`

@@ -47,9 +47,10 @@ use ring_types::{Capacity, Seq, SlotIndex};
 /// # The derived `Debug` renders every slot
 ///
 /// `{ :? }` on a `Buffer` walks the full allocation. That is megabytes of output
-/// for a realistic ring, and for `BytesSlot` it includes bytes a `clear` has
-/// already logically discarded
-/// (`ring_slot/docs/decisions/001_bytes_slot_marks_occupancy_with_a_length.md`).
+/// for a realistic ring, and it prints every slot's current payload, including
+/// records a consumer has already read but not taken out of the slot.
+/// `BytesSlot`'s own `Debug` shows only the first `len` bytes, so bytes a
+/// `clear` left behind do not appear.
 /// `ring_spsc` and `ring_mpsc` both avoid this by giving their own ring type a
 /// hand-written `Debug` that prints cursor positions only, never slot contents.
 /// A type that embeds a `Buffer` and derives `Debug` in turn inherits this cost

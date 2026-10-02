@@ -168,7 +168,7 @@ problems (325 stale-output, 35 unverifiable-by-design, 2 missing-recipe) as
 of the extraction.
 
 **Deliverables:** `CONTRIBUTING.md` + a real quickstart; the G15 problem
-count driven toward zero (`bench_harness/docs/guide/002_the_four_verdicts.md`
+count driven toward zero (`ring_bench/readme.md`
 explains what each finding type means and what fixing it looks like).
 Less flashy than fuzzing or CI, but a library nobody can onboard to isn't
 production-ready no matter how correct the code underneath it is — and
@@ -186,14 +186,14 @@ harder.
   semver-check passing, `cargo publish --dry-run` succeeding for all 34
   crates), phrase it that way. This project already grades itself that way
   — match its own standard rather than inventing a new one.
-  `bench_harness/docs/guide/001_running_the_verdicts_yourself.md` is the
+  `bench_harness/gate/readme.md` is the
   existing model to follow.
-  - `bench_harness/docs/guide/003_what_the_gates_do_not_prove.md` is worth
+  - `bench_harness/docs/decisions/002_defects_are_graded_by_mutation_not_coverage.md` is worth
     reading before designing a new gate — it's the project's own honest
     accounting of what a passing gate doesn't actually guarantee, and a
     useful template for scoping a new one honestly.
 - **Integration point at the end:** a joint session where each owner
   demos their gate going from red to green on a real (planted) violation —
   the same "prove it can fail" standard
-  `bench_harness/docs/invariant/001_gate_non_vacuity.md` already holds
+  `bench_harness/docs/decisions/001_a_gate_counts_only_after_failing_for_its_own_reason.md` already holds
   itself to.

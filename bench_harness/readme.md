@@ -1,42 +1,33 @@
 # bench_harness
 
 Family-neutral validation machinery: seeded workloads, a byte-parity oracle,
-and stage gates that grade several crate families from one runner
-(`gate/run_all.sh --family <name>`; declared families live under
-`gate/declared/`).
+and stage gates that grade a declared crate family from one runner
+(`gate/run_all.sh --family <name>`). Families are declared under
+`gate/declared/`, and `gate/declared/family.txt` names the one a bare run
+grades.
 
 This crate is a leaf. It depends on nothing else in this workspace, and
 specifically on no `ring_*` crate.
 
-That independence is the crate's whole point. `ring_bench` sits at tier 12 of
-the ring family's dependency forest and imports six of the crates it measures,
-so anything hosted there can only run once the family already builds. Stage
-gates have to run *before* the work they grade, against empty skeletons, on
-day one. So they cannot live downstream of it. `bench_harness` is therefore a
-grader that predates what it grades, and `ring_bench` is the grader of
-write-path candidates specifically. The two are different jobs, and the
-dependency direction keeps them apart.
+That independence is the reason the crate exists. `ring_bench` imports the
+crates it measures, so anything hosted there can run only once the family
+already builds. Stage gates have to run *before* the work they grade, against
+empty skeletons, so they cannot live downstream of it. `bench_harness` is a
+grader that predates what it grades, and `ring_bench` grades write-path
+candidates. The two are different jobs, and the dependency direction keeps
+them apart.
 
 It sits inside this workspace because the `ring_*` family was its first
-grading target and remains one of its declared families. Its grading role is
-not limited to this family. See `gate/declared/` for the rest.
+grading target and is the family declared today. Its grading role is not
+limited to that family. Another family is a new directory of declarations
+under `gate/declared/`.
 
-Implemented. The baseline the gates were built against, taken on 2026-08-28
-when the family was still 33 skeletons, read 0/6. Both family and gate count
-have grown since. The ring family now declares 14 gates
-(`gate/declared/ring/gates.txt`) and orbital 11
-(`gate/declared/orbital/gates.txt`). For both, `run_all.sh --family <name>`
-gives the current, authoritative reached-count. Re-run it rather than trusting
-a number restated here. This paragraph has already gone stale twice: a
-"7/7"-for-ring figure predating gates g12–g21, and a "12 tests" count
-predating T13/T14. The seeded workload
-generator and byte-parity oracle in `src/` are covered by 14 tests (6 in
-`tests/workload_test.rs`, 8 in `tests/oracle_test.rs`, `cargo nextest run`
-confirms).
+`gate/run_all.sh --family <name>` prints the current reading for a family.
 
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
-| `docs/` | Scope, invariants, and open trade-offs. See [docs/readme.md](docs/readme.md) |
+| `docs/decisions/` | Architecture decision records: [001](docs/decisions/001_a_gate_counts_only_after_failing_for_its_own_reason.md) when a gate's REACHED counts as evidence, [002](docs/decisions/002_defects_are_graded_by_mutation_not_coverage.md) what coverage and the other gates do not prove |
 | `gate/` | The stage gates, their per-family declarations, and the runner. See [gate/readme.md](gate/readme.md) |
 | `src/lib.rs` | Crate root. Re-exports the workload generator, accumulator semantics, and byte-parity oracle |
+| `tests/` | The workload and oracle suites |

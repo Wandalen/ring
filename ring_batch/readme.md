@@ -21,6 +21,5 @@ cargo test --doc -p ring_batch --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `batch_test.rs` and the manual plan under `manual/` |

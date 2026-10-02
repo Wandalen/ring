@@ -29,6 +29,5 @@ cargo test --doc -p ring_tls --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build, described in the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |

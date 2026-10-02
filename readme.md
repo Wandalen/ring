@@ -144,11 +144,18 @@ The reasoning, its costs, and its removal conditions are recorded in
 
 ## Tooling
 
+The [`justfile`](justfile) holds the workspace's build, test and check recipes.
+Running them needs [`just`](https://github.com/casey/just), verified on 1.58.0.
+`just fmt` runs the nightly the justfile pins, which `just --evaluate nightly`
+prints. Install it with `rustup toolchain install <pin> -c rustfmt`.
+
 ```sh
-verb/test                        # full suite, every crate. Final verification
-verb/test_only crate::ring_spsc  # filtered to one crate. Ordinary development
+just test                         # nextest, doctests, clippy, every crate. Final verification
+just test_only --crate ring_spsc  # nextest for one crate. Ordinary development
 ```
 
-| Directory | Responsibility |
-|-----------|-----------------|
-| [`verb/`](verb/readme.md) | do-protocol verb scripts (`test`, `lint`, `gate`, ...). Not a crate, no `Cargo.toml` |
+`just` with no arguments lists every recipe with its description, and
+`just --usage <recipe>` shows a recipe's options. `just --dry-run <recipe>`
+prints the commands a recipe would run, dependencies included, without running
+them. A recipe runs from the workspace root wherever `just` is invoked. The
+loom models and Miri have no recipe, so `just verify` does not run them.

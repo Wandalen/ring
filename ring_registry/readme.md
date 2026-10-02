@@ -55,7 +55,6 @@ cargo test --doc -p ring_registry --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | `Registry` and `RegistryError` |
 | `tests/registry_test.rs` | Tests across the public API, including the drop-counter cases |

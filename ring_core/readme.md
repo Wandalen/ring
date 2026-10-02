@@ -66,7 +66,6 @@ cargo test --doc -p ring_core --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The `Ring`, its three backends, and the ends/producer/consumer handles |
 | `tests/core_test.rs` | One program run against every backend the build offers, and the tests around it |

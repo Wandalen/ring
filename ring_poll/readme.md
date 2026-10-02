@@ -38,7 +38,6 @@ cargo tree -p ring_poll | grep -c ring_wait   # prints 0, the point of the crate
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The budget, the progress verdict, the bounded helpers, and the tick that accumulates them |
 | `tests/poll_test.rs` | The check that no tick-path crate reaches `ring_wait`, and tests across the public API |

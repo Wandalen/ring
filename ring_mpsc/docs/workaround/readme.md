@@ -62,12 +62,12 @@ not be `Sync`. See [its record](../../../ring_spsc/docs/workaround/readme.md).
 
 - The `compile_fail` guards in the crate's `//!` (no second consumer by `Clone`, `Consumer` not `Sync`, no second
   split, no second `Ends`, no `Reserved` outliving the ring it borrows) run only under `cargo test --doc`, which
-  `verb/test` and CI run. A nextest-only run, such as `verb/test_only`, checks none of them.
+  `just test` and CI run. A nextest-only run, such as `just test_only`, checks none of them.
 - `COMMIT`'s `Release` has no behavioural check. Only the test
   `the_orderings_are_the_ones_the_publication_invariant_names` reads the constant. The crate's `tests/manual/readme.md`
   records that weakening it to `Relaxed` survived both loom models and 120 hardware runs on aarch64.
 - The loom models, `mod exhaustive` in `tests/mpsc_test.rs`, cover the publish edge and the drain bound and run only
-  under `--cfg loom`. The Loom CI workflow runs them on `master` pushes and nightly, and no verb runs them. No verb or
-  workflow runs Miri.
+  under `--cfg loom`. The Loom CI workflow runs them on `master` pushes and nightly, and no recipe runs them. No recipe
+  or workflow runs Miri.
 - Delete the opt-out when a safe abstraction, from `std` or a dependency, can express exclusive access to one element
   of a shared array gated by a runtime cursor comparison. None exists. The `Sync` impl retires with it.

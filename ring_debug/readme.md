@@ -62,7 +62,6 @@ cargo test --doc -p ring_debug --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The three checks, `Watch`, and `Violation` |
 | `tests/debug_test.rs` | Every violation the tests catch is produced through `ring_cursor`'s own public `store` |

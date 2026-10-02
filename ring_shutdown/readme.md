@@ -44,7 +44,6 @@ cargo test --doc -p ring_shutdown --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The flag, the `Stopped` token, the guarded producer, and the close-aware waits |
 | `tests/shutdown_test.rs` | An end-to-end close, drain and reset run, and tests across the public API |

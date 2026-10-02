@@ -60,9 +60,9 @@ must be `Sync`. See [its record](../../../ring_mpsc/docs/workaround/readme.md).
 - `both_ends_are_send_and_neither_is_sync` in `tests/spsc_test.rs` asserts the `Send` half. The negatives the
   argument rests on (no `Clone`, no second split while a pair is live, neither end `Sync`, no batch borrow outliving
   its commit) are `compile_fail` doctests in the crate's `//!`. They run only under `cargo test --doc`, which
-  `verb/test` and CI run. A nextest-only run, such as `verb/test_only`, checks none of them.
+  `just test` and CI run. A nextest-only run, such as `just test_only`, checks none of them.
 - The loom model, `mod exhaustive` in `tests/spsc_test.rs`, runs only under `--cfg loom`. The Loom CI workflow runs it
-  on `master` pushes and nightly, and no verb runs it. No verb or workflow runs Miri, which is what found the
+  on `master` pushes and nightly, and no recipe runs it. No recipe or workflow runs Miri, which is what found the
   whole-buffer aliasing.
 - Delete the opt-out when a safe abstraction below this crate, from `std` or a dependency, can express exclusive access
   to one element of a shared array gated by a runtime cursor comparison. None exists. The `Sync` impl retires with

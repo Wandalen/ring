@@ -106,7 +106,6 @@ cargo test --doc -p ring_bench --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `examples/comparison.rs` | The comparison printed for a human: `cargo run -p ring_bench --all-features --example comparison` |
 | `src/lib.rs` | `Workload`, `Candidate`, `Outcome`, `Comparison`, and one runner per candidate |

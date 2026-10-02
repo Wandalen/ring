@@ -26,7 +26,6 @@ under `gate/declared/`.
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records: [001](docs/decisions/001_a_gate_counts_only_after_failing_for_its_own_reason.md) when a gate's REACHED counts as evidence, [002](docs/decisions/002_defects_are_graded_by_mutation_not_coverage.md) what coverage and the other gates do not prove |
 | `gate/` | The stage gates, their per-family declarations, and the runner. See [gate/readme.md](gate/readme.md) |
 | `src/lib.rs` | Crate root. Re-exports the workload generator, accumulator semantics, and byte-parity oracle |

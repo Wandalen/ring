@@ -27,7 +27,7 @@ ring_types = { workspace = true }
 # ordinary build never sees it. The model lives in `tests/`, not `src/`, so the
 # scripted fixture stays measurable by a coverage run that does not set the cfg.
 # That placement has a cost. The same cfg-less run does not compile the
-# exhaustive file at all, so a break there still leaves `verb/test` fully green.
+# exhaustive file at all, so a break there still leaves `just test` fully green.
 [target.'cfg(loom)'.dev-dependencies]
 loom = { workspace = true }
 

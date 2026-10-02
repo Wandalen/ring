@@ -46,7 +46,6 @@ cargo test --doc -p ring_handle --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | `Split`, `Ends`, the two handles, and the bounded `Drain` |
 | `tests/handle_test.rs` | This crate's runtime half, across the public API |

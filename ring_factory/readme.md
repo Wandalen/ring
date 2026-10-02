@@ -80,6 +80,5 @@ cargo test --doc -p ring_factory --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `src/lib.rs` | `Factory`, `BuildError`, and the two Contract re-exports |
 | `tests/` | The behavioural suite and the manual plan. See [tests/manual/readme.md](tests/manual/readme.md) |

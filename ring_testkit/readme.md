@@ -88,7 +88,6 @@ RUSTFLAGS="--cfg loom" cargo test -p ring_testkit --test exhaustive_test
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | `Script`, `Step`, `Outcome`, `Anomaly`, `audit_received`, `audit_received_unordered`, `leak`, `leak_ends` |
 | `tests/testkit_test.rs` | The scripted half |

@@ -75,7 +75,6 @@ cargo test --doc -p ring_flush --all-features
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The three policies, the driver, and the flush log |
 | `tests/flush_test.rs` | This crate's claiming test: each policy fires at its own trigger and at no other, checked against the flush log |

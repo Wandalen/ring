@@ -150,7 +150,7 @@ coverage first. Check current state first — some of this may already be
 fixed.
 
 **Deliverables:** the trybuild test fixed and understood (not just
-re-blessed away), a self-contained dev-script/`verb/test` that doesn't
+re-blessed away), a self-contained dev-script (the root `justfile`) that doesn't
 depend on anything outside this repo, and `loom` coverage extended to every
 crate on the unsafe allowlist plus its direct dependents. This is the
 topic with the most pre-existing investigation already done — a good pick

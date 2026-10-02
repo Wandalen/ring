@@ -83,8 +83,10 @@ impl WaitKind {
 /// What a producer does when the ring has no free slot.
 ///
 /// The overflow-policy feature is explicit that there is **no variant that
-/// overwrites unread data**. That absence is the feature. A publish that
-/// reports success has kept the item, under every policy here.
+/// overwrites unread data silently**. `DropOldest` does discard an unread item,
+/// and `ring_overflow` reports that as a loss. A publish that reports success
+/// has not always kept the item. Under `DropNewest`, `ring_core`'s `try_push`
+/// returns `Ok(())` on a full ring and discards the incoming item.
 ///
 /// ```
 /// use ring_types::OverflowPolicy;

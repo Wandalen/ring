@@ -1,11 +1,11 @@
 //! `ring_gating` tests for the producer half of the sequence barrier.
 //!
 //! This file carries half the reached-test for
-//! `docs/feature/178_sequence_barrier_and_gating_set.md`, which states that
-//! `ring_gating` refuses a claim that would advance past the gating minimum,
-//! and a producer never overwrites an uncommitted slot, asserted over a full
-//! lap with a deliberately stalled consumer. (`ring_barrier`'s own file carries
-//! the minimum-across-a-set half.)
+//! `docs/feature/178_sequence_barrier_and_gating_set.md`. The half asserted
+//! here is that `ring_gating` refuses a claim that would advance past the
+//! gating minimum, and a producer never overwrites an uncommitted slot, over a
+//! full lap with a deliberately stalled consumer. (`ring_barrier`'s own file
+//! carries the minimum-across-a-set half.)
 //!
 //! ## The stalled consumer is the test, not the setup
 //!

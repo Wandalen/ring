@@ -54,28 +54,28 @@ def check( docs ):
       names |= set( re.findall( r'^\s*fn ([a-z_][a-z0-9_]*)', t.read_text(), re.M ) )
 
   # Fix(a_deeper_heading_is_not_a_boundary): mirrors corpus_lib.py's own
-  # _section_rows fix — the close check used to be a bare
+  # _section_rows fix. The close check used to be a bare
   # `line.startswith('###')`, so a deeper `####` heading nested under
   # `### Tests` satisfied it and wrongly ended the section instead of nesting
-  # inside it. Root cause: same one line over — a prefix compares character
+  # inside it. Root cause: the same one line over. A prefix compares character
   # runs, not heading depth. Pitfall: zero live trigger today (no `#### `
   # heading exists anywhere under docs/, confirmed by a repo-wide grep), since
   # every `### Tests` table in this corpus currently ends before any nested
-  # heading — dormant until an author ever nests one under a Tests table.
+  # heading. Dormant until an author nests one under a Tests table.
   #
   # Fix(citations_tests_open_is_a_prefix_not_a_heading): the open check
-  # mirrored the fix above for the close boundary but not the sibling fix
-  # `_section_rows` also carries — `a_longer_heading_is_not_the_same_heading`
-  # — for the *open* boundary. `line.startswith( '### Tests' )` would treat a
-  # differently-named heading like `### Tests Deferred` or `### Testsuite
-  # Coverage` as opening this same section, same bug class, one line
-  # earlier. Root cause: identical to the fix above — a prefix compares
-  # character runs, not "is this heading the one named heading," which is
-  # what an open boundary actually means. Pitfall: zero live trigger today —
-  # measured directly, not assumed: every prose line in every doc instance
-  # across all 33 crates (158,104 lines, 923 files) for which
-  # `startswith( '### Tests' )` is true is also exactly equal to
-  # `'### Tests'`, so no corpus content distinguishes the two checks yet.
+  # mirrored the fix above for the close boundary, but not the sibling fix
+  # `_section_rows` also carries for the *open* boundary,
+  # `a_longer_heading_is_not_the_same_heading`. `line.startswith( '### Tests' )`
+  # would treat a differently-named heading like `### Tests Deferred` or
+  # `### Testsuite Coverage` as opening this same section. Same bug class, one
+  # line earlier. Root cause: identical to the fix above. A prefix compares
+  # character runs, not "is this heading the one named heading," which is what
+  # an open boundary means. Pitfall: zero live trigger today, measured
+  # directly, not assumed. Every prose line in every doc instance across all 33
+  # crates (158,104 lines, 923 files) for which `startswith( '### Tests' )` is
+  # true is also exactly equal to `'### Tests'`, so no corpus content
+  # distinguishes the two checks yet.
   for ( _, _, p ) in lib.instances( docs ):
     rel = p.relative_to( docs ).as_posix()
     inside = False

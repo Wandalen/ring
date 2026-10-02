@@ -1,14 +1,15 @@
 # `committed` returning the default instead of reading the cursor.
 #
-# Every assertion on `committed()` in the crate — one test and two doctests —
+# Every assertion on `committed()` in the crate, one test and two doctests,
 # expected `Seq::ZERO`, so a method that returned the default and never touched
 # the consumer cursor satisfied all three. `Consumer::position()`, the same
 # cursor by another name, was asserted once and also only at zero.
 #
 # This is the one-polarity rule (readme.md) applied to a quantity rather than a
-# predicate: a watermark asserted only where it has not moved is indistinguish-
-# able from one that cannot move. The detector now brackets a drain — zero
-# before, `Seq( 1 )` after — so the assertion straddles the change.
+# predicate. A watermark asserted only where it has not moved is
+# indistinguishable from one that cannot move. The detector now brackets a
+# drain, zero before and `Seq( 1 )` after, so the assertion straddles the
+# change.
 
 id: S11
 crate: ring_mpsc

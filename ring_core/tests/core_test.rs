@@ -1,30 +1,30 @@
-//! `ring_core` — the composition point over three backends.
+//! `ring_core`, the composition point over three backends.
 //!
 //! # What this file is arranged around
 //!
 //! This file carries the reached-test for
 //! `docs/feature/187_optional_crossbeam_queue_backend.md`, whose condition is
 //! that "the swap between them is a **build flag rather than a rewrite**". A
-//! claim of that shape is only worth what a test that runs the
-//! *same program* against every backend is worth, so the reached-test
+//! claim of that shape is only as good as a test that runs the
+//! *same program* against every backend. So the reached-test
 //! ([`the_same_program_behaves_identically_on_every_backend`]) is written once
 //! and parameterized over backends, rather than written three times.
 //!
-//! That shape has a failure mode of its own, and it is the one to watch: a
+//! That shape has a failure mode of its own, and it is the one to watch. A
 //! parameterized test that silently runs against one backend proves nothing
 //! about the other two while still reporting green.
 //! [`every_backend_the_build_offers_is_actually_exercised`] exists to make that
 //! visible, and the crossbeam arm is `#[ cfg( feature = "crossbeam" ) ]`
-//! throughout — under the default build there are genuinely two backends, not
-//! three, and the test says so rather than pretending.
+//! throughout. Under the default build there are two backends, not three, and
+//! the test says so rather than pretending.
 //!
 //! # What is deliberately not here
 //!
-//! No `is_closed`, and no test for it. Liveness is `ring_shutdown`'s (feature
-//! 184, stage S6) and a handle-local copy of the flag is the failure that crate
-//! exists to prevent — so this crate has no flag to test.
+//! No `is_closed`, and no test for it. Liveness is `ring_shutdown`'s, and a
+//! handle-local copy of the flag is the failure that crate exists to prevent.
+//! So this crate has no flag to test.
 //!
-//! No `loom` model. This crate contains no atomic of its own: every ordering
+//! No `loom` model. This crate contains no atomic of its own. Every ordering
 //! question belongs to a backend, and each backend models its own
 //! (`ring_spsc` and `ring_mpsc` both do). A model here would re-check theirs
 //! while proving nothing about the composition, which is what this file is for.
@@ -33,7 +33,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure, so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -42,18 +42,18 @@ use ring_config::RingConfig;
 use ring_core::{Backend, Ring};
 use ring_types::{OverflowPolicy, RingError};
 
-/// The backends this build actually has.
+/// The backends this build has.
 ///
-/// Written twice under a `cfg` rather than once with a conditional `push`: the
-/// list is what every test below loops over, so it should be readable as a
-/// literal for each build rather than assembled. It also avoids an
+/// Written twice under a `cfg` rather than once with a conditional `push`. The
+/// list is what every test below loops over, so it should read as a literal
+/// for each build rather than be assembled. It also avoids an
 /// `unused_mut` that would otherwise appear only in the default build.
 #[cfg(feature = "crossbeam")]
 fn every_backend() -> Vec<Backend> {
   vec![Backend::Spsc, Backend::Mpsc, Backend::Crossbeam]
 }
 
-/// The backends this build actually has — default build, no crossbeam.
+/// The backends the default build has, without crossbeam.
 #[cfg(not(feature = "crossbeam"))]
 fn every_backend() -> Vec<Backend> {
   vec![Backend::Spsc, Backend::Mpsc]
@@ -72,24 +72,25 @@ fn ring_on<T: Send>(backend: Backend, slots: usize, overflow: OverflowPolicy) ->
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Feature 187's reached-test.
+// The optional crossbeam backend's reached-test.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// The same program, run against every backend, produces the same result.
 ///
 /// This is `docs/feature/187_optional_crossbeam_queue_backend.md`'s condition
-/// stated as a test: if swapping the backend is a build flag rather than a
-/// rewrite, then a program written against this surface cannot tell which
-/// backend it got — for every behaviour the surface actually promises.
+/// stated as a test. If swapping the backend is a build flag rather than a
+/// rewrite, then a program written against this API cannot tell which
+/// backend it got, for every behaviour the API promises.
 ///
-/// The qualifier is doing real work. Three behaviours are deliberately excluded
-/// because the surface does *not* promise them uniformly, and asserting them
-/// would be asserting something false:
+/// The qualifier matters. Three behaviours are deliberately excluded because
+/// the API does *not* promise them uniformly, and asserting them would be
+/// asserting something false:
 ///
-/// - **Drain order** across multiple producers — publication order at SPSC, an
-///   interleaving at MPSC, unspecified at crossbeam. The assertion below sorts.
-/// - **`free_capacity`'s exactness** — binding at SPSC, advisory elsewhere.
-/// - **`DropOldest`** — only crossbeam can evict.
+/// - **Drain order** across multiple producers. It is publication order at
+///   SPSC, an interleaving at MPSC, and unspecified at crossbeam. The
+///   assertion below sorts.
+/// - **`free_capacity`'s exactness.** Binding at SPSC, advisory elsewhere.
+/// - **`DropOldest`.** Only crossbeam can evict.
 #[test]
 fn the_same_program_behaves_identically_on_every_backend() {
   const CAPACITY: usize = 8;
@@ -117,7 +118,7 @@ fn the_same_program_behaves_identically_on_every_backend() {
       } else {
         // Refused means full, and full means draining must make room. If it
         // does not, the ring has lost the ability to release slots and this
-        // loop would spin forever — so the drain is asserted, not assumed.
+        // loop would spin forever. So the drain is asserted, not assumed.
         assert!(
           consumer.try_recv_batch(&mut received) > 0,
           "{backend:?} refused a push while the consumer could drain nothing — deadlock"
@@ -135,7 +136,7 @@ fn the_same_program_behaves_identically_on_every_backend() {
     );
     assert_eq!(received.len(), RECORDS as usize, "{backend:?} lost or duplicated records");
 
-    // Sorted, because drain order is exactly what the surface does not promise.
+    // Sorted, because drain order is exactly what the API does not promise.
     received.sort_unstable();
     assert_eq!(
       received,
@@ -149,9 +150,9 @@ fn the_same_program_behaves_identically_on_every_backend() {
 
 /// Every backend the build offers is reached by the reached-test.
 ///
-/// The reached-test loops over [`every_backend`]; if that helper returned one
-/// entry the loop would pass while proving a third of what it claims. This
-/// pins the count to the build's feature set explicitly.
+/// The reached-test loops over [`every_backend`]. If that helper returned one
+/// entry, the loop would pass while proving a third of what it claims. This
+/// test pins the count to the build's feature set.
 #[test]
 fn every_backend_the_build_offers_is_actually_exercised() {
   let backends = every_backend();
@@ -191,18 +192,19 @@ fn the_producer_count_selects_between_spsc_and_mpsc() {
 
 /// Every backend hands back the capacity it was configured with.
 ///
-/// Fix(TY20): the crossbeam arm of `Ring::capacity` used to rebuild a
-/// `Capacity` from `ArrayQueue::capacity` and `expect` the result, which put
-/// this crate's only fallible validation inside an infallible accessor. The
-/// variant now carries the validated value, and this test is what holds the
-/// three backends to one answer rather than a comment claiming they agree.
+/// Fix(crossbeam_capacity_was_revalidated_in_an_accessor): the crossbeam arm of
+/// `Ring::capacity` used to rebuild a `Capacity` from `ArrayQueue::capacity`
+/// and `expect` the result, which put this crate's only fallible validation
+/// inside an infallible accessor. The variant now carries the validated value,
+/// and this test is what holds the three backends to one answer rather than a
+/// comment claiming they agree.
 ///
 /// The backends come from [`every_backend`] and only the crossbeam *arm* is
 /// gated, which is the point. This test used to carry
-/// `#[ cfg( feature = "crossbeam" ) ]` on the function — a gate sized to its
+/// `#[ cfg( feature = "crossbeam" ) ]` on the function, a gate sized to its
 /// widest arm rather than to the property it asserts. `default = []`, so that
 /// gate deleted the `Spsc` and `Mpsc` assertions from the build most consumers
-/// get: the sentence above claimed three backends were held to one answer
+/// get. The sentence above claimed three backends were held to one answer
 /// while, in the default build, none of them were. A `cfg` belongs on the code
 /// that cannot compile without the feature, never on the general property that
 /// code happens to be one case of.
@@ -230,9 +232,10 @@ fn every_backend_reports_the_capacity_it_was_configured_with() {
 
 /// The crossbeam backend is chosen by its constructor, not by the config.
 ///
-/// Feature 187 calls the swap "a build flag rather than a rewrite". A config
-/// field would make it a *runtime* choice, which would mean shipping crossbeam
-/// in every build that might want it — the opposite of an optional dependency.
+/// The optional-backend feature calls the swap "a build flag rather than a
+/// rewrite". A config field would make it a *runtime* choice, which would mean
+/// shipping crossbeam in every build that might want it. That is the opposite
+/// of an optional dependency.
 #[cfg(feature = "crossbeam")]
 #[test]
 fn the_crossbeam_backend_ignores_the_producer_count() {
@@ -252,7 +255,7 @@ fn the_crossbeam_backend_ignores_the_producer_count() {
 
 /// `try_clone` reports the backend's cardinality rather than assuming it.
 ///
-/// This is the surface's only machine-checkable way to tell SPSC from the
+/// This is the API's only machine-checkable way to tell SPSC from the
 /// others, which makes it the only way a caller can learn whether
 /// `free_capacity` is binding.
 #[test]
@@ -302,9 +305,9 @@ fn cloned_producers_share_one_ring() {
 /// Under `Fail`, a full ring hands the record back rather than dropping it.
 ///
 /// **This is the case that caught a real defect.** `ring_mpsc::Producer::push`
-/// takes the value by move and returns `Result< Seq, RingError >` — on a full
+/// takes the value by move and returns `Result< Seq, RingError >`, so on a full
 /// ring the record is consumed and gone. The first implementation here called
-/// it directly and could not honour `Result< (), T >`; the fix claims a slot
+/// it directly and could not honour `Result< (), T >`. The fix claims a slot
 /// *before* consuming the record. Only the MPSC arm was ever wrong, so a test
 /// covering SPSC alone would have passed throughout.
 #[test]
@@ -329,7 +332,7 @@ fn a_refused_record_comes_back_on_every_backend() {
       "{backend:?} swallowed a refused record instead of returning it"
     );
 
-    // And the refusal cost the ring nothing: what was accepted is still there.
+    // And the refusal cost the ring nothing. What was accepted is still there.
     let mut received = Vec::new();
     assert_eq!(
       consumer.try_recv_batch(&mut received),
@@ -392,8 +395,8 @@ fn drop_oldest_is_rejected_by_the_in_house_backends() {
     );
   }
 
-  // And it is a configuration error, not a traffic condition — the distinction
-  // that tells a caller to fix their config rather than retry.
+  // And it is a configuration error, not a traffic condition. That distinction
+  // tells a caller to fix their config rather than retry.
   assert!(RingError::PolicyUnsupported.is_configuration());
   assert!(!RingError::PolicyUnsupported.is_transient());
 }
@@ -401,7 +404,7 @@ fn drop_oldest_is_rejected_by_the_in_house_backends() {
 /// The crossbeam backend accepts `DropOldest` and actually evicts.
 ///
 /// The one capability the in-house rings deliberately lack. Asserting that it
-/// is *accepted* is not enough — a constructor that took the policy and then
+/// is *accepted* is not enough. A constructor that took the policy and then
 /// behaved as `DropNewest` would pass that. The contents are what separates them.
 #[cfg(feature = "crossbeam")]
 #[test]
@@ -439,9 +442,9 @@ fn crossbeam_honours_drop_oldest_by_evicting() {
 
 /// A partial batch push reports its count and leaves the iterator positioned.
 ///
-/// The iterator's position is the part worth pinning: the refused record was
+/// The iterator's position is the part worth pinning. The refused record was
 /// already taken from the iterator when the push failed, so a caller resuming
-/// from it resumes *after* the refusal, not at it. That is a real edge and a
+/// from it resumes *after* the refusal, not at it. That is a real edge, and a
 /// caller who assumes otherwise silently drops one record per refusal.
 #[test]
 fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
@@ -510,21 +513,21 @@ fn try_recv_batch_appends_to_the_caller_s_buffer() {
 /// reproduction.
 /// Root cause: `try_recv_batch` captures `len` from `Batch::len()` *before*
 /// the `filter_map` loop, then returns that captured `len` rather than the
-/// number of elements the loop actually pushed into `out` — a Finding filed
+/// number of elements the loop actually pushed into `out`. A Finding filed
 /// against `ring_core`'s own bug-hunt (tracked as a follow-up) worried this
 /// could diverge if any offset in the batch mapped to an already-empty slot,
 /// since `TypedSlot::take()` returns `None` for those and `filter_map` drops
 /// them silently.
 /// Pitfall: that divergence needs a batch offset landing on an empty slot,
 /// and this crate has two independent, backend-specific guarantees against
-/// it — SPSC's `drain()` bounds `len` by `consumer.distance_to(producer)`,
+/// it. SPSC's `drain()` bounds `len` by `consumer.distance_to(producer)`,
 /// where the SPSC invariant (single producer writes before publishing) makes
-/// every offset in range populated by construction; MPSC's `drain_up_to()`
+/// every offset in range populated by construction. MPSC's `drain_up_to()`
 /// calls `contiguous_end()`, which walks forward checking each slot's own
 /// per-lap stamp and stops at the *first* unwritten-or-stale slot, so a
 /// claimed-but-not-yet-written slot can never enter the batch at all. Both
 /// mechanisms were read at their source (`ring_spsc::Consumer::drain`,
-/// `ring_mpsc::contiguous_end`) rather than assumed — the wraparound case
+/// `ring_mpsc::contiguous_end`) rather than assumed. The wraparound case
 /// here is the one most likely to expose an off-by-one in either mechanism,
 /// since it is where the physical slot index reuses a previously-occupied
 /// address.
@@ -537,7 +540,7 @@ fn try_recv_batch_count_matches_the_buffer_across_a_wraparound() {
     let mut ends = ring.ends();
     let (mut producer, mut consumer) = ends.split();
 
-    // First lap: publish 3, drain all 3 — consumer cursor now sits at
+    // First lap: publish 3, drain all 3. The consumer cursor now sits at
     // logical position 3, one short of the first wrap.
     for value in 0..3_u32 {
       producer.try_push(value).unwrap();
@@ -545,9 +548,9 @@ fn try_recv_batch_count_matches_the_buffer_across_a_wraparound() {
     let mut first = Vec::new();
     assert_eq!(consumer.try_recv_batch(&mut first), 3, "{backend:?} first drain");
 
-    // Second publish straddles the wrap: logical position 3 is still lap 0
-    // (physical index 3), positions 4 and 5 are lap 1 (physical index 0, 1)
-    // — the same physical slots [0, 1] the first drain already emptied and
+    // The second publish straddles the wrap. Logical position 3 is still lap 0
+    // (physical index 3), and positions 4 and 5 are lap 1 (physical index 0, 1),
+    // the same physical slots [0, 1] the first drain already emptied and
     // committed.
     for value in 3..6_u32 {
       producer.try_push(value).unwrap();
@@ -592,12 +595,12 @@ fn draining_an_empty_ring_is_zero_not_an_error() {
 
 /// `len` and `is_empty` never disagree, at every point of a lap.
 ///
-/// Two computations of the same fact — `is_empty` is a comparison, `len` a
-/// subtraction or a load — so they are exactly the pair that can drift apart.
+/// These are two computations of the same fact. `is_empty` is a comparison and
+/// `len` a subtraction or a load, so they are exactly the pair that can drift apart.
 ///
 /// `clippy::len_zero` fires on every assertion below and its advice would
 /// rewrite `len() == 0` into `is_empty()`, turning each one into
-/// `is_empty() == is_empty()` — a tautology that passes whatever the ring does.
+/// `is_empty() == is_empty()`, a tautology that passes whatever the ring does.
 /// Comparing the two spellings is the entire test, so the lint is silenced here
 /// rather than obeyed.
 #[allow(clippy::len_zero)]
@@ -634,9 +637,9 @@ fn len_and_is_empty_agree_at_every_point_of_a_lap() {
 /// `free_capacity` and `is_full` agree, and `free_capacity` never overstates.
 ///
 /// Overstating is the dangerous direction and the only one testable from a
-/// single thread: a reported `n` that is larger than the room actually
+/// single thread. A reported `n` that is larger than the room actually
 /// available breaks the SPSC caller who treats it as binding. Understating is
-/// permitted everywhere — that is what "advisory" means.
+/// permitted everywhere. That is what "advisory" means.
 #[test]
 fn free_capacity_never_overstates_the_room_available() {
   const CAPACITY: usize = 4;
@@ -661,7 +664,7 @@ fn free_capacity_never_overstates_the_room_available() {
 
       // The binding half of the contract, which the two assertions above cannot
       // reach. Both are satisfied by a `free_capacity` that answers zero every
-      // time: understating is permitted, and zero is the largest understatement
+      // time. Understating is permitted, and zero is the largest understatement
       // there is, while `is_full` is *defined* as `free_capacity() == 0` and so
       // moves with it rather than against it. At SPSC the reading is exact, and
       // exactness is the only form of this assertion a constant cannot pass.
@@ -681,13 +684,13 @@ fn free_capacity_never_overstates_the_room_available() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Payloads and surface hygiene.
+// Payloads and API hygiene.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// A non-`Copy` payload arrives with its contents, not a shallow copy.
 ///
-/// The uniform surface moves values through a `TypedSlot< T >` on two of the
-/// three backends; a heap payload is what distinguishes a real move from a
+/// The uniform API moves values through a `TypedSlot< T >` on two of the
+/// three backends. A heap payload is what distinguishes a real move from a
 /// bitwise one that would double-free or leak.
 #[test]
 fn a_heap_payload_round_trips_its_contents() {
@@ -756,7 +759,7 @@ fn every_public_type_is_debuggable() {
   assert_debug::<ring_core::Producer<'_, u8>>();
   assert_debug::<ring_core::Consumer<'_, u8>>();
 
-  // And the value actually formats — `derive( Debug )` on an enum with a
+  // And the value actually formats. `derive( Debug )` on an enum with a
   // feature-gated variant is exactly where a cfg mistake would show.
   let config = RingConfig::new(4).unwrap();
   let ring: Ring<u8> = Ring::new(&config).unwrap();
@@ -780,11 +783,11 @@ fn a_ring_reports_the_overflow_policy_it_was_built_with() {
 
 /// Four threads publish through cloned producers and nothing is lost.
 ///
-/// The single-threaded tests above establish the surface's shape; this one
+/// The single-threaded tests above establish the API's shape. This one
 /// establishes that the shape survives being used the way the multi-producer
 /// backends exist to be used. It is skipped for SPSC, where a second producer
-/// is refused by construction — which is itself the correct behaviour and is
-/// asserted in [`try_clone_refuses_at_spsc_and_permits_elsewhere`].
+/// is refused by construction. That refusal is itself the correct behaviour,
+/// and [`try_clone_refuses_at_spsc_and_permits_elsewhere`] asserts it.
 #[test]
 fn four_threads_publishing_through_clones_lose_nothing() {
   const PRODUCERS: u32 = 4;
@@ -808,13 +811,13 @@ fn four_threads_publishing_through_clones_lose_nothing() {
             let record = id * PER_PRODUCER + index;
             let deadline = std::time::Instant::now() + PATIENCE;
 
-            // Retry on a refusal; the consumer is what makes room. Bounded, so
+            // Retry on a refusal. The consumer is what makes room. Bounded, so
             // a ring that stops releasing slots fails with a message instead of
-            // hanging — the failure mode `ring_mpsc`'s own suite was bitten by.
+            // hanging, the failure mode `ring_mpsc`'s own suite was bitten by.
             //
             // The deadline is computed once, outside the loop, and never
-            // refreshed inside it. Refreshing it per iteration — which this
-            // first did — pushes it forward faster than time passes, so the
+            // refreshed inside it. This loop first refreshed it per iteration,
+            // which pushes it forward faster than time passes, so the
             // assertion can never fire and the guard silently becomes the
             // unbounded spin it exists to prevent. A successful push is the
             // only progress available here, and that leaves the loop.
@@ -863,15 +866,15 @@ fn four_threads_publishing_through_clones_lose_nothing() {
 
 /// A capacity-1 ring cycles correctly on every backend.
 ///
-/// `ring_types::Capacity::new( 1 )` is explicitly `Ok` — capacity is validated
-/// to a power of two, and `1 == 2^0`. Nothing else in this suite builds one:
-/// the smallest capacity exercised elsewhere is 4. Capacity 1 is the sharpest
-/// boundary the power-of-two constraint can produce — `Capacity::mask()` is
-/// `capacity - 1 = 0`, so every sequence number's slot index collapses onto
-/// the same single slot on every lap. An off-by-one in a slot-index
-/// computation, or a mask applied to the wrong operand, has nowhere to hide
-/// behind a second slot the way it might at a wider capacity: there is only
-/// ever one slot to be wrong about, and this ring reuses it fifty times.
+/// `ring_types::Capacity::new( 1 )` is explicitly `Ok`, because capacity is
+/// validated to a power of two and `1 == 2^0`. Nothing else in this suite
+/// builds one. The smallest capacity exercised elsewhere is 4. Capacity 1 is
+/// the sharpest boundary the power-of-two constraint can produce.
+/// `Capacity::mask()` is `capacity - 1 = 0`, so every sequence number's slot
+/// index collapses onto the same single slot on every lap. An off-by-one in a
+/// slot-index computation, or a mask applied to the wrong operand, has no
+/// second slot to hide behind the way it might at a wider capacity. There is
+/// only ever one slot to be wrong about, and this ring reuses it fifty times.
 #[test]
 fn a_capacity_of_one_cycles_correctly_on_every_backend() {
   const LAPS: usize = 50;
@@ -907,7 +910,7 @@ fn a_capacity_of_one_cycles_correctly_on_every_backend() {
       // The refusal path, exercised where refusal and success are adjacent by
       // exactly one push. `Fail` is the policy here, so a second push must be
       // handed back rather than accepted and silently overwrite the pending
-      // record — `DropOldest`'s crossbeam-only eviction has its own tests.
+      // record. `DropOldest`'s crossbeam-only eviction has its own tests.
       let extra = value.wrapping_add(1000);
       assert_eq!(
         producer.try_push(extra),

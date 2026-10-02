@@ -2,10 +2,9 @@
 
 ## The gap
 
-This project has an unusually rich *internal* doc corpus — every crate
-carries its own `docs/api/`, `docs/algorithm/`, `docs/decisions/`,
-`docs/invariant/`, `docs/pitfall/`, and more. But that's design-rationale
-documentation for contributors, not the `///` rustdoc that actually renders
+This project keeps design rationale per crate as ADRs under
+`docs/decisions/`. But that's design-rationale documentation for
+contributors, not the `///` rustdoc that actually renders
 on docs.rs for a crates.io consumer. `cargo doc --no-deps` currently builds
 clean across all 34 crates, which is a good floor, not a ceiling — a clean
 build says nothing about whether the public items are actually documented.
@@ -18,9 +17,9 @@ build says nothing about whether the public items are actually documented.
   5 external-facing crates especially — `ring_types`, `ring_handle`,
   `ring_tls`, `ring_flush`, `ring_factory`) get a runnable example
 - A polished top-level `lib.rs` doc comment per crate that *links back* to
-  the richer internal `docs/` corpus instead of duplicating it — the two
-  are complementary, not competing: rustdoc for "how do I call this,"
-  `docs/decisions/` for "why does it work this way"
+  the crate's `docs/decisions/` ADRs instead of duplicating them. The two
+  are complementary, not competing. Rustdoc answers "how do I call this,"
+  and `docs/decisions/` answers "why does it work this way"
 
 ## Suggested priority order
 

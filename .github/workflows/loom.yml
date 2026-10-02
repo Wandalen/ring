@@ -1,11 +1,11 @@
-# Loom interleaving models — slow, separate job.
+# Loom interleaving models, run as a separate slow job.
 #
 # `RUSTFLAGS="--cfg loom"` swaps `ring_atomic`'s cells for loom's checked
 # equivalents, so the same test binaries exhaustively explore interleavings
 # instead of sampling them. Kept out of `ci.yml` because it is an order of
 # magnitude slower than the sampled run and would block every quick push.
 #
-# Schedule: `master` pushes + nightly + manual dispatch — never on every PR.
+# Schedule: `master` pushes + nightly + manual dispatch. Never on every PR.
 
 name: Loom
 

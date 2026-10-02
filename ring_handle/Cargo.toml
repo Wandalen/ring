@@ -10,10 +10,8 @@ publish = true
 
 [features]
 default = []
-# Feature 187's third backend, forwarded rather than re-declared. Present so
-# `docs/integration/001`'s requirement 1 — the same handle behaviour across
-# every backend — can be tested against all three rather than the two that
-# need no feature.
+# `ring_core`'s crossbeam backend, forwarded rather than re-declared, so the
+# handles can be tested for the same behaviour on every backend.
 crossbeam = [ "ring_core/crossbeam" ]
 
 [dependencies]

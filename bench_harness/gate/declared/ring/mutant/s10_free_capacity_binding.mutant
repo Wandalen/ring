@@ -3,12 +3,12 @@
 # `ring_core`'s own module table calls this "one signature over two contracts":
 # binding at SPSC, advisory at MPSC and crossbeam. The suite tested the advisory
 # reading against every backend and the binding reading against none, and a
-# constant zero satisfies the advisory reading completely — understating is
+# constant zero satisfies the advisory reading completely. Understating is
 # permitted, and zero is the largest understatement available.
 #
 # The test's other assertion looked stronger than it was. `assert_eq!( claimed
 # == 0, producer.is_full() )` compares two readings that move together, because
-# `is_full` is *defined* as `free_capacity() == 0`: mutate the one and both
+# `is_full` is *defined* as `free_capacity() == 0`. Mutate the one and both
 # sides of the comparison change with it. A test can only catch a mutation it
 # straddles, and this one sat entirely on one side.
 #

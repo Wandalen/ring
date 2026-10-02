@@ -1,40 +1,38 @@
 //! Wait strategies for space and data availability.
 //!
-//! Tier 4 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types` and `ring_cursor`.
+//! Part of the ring family's concurrency write path.
 //!
 //! `ring_types::WaitKind` holds the four discriminants; this crate holds the
-//! four handlers. That split is ruled by
-//! `docs/decision/121_workstream_008_contract_gaps_ruled.md` § 5, and it is why
-//! `ring_types` can say "no ring logic" and mean it: a `WaitKind` is a
-//! configuration value that travels through a `RingConfig` and into a struct
-//! field without dragging a thread parking implementation behind it.
+//! four handlers. That split is why `ring_types` can say "no ring logic" and
+//! mean it. A `WaitKind` is a configuration value that travels through a
+//! `RingConfig` and into a struct field without dragging a thread parking
+//! implementation behind it.
 //!
-//! ## What a wait strategy actually is
+//! ## What a wait strategy is
 //!
 //! One question, asked repeatedly until it answers yes or the caller gives up:
 //! *is the thing I am waiting for available?* [`wait_until`] is that loop, and
 //! the [`WaitKind`] only decides what happens **between** two askings.
 //!
-//! Everything else — which cursor, which threshold, whether this is a producer
-//! waiting for space or a consumer waiting for data — is the caller's, supplied
-//! as a closure.
+//! The caller supplies everything else as a closure: which cursor, which
+//! threshold, whether this is a producer waiting for space or a consumer
+//! waiting for data.
 //!
 //! This crate's own description names both sides, and [`for_space`] and
-//! [`for_data`] supply them. Each is one line over [`wait_until`], which is the
-//! point: two names for the two questions a caller actually asks, over exactly
-//! one loop, so the retry budget, the pause behaviour, and the give-up
+//! [`for_data`] supply them. Each is one line over [`wait_until`], and that is
+//! the point. They are two names for the two questions a caller asks, over
+//! exactly one loop, so the retry budget, the pause behaviour, and the give-up
 //! condition cannot drift apart between producer and consumer. Two full
 //! implementations would be the same loop written twice, which is how a family
 //! acquires two wait strategies that disagree under load and agree in tests.
 //!
 //! ## Why `WaitKind::None` is the variant that matters
 //!
-//! `docs/feature/173_wait_kind_and_strategies.md` requires all four, but names
-//! `None` as the one the tick path cannot do without. A tick has a deadline; a
-//! strategy that might block has already missed it. [`wait_until`] under `None`
-//! evaluates the predicate exactly once and returns — it is not a wait with a
-//! very short timeout, it is not a wait at all, and
+//! The wait-kind feature requires all four, but names `None` as the one the
+//! tick path cannot do without. A tick has a deadline; a strategy that might
+//! block has already missed it. [`wait_until`] under `None` evaluates the
+//! predicate exactly once and returns. That is no wait at all, rather than a
+//! wait with a very short timeout, and
 //! [`ring_types::WaitKind::is_non_blocking`] is true for exactly that variant.
 //!
 //! ## Why every wait is bounded
@@ -53,7 +51,7 @@ use ring_types::{RingError, WaitKind};
 ///
 /// Deliberately a plain count rather than a duration. A duration would make
 /// the same call take a different number of samples on different hardware,
-/// which turns a reproducible test into a flaky one — and this family's whole
+/// which turns a reproducible test into a flaky one, and this family's whole
 /// output is a measured verdict.
 ///
 /// ```
@@ -93,7 +91,7 @@ pub const fn escalation_hint(kind: WaitKind) -> Option<WaitKind> {
 /// function; [`wait_until`] is the same loop for all of them.
 ///
 /// `attempt` is the zero-based index of the pause about to happen, so a
-/// strategy can behave differently early and late — [`WaitKind::Spin`] uses it
+/// strategy can behave differently early and late. [`WaitKind::Spin`] uses it
 /// to emit a CPU pause hint rather than a bare busy loop.
 ///
 /// Returns whether the caller should try again at all: `false` for
@@ -109,7 +107,7 @@ pub const fn escalation_hint(kind: WaitKind) -> Option<WaitKind> {
 pub fn pause(kind: WaitKind, attempt: usize) -> bool {
   match kind {
     WaitKind::Spin => {
-      // A pause hint rather than an empty loop body: it tells the CPU this is
+      // A pause hint rather than an empty loop body. It tells the CPU this is
       // a spin-wait, which cuts the memory-order-violation penalty on leaving
       // the loop and stops the core from starving its hyperthread sibling.
       for _ in 0..=(attempt % 8) {
@@ -124,7 +122,7 @@ pub fn pause(kind: WaitKind, attempt: usize) -> bool {
     WaitKind::Park => {
       // Sleeping rather than `thread::park` on purpose. Parking requires the
       // publisher to hold the waiter's handle and unpark it, which is a
-      // registration relationship this crate deliberately does not have —
+      // registration relationship this crate deliberately does not have.
       // `ring_handle` owns who-knows-whom. A short sleep is the same
       // cost profile (idle rather than spinning) without inventing that
       // relationship here, and the sleep length is what a real unpark would
@@ -140,7 +138,7 @@ pub fn pause(kind: WaitKind, attempt: usize) -> bool {
 /// at most `spins` attempts.
 ///
 /// `ready` is evaluated at least once under every strategy including
-/// [`WaitKind::None`] — the non-blocking variant returns *whatever is
+/// [`WaitKind::None`]. The non-blocking variant returns *whatever is
 /// available*, which requires looking.
 ///
 /// # Errors
@@ -206,8 +204,8 @@ where
 ///
 /// # Errors
 ///
-/// [`RingError::Full`] when the budget runs out with the ring still full —
-/// note the error, which is the one difference from [`for_data`]. The two
+/// [`RingError::Full`] when the budget runs out with the ring still full.
+/// Note the error, which is the one difference from [`for_data`]. The two
 /// questions have the same shape and opposite failures, and a producer handed
 /// `Empty` would read it as "nothing to do" rather than "back-pressure".
 ///

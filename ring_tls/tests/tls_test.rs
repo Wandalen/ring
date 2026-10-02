@@ -6,9 +6,9 @@
 //! `flush_into` moves all `N` into the ring as a single contiguous claim."
 //!
 //! Both halves are asserted against `ring_atomic::CountingSeq`, the counting
-//! shim the criterion names. The pairing matters more than either half alone:
-//! a buffer satisfying only the first would flush item by item and pay the same
-//! `N` atomics at the end that it saved during — the traffic moved rather than
+//! shim the criterion names. The pairing matters more than either half alone.
+//! A buffer satisfying only the first would flush item by item and pay the same
+//! `N` atomics at the end that it saved during. The traffic is moved rather than
 //! removed. `one_flush_lands_everything_for_one_atomic_operation` is the test
 //! that closes that hole, and `accumulating_is_free_and_landing_is_one_op`
 //! measures both sides of the same run so neither can be satisfied in isolation.
@@ -18,7 +18,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -196,7 +196,7 @@ fn a_buffer_reports_its_own_shape() {
 
 #[test]
 fn a_zero_capacity_buffer_accepts_nothing_and_is_full_from_the_start() {
-  // Degenerate but reachable — a flush policy configured to flush every item
+  // Degenerate but reachable. A flush policy configured to flush every item
   // would produce it. It must refuse rather than panic or grow.
   let mut buffer = TlsBuffer::with_capacity(0);
 
@@ -209,7 +209,7 @@ fn a_zero_capacity_buffer_accepts_nothing_and_is_full_from_the_start() {
 
 #[test]
 fn flushing_an_empty_buffer_claims_nothing_but_still_costs_its_operation() {
-  // Documented behaviour, asserted so it cannot drift into a silent skip: a
+  // Documented behaviour, asserted so it cannot drift into a silent skip. A
   // conditional would make the operation count depend on the data, and the
   // whole value of the counting shim is that it does not.
   let cursor = CountingSeq::default();
@@ -287,7 +287,7 @@ fn drain_takes_the_items_and_advances_no_cursor() {
   // which is right when the destination is a sequenced ring; `drain` is for a
   // destination that decides for itself whether it can accept the batch, and
   // must therefore be asked *before* the buffer is emptied. `ring_flush` is
-  // that caller: its rejected flushes leave the records staged, which is only
+  // that caller. Its rejected flushes leave the records staged, which is only
   // possible because taking them and claiming sequences are separate calls.
   let cursor = AtomicSeq::default();
   let mut buffer = TlsBuffer::with_capacity(8);
@@ -307,7 +307,7 @@ fn drain_takes_the_items_and_advances_no_cursor() {
 fn drain_empties_the_buffer_even_when_the_iterator_is_dropped_unread() {
   // `Vec::Drain`'s own contract, inherited whole, and the reason a caller that
   // might not accept every record has to decide before calling rather than
-  // after — there is no point after the call at which the records are still
+  // after. There is no point after the call at which the records are still
   // staged.
   let mut buffer = TlsBuffer::with_capacity(8);
   for i in 0..4u8 {
@@ -331,7 +331,7 @@ fn drain_empties_the_buffer_even_when_the_iterator_is_dropped_unread() {
 #[test]
 fn draining_an_empty_buffer_yields_nothing_and_costs_no_operation() {
   // Unlike `flush_into`, which claims a zero-length run and still pays one
-  // atomic, `drain` touches no cursor at all — so a caller polling an idle
+  // atomic, `drain` touches no cursor at all. A caller polling an idle
   // buffer pays nothing for the poll.
   let mut buffer = TlsBuffer::<u8>::with_capacity(4);
 
@@ -401,8 +401,8 @@ fn successive_flushes_continue_where_the_last_one_stopped() {
 #[test]
 #[should_panic(expected = "flush_into's order must include Release semantics")]
 fn flush_into_rejects_an_order_without_release_semantics() {
-  // `Relaxed` compiles and returns a valid-looking `Flush` — the claim still
-  // lands correct, non-overlapping sequences — but the items behind them
+  // `Relaxed` compiles and returns a valid-looking `Flush`, and the claim still
+  // lands correct, non-overlapping sequences. But the items behind them
   // would never become visible to a consumer reading the cursor per this
   // function's own doc comment. The `debug_assert!` is the only thing
   // standing between that silent failure and a caller who passed the wrong
@@ -419,9 +419,9 @@ fn flush_into_rejects_an_order_without_release_semantics() {
 
 #[test]
 fn several_threads_flushing_never_receive_overlapping_sequences() {
-  // The point of the whole design: each thread accumulates privately with no
-  // coordination at all, and the only shared step is the one fetch_add per
-  // flush — which must still partition the sequence space exactly.
+  // This is the point of the whole design. Each thread accumulates privately
+  // with no coordination at all, and the only shared step is the one fetch_add
+  // per flush, which must still partition the sequence space exactly.
   const THREADS: usize = 4;
   const FLUSHES: usize = 200;
   const BATCH: usize = 8;
@@ -463,7 +463,7 @@ fn several_threads_flushing_never_receive_overlapping_sequences() {
 
 #[test]
 fn a_threads_own_items_stay_contiguous_within_each_flush() {
-  // Hard problem 118: a system's own writes survive the merge in order. Between
+  // A system's own writes survive the merge in order. Between
   // threads the interleaving is arbitrary; within one flush it is not.
   const THREADS: usize = 4;
   const FLUSHES: usize = 100;

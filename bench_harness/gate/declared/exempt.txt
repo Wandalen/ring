@@ -4,7 +4,7 @@
 # not. That is the point: an exemption is the one way to reach G18 without
 # gating anything, so a family that reached by emptying itself into this file
 # reads differently from one that reached by declaring its crates. A bare name
-# with no reason is not an exemption — G18 reports it as `exemption without a
+# with no reason is not an exemption. G18 reports it as `exemption without a
 # reason` and does not reach.
 #
 # Every family crate is declared in `ring/crates.txt` rather than excused from
@@ -12,13 +12,13 @@
 # and test targets only, no `src/`, so G22 keeps reading it as unimplemented —
 # a `pub` item under `src/` would expire it.
 #
-# This header exists for G22's own non-vacuity floor. Every check G22 makes is
-# a negative — an entry passes by *not* looking implemented — so an empty file
-# gives a broken detector nothing to be broken against, and `g22_exemption_expiry.sh`
+# This header exists for G22's own non-vacuity floor. Every check G22 makes is a
+# negative. An entry passes by *not* looking implemented, so an empty file gives
+# a broken detector nothing to be broken against. `g22_exemption_expiry.sh`
 # treats a file this small as more likely a wrong `$GATE_EXEMPT` path or a
-# truncated read than a genuinely curated empty list. Raw byte count is what
-# tells the two apart, which is the whole reason this header is long enough to
-# clear that floor rather than short enough to state its own purpose and stop.
+# truncated read than a curated empty list. Raw byte count tells the two apart,
+# and that is the whole reason this header is long enough to clear that floor
+# rather than short enough to state its own purpose and stop.
 #
 # Adding a line here is a decision to stop grading a crate. It follows the same
 # `crate_name  reason` form as every other entry this family will ever add.

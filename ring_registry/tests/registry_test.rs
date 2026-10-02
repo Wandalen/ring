@@ -1,4 +1,4 @@
-//! `ring_registry` — naming, refusal, and ownership.
+//! Tests for `ring_registry`'s naming, refusal, and ownership.
 //!
 //! `docs/feature/181_named_ring_registry.md`'s acceptance criterion has three
 //! clauses, and each has its own test named after it:
@@ -9,15 +9,15 @@
 //! | A second registration under a live name is refused | `a_second_registration_under_a_live_name_is_refused` |
 //! | Dropping the registry drops every ring it owns, by a drop counter | `dropping_the_registry_drops_every_record_still_in_every_ring` |
 //!
-//! The third is the one worth reading. It asserts ownership transitively — the
-//! registry drops the ring, and the ring drops the records still unread in it —
+//! The third is the one worth reading. It asserts ownership transitively. The
+//! registry drops the ring, and the ring drops the records still unread in it,
 //! which is a property of `ring_core`, not of this crate. It is measured here
 //! because this is where the claim is made.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -41,8 +41,8 @@ fn ring<T: Send>(slots: usize) -> Split<T> {
 /// The criterion's first clause, both halves.
 ///
 /// "By no other" is the half that is easy to leave untested and is the one that
-/// would actually catch a bug — a registry that returned the sole ring for any
-/// name would pass the first half perfectly.
+/// would catch a bug. A registry that returned the sole ring for any name would
+/// pass the first half perfectly.
 #[test]
 fn a_registered_ring_is_retrievable_by_its_name_and_by_no_other() {
   let mut registry = Registry::new();
@@ -58,8 +58,8 @@ fn a_registered_ring_is_retrievable_by_its_name_and_by_no_other() {
 /// Two rings under two names stay distinct.
 ///
 /// The registry is a map, and the way a map goes wrong is by conflating keys.
-/// Distinguished by capacity rather than by contents, because capacity is
-/// observable without consuming anything.
+/// The test tells them apart by capacity rather than by contents, because
+/// capacity is observable without consuming anything.
 #[test]
 fn two_names_hold_two_distinct_rings() {
   let mut registry = Registry::new();
@@ -80,9 +80,9 @@ fn two_names_hold_two_distinct_rings() {
 
 /// A retrieved ring is the same ring on the next retrieval.
 ///
-/// The registry lends rather than copies: a record pushed through one borrow is
-/// still there on the next. Worth pinning because "returns a ring for that
-/// name" would also be satisfied by something that rebuilt one.
+/// The registry lends rather than copies, so a record pushed through one borrow
+/// is still there on the next. This is pinned because something that rebuilt
+/// the ring would also satisfy "returns a ring for that name".
 #[test]
 fn a_retrieved_ring_keeps_what_was_written_to_it() {
   let mut registry = Registry::new();
@@ -128,10 +128,10 @@ fn a_second_registration_under_a_live_name_is_refused() {
 
 /// A refusal returns the ring it refused, rather than consuming it.
 ///
-/// The reason `register` returns `( RegistryError, Split< T > )` and not a bare
-/// error: a caller whose name collided still owns a perfectly good ring, and a
-/// signature that swallowed it would force them to drop it — discarding
-/// whatever was in it — as a side effect of choosing a name badly.
+/// `register` returns `( RegistryError, Split< T > )` and not a bare error
+/// because a caller whose name collided still owns a perfectly good ring. A
+/// signature that swallowed it would force them to drop it, and whatever was in
+/// it, as a side effect of choosing a name badly.
 #[test]
 fn a_refused_registration_hands_the_ring_back() {
   let mut registry = Registry::new();
@@ -146,11 +146,11 @@ fn a_refused_registration_hands_the_ring_back() {
 
 /// Registering does not replace, even silently.
 ///
-/// The failure this guards is a `HashMap::insert` where an `Entry` belongs:
-/// `insert` returns the displaced value and would drop it if ignored, so a name
-/// collision would destroy the previously registered ring and everything unread
-/// in it. Asserted through the drop counter, because "was not replaced" is
-/// exactly the claim a capacity check cannot make.
+/// The failure this guards against is a `HashMap::insert` where an `Entry`
+/// belongs. `insert` returns the displaced value and would drop it if ignored,
+/// so a name collision would destroy the previously registered ring and
+/// everything unread in it. The test asserts through the drop counter, because
+/// "was not replaced" is exactly the claim a capacity check cannot make.
 #[test]
 fn a_refused_registration_does_not_drop_the_ring_already_there() {
   static DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -192,7 +192,7 @@ fn a_refused_registration_does_not_drop_the_ring_already_there() {
 ///
 /// The claim is transitive and the test is written to match it: three rings,
 /// each holding unread records, all owned by one registry. Dropping the
-/// registry must account for every record — the registry drops each ring, and
+/// registry must account for every record. The registry drops each ring, and
 /// each ring drops what is still in it.
 ///
 /// That second step is `ring_core`'s property, not this crate's. It is measured
@@ -234,8 +234,8 @@ fn dropping_the_registry_drops_every_record_still_in_every_ring() {
 
 /// Removing a name hands the ring back and frees the name.
 ///
-/// What makes "a *live* name" a temporary condition — and therefore what makes
-/// the refusal recoverable rather than a permanent loss of the name.
+/// This is what makes "a *live* name" a temporary condition, and therefore what
+/// makes the refusal recoverable rather than a permanent loss of the name.
 #[test]
 fn removing_a_name_frees_it_for_reuse() {
   let mut registry = Registry::new();
@@ -261,8 +261,8 @@ fn removing_an_absent_name_is_none() {
 
 /// A removed ring is dropped by its new owner, not by the registry.
 ///
-/// The other side of ownership transfer: after `remove`, the registry is no
-/// longer accountable for the records, and the caller is.
+/// This is the other side of ownership transfer. After `remove`, the registry is
+/// no longer accountable for the records, and the caller is.
 #[test]
 fn a_removed_ring_carries_its_records_to_its_new_owner() {
   static DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -299,7 +299,7 @@ fn a_removed_ring_carries_its_records_to_its_new_owner() {
 }
 
 // ---------------------------------------------------------------------------
-// The rest of the surface
+// The rest of the public API
 // ---------------------------------------------------------------------------
 
 /// An empty registry reports itself empty, and `Default` matches `new`.
@@ -317,9 +317,9 @@ fn an_empty_registry_is_empty() {
 
 /// `names` lists exactly the live names, in whatever order.
 ///
-/// Sorted before comparison because `HashMap` iteration order is unspecified —
-/// asserting a fixed order here would be a test that passes for a reason the
-/// crate does not promise, and would break on a hasher change.
+/// The names are sorted before comparison because `HashMap` iteration order is
+/// unspecified. Asserting a fixed order here would make a test that passes for a
+/// reason the crate does not promise, and that would break on a hasher change.
 #[test]
 fn names_lists_every_live_name() {
   let mut registry = Registry::new();
@@ -336,7 +336,7 @@ fn names_lists_every_live_name() {
 /// A name is any string, including ones that look like nothing.
 ///
 /// `register` takes `impl Into< String >`, so the empty string and a name with
-/// spaces are both valid keys. Pinned rather than left implicit: a later
+/// spaces are both valid keys. This is pinned rather than left implicit. A later
 /// validation pass rejecting them would be a behaviour change, and this is the
 /// test that would say so.
 #[test]
@@ -363,11 +363,10 @@ fn the_error_names_the_taken_name() {
   assert!(caller().is_err(), "RegistryError does not satisfy Error");
 }
 
-/// `get_mut` is E5's uncovered path: assignment through the borrow replaces
-/// the ring in place, and nothing in the registry refuses it the way `E2`
-/// refuses a second `register` under the same name.
-///
-/// → `docs/invariant/001_one_name_one_ring.md`, E5.
+/// `get_mut` is the path "one name, one ring" leaves uncovered. Assignment
+/// through the borrow replaces the ring in place, and nothing in the registry
+/// refuses it the way the registry refuses a second `register` under the same
+/// name.
 #[test]
 fn assigning_through_get_mut_drops_the_ring_it_replaces() {
   static DROPS: AtomicUsize = AtomicUsize::new(0);
@@ -393,8 +392,8 @@ fn assigning_through_get_mut_drops_the_ring_it_replaces() {
 
   assert_eq!(DROPS.load(Ordering::SeqCst), 0, "nothing dropped on the way in");
 
-  // No refusal, no return value, no `remove` — E1/E2's protection covers
-  // `register`, not this.
+  // No refusal, no return value, no `remove`. The one-name-one-ring protection
+  // covers `register`, not this.
   *registry.get_mut("events").unwrap() = ring::<Counted>(16);
 
   assert_eq!(

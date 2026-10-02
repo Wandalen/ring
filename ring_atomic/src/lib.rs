@@ -1,7 +1,6 @@
 //! Atomic sequence cells with explicit memory orderings.
 //!
-//! Tier 2 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Every cursor in the family is a sequence in a shared cell, and every read or
 //! write of one is an ordering decision. Spreading those decisions across the
@@ -9,54 +8,53 @@
 //! whatever the sum of those call sites turns out to be. Concentrating them here
 //! makes the model one thing that can be read in one place.
 //!
-//! The orderings are therefore **named, not defaulted**: [`SeqCell`]'s methods
+//! The orderings are therefore **named, not defaulted**. [`SeqCell`]'s methods
 //! take an explicit [`Ordering`], and this crate never picks one on a caller's
 //! behalf. A helper that quietly chose `SeqCst` would make every operation
-//! correct and every benchmark meaningless, which for a workstream whose whole
-//! output is a measured verdict is the worse failure. That governs the cells
-//! callers hold; [`CountingSeq`]'s own bookkeeping counters are `Relaxed`
+//! correct and every benchmark meaningless. For a family whose whole output
+//! is a measured verdict, that is the worse failure. That rule governs the cells
+//! callers hold. [`CountingSeq`]'s own bookkeeping counters are `Relaxed`
 //! throughout, decided once here rather than per call, because they exist
 //! only to be totalled afterwards and no ordering closes the read/read tear
 //! between them (see [`CountingSeq::counts`]).
 //!
 //! ## Why a trait rather than a struct
 //!
-//! Two acceptance criteria in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` are
-//! *negative* claims about atomic traffic — feature 175's "accumulates N items
-//! with zero atomic operations" and feature 177's "a claim of 64 slots issues
-//! one fence, not 64". Neither can be asserted against a bare `AtomicU64`,
-//! because the count is not observable from outside. [`SeqCell`] exists so the
-//! crates that perform those operations can be written once and run against
-//! either [`AtomicSeq`] in production or [`CountingSeq`] in a test that needs
-//! the count.
+//! Two acceptance criteria are *negative* claims about atomic traffic: the
+//! thread-local buffer's "accumulates N items with zero atomic operations" and
+//! batch claim's "a claim of 64 slots issues one fence, not 64". Neither can be
+//! asserted against a bare `AtomicU64`, because the count is not observable
+//! from outside. [`SeqCell`] exists so the crates that perform those operations
+//! can be written once and run against either [`AtomicSeq`] in production or
+//! [`CountingSeq`] in a test that needs the count.
 //!
-//! No `unsafe`: `AtomicU64` is a safe abstraction, so nothing here needs to opt
+//! No `unsafe`. `AtomicU64` is a safe abstraction, so nothing here needs to opt
 //! out of the workspace-wide `unsafe-code = "deny"`. This crate used to hold an
 //! entry in `ring/bench_harness/gate/declared/ring/unsafe_allowlist.txt` saying
-//! otherwise;
-//! [decision 123](../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
-//! removed it after checking all four listed crates and finding not one of them
-//! exercised the permission.
+//! otherwise. It was removed after a check of all four listed crates found not
+//! one of them exercised the permission.
 //!
-//! ## The `loom` seam
+//! ## The `loom` switch
 //!
 //! Under `--cfg loom` the two atomics below come from `loom` instead of `core`.
 //! This is the family's only such switch, and it is here for the same reason
-//! the orderings are: this crate is the one place in 33 crates where a
+//! the orderings are. This crate is the one place in the family where a
 //! *sequence* atomic is created. Every cursor, gating set, claim and barrier
 //! reaches its atomic through [`AtomicSeq`], so the `loom` switch here reaches
-//! all of them — the counting instrument reaches only the callers generic
-//! enough to accept [`CountingSeq`] in its place — and no other crate needs to
-//! know the seam exists.
+//! all of them, and no other crate needs to know the switch exists. The
+//! counting instrument reaches only the callers generic enough to accept
+//! [`CountingSeq`] in its place.
 //!
-//! It costs one thing, stated at each site: loom's atomics carry model state
-//! and have no `const` constructor, so [`AtomicSeq::new`] and
-//! [`CountingSeq::new`] — and, downstream, `ring_cursor`'s two — are `const`
-//! only in an ordinary build.
+//! It costs one thing, stated at each site. Loom's atomics carry model state
+//! and have no `const` constructor, so [`AtomicSeq::new`],
+//! [`CountingSeq::new`] and, downstream, `ring_cursor`'s two are `const` only
+//! in an ordinary build.
 //!
-//! `ring_publish/tests/handshake_test.rs` is what uses it, and is run with
-//! `RUSTFLAGS="--cfg loom" cargo test -p ring_publish --test handshake_test`.
+//! A test that model-checks under it wraps its body in `loom::model` and runs
+//! with `RUSTFLAGS="--cfg loom" cargo test -p <crate> --test <file>`. A test file
+//! that reaches this crate without model-checking carries
+//! `#![cfg(not(loom))]`, because loom's atomics panic when touched outside a
+//! `loom::model`.
 
 #![deny(missing_docs)]
 
@@ -70,10 +68,10 @@ use ring_types::Seq;
 
 /// A shared cell holding one sequence.
 ///
-/// Implemented by [`AtomicSeq`] for production and [`CountingSeq`] for tests
-/// that assert how much atomic traffic an operation actually generated. Every
-/// method takes the [`Ordering`] explicitly — see the module documentation for
-/// why none is defaulted.
+/// [`AtomicSeq`] implements it for production and [`CountingSeq`] for tests
+/// that assert how much atomic traffic an operation generated. Every method
+/// takes the [`Ordering`] explicitly. See the module documentation for why none
+/// is defaulted.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
@@ -88,21 +86,21 @@ use ring_types::Seq;
 /// # Why `Sync`
 ///
 /// Every cell in the family is shared between a producer and a consumer, so
-/// `Sync` is the actual requirement — it is stated here rather than left to be
-/// satisfied by accident.
+/// `Sync` is a real requirement, and the trait states it here rather than
+/// leaving it to be satisfied by accident.
 ///
-/// Fix(AT7, AT45, AT46): the trait used to have no supertrait. Both
-/// implementors are `Sync` by auto-derivation from the atomics inside them, so
-/// nothing had ever failed; but `&dyn SeqCell` was **not** `Sync`, making the
-/// object form unusable for the crate's only stated purpose without writing
-/// `&( dyn SeqCell + Sync )` at every site, and the three generic `C : SeqCell`
-/// bounds in `ring_batch` and `ring_tls` depended on a property none of them
-/// asked for. With the supertrait, a `!Sync` implementor fails at its own
-/// `impl` — naming this trait — instead of at some later use site naming a
-/// `Cell< u64 >`.
+/// Fix(seq_cell_had_no_sync_supertrait): the trait used to have no supertrait.
+/// Both implementors are `Sync` by auto-derivation from the atomics inside
+/// them, so nothing had ever failed. But `&dyn SeqCell` was **not** `Sync`.
+/// That made the object form unusable for the crate's only stated purpose
+/// without writing `&( dyn SeqCell + Sync )` at every site. The three generic
+/// `C : SeqCell` bounds in `ring_batch` and `ring_tls` also depended on a
+/// property none of them asked for. With the supertrait, a `!Sync` implementor
+/// fails at its own `impl`, in an error naming this trait, instead of at some
+/// later use site naming a `Cell< u64 >`.
 ///
 /// Root cause: a requirement satisfied by composition rather than declared.
-/// Pitfall: object safety is not object *usability* — check what the `dyn` form
+/// Pitfall: object safety is not object *usability*. Check what the `dyn` form
 /// auto-implements, not only that it compiles.
 pub trait SeqCell: Sync {
   /// Read the current sequence.
@@ -111,7 +109,7 @@ pub trait SeqCell: Sync {
   /// Overwrite the sequence.
   fn store(&self, value: Seq, order: Ordering);
 
-  /// Advance by `n` and return the sequence as it was *before* the advance —
+  /// Advance by `n` and return the sequence as it was *before* the advance,
   /// which is the first sequence the caller now owns.
   ///
   /// # Monotonicity
@@ -124,12 +122,13 @@ pub trait SeqCell: Sync {
   /// the top. Callers own the monotonicity that `ring_types` and `ring_consume`
   /// each describe as something "every gate in the family relies on".
   ///
-  /// Fix(AT21, AT41, AT42): the word *monotonic* did not appear anywhere in the
-  /// crate that owns every operation those two statements are about, and no
-  /// test touched the boundary. `fetch_add_wraps_at_the_top_of_u64` now records
-  /// what happens there. No runtime check was added — at a billion advances per
-  /// second the horizon is 585 years, and the cost of a branch on every claim
-  /// is not worth paying for it — but silence was not the alternative.
+  /// Fix(fetch_add_monotonicity_was_unstated): the word *monotonic* did not
+  /// appear anywhere in the crate that owns every operation those two
+  /// statements are about, and no test touched the boundary.
+  /// `fetch_add_wraps_at_the_top_of_u64` now records what happens there. No
+  /// runtime check was added. At a billion advances per second the horizon is
+  /// 585 years, and the cost of a branch on every claim is not worth paying for
+  /// it. But silence was not the alternative.
   ///
   /// Root cause: the reverse direction comes free with `u64` addition and
   /// nothing in the signature or the contract rules it out.
@@ -142,8 +141,8 @@ pub trait SeqCell: Sync {
   ///
   /// # Errors
   ///
-  /// The sequence actually found, when it was not `current` — the multi-producer
-  /// claim's retry input.
+  /// The sequence found in the cell when it was not `current`, which is the
+  /// multi-producer claim's retry input.
   fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq>;
 
   /// The weak form of [`compare_exchange`](Self::compare_exchange): allowed to
@@ -181,8 +180,8 @@ impl Default for AtomicSeq {
   /// A cell at [`Seq::ZERO`].
   ///
   /// Written out rather than derived so that it does not depend on whichever
-  /// `AtomicU64` is in scope having its own `Default` — one of the two comes
-  /// from `loom` and its trait impls are its own business, not something this
+  /// `AtomicU64` is in scope having its own `Default`. One of the two comes
+  /// from `loom`, and its trait impls are its own business, not something this
   /// crate should be pinned to.
   fn default() -> Self {
     Self::new(Seq::ZERO)
@@ -193,8 +192,8 @@ impl AtomicSeq {
   /// A cell holding `value`.
   ///
   /// `const` in an ordinary build. Not under `--cfg loom`, whose atomics carry
-  /// per-execution model state and have no `const` constructor — see the module
-  /// documentation on the seam.
+  /// per-execution model state and have no `const` constructor. See the module
+  /// documentation on the `loom` switch.
   ///
   /// ```
   /// use ring_atomic::AtomicSeq;
@@ -207,7 +206,7 @@ impl AtomicSeq {
     Self(AtomicU64::new(value.0))
   }
 
-  /// A cell holding `value` — the `--cfg loom` build, where it is not `const`.
+  /// A cell holding `value` in the `--cfg loom` build, where it is not `const`.
   #[cfg(loom)]
   #[must_use]
   pub fn new(value: Seq) -> Self {
@@ -258,9 +257,9 @@ impl SeqCell for AtomicSeq {
 /// # Not a Coherent Observation
 ///
 /// [`CountingSeq::counts`] fills this struct with four independent `Relaxed`
-/// loads, so under concurrency the fields can come from four different instants
-/// — see that method for the measured skew. Two consequences follow, and the
-/// second is the one that bites:
+/// loads, so under concurrency the fields can come from four different
+/// instants. See that method for the measured skew. Two consequences follow,
+/// and the second is the one that bites:
 ///
 /// 1. A relationship between two fields may be one no instant ever satisfied.
 /// 2. **The tearing is not detectable from the value.** `total` is the sum of
@@ -269,9 +268,10 @@ impl SeqCell for AtomicSeq {
 ///    for a clean one. The consistency check a suspicious caller would reach
 ///    for certifies the torn readings as sound.
 ///
-/// Fix(AT43): the internal relation was the only cross-check available and it
-/// is derived from the torn reads rather than independently of them, so nothing
-/// was returned that could reveal the problem. This note is that signal;
+/// Fix(total_cannot_audit_its_own_reads): the internal relation was the only
+/// cross-check available and it is derived from the torn reads rather than
+/// independently of them, so nothing was returned that could reveal the
+/// problem. This note is that signal;
 /// `total_is_derived_from_the_same_four_reads` pins the fact that the relation
 /// is arithmetic rather than evidentiary.
 ///
@@ -285,9 +285,9 @@ pub struct OpCounts {
   pub loads: usize,
   /// Writes served.
   pub stores: usize,
-  /// Advances served — the batch claim's own operation.
+  /// Advances served, the batch claim's own operation.
   pub fetch_adds: usize,
-  /// Compare-exchanges served, successful or not — the contended claim's.
+  /// Compare-exchanges served, successful or not; the contended claim's operation.
   pub compare_exchanges: usize,
   /// Every operation above, summed.
   pub total: usize,
@@ -296,16 +296,16 @@ pub struct OpCounts {
 /// A sequence cell that behaves exactly like [`AtomicSeq`] and counts what it
 /// was asked to do.
 ///
-/// Not a mock: the underlying operations are the same real atomics, so a test
-/// running against this observes the same values production would — at
-/// roughly double the cost per operation, so this is a correctness instrument
-/// and not a timing one. Only the bookkeeping is added — which is why an
-/// assertion made against it is a statement about the code under test rather
-/// than about a substitute for it.
+/// Not a mock. The underlying operations are the same real atomics, so a test
+/// running against this observes the same values production would. It costs
+/// roughly double per operation, so this is a correctness instrument and not a
+/// timing one. Only the bookkeeping is added, which is why an assertion made
+/// against it is a statement about the code under test rather than about a
+/// substitute for it.
 ///
-/// The four counters are packed against the cell with no padding between
-/// them, deliberately: every operation touches its own counter *and* the
-/// cell, so separating them onto their own cache lines pays for an extra
+/// The four counters are deliberately packed against the cell with no padding
+/// between them. Every operation touches its own counter *and* the cell, so
+/// separating them onto their own cache lines pays for an extra
 /// line acquisition on every call rather than avoiding one, and measures
 /// slower past four threads.
 ///
@@ -363,7 +363,7 @@ impl CountingSeq {
     }
   }
 
-  /// A counting cell holding `value` — the `--cfg loom` build, not `const`.
+  /// A counting cell holding `value` in the `--cfg loom` build, not `const`.
   #[cfg(loom)]
   #[must_use]
   pub fn new(value: Seq) -> Self {
@@ -376,7 +376,7 @@ impl CountingSeq {
     }
   }
 
-  /// What this cell has been asked to do so far — read as four separate
+  /// What this cell has been asked to do so far, read as four separate
   /// values, so meaningful only when nothing else is touching the cell.
   ///
   /// ```
@@ -394,14 +394,14 @@ impl CountingSeq {
   /// concurrent use the four fields can come from four different instants, and
   /// [`OpCounts::total`] is the sum of readings that were never simultaneously
   /// true. Assert on a single field, or take the reading while nothing else
-  /// touches the cell — never on a *relationship between two fields*.
+  /// touches the cell. Never assert on a *relationship between two fields*.
   ///
-  /// Fix(AT3): a two-million-sample probe against a writer whose own loop keeps
-  /// `loads >= stores` true at every instant found 11,575 returned structs
-  /// reporting `stores > loads`, the widest by 5,456. Concurrency is not
-  /// hypothetical here: every `SeqCell` in the family is shared between a
-  /// producer and a consumer, and this crate's own contention test drives four
-  /// threads against one cell.
+  /// Fix(counts_tear_across_fields): a two-million-sample probe against a
+  /// writer whose own loop keeps `loads >= stores` true at every instant found
+  /// 11,575 returned structs reporting `stores > loads`, the widest by 5,456.
+  /// Concurrency is not hypothetical here. Every `SeqCell` in the family is
+  /// shared between a producer and a consumer, and this crate's own contention
+  /// test drives four threads against one cell.
   ///
   /// Root cause: bundling several independent atomic reads into one struct
   /// makes the struct look like a single observation.
@@ -424,11 +424,12 @@ impl CountingSeq {
 
   /// Return every count to zero, leaving the sequence itself untouched.
   ///
-  /// Four independent `Relaxed` stores, not one atomic reset — safe to read
-  /// as complete only while nothing else is touching the cell. For a test
-  /// that sets up a state through the cell and then wants to count only what
-  /// the operation under test does; confirming the sequence survived costs a
-  /// count of its own, since the confirming read is itself counted.
+  /// Four independent `Relaxed` stores, not one atomic reset, so the result is
+  /// safe to read as complete only while nothing else is touching the cell. It
+  /// is for a test that sets up a state through the cell and then wants to
+  /// count only what the operation under test does. Confirming the sequence
+  /// survived costs a count of its own, since the confirming read is itself
+  /// counted.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -451,16 +452,16 @@ impl CountingSeq {
 
 /// Each method bumps its counter **before** delegating to the cell.
 ///
-/// Fix(AT24): the order is deliberate and was undocumented. A concurrent
-/// observer reading the counter and the cell while both are moving can
-/// therefore see a counter that has already been incremented for an operation
-/// the cell has not yet performed — a million-sample probe found 7,176 such
-/// orderings. Bumping after the delegation would only move the window, not
-/// close it; closing it needs a lock, which is the cost this type exists to
-/// measure rather than pay.
+/// Fix(counter_bumps_before_the_cell): the order is deliberate and was
+/// undocumented. A concurrent observer reading the counter and the cell while
+/// both are moving can therefore see a counter that has already been
+/// incremented for an operation the cell has not yet performed. A
+/// million-sample probe found 7,176 such orderings. Bumping after the
+/// delegation would only move the window, not close it. Closing it needs a
+/// lock, which is the cost this type exists to measure rather than pay.
 ///
-/// The consequence is bounded and worth stating plainly: at rest the counts are
-/// exact (`counts_are_exact_under_contention` asserts that), and in flight they
+/// The consequence is bounded. At rest the counts are exact
+/// (`counts_are_exact_under_contention` asserts that), and in flight they
 /// lead. Never assert a counter against the cell's value while anything is
 /// still running.
 ///

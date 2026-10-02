@@ -1,67 +1,66 @@
 #!/usr/bin/env bash
-# G1 — 100% line coverage over the declared family, AND coverable lines > 0.
+# G1. 100% line coverage over the declared family, AND coverable lines > 0.
 #
-# The non-vacuity half is the point: tarpaulin reports "No coverable lines
-# found" on the skeletons and would otherwise be indistinguishable from a
-# fully-covered family.
+# The non-vacuity half is the point. tarpaulin reports
+# "No coverable lines found" on the skeletons, and that report would otherwise
+# be indistinguishable from a fully-covered family.
 set -uo pipefail
 GATE=G1
 source "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
 assert_declared_crates_exist
 
 # `--all-features`, because tarpaulin counts `cfg`-removed lines as uncovered
-# rather than omitting them. `ring_core`'s crossbeam backend is behind a cargo
+# instead of omitting them. `ring_core`'s crossbeam backend is behind a cargo
 # feature, so a featureless run leaves 26 of its lines in the denominator that
-# the binary under test does not contain — measured at 93/119 (78.2%) with the
+# the binary under test does not contain. Measured at 93/119 (78.2%) with the
 # feature off against 120/120 with it on, for the identical test suite. The
 # featureless figure is a miscount, not a gap, and building every line is what
 # makes the 100% threshold below mean what it says.
 #
-# Safe family-wide: of the ring_* crates, four declare a `crossbeam` feature
-# (`ring_core`, `ring_bench`, `ring_factory`, `ring_handle`) and all four
-# forward to the same underlying `ring_core/crossbeam` capability rather than
-# gating independent ones — see docs/pitfall/002 in ring_core for the full
-# account. `loom` is a RUSTFLAGS `cfg` rather than a feature, so `--all-features`
-# still turns on exactly one thing.
+# Safe family-wide. Of the ring_* crates, four declare a `crossbeam` feature
+# (`ring_core`, `ring_bench`, `ring_factory`, `ring_handle`), and all four
+# forward to the same underlying `ring_core/crossbeam` capability instead of
+# gating independent ones. See docs/pitfall/002 in ring_core for the full
+# account. `loom` is a RUSTFLAGS `cfg`, not a feature, so `--all-features` still
+# turns on exactly one thing.
 # Cleared before every run, for the reason `mutant_survey.sh` records at its own
-# `rm -rf` and does not need restating here: tarpaulin accumulates one `.profraw`
-# per test binary and merges whatever is in this directory, so a run scoped to a
-# different family — or one that died before its own merge — leaves profraws that
-# the next run silently folds into its reading.
+# `rm -rf` and does not need restating here. tarpaulin accumulates one
+# `.profraw` per test binary and merges whatever is in this directory. So a run
+# scoped to a different family, or one that died before its own merge, leaves
+# profraws that the next run folds into its reading without a word.
 #
-# What it looked like: a run reported `Failed to generate report:
-# missing section: CoverageFunctions` after every one of its test binaries had
-# run and produced a profraw, and the identical command succeeded twenty-eight
-# seconds later once the directory had been reduced by an unrelated single-crate
-# run. That failure is the benign shape — G1 catches it below and says the gate
-# did not run. The shape to fear is a stale profraw that parses cleanly, which
-# would move the percentage against a threshold of 100% with nothing to show for
-# it.
+# What it looked like: a run reported `Failed to generate report: missing
+# section: CoverageFunctions` after every one of its test binaries had run and
+# produced a profraw. The identical command succeeded twenty-eight seconds later
+# once the directory had been reduced by an unrelated single-crate run. That
+# failure is the benign shape. G1 catches it below and says the gate did not
+# run. The shape to fear is a stale profraw that parses cleanly, which would
+# move the percentage against a threshold of 100% with nothing to show for it.
 #
 # Same overlap hazard as G12: this must not run concurrently with another
 # tarpaulin invocation over this workspace, in either direction.
-# Which `target/` cargo will actually use, rather than assuming `$REPO/target`.
-# This cleanup and the lcov output below both used to hardcode that path, and a
-# run given an isolated `CARGO_TARGET_DIR` — the documented remedy for the
-# concurrency hazard named just above, and how this gate is routinely invoked —
-# then cleared a directory nothing had written to, leaving the stale-profraw
-# hazard the paragraph above describes fully live while reporting it handled.
-# Not a deduction: `-target_gate/tarpaulin/profraws` exists on disk from real
-# gate runs, so tarpaulin does follow the override.
+# Which `target/` cargo will use, instead of assuming `$REPO/target`. This
+# cleanup and the lcov output below both used to hardcode that path. An isolated
+# `CARGO_TARGET_DIR` is the documented remedy for the concurrency hazard named
+# just above, and how this gate is routinely invoked. A run given one then
+# cleared a directory nothing had written to. The stale-profraw hazard the
+# paragraph above describes stayed fully live while the gate reported it
+# handled. Not a deduction: `-target_gate/tarpaulin/profraws` exists on disk
+# from real gate runs, so tarpaulin does follow the override.
 target_root_for() {
   if [ -n "${CARGO_TARGET_DIR:-}" ]; then printf '%s\n' "${CARGO_TARGET_DIR%/}"
   else printf '%s/target\n' "${1%/}"; fi
 }
 
-# Cleared immediately before each invocation rather than once up front, because
-# there is now more than one invocation and each merges whatever it finds. That
-# also closes a hazard the single-invocation form never had: under a shared
+# Cleared immediately before each invocation, not once up front, because there
+# is now more than one invocation and each merges whatever it finds. That also
+# closes a hazard the single-invocation form never had. Under a shared
 # `CARGO_TARGET_DIR` every workspace's profraws land in one directory, so
 # without this the second workspace would fold in the first workspace's.
 #
-# The leading `/` in the pattern is load-bearing. `*/tarpaulin/profraws` also
-# matches `/tarpaulin/profraws` with an empty `*`, so an empty base would pass
-# the guard and `rm -rf` a top-level path; `/?*/` requires a non-empty one.
+# The leading `/` in the pattern matters. `*/tarpaulin/profraws` also matches
+# `/tarpaulin/profraws` with an empty `*`, so an empty base would pass the guard
+# and `rm -rf` a top-level path. `/?*/` requires a non-empty one.
 clear_profraws() {
   local d="$1/tarpaulin/profraws"
   case "$d" in
@@ -85,19 +84,19 @@ mkdir -p "$lcov_root"
 
 # One tarpaulin invocation per owning workspace, not one at `$REPO` for the lot.
 # `-p` naming a package outside the invoking workspace is not a scoping request
-# cargo honours: with `--all-features` it refuses the whole invocation outright
-# — `error: cannot specify features for packages outside of workspace` — and
-# that refusal is a property of the selection, not of each package, so one root
+# cargo honours. With `--all-features` it refuses the whole invocation outright
+# with `error: cannot specify features for packages outside of workspace`. That
+# refusal is a property of the selection, not of each package, so one root
 # member in the list is enough to mask it for the rest. Families can split
-# across several workspaces, some of them naming no root member at all, and
-# this gate graded every one of those on a command that compiled nothing.
-# See common.sh's family_workspace_groups() for the grouping.
+# across several workspaces, some of them naming no root member at all, and this
+# gate graded every one of those on a command that compiled nothing. See
+# common.sh's family_workspace_groups() for the grouping.
 #
-# Worse here than in G2, and worth naming: tarpaulin swallows cargo's message
-# and substitutes `Cargo failed to run! Error: cargo run failed`, so the line
-# that says what went wrong is neither the last line nor recognisably an error.
-# That is why the failure path prints the whole capture rather than a tail of
-# it — the tail is exactly the line that carries no information.
+# Worse here than in G2. tarpaulin swallows cargo's message and substitutes
+# `Cargo failed to run! Error: cargo run failed`, so the line that says what
+# went wrong is neither the last line nor recognisably an error. That is why the
+# failure path prints the whole capture, not a tail of it. The tail is exactly
+# the line that carries no information.
 #
 # `--output-dir` takes one path, so each workspace writes its own lcov.info and
 # they are concatenated afterwards. Concatenation IS the merge for this format:
@@ -117,11 +116,11 @@ while read -r ws pkgs; do
     --out Stdout Lcov --output-dir "$lcov_root/$slug" 2>&1 )"
 
   # Did tarpaulin run at all? This is the one ambiguity an early reading could
-  # not resolve: "zero coverable lines" is consistent both with looking and
+  # not resolve. "zero coverable lines" is consistent both with looking and
   # finding nothing and with never looking. Two branches follow, and they are
-  # not the same claim. Both ask per
-  # invocation, because each answers only for its own packages — another
-  # workspace's healthy report is no evidence this one ran.
+  # not the same claim. Both ask per invocation, because each answers only for
+  # its own packages. Another workspace's healthy report is no evidence this one
+  # ran.
   #
   # Branch one is tarpaulin's OWN message, so reaching it proves it executed.
   if grep -q 'No coverable lines found' <<<"$ws_out"; then
@@ -139,10 +138,10 @@ while read -r ws pkgs; do
   # rule both out before treating this as one. They are told apart by reading
   # the printed capture, which is why the whole of it goes to stdout:
   #
-  #   * A `-p` package the invoking workspace does not contain — cargo refuses
+  #   * A `-p` package the invoking workspace does not contain. cargo refuses
   #     before compiling anything, in about a second. This is what the
   #     per-workspace loop above exists to prevent, so if it fires anyway the
-  #     grouping is wrong; cargo's own `outside of workspace` line will be in
+  #     grouping is wrong. cargo's own `outside of workspace` line will be in
   #     the capture, second from the bottom.
   #   * Another cargo process building in the same target directory. Tarpaulin
   #     exits with `Failed to get test coverage! Error: missing section:
@@ -150,11 +149,11 @@ while read -r ws pkgs; do
   #     mid-write on. Recorded because it happened: two runs eleven seconds
   #     apart over an unchanged tree gave `missing section: CoverageFunctions`
   #     and `100% over 2648 coverable lines`. The distinguishing variable was a
-  #     second cargo, not the code. Re-running the gate alone settles this one
-  #     — and only this one, which is why it is no longer offered as the remedy
+  #     second cargo, not the code. Re-running the gate alone settles this one,
+  #     and only this one, which is why it is no longer offered as the remedy
   #     for whatever reaches this branch.
   #
-  # Deliberately NOT retried automatically in either case: a gate that silently
+  # Deliberately NOT retried automatically in either case. A gate that silently
   # retries until it likes the answer is how a real intermittent failure gets
   # buried, and both of these are loud, specific and cheap to reproduce by hand.
   if ! grep -qE '^[0-9]+\.[0-9]+% coverage,|\|\| Tested/Total Lines' <<<"$ws_out"; then
@@ -165,12 +164,12 @@ while read -r ws pkgs; do
   out+="$ws_out"$'\n'
 done < <( family_workspace_groups )
 
-# The summary percentage tarpaulin prints is workspace-wide: `-p` selects which
+# The summary percentage tarpaulin prints is workspace-wide. `-p` selects which
 # packages' tests to RUN, not which sources to report on, so unrelated crates
-# sit in the denominator and hold the figure below
-# 100% no matter how complete the family is. Recompute from the per-file
-# "Tested/Total Lines" breakdown, restricted to the crates actually in scope —
-# the whole family by default, one stage's crates under a stage run.
+# sit in the denominator and hold the figure below 100% no matter how complete
+# the family is. Recompute from the per-file "Tested/Total Lines" breakdown,
+# restricted to the crates in scope: the whole family by default, one stage's
+# crates under a stage run.
 scoped="$( family_crates | paste -sd'|' )"
 
 # Each surviving line becomes `<crate>/src/<file> <tested>/<total>`.
@@ -178,9 +177,9 @@ scoped="$( family_crates | paste -sd'|' )"
 # No `$` anchor, deliberately. Tarpaulin appends a ` +0.00%` delta to every
 # per-file line once a previous run exists to compare against, and omits it on
 # the very first run in a fresh target dir. An anchored pattern therefore
-# matched on the first run and matched nothing on every run after it — a gate
-# that passed once and then reported "zero coverable lines" forever, which
-# reads as an unimplemented family rather than as a broken gate. `-o` ends the
+# matched on the first run and matched nothing on every run after it. The result
+# was a gate that passed once and then reported "zero coverable lines" forever,
+# which reads as an unimplemented family, not as a broken gate. `-o` ends the
 # match at the fraction, so the delta is discarded either way.
 # A crate's path in tarpaulin's report is relative to the workspace the run was
 # invoked in, not to `$REPO`, so its shape depends on which workspace owns the
@@ -190,43 +189,44 @@ scoped="$( family_crates | paste -sd'|' )"
 #     || some_crate/src/lib.rs: 25/28
 #
 # where the same file reported from `$REPO` reads
-# `some_root/some_crate/src/lib.rs`. This pattern used to require a fixed root
-# prefix, mandatory — which matched nothing at all once the loop above began
+# `some_root/some_crate/src/lib.rs`. This pattern used to require a fixed,
+# mandatory root prefix. That matched nothing at all once the loop above began
 # running each family in its own workspace. Every row was dropped, `per_file`
 # came back empty, and the gate reported "zero coverable lines in the crates
-# under test": an unimplemented family, in a message about a fully implemented
-# one.
+# under test". That is an unimplemented family, in a message about a fully
+# implemented one.
 #
 # So the prefix is optional and names no root, and the crate segment carries the
-# restriction instead. Requiring that prefix to end in `/` is what keeps it from
-# widening: a hypothetical `legacy_some_crate/src/lib.rs` cannot match, since
+# restriction instead. Requiring that prefix to end in `/` keeps it from
+# widening. A hypothetical `legacy_some_crate/src/lib.rs` cannot match, since
 # `legacy_` is not a path segment and the alternation is not a substring search.
 #
 # Stripping it leaves `<crate>/src/<file>` whichever workspace reported the row,
-# which is not cosmetic — three things downstream key on that exact shape and on
-# both workspaces producing it identically: the max-per-path merge immediately
-# below, the binary-entry-point drop, and the phantom discount's own `$rel`.
+# and that is not cosmetic. Three things downstream key on that exact shape and
+# on both workspaces producing it identically: the max-per-path merge
+# immediately below, the binary-entry-point drop, and the phantom discount's own
+# `$rel`.
 per_file="$( grep -oE "^\|\| ([^ ]*/)?(${scoped})/src/[^:]+: [0-9]+/[0-9]+" <<<"$out" \
   | sed -E "s#^\|\| ([^ ]*/)?((${scoped})/src/)#\2#; s/: / /" )"
 
 # One row per source file, keeping the highest tested count.
 #
 # `$out` is now several reports concatenated, and a file can appear in more than
-# one of them: tarpaulin instruments the whole path-dependency graph it compiles,
-# not just the `-p` packages, so a family crate that another workspace's family
-# crate depends on by path is reported by both. Observed in one family whose
-# several members all depend by path on a shared crate that is itself a member
-# of a different family's workspace, so that shared crate clears the family
-# filter above from both reports.
+# one of them. tarpaulin instruments the whole path-dependency graph it
+# compiles, not just the `-p` packages, so a family crate that another
+# workspace's family crate depends on by path is reported by both. Observed in
+# one family whose several members all depend by path on a shared crate that is
+# itself a member of a different family's workspace, so that shared crate clears
+# the family filter above from both reports.
 #
 # Summing both copies would inflate numerator and denominator together, which
-# the 100% threshold mostly survives; the phantom discount below is what makes it
-# dangerous. That discount is keyed on the file path, so it applies to every row
-# bearing it — a genuine 9/10 counted twice becomes 10/10 twice and passes.
+# the 100% threshold mostly survives. The phantom discount below is what makes
+# it dangerous. That discount is keyed on the file path, so it applies to every
+# row bearing it. A genuine 9/10 counted twice becomes 10/10 twice and passes.
 #
-# The max is the merge rather than the first or the sum: two invocations run
-# different test sets over the same file, and a line covered by either is
-# covered. A no-op for a file reported once, which is still the ordinary case.
+# The max is the merge, not the first or the sum. Two invocations run different
+# test sets over the same file, and a line covered by either is covered. A no-op
+# for a file reported once, which is still the ordinary case.
 per_file="$( awk 'NF == 2 {
     split( $2, a, "/" )
     if ( !( $1 in tot ) ) { order[ ++n ] = $1; best[ $1 ] = a[ 1 ]; tot[ $1 ] = a[ 2 ] }
@@ -240,33 +240,34 @@ per_file="$( awk 'NF == 2 {
 # Tarpaulin counts a binary's source in the denominator and never executes it.
 # Measured directly: `--run-types Bins` and `--run-types AllTargets` both leave
 # every binary in the workspace at zero, regardless of which binary or how many
-# lines it has. This is a property of the tool, not of the tests: no test
-# suite can raise those figures, so a 100% bar including them is unreachable by
-# construction rather than demanding.
+# lines it has. This is a property of the tool, not of the tests. No test suite
+# can raise those figures, so a 100% bar including them is unreachable by
+# construction, not demanding.
 #
 # The lines are dropped from THIS gate's denominator and picked up by two other
 # checks, so the entry point stays graded:
 #
-#   * G7 executes the binary three times per run — debug twice and release once
-#     — and byte-compares the output. A `main` that failed to parse its
-#     arguments, failed to reach `main_from_args`, or returned the wrong exit
-#     code produces no output or different output, and G7 fails.
+#   * G7 executes the binary three times per run, debug twice and release once,
+#     and byte-compares the output. A `main` that failed to parse its arguments,
+#     failed to reach `main_from_args`, or returned the wrong exit code produces
+#     no output or different output, and G7 fails.
 #   * The shim assertion below bounds how much can live there at all.
 #
-# That second check is the non-vacuity pairing, and it is the reason this is not
-# simply a hole. Excluding a file from coverage is an invitation to park logic
-# in it; a bounded shim cannot hold logic. Without the bound, "the entry point is
-# only a shim" would be a claim nobody re-checks after the first time it is true.
+# That second check is the non-vacuity pairing, and it is why this is not a
+# hole. Excluding a file from coverage is an invitation to park logic in it, and
+# a bounded shim cannot hold logic. Without the bound,
+# "the entry point is only a shim" would be a claim nobody re-checks after the
+# first time it is true.
 #
 # Which files those are is asked of cargo, not assumed to be `src/main.rs`. Both
-# halves above used to name that one path literally, so a `[[bin]]` declaring any
-# other `path` was neither dropped nor bounded — it got the strictness of a
+# halves above used to name that one path literally, so a `[[bin]]` declaring
+# any other `path` was neither dropped nor bounded. It got the strictness of a
 # library with none of the reachability. Measured directly: a `[[bin]]` target
-# declaring a non-default `path` reported `0/10`, ten lines no test
-# can reach, held against a threshold of 100%, and the message the gate printed
-# asked for coverage that cannot be written. Its 21 non-comment lines were
-# meanwhile outside the budget entirely, which is the same hole from the other
-# side. See `family_bin_sources` in `common.sh`.
+# declaring a non-default `path` reported `0/10`, ten lines no test can reach,
+# held against a threshold of 100%, and the message the gate printed asked for
+# coverage that cannot be written. Its 21 non-comment lines were meanwhile
+# outside the budget entirely, the same hole from the other side. See
+# `family_bin_sources` in `common.sh`.
 bin_list="$( family_bin_sources )" \
   || fail "cargo metadata produced no target list, so binary entry points cannot be told from library sources — the gate did not run"
 bin_sources=()
@@ -298,11 +299,11 @@ per_file="$( awk 'NR == FNR { drop[ $0 ] = 1; next } !( $1 in drop )' \
 #     line 202  `return Err( … )`, inside that block        5 hits
 #
 # Line 202 is reachable only by the pattern on 199 failing, which is the `else`
-# on 200 being taken. Five executions of 202 is five executions of 200. The
-# zero is an artifact of the instrumentation, not a fact about the tests, and no
-# test can be written to fix it: this is `main.rs` again, and it gets the same
-# treatment for the same stated reason — a 100% bar including such lines is
-# unreachable by construction rather than demanding.
+# on 200 being taken. Five executions of 202 is five executions of 200. The zero
+# is an artifact of the instrumentation, not a fact about the tests, and no test
+# can be written to fix it. This is `main.rs` again, and it gets the same
+# treatment for the same stated reason: a 100% bar including such lines is
+# unreachable by construction, not demanding.
 #
 # The same thing happens at an ordinary `if`/`else`. Measured 2026-09-05,
 # `session_ledger/src/replay.rs` under the whole slice family's tests:
@@ -315,66 +316,65 @@ per_file="$( awk 'NR == FNR { drop[ $0 ] = 1; next } !( $1 in drop )' \
 # and the argument reads identically: line 210 executes only when the `else` on
 # 208 is taken, so fifty-eight executions of 210 is fifty-eight of 208.
 #
-# What makes the discount safe is that it proves itself per site rather than
-# trusting a rule about the construct — which is exactly why it does not need to
-# tell the two constructs apart, and no longer tries to. It applies to one line
-# only when that line reports zero hits AND some line inside the block it opens
-# reports more than zero. Rust guarantees the second implies the first was
-# taken: an `else` block's contents are reachable by no other route, whether the
-# `else` belongs to a `let` or to an `if`. Every other case is left alone and
-# still fails the gate:
+# What makes the discount safe is that it proves itself per site instead of
+# trusting a rule about the construct. That is why it does not need to tell the
+# two constructs apart, and no longer tries to. It applies to one line only when
+# that line reports zero hits AND some line inside the block it opens reports
+# more than zero. Rust guarantees the second implies the first was taken: an
+# `else` block's contents are reachable by no other route, whether the `else`
+# belongs to a `let` or to an `if`. Every other case is left alone and still
+# fails the gate:
 #
-#   * An `else` whose path no test takes — the whole block reads zero, nothing
+#   * An `else` whose path no test takes. The whole block reads zero, nothing
 #     inside it is positive, no discount, and the gate fails on the `else` and
 #     the body alike. Measured 2026-08-31: one crate's `src/lib.rs` lines 237,
 #     238 and 240 all read zero together.
-#   * A site where tarpaulin instruments the `else` correctly — the line already
+#   * A site where tarpaulin instruments the `else` correctly. The line already
 #     reads positive, so there is nothing to discount. Measured in the same run:
 #     all four `let … else` in another crate's `src/lib.rs`, whose `else` lines
-#     are hit normally. Which sites land which way is not settled here; the
+#     are hit normally. Which sites land which way is not settled here, and the
 #     discount does not depend on knowing.
 #
 # So this cannot excuse an untested branch. The statement the block is required
-# to contain — the diverging one in a `let … else`, the value in an `if`/`else`
-# — stays in the denominator, and it is the line that actually evidences the
-# path was taken. The keyword line is the only thing ever discounted, and only
-# against evidence from inside its own block.
+# to contain stays in the denominator: the diverging one in a `let … else`, the
+# value in an `if`/`else`. It is the line that evidences the path was taken. The
+# keyword line is the only thing ever discounted, and only against evidence from
+# inside its own block.
 #
 # The narrower earlier form of this rule fired only inside a `let … else`, told
 # apart by a `let` being open with the preceding line not ending in `}`. That
-# discrimination is dropped rather than kept as a belt: it never carried the
-# safety argument — the per-site evidence did — and keeping it meant an
-# `if`/`else` phantom had no route to a verdict except rewriting working source
-# to dodge a tool artifact.
+# discrimination is dropped, not kept as a belt. It never carried the safety
+# argument; the per-site evidence did. Keeping it meant an `if`/`else` phantom
+# had no route to a verdict except rewriting working source to dodge a tool
+# artifact.
 phantom_lines()
 {
-  # Brace placement below is awk's, not the house's: a top-level pattern and its
+  # Brace placement below is awk's, not the house's. A top-level pattern and its
   # `{` must share a line, or the pattern silently becomes a bare print rule and
   # the block runs unconditionally. Allman applies normally inside the actions.
   #
   # Fix(brace_depth_miscounted_braces_inside_string_and_char_literals)
   # Root cause: the depth counter below used to gsub `{`/`}` over each line's
   #   raw text, so a string literal such as
-  #   `format!( "{noun} value has no matching '}}'" )`
-  #   (flow_record.rs:332) contributed its own unmatched braces to the count —
-  #   one open, three close on that single line — closing the tracked block
-  #   one line early. Demonstrated live at that exact site (and its two
-  #   siblings at lines 528 and 571); it happened not to flip any verdict
-  #   there only because each block's sole content line was also its only
-  #   possible evidence line, so the truncated search window still covered it
-  #   by coincidence. A block whose real evidence line sits after a brace-
-  #   bearing literal would have that evidence silently excluded, which is the
-  #   exact phantom-failure shape this whole discount exists to prevent.
+  #   `format!( "{noun} value has no matching '}}'" )` (flow_record.rs:332)
+  #   contributed its own unmatched braces to the count. That is one open and
+  #   three close on that single line, which closed the tracked block one line
+  #   early. Demonstrated live at that exact site (and its two siblings at lines
+  #   528 and 571). It happened not to flip any verdict there only because each
+  #   block's sole content line was also its only possible evidence line, so the
+  #   truncated search window still covered it by coincidence. A block whose
+  #   real evidence line sits after a brace-bearing literal would have that
+  #   evidence silently excluded. That is the exact phantom-failure shape this
+  #   whole discount exists to prevent.
   # Pitfall: a lifetime (`'a`) opens with the same character as a char literal
-  #   but never closes with a second one on the same line — treating every
-  #   `'` as a char-literal opener strips real braces from any code that
-  #   follows a lifetime on that line. `strip_literals` below only recognizes
-  #   a `'` as a char literal when a closing `'` actually follows (one or two
-  #   characters later, allowing for a `\`-escape); a lone `'a` is passed
-  #   through unchanged. Line comments are truncated too, for the same
-  #   reason — block comments (`/* */`) are not, since none exist in this
-  #   crate and the multi-line state they would need is not worth carrying
-  #   for a residual, unconfirmed-live case.
+  #   but never closes with a second one on the same line. Treating every `'` as
+  #   a char-literal opener strips real braces from any code that follows a
+  #   lifetime on that line. `strip_literals` below only recognizes a `'` as a
+  #   char literal when a closing `'` follows (one or two characters later,
+  #   allowing for a `\`-escape). A lone `'a` is passed through unchanged. Line
+  #   comments are truncated too, for the same reason. Block comments (`/* */`)
+  #   are not, since none exist in this crate and the multi-line state they
+  #   would need is not worth carrying for a residual, unconfirmed-live case.
   awk -v src="$1" -v sq="'" '
     function trim( x ) { sub( /^[[:space:]]+/, "", x ); sub( /[[:space:]]+$/, "", x ); return x }
 
@@ -450,13 +450,13 @@ phantom_lines()
   ' "$LCOV" "$1"
 }
 
-# One lcov.info per workspace, concatenated into one — valid for this format for
-# the reason given at the invocation loop above, and read back by the awk that
-# re-anchors at every `SF:` record.
+# One lcov.info per workspace, concatenated into one. That is valid for this
+# format for the reason given at the invocation loop above, and the awk that
+# re-anchors at every `SF:` record reads it back.
 #
-# `-mindepth 2` is what keeps the destination out of its own input: the merged
-# file sits at the root of `$lcov_root`, each workspace's under a slug directory
-# one level further down.
+# `-mindepth 2` keeps the destination out of its own input. The merged file sits
+# at the root of `$lcov_root`, each workspace's under a slug directory one level
+# further down.
 LCOV="$lcov_root/lcov.info"
 : >"$LCOV"
 merged=0
@@ -473,8 +473,8 @@ while read -r c; do
   while IFS= read -r src; do
     # Same set the denominator dropped. A discount credited to a file no longer
     # in `per_file` changes no arithmetic, but it would still be counted into
-    # the note below — an evidence line reporting work the verdict did not rest
-    # on.
+    # the note below. That would be an evidence line reporting work the verdict
+    # did not rest on.
     rel="$c/${src#"$cdir/"}"
     grep -qxF "$rel" <<<"$bin_list" && continue
     n_hit="$( phantom_lines "$src" | grep -c . )"

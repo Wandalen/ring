@@ -1,9 +1,9 @@
-//! `ring_consume` — what a consumer may read, and saying it has.
+//! Tests for `ring_consume`: what a consumer may read, and saying it has.
 //!
 //! The consumer half of
 //! `docs/feature/170_claim_publish_available_commit_handshake.md`. The
 //! feature's own reached-test wires all four operations together in
-//! `ring_publish/tests/handshake_test.rs`; this file covers `available` and
+//! `ring_publish/tests/handshake_test.rs`. This file covers `available` and
 //! `commit` on their own, where the boundary conditions are cheap to state
 //! exhaustively and expensive to reason about in a four-crate integration.
 //!
@@ -18,13 +18,13 @@
 //! - Committing **backwards** re-reads slots the producer has already been
 //!   cleared to reuse.
 //!
-//! Neither is caught by a test that only ever commits exactly what `available`
-//! returned, which is what a natural happy-path suite does throughout.
+//! A test that only ever commits exactly what `available` returned catches
+//! neither, and that is what a natural happy-path suite does throughout.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -139,9 +139,9 @@ fn available_starts_where_the_consumer_stands() {
 
 #[test]
 fn a_consumer_with_no_dependencies_never_has_anything_available() {
-  // An empty barrier means nothing has been published, not "everything" —
-  // the asymmetry with `ring_gating` that `ring_barrier`'s own suite asserts,
-  // carried through to the operation a caller actually uses.
+  // An empty barrier means nothing has been published, not "everything".
+  // This is the asymmetry with `ring_gating` that `ring_barrier`'s own suite
+  // asserts, carried through to the operation a caller uses.
   let position = PaddedCursor::default();
   let consumer = Consumer::new(&position, Barrier::over(&[]));
 
@@ -226,7 +226,7 @@ fn committing_backwards_is_refused_and_moves_nothing() {
 
 #[test]
 fn committing_where_you_already_are_is_allowed_and_is_a_no_op() {
-  // Not an error: a drain loop that read zero items and commits its position
+  // Not an error. A drain loop that read zero items and commits its position
   // is doing nothing wrong, and making it an error would put a special case in
   // every caller.
   let published = published_at(6);
@@ -240,16 +240,17 @@ fn committing_where_you_already_are_is_allowed_and_is_a_no_op() {
 
 #[test]
 fn the_accepted_commits_are_exactly_the_available_range_inclusive_of_both_ends() {
-  // The full boundary map, in one sweep: for every published frontier and every
-  // consumer position, exactly the values in `position..=frontier` are accepted.
+  // The full boundary map, in one sweep. For every published frontier and
+  // every consumer position, `commit` accepts exactly the values in
+  // `position..=frontier`.
   const FRONTIER: u64 = 8;
   let published = published_at(FRONTIER);
 
   for position in 0..=FRONTIER {
     for candidate in 0..FRONTIER + 4 {
-      // A fresh consumer per case rather than one per row: an accepted commit
-      // moves the position, and reusing the consumer would silently change
-      // which case the next iteration is actually testing.
+      // A fresh consumer per case, not one per row. An accepted commit moves
+      // the position, and reusing the consumer would silently change which
+      // case the next iteration tests.
       let position_cursor = PaddedCursor::default();
       let consumer = Consumer::new(&position_cursor, Barrier::over(&published));
       consumer.commit(Seq(position)).expect("reachable in one step from zero");
@@ -281,9 +282,9 @@ fn commit_available_takes_everything_and_reports_where_it_reached() {
 #[test]
 fn the_consumer_cursor_is_what_the_producer_would_gate_on() {
   // A commit must land in the cursor the producer holds, not in one the
-  // consumer kept to itself — a producer gating on a position that never moves
+  // consumer kept to itself. A producer gating on a position that never moves
   // deadlocks after one lap. Read through `position` rather than through
-  // `consumer.cursor()`, because `position` is what a producer actually has.
+  // `consumer.cursor()`, because `position` is what a producer has.
   let published = published_at(7);
   let position = PaddedCursor::default();
   let consumer = Consumer::new(&position, Barrier::over(&published));
@@ -309,9 +310,9 @@ fn the_consumer_exposes_the_barrier_it_was_built_over() {
 #[test]
 fn a_consumer_never_reads_past_what_was_published() {
   // The safety property, with a real writer moving the frontier underneath.
-  // `available` may under-report — a publication that landed after the read is
-  // simply not yet seen — but it must never over-report, because the caller
-  // reads slots on the answer.
+  // `available` may under-report by missing a publication that landed after
+  // the read. It must never over-report, because the caller reads slots on
+  // the answer.
   const TOTAL: u64 = 4_000;
   let published = published_at(0);
   let position = PaddedCursor::default();
@@ -345,8 +346,9 @@ fn a_consumer_never_reads_past_what_was_published() {
 
 #[test]
 fn every_sequence_is_offered_exactly_once_across_a_full_drain() {
-  // A drain loop that commits what it was offered must see each sequence once:
-  // twice means the cursor rewound, never means a run was skipped.
+  // A drain loop that commits what it was offered must see each sequence once.
+  // Seeing one twice means the cursor rewound. Never seeing one means a run was
+  // skipped.
   const TOTAL: u64 = 2_000;
   let published = published_at(0);
   let position = PaddedCursor::default();

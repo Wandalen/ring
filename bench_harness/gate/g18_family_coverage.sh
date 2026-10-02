@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# G18 — every crate in this repository is claimed by exactly one gate family,
-# or exempted with a written reason.
+# G18. Every crate in this repository is claimed by exactly one gate family, or
+# exempted with a written reason.
 #
-# The gate the other seventeen cannot be: each of those grades the crates its
-# family declares, and is silent about a crate no family declares at all. A
+# The other seventeen gates cannot do this job. Each of them grades the crates
+# its family declares and says nothing about a crate no family declares. A
 # family whose crates.txt names four of its ten crates reports the same
 # "REACHED" as one that names all ten, and nothing in a per-family run can tell
 # the two apart. Coverage is the only property that has to be read across
-# families rather than within one, which is why this gate is family-independent
-# and does not appear in any family's gates.txt.
+# families, not within one. That is why this gate is family-independent and
+# appears in no family's gates.txt.
 #
 # Exactly one, not at least one. A crate named by two families is graded twice
 # under two different gate lists, and a fix that satisfies one can break the
-# other with no run reporting the contradiction — so a double claim fails here
-# rather than being tolerated as redundant coverage.
+# other with no run reporting the contradiction. So a double claim fails here
+# instead of being tolerated as redundant coverage.
 #
-# Exemptions are counted out loud on every run, including a reached one. An
-# exemption is the one way to reach this gate without gating anything, so the
-# count has to stay visible in the passing output; a gate that goes quiet once
-# it is green cannot report that it went green by emptying itself.
+# Every run counts exemptions out loud, including a reached one. An exemption is
+# the one way to reach this gate without gating anything, so the count has to
+# stay visible in the passing output. A gate that goes quiet once it is green
+# cannot report that it went green by emptying itself.
 set -uo pipefail
 GATE=G18
 source "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
@@ -26,8 +26,8 @@ source "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
 EXEMPT="$DECL_ROOT/exempt.txt"
 
 # Crates on disk: a directory under any crate root carrying a manifest. The
-# manifest is what separates a crate from a bare directory, and is the same
-# test cargo itself applies when resolving a workspace member.
+# manifest separates a crate from a bare directory, and cargo applies the same
+# test when resolving a workspace member.
 mapfile -t disk < <( all_crate_names )
 
 [ ${#disk[@]} -gt 0 ] || fail "no crate manifests found under ${CRATE_ROOTS[*]#"$REPO"/} — the gate would report clean having read nothing"
@@ -35,8 +35,8 @@ mapfile -t disk < <( all_crate_names )
 mapfile -t families < <( find "$DECL_ROOT" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort )
 [ ${#families[@]} -gt 0 ] || fail "no families declared under ${DECL_ROOT#"$REPO"/} — nothing to check coverage against"
 
-# Claim table: crate -> space-separated family names that name it. Built by
-# reading every family's declaration rather than the one this run defaults to.
+# Claim table: crate -> space-separated family names that name it. The loop
+# reads every family's declaration, not only the one this run defaults to.
 declare -A claim=()
 for f in "${families[@]}"; do
   while read -r c; do
@@ -45,8 +45,8 @@ for f in "${families[@]}"; do
   done < <( decl_lines "$DECL_ROOT/$f/crates.txt" )
 done
 
-# Exemptions: `crate_name  reason`. A bare name with no reason is not an
-# exemption, it is an omission wearing one, so it is collected separately.
+# Exemptions: `crate_name  reason`. A bare name with no reason is an omission
+# dressed as an exemption, so the loop collects it separately.
 declare -A exempt=()
 reasonless=()
 if [ -f "$EXEMPT" ]; then
@@ -73,9 +73,10 @@ for c in "${disk[@]}"; do
   esac
 done
 
-# A name in a declaration with no crate behind it. The mirror of an unclaimed
-# crate and the more dangerous direction: it inflates a family's apparent reach
-# while grading nothing, and every per-family gate skips it in silence.
+# A name in a declaration with no crate behind it. This mirrors an unclaimed
+# crate and is the more dangerous direction. It inflates a family's apparent
+# reach while grading nothing, and every per-family gate skips it without a
+# word.
 stale=()
 for c in "${!claim[@]}"; do
   crate_dir "$c" >/dev/null || stale+=( "$c (claimed by${claim[$c]})" )

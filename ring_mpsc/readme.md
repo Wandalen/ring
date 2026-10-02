@@ -1,56 +1,58 @@
 # ring_mpsc
 
-Sequence-numbered multi-producer ring buffer: many threads claim-and-publish
-concurrently, one consumer thread drains in total order.
+Sequence-numbered multi-producer ring buffer. Many threads claim and publish
+concurrently, and one consumer thread drains in total order.
 
-Depends on [`ring_atomic`](../ring_atomic/readme.md),
-[`ring_store`](../ring_store/readme.md), [`ring_claim`](../ring_claim/readme.md),
-[`ring_config`](../ring_config/readme.md), [`ring_cursor`](../ring_cursor/readme.md),
-[`ring_gating`](../ring_gating/readme.md), [`ring_slot`](../ring_slot/readme.md),
-and [`ring_types`](../ring_types/readme.md).
-One of the 33 `ring_*` crates that make up this family's concurrency
-write-path — a 33-crate dependency forest rooted at `ring_types`, acyclic
-by construction. Build order follows [`../Cargo.toml`](../Cargo.toml)'s
-member list; the family as a whole is described in
-[`../readme.md`](../readme.md). This crate was `mpsc_ring` before the family
-adopted a single prefix.
+Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 
-**The dependency list changed on implementation, in both directions, and the
-substitutions are the interesting part.** Originally scoped for seven
-dependencies; the crate ended up with eight. `ring_slot` and `ring_types` and
-`ring_atomic` were added — the first two because slot storage and the
-`Seq`/`Capacity`/`RingError` vocabulary are genuinely shared, the third
-because loom instrumentation has to be swapped in at the atomic type rather
-than at this crate. `ring_publish` and `ring_consume` were *removed*:
-publication here is a per-slot stamp write and a scan, not a cursor advance,
-so neither crate's shape fits. Both now have no consumer in the family, which
-is a consequence of that shape rather than an oversight.
+More than one independent consumer needs this mechanism, so it is factored out
+and built once. Publication is a per-slot stamp write and a scan, not a cursor
+advance. A slot is published when its stamp equals the sequence addressing it,
+so no producer waits for another to publish and the consumer pays a scan
+instead. That shape is why the crate uses neither `ring_publish` nor
+`ring_consume`.
 
-It carries no *consumer*-side family prefix for the original reason — no
-natural single owner. More than one consumer needs the same staging mechanism
-independently, and prefixing it into any one consumer's namespace would
-misrepresent genuinely co-equal shared infrastructure as one stack's internals
-loaned to another.
+The crate opts out of the workspace `unsafe` deny so many producers can write
+disjoint slots of one array. [docs/workaround/readme.md](docs/workaround/readme.md)
+records why, what bounds the unsafe code, and when to delete it.
 
-The ring pattern is now implemented and its correctness is established; a
-consumer's migration onto it is a decision that belongs to that consumer, not
-to this crate (→ [`docs/non_functional_requirement/001`](docs/non_functional_requirement/001_measured_before_adopted.md)).
-This crate exists so that decision gets built on exactly one implementation
-rather than reinvented per consumer. Implemented is deliberately not adoption:
-no consumer manifest names it.
+## Decisions
 
-Implemented. 33 integration tests plus 2 loom models, 100% line coverage,
-clippy clean under `-D warnings`.
+- [The producer claims k sequences per gate check and exchange, on the sweep's measured win](docs/decisions/001_the_batched_claim_path_won_its_sweep.md)
+
+## Known limitations
+
+- `ring_mpsc::Ring::committed`, `Ring::published_through`, `Ring::stamps`,
+  `Producer::claimed`, `Producer::on_distinct_lines`, `Consumer::position` and
+  `Batch::sequences` have no production caller. They are public only because the
+  crate's integration tests can reach nothing else.
+- `ring_mpsc::Ring::stamps` returns the raw `&[AtomicSeq]`, so a caller gets the
+  stamp values without the rule that a slot is published only when its stamp
+  equals its sequence. Only the private `Ring::contiguous_end` applies that rule,
+  and `!= UNSTAMPED` or `>=` would get it wrong by reading a previous lap's stamp
+  as published.
+- The private `ring_mpsc::Ring::stamp` masks the sequence with
+  `Ring::capacity()`, which is the `GatingSet`'s copy, while the stamp array was
+  sized from `Ring::new`'s argument. The index stays in bounds only because
+  `Ring::new` passes the same `Capacity` to both, not for the power-of-two
+  reason the comment in `stamp` gives.
+- A `ring_mpsc::Reserved` publishes on drop even if nothing was written
+  through it. An early `?` between `Producer::claim` and the write delivers the
+  slot as it stands. That is empty on the first lap, and otherwise whatever
+  record the previous lap left there if the consumer did not take it.
+
+## Run it
 
 ```sh
-cd "$(git rev-parse --show-toplevel)"
-cargo nextest run -p ring_mpsc                              # 33 passed
-RUSTFLAGS="--cfg loom" cargo nextest run -p ring_mpsc exhaustive::   # 2 passed
+cargo nextest run -p ring_mpsc --all-features
+cargo test --doc -p ring_mpsc --all-features
+RUSTFLAGS="--cfg loom" cargo nextest run -p ring_mpsc exhaustive::
 ```
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build — see [verb/readme.md](verb/readme.md) |
-| `docs/` | Scope, related crates, and open trade-offs — see [docs/readme.md](docs/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
+| `docs/workaround/` | Why the crate opts out of the workspace `unsafe` deny. See [docs/workaround/readme.md](docs/workaround/readme.md) |
+| `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | The ring, its two handles, and the two RAII guards that publish and commit |
-| `tests/` | Integration tests and the loom models — see [tests/manual/readme.md](tests/manual/readme.md) for what was checked by hand |
+| `tests/` | Integration tests and the loom models. [tests/manual/readme.md](tests/manual/readme.md) records what was checked by hand |

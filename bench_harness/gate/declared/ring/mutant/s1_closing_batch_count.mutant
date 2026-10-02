@@ -1,22 +1,22 @@
-# S1 — `MutexQueue`'s closing partial batch, counted into `reported` with the
+# S1. `MutexQueue`'s closing partial batch, counted into `reported` with the
 # wrong sign.
 #
 # The first mutant here that no one tripped over. B2, B5 and F1 were each paid
 # for by a wrong answer; this one came from `gate/mutant_survey.sh`, which broke
 # `ring_bench` 180 ways and reported the 22 the suite ignored. Its `S` marks
-# that provenance — a survey round rather than a manual one.
+# that provenance: a survey round rather than a manual one.
 #
 # The mutation flips the sign on the commit that runs *after* the producer loop,
 # the one that publishes whatever is left staged when the records run out. On a
 # fixture where the batch divides, that call commits zero records and `-=` is
 # indistinguishable from `+=`. On a fixture with a remainder it puts `reported`
-# below `received` by exactly the remainder — the run claims it wrote fewer
+# below `received` by exactly the remainder. The run claims it wrote fewer
 # records than the drain handed back, which is not a state the crate has.
 #
 # It survived because the two fixture families each held one half of what was
 # needed and neither held both. `a_cramped_run_drops_and_the_drop_is_counted_
 # from_the_drain` asserts `received <= reported` across every candidate, which
-# catches this exactly — but runs 256 records in batches of 32, where the
+# catches this exactly. But it runs 256 records in batches of 32, where the
 # remainder is zero and there is nothing to miscount. The 250-record fixture has
 # the remainder, and asserted only `is_lossless()` and `received()`; it read
 # `reported` on `TlsOverRing` alone, through `conserved()`, and left the other
@@ -27,7 +27,7 @@
 # test that relates two quantities must run where they can differ.** B5 failed
 # it by fixture (the candidate chosen had them equal), the `drain_final` gap
 # failed it by dimension (the batch always divided), and this failed it by
-# both at once — the assertion relating them lived on the fixture that made
+# both at once. The assertion relating them lived on the fixture that made
 # them trivially equal, and the fixture that could separate them never made the
 # assertion. The 250-record fixture was itself added to close a blind spot, and
 # arrived carrying a narrower one.
@@ -37,10 +37,10 @@
 #
 # The `from` block carries the `fetch_add` line it does not mutate, and has to.
 # The commit line alone is byte-identical to the in-loop commit at `:1053` except
-# for indentation, and `occurrences()` matches raw substrings — so the shorter
+# for indentation, and `occurrences()` matches raw substrings. So the shorter
 # block sits inside the deeper-indented line and counts twice. The gate rejected
-# it on that count before running anything, which is the >1-match rule doing
-# exactly its job: the probe would otherwise have hit a site no round recorded.
+# it on that count before running anything. That is the >1-match rule doing its
+# job, since the probe would otherwise have hit a site no round recorded.
 
 id: S1
 crate: ring_bench

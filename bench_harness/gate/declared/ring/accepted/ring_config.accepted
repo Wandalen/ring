@@ -7,7 +7,7 @@
 # `else` arm yields `batch`, and they are equal. Every other input takes the
 # same branch under both operators.
 #
-# So the usual off-by-one test — exercise the boundary, both sides of it — is
+# So the usual off-by-one test, exercising both sides of the boundary, is
 # already present and cannot fail. This is an equivalent mutant, and unusually,
 # one where the mutated operator is arguably the clearer way to write it.
 

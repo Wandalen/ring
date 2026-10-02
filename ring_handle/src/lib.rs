@@ -1,16 +1,14 @@
 //! Producer and consumer handles.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_core`.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What this crate adds
 //!
-//! [Feature 179](../../../docs/feature/179_producer_and_consumer_handles.md)
-//! asks for the ring's two ends as two separate values, with capability
-//! following ownership. `ring_core` already partitions the capabilities — its
-//! `Producer` cannot drain and its `Consumer` cannot publish — so this crate is
-//! not where that split is invented. It is where four things are added that
-//! `ring_core` does not do, each of them a *narrowing*:
+//! The requirement is the ring's two ends as two separate values, with
+//! capability following ownership. `ring_core` already partitions the
+//! capabilities. Its `Producer` cannot drain and its `Consumer` cannot publish,
+//! so this crate is not where that split is invented. This crate adds four
+//! things that `ring_core` does not do, each of them a *narrowing*:
 //!
 //! | Added | Why `ring_core` does not have it |
 //! |---|---|
@@ -19,22 +17,22 @@
 //! | [`Consumer::drain`] | A drain whose bound is fixed at call time, so it terminates under a live producer |
 //! | Nothing reaches the backend | No `Deref`, no `inner()`, no public field, on any of the three types |
 //!
-//! The overlap with `ring_core` is real and is documented rather than
-//! minimised — see `docs/decisions/001`.
+//! The overlap with `ring_core` is real, and
+//! `docs/decisions/001_handles_are_a_narrowing_layer_over_ring_core.md`
+//! documents it rather than minimising it.
 //!
 //! # Two things the pre-implementation spec asked for that are not here
 //!
 //! **`is_closed()` on both handles.** It would need a `ring_shutdown`
-//! dependency, and `ring_shutdown` depends on `ring_wait` — which would put a
-//! parking operation within reach of the tick path and break
-//! [feature 183](../../../docs/feature/183_try_only_operations_on_the_tick_path.md),
-//! asserted in `ring_poll`'s suite. Two features in tension, resolved by
-//! measurement; see `docs/decisions/002`.
+//! dependency, and `ring_shutdown` depends on `ring_wait`. That would put a
+//! parking operation within reach of the tick path and break the rule that
+//! the tick path only tries, asserted in `ring_poll`'s suite. Two requirements
+//! in tension, resolved by measurement; see
+//! `docs/decisions/002_handles_have_no_is_closed.md`.
 //!
 //! **`&self` receivers.** `&mut self` is what makes "exactly one producer"
-//! hold: a shared `&Producer` could be used from two threads at once, which is
-//! precisely the cardinality violation `ring_spsc` cannot otherwise detect.
-//! Recorded in `docs/invariant/001`.
+//! hold. A shared `&Producer` could be used from two threads at once, which is
+//! the cardinality violation `ring_spsc` cannot otherwise detect.
 
 #![deny(missing_docs)]
 
@@ -42,9 +40,9 @@ use ring_core::Ring;
 
 /// A ring that has been given up, and can now only be split.
 ///
-/// Taking the ring **by value** is the whole mechanism of
-/// `docs/algorithm/001`: afterwards there is no route to the ring except
-/// through this value, and this value offers exactly one operation.
+/// Taking the ring **by value** is the whole mechanism. Afterwards there is no
+/// route to the ring except through this value, and this value offers exactly
+/// one operation.
 ///
 /// ```
 /// use ring_config::RingConfig;
@@ -67,7 +65,7 @@ pub struct Split<T> {
 impl<T: Send> Split<T> {
   /// Give up the ring.
   ///
-  /// The ring is moved in and is not reachable again — not through a getter,
+  /// The ring is moved in and is not reachable again: not through a getter,
   /// not through `Deref`, and not by splitting twice, since [`Split::ends`]
   /// borrows exclusively.
   pub const fn new(ring: Ring<T>) -> Self {
@@ -76,7 +74,7 @@ impl<T: Send> Split<T> {
 
   /// Borrow the two ends, which [`Ends::split`] then separates.
   ///
-  /// The two-step shape is inherited: the pair borrows from the `Ends` value,
+  /// The two-step shape is inherited. The pair borrows from the `Ends` value,
   /// so the caller has to hold it. Collapsing the steps would need a
   /// self-referential struct.
   pub fn ends(&mut self) -> Ends<'_, T> {
@@ -106,8 +104,6 @@ impl<'a, T: Send> Ends<'a, T> {
 /// The publishing end. Cannot drain, cannot be cloned, cannot reach the ring.
 ///
 /// The absences are the contract; the present methods are ordinary forwarding.
-/// See `docs/api/001` for the full absent-operations table and what each
-/// addition would cost.
 #[derive(Debug)]
 pub struct Producer<'a, T> {
   inner: ring_core::Producer<'a, T>,
@@ -117,10 +113,8 @@ impl<T: Send> Producer<'_, T> {
   /// Publish one record, or hand it back.
   ///
   /// Never blocks. On a full ring the ring's own `OverflowPolicy` decides:
-  /// `Fail` returns the record, `DropNewest` discards it and reports success —
-  /// so an `Ok` is not by itself evidence the record was kept. That trap is
-  /// documented once, at
-  /// [`ring_shutdown/docs/pitfall/002`](../../../ring_shutdown/docs/pitfall/002_ok_does_not_mean_kept_under_drop_newest.md).
+  /// `Fail` returns the record, and `DropNewest` discards it and reports success,
+  /// so an `Ok` is not by itself evidence the record was kept.
   ///
   /// # Errors
   ///
@@ -141,7 +135,8 @@ impl<T: Send> Producer<'_, T> {
   ///
   /// Binding at SPSC cardinality, where this is the only producer; advisory at
   /// MPSC, where another producer may take the room first. One signature, two
-  /// contracts, selected by a config field — see `docs/api/001`.
+  /// contracts, selected by a config field. See
+  /// `ring_core/docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md`.
   #[must_use]
   pub fn free_capacity(&self) -> usize {
     self.inner.free_capacity()
@@ -159,8 +154,8 @@ impl<T: Send> Producer<'_, T> {
 /// The draining end. Cannot publish, cannot be cloned, cannot reach the ring.
 ///
 /// Because there is exactly one of these, whoever holds it *is* the consume
-/// point — which is why where this value lives is a correctness question and
-/// not only a design one. See `docs/lifecycle/002`.
+/// point. That makes where this value lives a correctness question and
+/// not only a design one.
 #[derive(Debug)]
 pub struct Consumer<'a, T> {
   inner: ring_core::Consumer<'a, T>,
@@ -169,7 +164,7 @@ pub struct Consumer<'a, T> {
 impl<'a, T: Send> Consumer<'a, T> {
   /// Take one record, if one is waiting.
   ///
-  /// `Option` rather than `Result`: an empty ring is not a failure, and
+  /// `Option` rather than `Result`, because an empty ring is not a failure, and
   /// modelling it as one makes every caller unwrap a non-failure.
   pub fn try_recv(&mut self) -> Option<T> {
     self.inner.try_recv()
@@ -184,7 +179,7 @@ impl<'a, T: Send> Consumer<'a, T> {
   ///
   /// **The bound is fixed here, not as the iterator runs.** An iterator that
   /// kept yielding whatever arrived would have no termination guarantee under a
-  /// live producer — a live-lock that satisfies "never blocks" at every
+  /// live producer. That is a live-lock that satisfies "never blocks" at every
   /// individual step. Reading the length once, up front, is what makes a full
   /// drain a bounded operation and what makes it reproducible given a fixed
   /// publication history.
@@ -213,7 +208,7 @@ impl<'a, T: Send> Consumer<'a, T> {
 
   /// How many records are waiting, as a lower bound.
   ///
-  /// It can only grow, never shrink, because this is the only consumer — the
+  /// It can only grow, never shrink, because this is the only consumer. That is the
   /// opposite direction from `Producer::free_capacity`'s bound at MPSC
   /// cardinality. The two read as duals and are not.
   #[must_use]

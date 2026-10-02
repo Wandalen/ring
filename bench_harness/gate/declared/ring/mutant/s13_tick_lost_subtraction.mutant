@@ -4,7 +4,7 @@
 # `try_push_batch` pulled from the iterator before it knew there was no room.
 # Every existing caller of `push_batch` happened to move at least one record,
 # so `offered / moved` (integer division) came out equal to `offered - moved`
-# by coincidence in each of them — the two operators diverge only once `moved`
+# by coincidence in each of them. The two operators diverge only once `moved`
 # drops to zero, which nothing exercised.
 #
 # A ring that is already full before `push_batch` is called moves nothing on

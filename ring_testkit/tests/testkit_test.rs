@@ -1,6 +1,6 @@
-//! `docs/feature/188_loom_and_testkit_helpers.md` — the scripted-fixture half.
+//! The scripted-fixture half of `docs/feature/188_loom_and_testkit_helpers.md`.
 //!
-//! Feature 188 asks for two things: a model checker exploring interleavings
+//! The feature asks for two things: a model checker exploring interleavings
 //! exhaustively, and fixtures driving a ring through a scripted sequence of
 //! claims and drains. This file covers the second and asserts the first is
 //! reachable; the model itself is `tests/exhaustive_test.rs`, which only
@@ -15,13 +15,13 @@
 //!
 //! [`neither_the_count_nor_the_delivered_records_sees_a_drop_alone`] is the
 //! crate's reason to exist, and it pins a result that contradicted the
-//! prediction it was written to confirm — see `tests/manual/readme.md` M1.
+//! prediction it was written to confirm. See `tests/manual/readme.md` M1.
 
 // The inverse of `exhaustive_test.rs`'s `#![ cfg( loom ) ]`. `--cfg loom` swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole graph,
-// and those panic the moment they are touched outside a `loom::model` closure —
+// and those panic the moment they are touched outside a `loom::model` closure,
 // which every `Ring` here does. The `--test exhaustive_test` narrowing in the
-// invocation above sidesteps that for this crate alone; this gate is what lets
+// invocation above sidesteps that for this crate alone. This gate is what lets
 // a whole-crate or whole-workspace loom run reach the model instead of dying
 // here first.
 #![cfg(not(loom))]
@@ -49,10 +49,10 @@ fn dropping_ring(slots: usize) -> Ring<u32> {
 
 // ── the acceptance clauses ────────────────────────────────────────────────
 
-/// **Clause 1 — a scripted sequence reproduces identical outcomes every run.**
+/// **Clause 1: a scripted sequence reproduces identical outcomes every run.**
 ///
 /// Two fresh rings, one script, and equality of the whole `Outcome` rather than
-/// of a chosen field: a comparison that looked only at `received` would pass
+/// of a chosen field. A comparison that looked only at `received` would pass
 /// for a script whose refusal counts drifted, which is the failure the next
 /// test shows is easy to have.
 #[test]
@@ -74,8 +74,8 @@ fn one_script_run_twice_produces_equal_outcomes() {
 /// **Clause 1, the part a single re-run cannot show.** Ten runs, all equal.
 ///
 /// One repeat can agree by coincidence if the outcome depends on something that
-/// happens to be stable within a process — an allocator address, a `HashMap`
-/// seed. Ten does not prove determinism either, but it is the cheap half of the
+/// happens to be stable within a process, such as an allocator address or a
+/// `HashMap` seed. Ten does not prove determinism either, but it is the cheap half of the
 /// claim; the exhaustive half is loom's.
 #[test]
 fn ten_runs_of_one_script_all_agree() {
@@ -87,16 +87,16 @@ fn ten_runs_of_one_script_all_agree() {
   }
 }
 
-/// **Clause 2 — the fixture decides something a count cannot.**
+/// **Clause 2: the fixture decides something a count cannot.**
 ///
-/// The measurement the crate is built on, and it contradicted the prediction:
-/// the two policies were expected to produce equal counts and different
+/// The measurement the crate is built on, and it contradicted the prediction.
+/// The two policies were expected to produce equal counts and different
 /// delivered records. They produce the opposite. Both rings deliver exactly
 /// `[0, 1, 2, 3]`; the counts differ, and differ in the direction that reads as
 /// *more work done* rather than *records destroyed*.
 ///
-/// `vanished` is the reading that is neither — accepted, minus delivered, minus
-/// still held.
+/// `vanished` is the reading that is neither. It is accepted, minus delivered,
+/// minus still held.
 #[test]
 fn neither_the_count_nor_the_delivered_records_sees_a_drop_alone() {
   let script = Script::new(4).then(Step::PushMany(8)).then(Step::DrainAll);
@@ -130,7 +130,7 @@ fn a_ring_with_room_vanishes_nothing_under_either_policy() {
 
 // ── accounting ────────────────────────────────────────────────────────────
 
-/// Every minted record is accepted, refused, or still staged — never nowhere.
+/// Every minted record is accepted, refused, or still staged, never nowhere.
 ///
 /// Checked across four shapes rather than one, because the interesting failure
 /// is a step that mints without accounting, and only the step that does it
@@ -154,8 +154,8 @@ fn every_minted_record_is_accounted_for() {
 ///
 /// Six slots offered eight records: two refused at the buffer, then the flush
 /// offers six to a four-slot ring and two more are refused there. Both
-/// refusals are separately counted, because they are separately recoverable —
-/// a staging refusal never reached the ring at all.
+/// refusals are separately counted, because they are separately recoverable.
+/// A staging refusal never reached the ring at all.
 #[test]
 fn a_full_staging_buffer_refuses_before_the_ring_is_reached() {
   let script = Script::new(6).then(Step::StageMany(8)).then(Step::Flush).then(Step::DrainAll);
@@ -223,10 +223,10 @@ fn reopening_admits_publications_again() {
 /// **`Reopen` on an already-open ring closes it first, and is still a no-op.**
 ///
 /// `Stopped::reopen` consumes the token proving the ring closed, and
-/// `Shutdown::close` is the only thing that mints one — so there is no way to
+/// `Shutdown::close` is the only thing that mints one. So there is no way to
 /// reopen without closing. In a single-threaded script the window is invisible,
-/// which is precisely why it is pinned here rather than left to be discovered
-/// by a concurrent caller.
+/// which is why this test pins it rather than leaving it for a concurrent caller
+/// to discover.
 #[test]
 fn reopening_an_open_ring_is_observably_a_no_op() {
   let with_reopen = Script::new(2).then(Step::Reopen).then(Step::PushMany(2)).then(Step::DrainAll);
@@ -237,10 +237,11 @@ fn reopening_an_open_ring_is_observably_a_no_op() {
 
 /// A flush into a closed ring is refused as closed, not as full.
 ///
-/// The staged records are still emptied out of the buffer — a flush does not
-/// hold them back on refusal — so they end up counted in `refused_closed` and
-/// in neither the buffer nor the ring. Room in the ring makes the reason
-/// unambiguous: an eight-slot ring taking three records cannot be full.
+/// The flush still empties the staged records out of the buffer, because it
+/// does not hold them back on refusal. So they end up counted in
+/// `refused_closed` and in neither the buffer nor the ring. Room in the ring
+/// makes the reason unambiguous, since an eight-slot ring taking three records
+/// cannot be full.
 #[test]
 fn a_flush_into_a_closed_ring_is_refused_as_closed() {
   let script = Script::new(4).then(Step::StageMany(3)).then(Step::Close).then(Step::Flush);
@@ -276,7 +277,7 @@ fn closing_leaves_published_records_where_they_are() {
   // The method that measures discarding, asserted in the one test whose name
   // claims nothing was discarded. `vanished` subtracts `received + in_ring`
   // from `accepted`, and every other test that reads it leaves `in_ring_at_end`
-  // at zero — where adding that term and subtracting it give the same answer.
+  // at zero, where adding that term and subtracting it give the same answer.
   // This is the only fixture in the suite where the two can disagree.
   assert_eq!(outcome.vanished(), 0, "records held by a closed ring are not destroyed");
 }
@@ -297,7 +298,7 @@ fn the_single_record_steps_match_a_many_of_one() {
 
 /// A receive from an empty ring yields nothing and stops the step early.
 ///
-/// `RecvMany( 10 )` against three records takes three: the step breaks on the
+/// `RecvMany( 10 )` against three records takes three. The step breaks on the
 /// first empty read rather than spinning, so the count is a ceiling.
 #[test]
 fn a_receive_step_stops_at_the_first_empty_read() {
@@ -479,7 +480,7 @@ fn a_script_runs_the_same_against_a_leaked_ring() {
 /// borrowed from a local cannot be moved onto a `'static` closure.
 ///
 /// Ordinary `std` threads here rather than loom's, because this file compiles
-/// without `--cfg loom` — the lifetime is the property under test, and it is
+/// without `--cfg loom`. The lifetime is the property under test, and it is
 /// the same lifetime either runtime demands. The loom model itself is
 /// `tests/exhaustive_test.rs`.
 #[test]
@@ -495,16 +496,16 @@ fn leak_ends_produces_ends_that_can_be_moved_onto_spawned_threads() {
   assert_eq!(draining.join().expect("the drain thread"), Some(7));
 }
 
-// ── the boundaries the findings named ─────────────────────────────────────
+// ── boundary cases ────────────────────────────────────────────────────────
 
 /// `vanished()` answers the healthy `0` for a state no run can produce, and
 /// `audit` is what tells that zero from the real one.
 ///
-/// The subtraction saturates: three records out of a ring that accepted two
+/// The subtraction saturates. Three records out of a ring that accepted two
 /// clamps to `0`, which is the same reading a ring that destroyed nothing
-/// gives. Nothing in the returned struct distinguishes them —
+/// gives. Nothing in the returned struct distinguishes them.
 /// `Anomaly::Overdelivered` is the distinction, and it lives on the other
-/// method. → `docs/data_structure/002` TK11.
+/// method.
 #[test]
 fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
   let outcome = Outcome {
@@ -532,9 +533,9 @@ fn an_outcome_that_delivered_more_than_it_accepted_is_caught() {
 ///
 /// "A caller comparing two runs must supply two rings, not run twice on one."
 /// Run twice on one and the second `Outcome` describes six records in a ring
-/// that accepted three — every field of it individually plausible, the set of
-/// them impossible, and `vanished()` reporting the healthy `0` throughout.
-/// This is the second of TK11's two established routes to that state, and
+/// that accepted three. Every field of it is plausible on its own, the set of
+/// them is impossible, and `vanished()` reports the healthy `0` throughout.
+/// This is the second of the two established routes to that state, and
 /// unlike the hand-built `Outcome` above it needs no cooperation from the
 /// caller beyond a mistake the contract already names.
 #[test]
@@ -559,8 +560,8 @@ fn a_script_run_twice_on_one_ring_produces_an_outcome_that_fails_its_audit() {
 ///
 /// Producer A minted 0, 1, 2 and producer B minted 100, 101; the ring delivered
 /// them in claim order. That is a correct delivery and not an ascending one, so
-/// `audit_received` — the function whose stated reason for existing is the
-/// concurrent case — reports it as an anomaly. → `docs/algorithm/002` TK3.
+/// `audit_received`, the function whose stated reason for existing is the
+/// concurrent case, reports it as an anomaly.
 #[test]
 fn interleaved_producers_pass_only_the_unordered_audit() {
   let delivered = [0, 100, 1, 101, 2];
@@ -596,10 +597,9 @@ fn the_unordered_audit_keeps_the_two_failures_a_ring_can_produce() {
 
 /// A `Many` count far above the ring's capacity is executed in full.
 ///
-/// Nothing clamps it. The termination argument calls each step "bounded by a
-/// constant in the step itself"; the constant is whichever number the caller
-/// wrote, and a ring that refuses everything after the fourth record still
-/// receives all thousand offers. → `docs/data_structure/001` TK10.
+/// Nothing clamps it. Each step is bounded by a constant in the step itself;
+/// the constant is whichever number the caller wrote, and a ring that refuses
+/// everything after the fourth record still receives all thousand offers.
 #[test]
 fn a_many_count_far_above_capacity_is_executed_in_full() {
   let outcome = Script::new(0).then(Step::PushMany(1000)).run(&mut failing_ring(4));
@@ -610,13 +610,14 @@ fn a_many_count_far_above_capacity_is_executed_in_full() {
   assert_eq!(outcome.audit(), Ok(()));
 
   // `RecvMany` is the one that stops early, and only because an empty read
-  // ends its loop — not because the count was checked against anything.
+  // ends its loop, not because anything checked the count.
   let drained = Script::new(0).then(Step::RecvMany(1000)).run(&mut failing_ring(4));
   assert_eq!(drained.received, [] as [u32; 0]);
 }
 
-/// A `Push` landing between a `Stage` and its `Flush` still audits clean —
-/// the ring delivered records in the exact order it accepted them, and a
+/// A `Push` landing between a `Stage` and its `Flush` still audits clean.
+///
+/// The ring delivered records in the exact order it accepted them, and a
 /// lower mint value flushed later must not be reported as an out-of-order
 /// delivery.
 ///
@@ -630,14 +631,14 @@ fn a_many_count_far_above_capacity_is_executed_in_full() {
 ///
 /// Why Not Caught: every existing script either pushed directly with no
 /// staging at all, or staged and flushed with no push interleaved between
-/// them — both keep mint order and push order identical by construction, so
+/// them. Both keep mint order and push order identical by construction, so
 /// no test before this one exercised the one interleaving where they differ.
 ///
 /// Fix Applied: `Outcome` gained a `published` field recording accepted
 /// records in actual push order, populated at both `try_push` call sites in
 /// `Script::run`. `Outcome::audit` now checks `received` against `published`
 /// through `audit_delivery_order`, which compares *positions* in `published`
-/// rather than raw mint values — the reading a mixed script needs.
+/// rather than raw mint values. That is the reading a mixed script needs.
 ///
 /// Prevention: an audit over a fixture's own output must be checked against
 /// what the fixture actually recorded happening, not against a value (mint
@@ -645,7 +646,7 @@ fn a_many_count_far_above_capacity_is_executed_in_full() {
 /// step ordering.
 ///
 /// Pitfall: `audit_received`/`audit_received_unordered` are unchanged and
-/// must stay that way — they are correct for their own documented callers (a
+/// must stay that way. They are correct for their own documented callers (a
 /// `Push`-only script, the loom model's direct `try_push`), where mint order
 /// and push order are the same thing by construction. Do not fold
 /// `audit_delivery_order`'s position-based check back into them; that would

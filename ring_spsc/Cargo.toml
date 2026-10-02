@@ -15,11 +15,11 @@ ring_cursor = { workspace = true }
 ring_slot = { workspace = true }
 ring_types = { workspace = true }
 
-# `tests/spsc_test.rs`'s `exhaustive` module. Only under
+# For `tests/spsc_test.rs`'s `exhaustive` module. Only under
 # `RUSTFLAGS="--cfg loom"`; an ordinary build never sees it and never pays for
-# it. The seam that makes it work is `ring_atomic`'s — it swaps `AtomicSeq` for
-# an instrumented one under the same cfg, so this crate's own code is what gets
-# explored rather than a re-implementation of it.
+# it. It works because `ring_atomic` swaps `AtomicSeq` for an instrumented one
+# under the same cfg, so loom explores this crate's own code, not a
+# re-implementation of it.
 [target.'cfg(loom)'.dev-dependencies]
 loom = { workspace = true }
 

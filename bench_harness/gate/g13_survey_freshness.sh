@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# G13 — every crate's survey findings still describe the crate as it stands.
+# G13. Every crate's survey findings still describe the crate as it stands.
 #
 # G12 replays defects somebody recorded, and `accepted/` subtracts survivors
 # somebody ruled on. Both are claims about a crate at the moment it was swept,
-# and both decay without saying so: a suite that grows an assertion, or a source
+# and both decay without saying so. A suite that grows an assertion, or a source
 # file that gains a branch, changes what a survey would find while changing
-# nothing either directory can see. The checks that catch this do exist — a
-# stale `from` block fails G12, an acceptance matching no survivor exits 3 — but
+# nothing either directory can see. The checks that catch this exist. A stale
+# `from` block fails G12, and an acceptance matching no survivor exits 3. But
 # both run only when a person chooses to sweep. On the gate board a crate last
-# surveyed in March reads exactly like one surveyed this morning.
+# surveyed in March reads the same as one surveyed this morning.
 #
 # This gate is the mechanical half of that question and deliberately only the
 # mechanical half. Whether a survivor is a defect or a decision is a judgement
@@ -23,10 +23,11 @@ assert_declared_crates_exist
 REC_DIR="$DECL/surveyed"
 
 # The same listing `mutant_survey.sh` takes as its restoration guard, reduced to
-# one line — shared via `crate_rs_listing` rather than rewalked here, so the two
-# cannot drift apart and start hashing different file sets. Both halves of it are
-# load-bearing and for different reasons: a changed test may now kill what
-# survived, and a changed source may carry mutations no survey has ever run.
+# one line. Both scripts share it through `crate_rs_listing` instead of
+# rewalking the tree here, so the two cannot drift apart and start hashing
+# different file sets. Both halves of the listing matter, for different reasons.
+# A changed test may now kill what survived, and a changed source may carry
+# mutations no survey has ever run.
 crate_digest() {
   crate_rs_listing "$( crate_dir "$1" )" | sha256sum | awk '{ print $1 }'
 }
@@ -40,9 +41,9 @@ while read -r c; do
     continue
   fi
   want="$( grep -E '^digest:' "$rec" | awk '{ print $2 }' )"
-  # A record with no digest is treated as moved rather than as absent: the file
-  # claims a sweep happened, so reporting it as never-surveyed would understate
-  # what is wrong with it.
+  # A record with no digest counts as moved, not absent. The file claims a sweep
+  # happened, so reporting it as never-surveyed would understate what is wrong
+  # with it.
   [ -n "$want" ] && [ "$want" = "$( crate_digest "$c" )" ] || moved+=( "$c" )
 done < <( family_crates )
 

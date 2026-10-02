@@ -792,10 +792,11 @@ mod threaded {
 
   #[test]
   fn every_record_written_is_dropped_exactly_once() {
-    // `lifecycle/001`'s Cleanup 1 and 2. Neither a leak nor a double free shows
-    // up in any other test in this file. A ring that forgot its records would
-    // pass all twenty-five, and so would one that dropped them twice on a
-    // platform tolerant enough not to abort. The count is the only witness.
+    // The teardown half of `Ring`'s lifecycle section. Neither a leak nor a
+    // double free shows up in any other test in this file. A ring that forgot
+    // its records would pass all twenty-five, and so would one that dropped
+    // them twice on a platform tolerant enough not to abort. The count is the
+    // only witness.
     //
     // Two laps, not one. A single lap would not exercise the overwrite, which is
     // where the interesting failure is. `TypedSlot::set` replacing an occupied
@@ -834,9 +835,9 @@ mod threaded {
 
   #[test]
   fn the_ends_going_out_of_scope_in_either_order_releases_the_storage_once() {
-    // `lifecycle/001`'s Cleanup 2 and `lifecycle/002`'s Cleanup 4 say end drop
-    // order is unspecified, so both orders must be correct, not one correct and
-    // the other untried.
+    // `Ring`'s lifecycle section says the order the ends go out of scope in
+    // cannot matter, so both orders are tried, not one correct and the other
+    // untried.
     //
     // An earlier form of this test called `drop( consumer ); drop( producer );`
     // and clippy's `drop_non_drop` rejected it, correctly and with a point

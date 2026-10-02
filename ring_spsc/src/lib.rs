@@ -152,12 +152,26 @@
 //! in order, with zero loss and no lock in the path, and cites the feature
 //! textually. That citation is the only crate→feature edge the family records.
 //!
-//! Reasoning honed on `ring_mpsc` is conservative in this crate, not the
-//! reverse. A habit formed here, such as treating the producer cursor as a
-//! frontier or a claim as impossible to overtake, is unsafe when carried into
-//! `ring_mpsc`, where more than one producer can be racing the same claim. The
-//! type system stops the opposite mistake (a `ring_mpsc` shape will not compile
-//! here); it stops nothing in this direction.
+//! # Pitfall: what holds here does not carry over to `ring_mpsc`
+//!
+//! **Trap.** Carrying a property of this crate into `ring_mpsc`, where more than
+//! one producer can be racing the same claim. The producer cursor as the
+//! published frontier, a claim that cannot be overtaken, a binding
+//! [`Producer::free_capacity`], and a claim that finishes in a bounded number of
+//! steps all hold here only because there is one producer. None holds there,
+//! and `ring_mpsc`'s module documentation explains why its claim is lock-free
+//! and not wait-free.
+//!
+//! **Failure.** Each one breaks only with more than one producer, so a test run
+//! with one passes. The two crates hand out their ends differently (`split`
+//! here, `ends` then `split` there), so moved code does not compile unchanged,
+//! but moved reasoning raises no error.
+//!
+//! **Mitigation.** Code meant for both rings treats
+//! [`Producer::free_capacity`] as a hint, handles [`RingError::Full`] on every
+//! push, learns what is published from what a drain returns, and does not
+//! assume a push takes a bounded number of steps. The reverse direction is
+//! safe. Reasoning honed on `ring_mpsc` is conservative in this crate.
 
 #![deny(missing_docs)]
 #![allow(unsafe_code)]
@@ -179,6 +193,13 @@ use ring_types::{Capacity, RingError, Seq};
 /// performing this load is the thread that performed the store it is reading
 /// back, and program order already sequences the two. No inter-thread edge is
 /// being established, so none needs to be paid for.
+///
+/// An end moved to another thread breaks the second sentence above. The
+/// loading thread is then not the one that stored. It stays sound because each
+/// end is `Send` and not `Sync`, so the move is the only way to hand it over,
+/// and every safe way to move a value between threads (spawning, joining, a
+/// channel, a mutex) carries the happens-before edge this crate does not
+/// supply.
 ///
 /// Contrast [`ring_cursor::GATING`], the ordering an end reads the *other*
 /// end's cursor with. There the load is what makes the peer's slot writes
@@ -220,6 +241,37 @@ pub const HANDOFF: Ordering = Ordering::Release;
 /// whole precondition.
 ///
 /// [`split`]: Self::split
+///
+/// # Lifecycle: one allocation, derived slot states, and teardown
+///
+/// The slot array is allocated once, in [`new`](Self::new). Nothing a producer
+/// or consumer does allocates, so a long-running ring's memory stays flat and a
+/// borrowed [`Batch`] can never be invalidated by the ring growing.
+///
+/// A slot's state is never stored either. Free, published and drained follow
+/// from comparing a sequence with the two cursors, and claimed means a live
+/// [`Reservation`] holds it. The sequence, not the slot, says which lap a
+/// record belongs to. A slot is writable again the moment the consumer's
+/// commit passes it, with no write to the slot. A reset step there would cost a
+/// store and open a window in which the slot is in neither state.
+///
+/// Neither end has a destructor and neither owns the storage. The ring releases
+/// it when it goes out of scope, which the borrow checker places after both
+/// ends, so the order the ends go out of scope in cannot matter. Dropping one
+/// end leaves the other usable. A consumer whose producer is gone can still
+/// drain everything that was published.
+///
+/// Records still in the ring are dropped with it, on whichever thread drops the
+/// ring. A record left in a slot otherwise goes when a later lap's write
+/// replaces it. [`TypedSlot::set`] hands it back, and [`Producer::try_push`]
+/// drops it there. Leaking them instead would skip the destructor of every
+/// record still in a slot at each teardown, and refusing to drop a non-empty
+/// ring would mean a panic in a destructor.
+///
+/// `every_record_written_is_dropped_exactly_once`,
+/// `the_ends_going_out_of_scope_in_either_order_releases_the_storage_once` and
+/// `a_departed_producer_leaves_the_published_tail_drainable` in
+/// `tests/spsc_test.rs` check the teardown.
 ///
 /// ```
 /// use ring_slot::BytesSlot;
@@ -276,6 +328,10 @@ unsafe impl<S: Send> Sync for Ring<S> {}
 
 impl<S: Slot + Default> Ring<S> {
   /// Allocate a ring of `capacity` slots, with both cursors at zero.
+  ///
+  /// Sequence zero, which is also `Seq::default()`, is therefore the first real
+  /// record, not a sentinel for "no sequence". Code that needs "no sequence"
+  /// says `Option<Seq>`.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -356,6 +412,11 @@ impl<S> Ring<S> {
   /// first pair exists. At no moment do two `Producer` values name one ring.
   /// Neither end is `Clone` and neither is `Sync`, so neither can be
   /// shared with a second thread after the split either.
+  ///
+  /// Once the first pair is gone the ring may be split again, and the cursors
+  /// carry over. The second pair continues where the first stopped, not at zero,
+  /// as `a_second_pair_may_be_split_once_the_first_is_gone` in
+  /// `tests/spsc_test.rs` checks.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -802,6 +863,19 @@ impl<S> Consumer<'_, S> {
   /// [`drain`]: Self::drain
   /// [`is_empty`]: Self::is_empty
   ///
+  /// # Invariant: the reading is a lower bound until this end drains
+  ///
+  /// Only this end lowers the count, and only when a drained batch is dropped.
+  /// The producer only adds to it. A reported `n` therefore stays true until
+  /// this end's next drain, and the real count may already be higher. It
+  /// mirrors [`Producer::free_capacity`], which is binding for the same reason.
+  ///
+  /// **Excluded.** An empty reading, from this or from [`is_empty`], promises
+  /// nothing. The producer can publish the moment after.
+  ///
+  /// **Enforced by.** The structure alone. Each cursor has one writer that
+  /// only moves it forward, and no test exercises the concurrent case.
+  ///
   /// ```
   /// use ring_slot::TypedSlot;
   /// use ring_spsc::Ring;
@@ -1083,6 +1157,10 @@ impl<S> Drop for Batch<'_, S> {
   /// Commit, with the one release store that is the consumer path's entire
   /// synchronization. It is one store for the whole batch, which is why the
   /// API is batch-shaped.
+  ///
+  /// The producer sees the whole batch freed at once. A full ring drained in
+  /// one batch goes from full to empty in a single step, and anything watching
+  /// [`Producer::free_capacity`] never sees the space come back gradually.
   fn drop(&mut self) {
     self
       .ring

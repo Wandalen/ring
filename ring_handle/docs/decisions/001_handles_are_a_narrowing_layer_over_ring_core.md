@@ -11,13 +11,16 @@ What `ring_handle` adds is four narrowings, listed in [`src/lib.rs`](../../src/l
 
 `ring_handle` is one of the five crates on the family's public contract (`ring_types`, `ring_handle`, `ring_tls`,
 `ring_flush`, `ring_factory`). `ring_core` is not. The question was whether four narrowings justify a crate on that
-contract, or whether the handles belong in `ring_core`.
+contract, or whether the handles belong in `ring_core`. What settles it is whether any caller legitimately wants
+`ring_core`'s ends rather than these. If none does, moving the ends out of `ring_core` is right and the duplication
+is pure. If some caller does, the two types serve two populations and keeping both is right.
 
 Two facts bear on it:
 
 - `ring_factory`, the constructor real callers use, returns `ring_handle::Split` from `Factory::build` and
   `Factory::build_crossbeam`, and names no `ring_core` end.
-- No code outside `ring_core` calls `ring_core::Producer::try_clone`. No caller has asked for the wider ends.
+- No code outside `ring_core` calls `ring_core::Producer::try_clone`. `ring_bench` does take `ring_core`'s ends,
+  for the reason given under Consequences.
 
 ## Decision
 
@@ -43,9 +46,12 @@ ends out now would change every crate that names them.
 - A factory-built `ring_handle::Producer` feeds neither `ring_flush::Flusher::new`, which is on the public
   contract, nor `ring_shutdown::Shutdown::guard`. Both take `ring_core::Producer`, and no conversion exists. A
   caller who needs either takes `ring_core`'s ends and gives up all four narrowings. `ring_bench` declares
-  `ring_core` for this reason. This is the population wanting `ring_core`'s ends that the decision assumed did not
-  exist, and a trait for "a producer that can `try_push`" is the missing piece (see
+  `ring_core` for this reason. That is a caller wanting `ring_core`'s ends, which is the evidence for keeping both
+  types rather than moving the ends out, and a trait for "a producer that can `try_push`" is the missing piece (see
   [002](002_handles_have_no_is_closed.md)).
-- Revisit when a caller needs a second producer, such as an MPSC fan-in through `try_clone`. `ring_bench` records
-  the same trigger for its producer ceiling in
+- Revisit whether to forward `try_clone` when a caller of these handles needs a second producer, such as an MPSC
+  fan-in. That withdraws one narrowing, not the layer. `ring_bench` records the same trigger for its producer
+  ceiling in
   [its benchmark-candidates decision](../../../ring_bench/docs/decisions/001_the_in_house_ring_is_three_candidates.md).
+- Revisit moving the ends out of `ring_core` if no caller is left that needs them, for example once `ring_flush` and
+  `ring_shutdown` accept these handles.

@@ -63,8 +63,8 @@ The reason is that `ring_publish` stays testable alone. `ring_claim` is a dev-de
 - Revisit when a claim becomes retractable. A spin budget on `publish` would then have a correct handling for
   exhaustion, which today it lacks.
 - Revisit when payloads grow large enough that waiting on a predecessor's slot write dominates, or `Yield` beats
-  `Spin`. Nothing has measured this. The only multi-producer test, in `tests/handshake_test.rs`, carries a one-word
-  payload.
+  `Spin`. Nothing has measured this. The only tests that write a payload, in `tests/handshake_test.rs`, write one
+  `u64` per slot.
 - Revisit when a tick-path caller appears. A tick has a deadline, and an unbounded spin can miss it.
 - Revisit when a consumer needs contention-tolerant publication and cannot own a stamp array the way `ring_mpsc` does.
   That reopens the exact-frontier refusal argued in [`src/lib.rs`](../../src/lib.rs).

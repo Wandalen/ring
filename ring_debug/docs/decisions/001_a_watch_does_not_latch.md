@@ -1,6 +1,6 @@
 # A `Watch` reports only what it can observe now, and does not latch a violation it has reported
 
-Status: Accepted
+Status: Deferred
 
 ## Context
 
@@ -20,12 +20,15 @@ Two forces pull against each other:
 
 ## Decision
 
+Keep the current behaviour until an investigation shows which way it should go. Both positions are coherent, and
+no-latch is the default because no code was written either way, not because it won.
+
 A `Watch` does not latch. `Watch::observe` returns `Ok` for any reading that is valid against the last accepted
 baseline, whatever it returned before, and that reading becomes the new baseline. The test
 `a_watch_that_faulted_reports_ok_once_the_ring_recovers` pins the transition: a violation, then a valid reading,
 then `Ok`, then ordinary steps that still pass.
 
-This is the stricter reading of what a checker is. The watch reports what it can observe and nothing else. A latch
+Not latching is the stricter reading of what a checker is. The watch reports what it can observe and nothing else. A latch
 would make it claim knowledge of the ring's history that it does not have, and it would need a definition of
 "recovered" that this crate cannot supply.
 

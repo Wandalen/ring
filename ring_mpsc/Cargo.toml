@@ -8,10 +8,8 @@ readme = "readme.md"
 description = "Multi-producer single-consumer ring API"
 publish = true
 
-# Eight, not the seven this manifest was scaffolded with. `ring_publish` and
-# `ring_consume` are gone and `ring_atomic`, `ring_slot` and `ring_types` are
-# new. See decision 124. Publication here is a per-slot stamp this crate owns,
-# so there is no published cursor for either removed crate to act on.
+# No `ring_publish` or `ring_consume`. Publication here is a per-slot stamp this
+# crate owns, so there is no published cursor for either to act on.
 [dependencies]
 ring_atomic = { workspace = true }
 ring_store = { workspace = true }

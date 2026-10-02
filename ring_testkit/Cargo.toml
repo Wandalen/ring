@@ -13,9 +13,8 @@ ring_core = { workspace = true }
 ring_tls = { workspace = true }
 ring_shutdown = { workspace = true }
 
-# `ring_config` is not one of message 960's declared edges. It is a
-# dev-dependency rather than an added one, because `Script::run` takes a ring the
-# caller already built, so the config type appears in no signature here. Only the
+# A dev-dependency, not a dependency. `Script::run` takes a ring the caller
+# already built, so the config type appears in no signature here. Only the
 # tests and doc examples need to build a ring to drive.
 [dev-dependencies]
 ring_config = { workspace = true }
@@ -24,12 +23,11 @@ ring_config = { workspace = true }
 # the vocabulary lives in.
 ring_types = { workspace = true }
 
-# The exhaustive half of feature 188. Only under `RUSTFLAGS="--cfg loom"`. An
+# The exhaustive model. Only under `RUSTFLAGS="--cfg loom"`. An
 # ordinary build never sees it. The model lives in `tests/`, not `src/`, so the
 # scripted fixture stays measurable by a coverage run that does not set the cfg.
 # That placement has a cost. The same cfg-less run does not compile the
-# exhaustive file at all, so a break there still leaves `verb/test` fully green
-# (docs/workaround/002 TK54).
+# exhaustive file at all, so a break there still leaves `verb/test` fully green.
 [target.'cfg(loom)'.dev-dependencies]
 loom = { workspace = true }
 

@@ -10,8 +10,9 @@ publish = true
 
 [features]
 default = []
-# Feature 187: an optional third backend, so consumers needing a working
-# multi-producer channel are not blocked on the in-house ring being finished.
+# An optional third backend, so consumers that need a working multi-producer
+# channel are not blocked on the in-house ring. See
+# docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md.
 crossbeam = [ "dep:crossbeam-queue" ]
 
 [dependencies]

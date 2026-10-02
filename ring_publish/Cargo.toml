@@ -12,9 +12,9 @@ publish = true
 ring_types = { workspace = true }
 ring_cursor = { workspace = true }
 
-# Tests only. `tests/handshake_test.rs` is feature 170's reached-test, which is
-# the whole four-operation handshake, so it needs the other three operations'
-# crates. None of them depends on this one, so the graph stays acyclic.
+# Tests only. `tests/handshake_test.rs` runs the whole four-operation handshake,
+# so it needs the other three operations' crates. None of them depends on this
+# one, so the graph stays acyclic.
 [dev-dependencies]
 ring_claim = { workspace = true }
 ring_consume = { workspace = true }

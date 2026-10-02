@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-#@ purpose: ring_bench-scoped test. Thin wrapper. See verb/readme.md at the workspace root.
-#@ tags: verb, test
-exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/verb/_crate_dispatch" test ring_bench "$@"

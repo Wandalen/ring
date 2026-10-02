@@ -22,7 +22,7 @@ other crates.
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build, described in [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build, described in the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | Scope, related crates, and open trade-offs, indexed in [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 

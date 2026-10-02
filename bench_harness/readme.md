@@ -36,7 +36,7 @@ confirms).
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | Scope, invariants, and open trade-offs. See [docs/readme.md](docs/readme.md) |
 | `gate/` | The stage gates, their per-family declarations, and the runner. See [gate/readme.md](gate/readme.md) |
 | `src/lib.rs` | Crate root. Re-exports the workload generator, accumulator semantics, and byte-parity oracle |

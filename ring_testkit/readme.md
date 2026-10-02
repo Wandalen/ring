@@ -41,7 +41,7 @@ builds the ring however they like and passes it to `run`. That split is why
 
 | Step | Effect |
 |---|---|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `Push` / `PushMany` | Mint a record and publish it through the shutdown guard |
 | `Recv` / `RecvMany` | Take from the consumer end |
 | `Stage` / `StageMany` | Mint into the `TlsBuffer` instead of the ring |

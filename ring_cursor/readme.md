@@ -21,7 +21,7 @@ answers to the same question. This crate holds the cursors that wear it.
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | Scope, related crates, and open trade-offs. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `cursor_test.rs` and the manual plan under `manual/` |

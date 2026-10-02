@@ -39,7 +39,7 @@ RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | Scope, related crates, and closed trade-offs. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | The `Ring`, its two ends, and the two publish/commit guards |
 | `tests/spsc_test.rs` | This crate's reached-test, 26 tests around the public API, and a `loom` model of every interleaving |

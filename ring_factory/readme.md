@@ -36,7 +36,7 @@ producer.try_push( 7 )?;
 
 | Operation | Effect |
 |---|---|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `build` | A config in, the `Split` that owns the ring out |
 | `build_named` | Same, but the ring goes into a registry the caller passes |
 | `build_crossbeam` | A deliberate second door, for the crossbeam backend |

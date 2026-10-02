@@ -49,7 +49,7 @@ RUSTFLAGS="--cfg loom" cargo nextest run -p ring_mpsc exhaustive::   # 2 passed
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | Scope, related crates, and open trade-offs. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | The ring, its two handles, and the two RAII guards that publish and commit |
 | `tests/` | Integration tests and the loom models. [tests/manual/readme.md](tests/manual/readme.md) records what was checked by hand |

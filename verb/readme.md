@@ -6,7 +6,7 @@ do-protocol verb scripts for the `ring` repository, which is one Cargo workspace
 here reaches the whole family directly. No fan-out step exists or is needed.
 
 This is the repo root's `verb/`. Every one of the 34 crates also has its own `verb/`
-(`test`, `test_only`, `lint`, `build`; see e.g. [`../ring_spsc/verb/readme.md`](../ring_spsc/verb/readme.md))
+(`test`, `test_only`, `lint`, `build`)
 for iterating on one crate without touching the other 33. Those are thin wrappers.
 Every crate's `verb/test` is a 4-line file that `exec`s this directory's own
 `_crate_dispatch` with its own crate name baked in. The logic (argument parsing, the

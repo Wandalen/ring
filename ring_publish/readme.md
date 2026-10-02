@@ -44,7 +44,7 @@ earlier. The corpus under
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | 13 doc definitions, 26 instances, 46 findings. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `publish_test.rs`, the handshake's `handshake_test.rs`, and the manual plan under `manual/` |

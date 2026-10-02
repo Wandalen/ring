@@ -39,7 +39,7 @@ cargo tree -p ring_poll | grep -c ring_wait   # 0 — the point of the crate
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | 11 doc instances across 9 definitions. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | The budget, the progress verdict, four bounded helpers, and the tick that accumulates them |
 | `tests/poll_test.rs` | This crate's reached-test and 21 tests across the public API |

@@ -32,7 +32,7 @@ those two decisions and what they cost.
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build, described in [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build, described in the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | 13 doc definitions, 26 instances, 24 findings, indexed in [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `wait_test.rs` and the manual plan under `manual/` |

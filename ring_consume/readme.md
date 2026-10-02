@@ -40,7 +40,7 @@ and ranks it by severity.
 
 | File | Responsibility |
 |------|-----------------|
-| `verb/` | Crate-scoped test/lint/build. See [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/` | The design corpus of 13 definitions, 26 instances and 54 findings. See [docs/readme.md](docs/readme.md) |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `consume_test.rs` and the manual plan under `manual/` |

@@ -35,7 +35,7 @@ print!( "{}", comparison.report() );
 
 | Type | Responsibility |
 |---|---|
-| `verb/` | Crate-scoped test/lint/build; see [verb/readme.md](verb/readme.md) |
+| `verb/` | Crate-scoped test/lint/build; see the workspace [verb/readme.md](../verb/readme.md) |
 | `Workload` | One description of capacity, producers, records, batch, accumulator cells, and `Set`/`Delta` semantics, run identically against every candidate |
 | `Candidate` | The five (six with `crossbeam`) write paths under comparison |
 | `Outcome` | What one candidate did with one workload: offered, reported, received, timed, and folded into an accumulator table |

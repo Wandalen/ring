@@ -285,8 +285,8 @@ fn an_unguarded_producer_publishes_straight_through_a_close() {
 /// Draining a ring that holds more than one batch still empties it.
 ///
 /// `try_recv_batch` returns one batch, so `drain_all` must loop. A ring filled
-/// and partly drained twice leaves records on both sides of a wrap, which a
-/// single-batch drain would leave behind.
+/// and partly drained twice leaves records on both sides of a wrap. At SPSC a
+/// single batch already spans the wrap, so this pins the result, not the loop.
 #[test]
 fn drain_all_loops_until_the_ring_is_actually_empty() {
   let mut ring = ring(4);

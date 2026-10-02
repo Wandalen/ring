@@ -20,8 +20,7 @@
 //! [`Shutdown::guard`] is the mitigation. A [`Guarded`] producer checks before
 //! every push and cannot skip the check. A caller holding a raw `ring_core::Producer`,
 //! though, publishes into a closed ring without complaint. That is the one
-//! guarantee this crate makes by convention rather than by construction, and it is
-//! why `drain_all` terminates *eventually* rather than *immediately*. See
+//! guarantee this crate makes by convention rather than by construction. See
 //! `docs/decisions/001_stopped_tokens_and_into_inner_wait_for_a_real_caller.md`.
 //!
 //! Acceptance is binary and lives in a test. The feature is Reached when a
@@ -133,6 +132,24 @@ impl Shutdown {
   /// The wrapper is the difference between a rule and a guarantee. A caller
   /// holding a [`Guarded`] cannot publish into a closed ring, because the only
   /// push it has performs the check.
+  ///
+  /// # Invariant: a guarded push that sees the close publishes nothing
+  ///
+  /// Every [`Guarded`] push reads the flag before it touches the ring, and
+  /// refuses once that read sees the ring closed.
+  ///
+  /// **Excluded.** A push already past its read when [`Shutdown::close`] runs.
+  /// The read and the publish are two steps, and nothing stops a close from
+  /// landing between them, so that push publishes after the close returns.
+  /// [`Guarded::try_push`] publishes its one record. [`Guarded::try_push_batch`]
+  /// reads the flag once, before its first record, so it publishes the rest of
+  /// its batch. [`Stopped::drain_all`] does not wait for those pushes. One that
+  /// lands after the drain's last batch stays in the ring, so a caller that
+  /// needs every record stops its producers before draining.
+  ///
+  /// **Enforced by.** `a_guarded_producer_refuses_a_closed_ring_and_returns_the_record`
+  /// and `a_closed_batch_push_consumes_nothing`, for pushes that start after the
+  /// close. No test races a push against a close.
   pub const fn guard<'a, T>(&'a self, producer: Producer<'a, T>) -> Guarded<'a, T> {
     Guarded {
       producer,
@@ -185,6 +202,18 @@ impl<'a> Stopped<'a> {
   /// Returns how many were recovered. Loops until a batch comes back empty,
   /// which terminates because publication has stopped. The crate docs describe
   /// the one case where it does not.
+  ///
+  /// # Algorithm: drain until a batch comes back empty
+  ///
+  /// One [`Consumer::try_recv_batch`] is not a drain. A batch holds only what
+  /// was published when it began, so a guarded push still in flight at the
+  /// close (see [`Shutdown::guard`]) lands after it and waits for the next
+  /// batch. Nothing reports the leftover, and a single call returns a plausible
+  /// count on a ring that is not empty. Repeating until a batch comes back empty
+  /// collects what lands while the drain runs. It does not wait for a push that
+  /// has not landed, and at MPSC a batch stops at a slot claimed but not yet
+  /// published, so the return means the last batch found nothing, not that
+  /// nothing can still arrive.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -412,11 +441,10 @@ impl<'a, T: Send> Guarded<'a, T> {
   /// Publish from `records` until one is refused, and return the count
   /// [`Producer::try_push_batch`] returns.
   ///
-  /// Stops at the first refusal of either kind. A closed ring accepts nothing,
-  /// so this returns `0` without consuming from the iterator. It checks before
-  /// the first read. Past that check this is `Producer::try_push_batch`, and its
-  /// pitfall applies unchanged. The count is not the number of records kept, and
-  /// under `Fail` the refused record is destroyed.
+  /// Checks the flag once, before the first read. A closed ring accepts nothing,
+  /// so this returns `0` without consuming from the iterator, and a close during
+  /// the batch does not stop it. Past that check this is
+  /// `Producer::try_push_batch`, and its pitfall applies unchanged.
   pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
     if self.shutdown.is_closed() {
       return 0;
@@ -469,6 +497,19 @@ impl<'a, T: Send> Guarded<'a, T> {
   }
 
   /// Give up the guarantee and take the raw producer back.
+  ///
+  /// # Pitfall: the raw producer outlives the reason it was taken
+  ///
+  /// **Trap.** Unwrapping a guard for one call that needs a raw `Producer`,
+  /// such as a helper with a `Producer` parameter, and keeping the result.
+  ///
+  /// **Failure.** The raw producer publishes into a closed ring. While it keeps
+  /// publishing, a [`Stopped::drain_all`] at teardown may never end, and the hang
+  /// shows up far from the unwrap that caused it.
+  ///
+  /// **Mitigation.** Use the raw producer and drop it in the same scope. Where
+  /// it has to live longer, call [`Shutdown::admit`] before each push, and drain
+  /// with [`Stopped::drain_all_bounded`], which gives up instead of hanging.
   pub fn into_inner(self) -> Producer<'a, T> {
     self.producer
   }
@@ -542,7 +583,9 @@ pub fn wait_for_close(shutdown: &Shutdown, kind: WaitKind, spins: usize) -> Resu
 ///
 /// This is `ring_wait::for_space` with a second exit. The return value says
 /// which exit the wait took, so a producer can tell "room appeared" from
-/// "stop". A bare `Ok` would merge those two outcomes.
+/// "stop". A bare `Ok` would merge those two outcomes. The `Wake` takes the
+/// place of the attempt count that [`wait_for_close`] passes on, so a caller
+/// sizing `spins` for this wait gets no reading of how many it used.
 ///
 /// # Errors
 ///
@@ -589,6 +632,23 @@ pub fn for_space_or_close(pair: &CursorPair, shutdown: &Shutdown, kind: WaitKind
 /// go somewhere would need the caller to supply a sink at teardown, which is
 /// the moment they least want one. A caller who wants the remainder calls
 /// [`Shutdown::close`] and [`Stopped::drain_all`] and then reopens.
+///
+/// # Invariant: a reset ring behaves as a fresh one
+///
+/// Afterwards the ring reads as empty, accepts a full capacity again and no
+/// more, and delivers in the order a fresh ring of the same backend does. On an
+/// empty ring it returns `0` and ends open, as it does from any start, so a
+/// test fixture can call it in both setup and teardown.
+///
+/// **Excluded.** Cursors and sequence numbers do not return to zero. They keep
+/// counting from where the discard left them, so anything that records
+/// sequence numbers sees them continue rather than restart.
+///
+/// **Enforced by.** `the_three_operations_hand_back_a_ring_fit_for_the_next_run`
+/// compares a ring taken through close, drain and reopen with a fresh one under
+/// the same script. That path drains where `reset` discards, and
+/// `reset_discards_and_leaves_the_ring_open` checks the count, the flag and
+/// that the ring reads as empty. Both tests run on the SPSC backend only.
 ///
 /// ```
 /// use ring_config::RingConfig;

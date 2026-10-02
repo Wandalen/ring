@@ -1,7 +1,7 @@
 # Full family gate suite. Slow, but an honest signal.
 #
-# Runs `bench_harness/gate/run_all.sh --family ring` (g1-g22) in full, exactly
-# as `verb/gate` does locally. Failures go red. The workflow never runs on
+# Runs `bench_harness/gate/run_all.sh --family ring`, every gate listed in
+# `bench_harness/gate/declared/ring/gates.txt`, exactly as `verb/gate` does locally. Failures go red. The workflow never runs on
 # PRs, so a failure blocks nothing, but the Gates badge must mean something.
 # Fast per-push verification lives in `ci.yml`.
 #

@@ -571,14 +571,12 @@ impl<T: Send> Consumer<'_, T> {
 
   /// How many records are waiting, at least.
   ///
-  /// A lower bound: it may grow between this read and the next drain. It never
-  /// shrinks on its own, since this is the only consumer.
-  ///
-  /// **Binding at SPSC, advisory at MPSC and crossbeam.** This is the mirror
-  /// image of [`Producer::free_capacity`](Producer::free_capacity), asymmetric
-  /// for the same reason. Against one producer the reading cannot move under
-  /// you, against several it can. Let [`try_recv`](Self::try_recv) be the
-  /// authority, which is always correct.
+  /// A lower bound on every backend: it may grow between this read and the
+  /// next drain. It never shrinks on its own, since this is the only consumer
+  /// and producers only add. Unlike
+  /// [`Producer::free_capacity`](Producer::free_capacity), the reading does not
+  /// depend on the backend. Let [`try_recv`](Self::try_recv) be the authority,
+  /// which is always correct.
   #[must_use]
   pub fn len(&self) -> usize {
     match &self.inner {
@@ -591,8 +589,9 @@ impl<T: Send> Consumer<'_, T> {
 
   /// Whether nothing is waiting, by the same reading as [`len`](Self::len).
   ///
-  /// **Binding at SPSC, advisory at MPSC and crossbeam.** A reported `true`
-  /// can be false the instant a producer on another thread publishes.
+  /// A reported `false` holds until this consumer drains. A reported `true` can
+  /// be false the instant a producer on another thread publishes, on every
+  /// backend.
   #[must_use]
   pub fn is_empty(&self) -> bool {
     self.len() == 0

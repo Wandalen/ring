@@ -10,7 +10,9 @@ editing call sites.
 
 `ring_core::Producer::free_capacity` cannot mean the same thing on all three. At SPSC a reported `n` is binding.
 Nothing else can take the room, so `n` pushes will succeed. At MPSC and crossbeam another producer can take the room
-between the read and the push. `Producer::is_full`, `Consumer::len` and `Consumer::is_empty` carry the same split.
+between the read and the push. `Producer::is_full` carries the same split. The consumer side does not. The ring has
+one consumer and producers only add, so `Consumer::len` is a lower bound on every backend, and a reported
+`Consumer::is_empty` of `true` can turn false on any backend the moment a producer publishes.
 
 A caller can learn which contract applies from `Producer::try_clone`, which returns `None` at SPSC and `Some`
 elsewhere, or from `Ring::backend`. No library code in the family asks. Outside `ring_core`, no `src/` file calls
@@ -25,7 +27,7 @@ Keep one plain signature until a caller shows which reading it needs. This is th
 the SPSC guarantee is worth what it costs.
 
 - `free_capacity`, `is_full`, `Consumer::len` and `Consumer::is_empty` keep one plain signature on every backend.
-  Each method's documentation states the split and names the authority, `Producer::try_push` for the producer and
+  Each method's documentation states its reading and names the authority, `Producer::try_push` for the producer and
   `Consumer::try_recv` for the consumer.
 - `Producer::try_clone` is the discriminator, and there is no cardinality type. `if let Some(p) = producer.try_clone()`
   makes the check and the action one step, so they cannot disagree. `Producer` is not `Clone`, because

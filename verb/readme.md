@@ -36,6 +36,8 @@ prints the command(s) the verb would run without running them.
 
 ### Why `test` is leveled
 
-Each level adds slower checks to the one below it, so a quick run can stop at
-nextest and a final run goes all the way to the gate suite (`level::5` runs
-`gate` internally).
+The levels mirror the `will .test level::N` ladder this repo was asked to
+follow, from nextest alone at level 1 up to nextest, doctests, clippy, udeps and
+audit. That ladder's level 5 adds `will .test dry:0`, a self-check of the `will`
+tool with no equivalent here, so this repo runs the family's gate suite in its
+place (`level::5` runs `gate` internally).

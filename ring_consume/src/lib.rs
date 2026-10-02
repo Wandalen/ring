@@ -1,12 +1,13 @@
 //! Single-consumer available-range computation and commit.
 //!
-//! Tier 5 of the ring family's 33 crates — the concurrency write-path implementation.
+//! Tier 5 of the ring family's 33 crates, which implement the concurrency write-path.
 //! Depends on `ring_types`, `ring_cursor`, `ring_barrier`, `ring_seqno`.
 //!
-//! The consumer's two operations in
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`: what may be
-//! read, and saying it has been. The feature's reached-test wires all four
-//! operations together in `ring_publish/tests/handshake_test.rs`.
+//! This crate holds the consumer's two operations in
+//! `docs/feature/170_claim_publish_available_commit_handshake.md`. One says what
+//! may be read, the other reports that it has been read. The feature's
+//! reached-test wires all four operations together in
+//! `ring_publish/tests/handshake_test.rs`.
 //!
 //! ## Why `available` and `commit` are separate calls
 //!
@@ -14,56 +15,56 @@
 //! the producer must not overwrite, and the only thing preventing that is that
 //! its cursor has *not* advanced yet. An `available_and_commit` that did both
 //! would advance the cursor before the caller had read a byte, which frees
-//! those slots for the producer while they are still being read — the exact
-//! corruption the gating set exists to prevent, reintroduced above it.
+//! those slots for the producer while they are still being read. That is the
+//! exact corruption the gating set exists to prevent, reintroduced above it.
 //!
-//! The split is what makes the dangerous window explicit: everything between
-//! the two calls is a read of borrowed slots.
+//! The split makes the dangerous window explicit. Everything between the two
+//! calls is a read of borrowed slots.
 //!
-//! The window's own alternative — a guard whose `Drop` performed the commit,
-//! `fn read( &self ) -> ReadGuard< '_ >` — would close it instead of merely
-//! naming it, and has real costs of its own: it forces a scope, it makes an
-//! early commit impossible rather than merely wrong, and it does not compose
-//! with a caller that wants to commit part of a run. Those costs are why
-//! `available` returns a plain `Copy` value instead.
+//! The alternative is a guard whose `Drop` performs the commit,
+//! `fn read( &self ) -> ReadGuard< '_ >`. It would close the window instead of
+//! only naming it, but it has costs of its own: it forces a scope, it makes an
+//! early commit impossible rather than only wrong, and it does not compose with
+//! a caller that wants to commit part of a run. Those costs are why `available`
+//! returns a plain `Copy` value instead.
 //!
 //! ## Why commit is monotonic and clamped
 //!
 //! [`Consumer::commit`] refuses to move backwards and refuses to move past what
-//! is available. Both refusals matter for the same reason and neither is
-//! defensive programming.
+//! is available. Both refusals matter for the same reason. Neither is defensive
+//! programming.
 //!
 //! Moving backwards re-reads slots the producer has already been told it may
 //! reuse. Moving past `available` tells the producer that slots the consumer
-//! has not read are free — and the producer will believe it, because the
-//! consumer cursor *is* the gating signal. A consumer that over-commits is
-//! indistinguishable, from the producer's side, from one that read faster.
+//! has not read are free. The producer will believe it, because the consumer
+//! cursor *is* the gating signal. From the producer's side, a consumer that
+//! over-commits looks the same as one that read faster.
 //!
 //! ## Why this is single-consumer
 //!
-//! One cursor, no compare-exchange, plain stores. Two consumers sharing a
-//! [`Consumer`] would each advance the same cursor and each believe they had
-//! read what the other did. Fanning out to several independent consumers is a
-//! matter of giving each its own cursor in the gating set — which is what
+//! The crate uses one cursor and plain stores, with no compare-exchange. Two
+//! consumers sharing a [`Consumer`] would each advance the same cursor and each
+//! believe they had read what the other did. To fan out to several independent
+//! consumers, give each its own cursor in the gating set. That is what
 //! `ring_gating::GatingSet` already is, and why this crate does not need to
 //! know about it.
 //!
 //! Nothing in the type system enforces this. [`Consumer::new`] takes a
 //! `&PaddedCursor`, so calling it twice over the *same* cursor compiles
-//! cleanly — two [`Consumer`]s, each believing it owns the only view, each
-//! computing an available run that overlaps the other's, each committing over
-//! the other. That is the premise's exact failure mode, reachable in two
-//! lines of safe code, and no check in this crate or the family reports it.
+//! cleanly. The result is two [`Consumer`]s. Each believes it owns the only
+//! view, each computes an available run that overlaps the other's, and each
+//! commits over the other. That is the premise's exact failure mode. Two lines
+//! of safe code reach it, and no check in this crate or the family reports it.
 //!
 //! ## Why the cursor is borrowed rather than owned
 //!
 //! [`Consumer::new`] takes a `&PaddedCursor` from somewhere else, and the
 //! somewhere else is almost always a producer's `ring_gating::GatingSet`. That
-//! is the whole mechanism: the producer decides what it may overwrite by
-//! reading the cursors in its set, so a consumer whose position lived in a
-//! cursor it owned privately would be invisible to the producer and gate
-//! nothing. A ring wired that way runs, passes every single-threaded test, and
-//! overwrites unread slots on the first lap.
+//! is the whole mechanism. The producer decides what it may overwrite by
+//! reading the cursors in its set. A consumer whose position lived in a cursor
+//! it owned privately would gate nothing, because the producer never reads
+//! that cursor. A ring wired that way runs, passes every single-threaded test,
+//! and overwrites unread slots on the first lap.
 
 #![deny(missing_docs)]
 
@@ -73,7 +74,7 @@ use ring_types::{RingError, Seq};
 
 /// The ordering a commit is made visible at.
 ///
-/// `Release`, paired with the producer's `Acquire` gating read: the producer
+/// `Release`, paired with the producer's `Acquire` gating read. The producer
 /// must not observe this consumer's advance before the reads that justified it.
 /// A `Relaxed` store here lets the producer see freed slots and overwrite them
 /// while the reads that freed them are still in flight.
@@ -81,7 +82,7 @@ const COMMIT: core::sync::atomic::Ordering = core::sync::atomic::Ordering::Relea
 
 /// A contiguous run of sequences a consumer may read.
 ///
-/// Half-open, like `ring_claim::Claim`, and for the same reason: `end` is
+/// Half-open, like `ring_claim::Claim`, and for the same reason. `end` is
 /// directly the sequence to commit once the run has been read.
 ///
 /// ```
@@ -125,7 +126,7 @@ impl Available {
     self.start
   }
 
-  /// One past the last readable sequence — the value to commit.
+  /// One past the last readable sequence, which is the value to commit.
   ///
   /// ```
   /// use ring_consume::Available;
@@ -206,9 +207,9 @@ pub struct Consumer<'a> {
 impl<'a> Consumer<'a> {
   /// A consumer reporting into `cursor`, bounded by `barrier`.
   ///
-  /// `cursor` is not reset: a consumer built over a cursor that has already
-  /// advanced resumes from there, which is what makes it safe to construct one
-  /// around a position the producer is already gating on.
+  /// `cursor` is not reset. A consumer built over a cursor that has already
+  /// advanced resumes from there, which makes it safe to construct one around a
+  /// position the producer is already gating on.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -227,16 +228,16 @@ impl<'a> Consumer<'a> {
     Self { cursor, barrier }
   }
 
-  /// The cursor this consumer reports into — the one a producer gates on.
+  /// The cursor this consumer reports into, which is the one a producer gates on.
   ///
   /// The producer reads this to decide what it may overwrite, which is why
   /// [`commit`] is the only thing that advances it.
   ///
   /// The returned reference is a full [`SeqCell`], so it also permits a
-  /// direct `store` — which bypasses `commit`'s guard entirely, along with
-  /// every guarantee this type provides. The only sound reason to call this
-  /// accessor is to assert wiring identity, as the doctest below does with
-  /// `ptr::eq`; never to write through it.
+  /// direct `store`. That store bypasses `commit`'s guard and every guarantee
+  /// this type provides. The only sound reason to call this accessor is to
+  /// assert wiring identity, as the doctest below does with `ptr::eq`. Never
+  /// write through it.
   ///
   /// [`commit`]: Self::commit
   ///
@@ -296,10 +297,10 @@ impl<'a> Consumer<'a> {
 
   /// The run of sequences readable right now.
   ///
-  /// Empty when the consumer has caught up. Never includes a claimed-but-
-  /// unpublished slot, because the barrier is built over the *published*
-  /// cursor — which is the whole of feature 170's first clause, and is a
-  /// property of what the barrier was pointed at rather than of this function.
+  /// Empty when the consumer has caught up. Never includes a
+  /// claimed-but-unpublished slot, because the barrier is built over the
+  /// *published* cursor. That is the whole of feature 170's first clause. It is
+  /// a property of what the barrier was pointed at, not of this function.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -353,15 +354,15 @@ impl<'a> Consumer<'a> {
 
   /// Report that everything before `through` has been read.
   ///
-  /// Frees those slots for the producer, so it must be called only after the
-  /// reads are done — see the module documentation on the window between
-  /// [`available`] and here.
+  /// Frees those slots for the producer, so call it only after the reads are
+  /// done. See the module documentation on the window between [`available`]
+  /// and here.
   ///
   /// [`available`]: Self::available
   ///
   /// # Errors
   ///
-  /// [`RingError::Empty`] when `through` is past what is available: the
+  /// [`RingError::Empty`] when `through` is past what is available, because the
   /// consumer would be freeing slots it has not read. [`RingError::Empty`] also
   /// when `through` is behind the current position, which would re-read slots
   /// the producer has already been cleared to reuse.
@@ -384,7 +385,7 @@ impl<'a> Consumer<'a> {
   /// assert_eq!( consumer.commit( Seq( 2 ) ), Err( RingError::Empty ), "backwards" );
   /// ```
   ///
-  /// The ordinary call site never takes the error arm shown above: a value
+  /// The ordinary call site never takes the error arm shown above. A value
   /// read from [`available`] is always still in range when it reaches
   /// `commit`, because between the two calls the run can only grow.
   ///
@@ -418,7 +419,7 @@ impl<'a> Consumer<'a> {
   /// Commit everything currently available, and report how far that reached.
   ///
   /// Call this only when the whole available run has been read. After a
-  /// partial read, use [`commit`]`( first_unread )` instead — committing
+  /// partial read, use [`commit`]`( first_unread )` instead. Committing
   /// everything here tells the producer that slots which were never read are
   /// free to overwrite.
   ///
@@ -439,13 +440,13 @@ impl<'a> Consumer<'a> {
   /// assert_eq!( consumer.commit_available(), Seq( 6 ) );
   /// assert_eq!( consumer.position(), Seq( 6 ) );
   /// ```
-  // Duplicates `commit`'s store rather than delegating to it: `run.end()` is
+  // Duplicates `commit`'s store rather than delegating to it. `run.end()` is
   // always inside `commit`'s accepted range, so delegating would mean either
   // discarding an unreachable `Err` (`unwrap_or`, itself a smell) or changing
   // this function's return type to `Result` for an error that can never
-  // occur. Two stores, kept in step by hand, was judged the smaller cost —
-  // which means anything added to `commit` later (a debug assertion, a
-  // counter, a trace hook) must be added here too, by hand.
+  // occur. Two stores, kept in step by hand, was judged the smaller cost. So
+  // anything added to `commit` later (a debug assertion, a counter, a trace
+  // hook) must be added here too, by hand.
   pub fn commit_available(&self) -> Seq {
     let run = self.available();
     let end = run.end();

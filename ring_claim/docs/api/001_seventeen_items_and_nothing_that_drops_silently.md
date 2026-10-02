@@ -60,8 +60,9 @@ pub struct Claimer< 'a >
 | `Claim::sequences` | `:205` | — | — (see below) | ✔ | — |
 | `Claim::overlaps` | `:226` | ✔ | ✔ | ✔ | — |
 | `Claimer` | `:257` | — | — | ✔ | — |
-| `Claimer::new` | `:276` | — | ✔ | ✔ | — |
-| `Claimer::cursor` | `:315` | ✔ | ✔ | ✔ | — |
+| `Claimer::new` | `:287` | — | ✔ | ✔ | — |
+| `Claimer::borrowed` | `:332` | — | ✔ | ✔ | — |
+| `Claimer::cursor` | `:373` | ✔ | ✔ | ✔ | — |
 | `Claimer::consumers` | `:331` | ✔ | ✔ | ✔ | — |
 | `Claimer::claimed` | `:354` | — | ✔ | ✔ | **✔** load |
 | `Claimer::headroom` | `:382` | — | ✔ | ✔ | **✔** load, via the gate |
@@ -71,6 +72,17 @@ pub struct Claimer< 'a >
 Seventeen items, seventeen doctests — one per item, no item without one and no
 item with two — `#![ deny( missing_docs ) ]` at `:64`, nine
 `const fn`, no `unsafe`, and no `std::` path anywhere in the file.
+
+**An eighteenth item arrived on 2026-10-02, and this census keeps its snapshot
+rather than renumbering itself.** `Claimer::borrowed(consumers, cursor)` — a
+claimer over a cursor cell its caller owns — is the constructor the
+claim-cursor-in-the-ring fix needed (`ring_mpsc`'s `ends()` builds each
+generation's claimer over the ring's own cell, so a grant persists across
+generations instead of restarting at zero; the defect and its repro are
+`ring_mpsc`'s `pitfall/003`). It carries its own doctest and `#[ must_use ]`
+annotation, touches no atomic directly, and leaves everything the table
+asserts about the seventeen true. The line numbers above are the snapshot's;
+the file has moved since, and the movement is recorded rather than folded in.
 
 ### CL11 — Four Items Carry No `#[ must_use ]`, and All Four Are Already Covered by Their Return Type
 

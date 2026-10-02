@@ -34,7 +34,7 @@ must go the opposite way.
 |-------|------|---------|
 | `slots` | Fixed-capacity array of payload cells — `UnsafeCell<[ MaybeUninit< T >; CAPACITY ]>`-shaped, densely packed with no per-cell padding | The claimed-and-written region; a producer owns exactly one cell for exactly one lap (→ [Claim-Then-Publish Slot Acquisition](../algorithm/001_claim_then_publish.md) Steps 2–3) |
 | `stamps` | One atomic sequence stamp per slot — `AtomicSeq`, deliberately **unpadded** | The publication token *and* the lap discriminator; a slot's stamp equals the sequence number published into it, never a boolean. Padding it would cost 64× the payload array |
-| `producer_cursor` | `AtomicSeq`, cache-line padded, alone on its line | The claim counter every producer exchanges against; monotonic, never decreasing, never reset. Owned by `ring_claim`'s `Claimer` rather than by `Ring` directly |
+| `producer_cursor` | `AtomicSeq`, cache-line padded, alone on its line | The claim counter every producer exchanges against; monotonic, never decreasing, never reset. The cell is owned by `Ring` — so a claim grant persists across `ends()` generations — and moved only by `ring_claim`'s `Claimer`, which each `ends()` builds over it |
 | `consumer_cursor` | `AtomicUsize`, cache-line padded, on a **different** line from `producer_cursor` | How far the single consumer has drained; also the signal that releases slots for reuse |
 
 #### Why the stamp is a sequence number, not a ready flag

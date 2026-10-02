@@ -288,11 +288,17 @@ pub const OWN: Ordering = Ordering::Relaxed;
 
 /// A ring many threads write and one thread reads.
 ///
-/// Three fields: the slot array, one stamp per slot, and the gating set holding
-/// the single consumer cursor. The claim cursor is not here — it belongs to the
-/// [`Claimer`] that [`ends`] constructs, because `Claimer` borrows the gating
-/// set it checks headroom against and a struct cannot hold both halves of that
-/// borrow.
+/// Four fields: the slot array, one stamp per slot, the gating set holding
+/// the single consumer cursor, and the claim cursor. The claim cursor lives
+/// here rather than inside the [`Claimer`] that [`ends`] constructs, because
+/// a claimer is built fresh per `ends` call and a cursor that started at
+/// zero every time would hand the second generation's producers sequences
+/// the first generation had already moved past — records pushed through
+/// them answer `Ok` and are never delivered. Owned by the ring, the cell
+/// persists: each `ends` builds its claimer over the same cell, which
+/// continues from wherever the previous generation stopped. `Claimer` still
+/// borrows the gating set it checks headroom against — one ring, two
+/// borrows, no self-reference.
 ///
 /// [`ends`]: Self::ends
 ///
@@ -334,6 +340,11 @@ pub struct Ring<S> {
   /// stores on one line rather than a contended loop.
   stamps: Box<[AtomicSeq]>,
   consumers: GatingSet,
+  /// The claim cursor, owned by the ring so a claim grant persists across
+  /// `ends` generations. On its own cache line — it is the line every
+  /// producer's compare-exchange moves, and it must not share one with the
+  /// consumer cursor those exchanges read.
+  claim_cursor: PaddedCursor,
 }
 
 // SAFETY: `Ring` is shared as the `&Ring` held by any number of `Producer`s and
@@ -374,6 +385,7 @@ impl<S: Slot + Default> Ring<S> {
       slots: Buffer::new(capacity),
       stamps,
       consumers: GatingSet::new(capacity, 1),
+      claim_cursor: PaddedCursor::default(),
     }
   }
 
@@ -542,10 +554,18 @@ impl<S> Ring<S> {
 
   /// The ends, to be split and moved onto threads.
   ///
-  /// Two steps rather than one because [`Claimer`] borrows the [`GatingSet`] it
-  /// checks headroom against, and a `Ring` holding both would be
-  /// self-referential. `&mut self` is what makes the claim cursor unique: there
-  /// is no moment at which two `Ends` name one ring.
+  /// Two steps rather than one because [`Claimer`] borrows the [`GatingSet`]
+  /// it checks headroom against and the [`PaddedCursor`] it exchanges — one
+  /// ring, two borrows, no self-reference. `&mut self` is what keeps the
+  /// claim cursor single-owner: there is no moment at which two `Ends` name
+  /// one ring.
+  ///
+  /// The claim cursor is the ring's own cell, not a fresh one: a claimer
+  /// built here continues from wherever the previous generation's claimer
+  /// stopped. Before the cell moved into the ring, a second `ends` on a used
+  /// ring started its producers back at sequence zero under a consumer
+  /// cursor that had moved on — pushes answered `Ok` and were never
+  /// delivered (→ [`pitfall/003`](../docs/pitfall/003_a_fresh_ends_restarted_the_claim_cursor.md)).
   ///
   /// ```
   /// use ring_mpsc::Ring;
@@ -561,7 +581,7 @@ impl<S> Ring<S> {
 
     Ends {
       ring: shared,
-      claimer: Claimer::new(&shared.consumers),
+      claimer: Claimer::borrowed(&shared.consumers, &shared.claim_cursor),
     }
   }
 

@@ -611,6 +611,84 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
+  // Claim-cursor persistence — a second `ends` continues, never restarts.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// A second `ends()` continues the claim cursor from the first generation's
+  /// watermark.
+  ///
+  /// The claim cursor is the ring's own cell: each `ends()` builds its
+  /// claimer over the same cell, so the second generation's first claim is
+  /// the sequence after the first generation's last, not zero.
+  #[test]
+  fn a_second_ends_continues_the_claim_cursor_rather_than_restarting_it() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      for value in 1..=3 {
+        producer.push(value).expect("room");
+      }
+      drop(consumer.drain());
+    }
+    // The first generation's claim cursor stands at 3, its consumer at 3.
+
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      let reserved = producer.claim().expect("room");
+      assert_eq!(
+        reserved.sequence(),
+        Seq(3),
+        "the second generation continues from the first's watermark"
+      );
+      drop(reserved); // publishes an empty slot at sequence 3
+      producer.push(7).expect("room"); // sequence 4
+
+      let mut batch = consumer.drain();
+      assert_eq!(batch.len(), 2, "the whole grant is published, empty slot included");
+      assert_eq!(batch.get(0).and_then(TypedSlot::get), None);
+      assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(7));
+    }
+  }
+
+  /// The defect the persistence fixes, kept as a regression test: before the
+  /// claim cursor moved into the ring, a push through a second `ends()`
+  /// answered `Ok` at sequence zero under a consumer that had moved past it —
+  /// accepted, published into a slot the consumer never rescanned, and never
+  /// delivered.
+  #[test]
+  fn a_record_pushed_through_a_second_ends_is_delivered_rather_than_lost() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      for value in 1..=3 {
+        producer.push(value).expect("room");
+      }
+      drop(consumer.drain());
+    }
+
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      assert_eq!(
+        producer.push(4).expect("the grant continues, so the ring has room"),
+        Seq(3),
+        "the push lands on the continuation sequence, not back at zero"
+      );
+
+      let mut batch = consumer.drain();
+      assert_eq!(batch.len(), 1, "delivered — the pre-fix behaviour drained nothing here");
+      assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(4));
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
   // The published watermark — seam I6, and the property total order rests on.
   // ───────────────────────────────────────────────────────────────────────────
 

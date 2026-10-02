@@ -32,14 +32,14 @@ sequence can equal.
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_mpsc
 printf 'PaddedCursor uses:  '; grep -c 'PaddedCursor' src/lib.rs
-printf 'stamps field type:  '; grep -n 'stamps : ' src/lib.rs
+printf 'stamps field type:  '; grep -n 'stamps: ' src/lib.rs
 ```
 
 Live output:
 
 ```
-PaddedCursor uses:  4
-stamps field type:  336:  stamps : Box< [ AtomicSeq ] >,
+PaddedCursor uses:  7
+stamps field type:  341:  stamps: Box<[AtomicSeq]>,
 ```
 
 The stamp array is **unpadded on purpose**, and the source states the reasoning:
@@ -63,7 +63,7 @@ publication marker that survives wrapping.
 ```sh
 cd "$(git rev-parse --show-toplevel)"/ring_mpsc
 printf 'PaddedCursor mentions:   '; grep -c 'PaddedCursor' src/lib.rs
-printf 'stamps field:            '; grep -n 'stamps : ' src/lib.rs
+printf 'stamps field:            '; grep -n 'stamps: ' src/lib.rs
 printf 'the padding test:        '
 grep -hoE '^\s*fn [a-z_0-9]+' tests/*.rs | sed 's/^ *fn //' | grep 'distinct_cache_lines'
 ```
@@ -71,8 +71,8 @@ grep -hoE '^\s*fn [a-z_0-9]+' tests/*.rs | sed 's/^ *fn //' | grep 'distinct_cac
 Live output:
 
 ```
-PaddedCursor mentions:   4
-stamps field:            336:  stamps : Box< [ AtomicSeq ] >,
+PaddedCursor mentions:   7
+stamps field:            341:  stamps: Box<[AtomicSeq]>,
 the padding test:        the_claim_cursor_and_the_consumer_cursor_are_on_distinct_cache_lines
 ```
 

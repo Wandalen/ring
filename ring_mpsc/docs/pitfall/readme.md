@@ -12,6 +12,8 @@
 | ID | Name | Purpose | Status |
 |----|------|---------|--------|
 | 001 | [The Spinning Consumer Owns a Core](001_spinning_consumer_owns_a_core.md) | The ring has no triggering event, so its canonical `while(true)` consumer burns ~99% of a core at a ~1% duty cycle on a tick-bounded workload — and is correct on a continuous one | 🔄 |
+| 002 | [A Stale Stamp Reads as Unpublished, Not as Wrong](002_a_stale_stamp_reads_as_unpublished_not_as_wrong.md) | Only `stamp == seq` is a correct publication test; the two weaker tests both read the previous lap's stamp as published | 🔄 |
+| 003 | [A Fresh `ends` Restarted the Claim Cursor](003_a_fresh_ends_restarted_the_claim_cursor.md) | Building each ends-generation's claimer over a fresh cursor cell produced pushes that answered `Ok` and were never delivered; the cell moved into the ring | ✅ |
 
 
 ### Regenerate
@@ -21,9 +23,9 @@ cd "$(git rev-parse --show-toplevel)"/ring_mpsc/docs/pitfall
 printf 'instances:                '; ls [0-9][0-9][0-9]_*.md | wc -l
 printf 'finding headings inside:  '; grep -hoE '^### MP[0-9]+ ' [0-9][0-9][0-9]_*.md | wc -l
 printf 'rows in the table below:  '; grep -coE '^\| MP[0-9]+ ' readme.md
-# instances:                2
-# finding headings inside:  4
-# rows in the table below:  4
+# instances:                3
+# finding headings inside:  5
+# rows in the table below:  5
 ```
 ### Findings Recorded Here
 
@@ -33,3 +35,4 @@ printf 'rows in the table below:  '; grep -coE '^\| MP[0-9]+ ' readme.md
 | MP45 | `spinning` | n/a — coverage | The pitfall names a cost — one core — and no benchmark in the family produces the number. |
 | MP46 | the stale-stamp trap | **latent hazard** | `stamp != UNSTAMPED` and `stamp == seq` agree on every ring that never wraps, so a suite that fills a ring once cannot distinguish them. |
 | MP47 | `stamps` | **latent hazard** | The accessor exposes `&[ AtomicSeq ]`, so an external reader must reimplement the publication test — and the wrong version is the intuitive one. |
+| MP54 | `ends` / the claim cursor | **fixed hazard** | The gate's arithmetic folds a producer-behind-consumer state into "all slots free", and a restarted claim cursor is exactly that state — silent loss, checksum balanced. The cell moved into the ring; the two regression tests pin delivery. |

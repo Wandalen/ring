@@ -1,8 +1,9 @@
 # Full family gate suite. Slow, but an honest signal.
 #
-# Runs `bench_harness/gate/run_all.sh --family ring`, every gate listed in
-# `bench_harness/gate/declared/ring/gates.txt`, exactly as `verb/gate` does locally. Failures go red. The workflow never runs on
-# PRs, so a failure blocks nothing, but the Gates badge must mean something.
+# Runs `just gate`, the same recipe a local run uses: every gate listed in
+# `bench_harness/gate/declared/ring/gates.txt`. Failures go red. The workflow
+# never runs on PRs, so a failure blocks nothing, but the Gates badge must mean
+# something.
 # Fast per-push verification lives in `ci.yml`.
 #
 # Schedule: `master` pushes + nightly + manual dispatch. Never on every PR,
@@ -20,6 +21,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  JUST_VERSION: 1.58.0
 
 jobs:
   gates:
@@ -31,6 +33,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.98.0
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@cargo-tarpaulin
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just@${{ env.JUST_VERSION }}
       - uses: Swatinem/rust-cache@v2
-      - name: full gate suite (verb/gate)
-        run: bash bench_harness/gate/run_all.sh --family ring
+      - name: full gate suite
+        run: just gate

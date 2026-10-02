@@ -20,7 +20,8 @@
 //! happens to have does not enter into it. Sharing one function between
 //! the two would mean one of the callers passing a capacity it does not have,
 //! or receiving a bound that has been clamped for a reason that does not apply
-//! to it.
+//! to it. `available_ignores_capacity_entirely` reads one set of cursors from
+//! both sides and checks that only the producer's answer is clamped.
 //!
 //! What they *do* share is the fold over a slice of cursors, which is
 //! [`ring_cursor::slowest`] and lives in neither of them.
@@ -50,6 +51,8 @@
 //! with nothing published in front of it has nothing to read. In both cases the
 //! empty set means "no constraint from dependencies", and in both cases that
 //! resolves to the value a dependency-free participant has available.
+//! `an_empty_barrier_and_an_empty_gating_set_answer_oppositely` asserts the
+//! asymmetry, so a change that aligns the two answers fails.
 
 #![deny(missing_docs)]
 
@@ -165,6 +168,35 @@ impl<'a> Barrier<'a> {
   /// has not finished producing or forwarding. One lagging dependency holds the
   /// whole barrier, which is the point of having one.
   ///
+  /// # Invariant: the frontier never passes a dependency
+  ///
+  /// The frontier is [`ring_cursor::slowest`] over the dependencies, a lower
+  /// bound and not a snapshot, as argued there. A barrier can under-report
+  /// progress and never over-report it.
+  ///
+  /// **Enforced by.** The test
+  /// `a_barrier_never_reports_a_frontier_a_dependency_has_not_reached` drives
+  /// one dependency on another thread while the other stays at zero, and
+  /// requires exactly zero on every read. The test
+  /// `every_set_size_from_one_to_eight_folds_to_the_minimum` puts the minimum
+  /// at every index. Neither catches a `Relaxed` load in place of
+  /// [`ring_cursor::GATING`] on any architecture, because neither reads data
+  /// written before a cursor store, and this crate has no loom model.
+  ///
+  /// # Pitfall: `unwrap_or(Seq::ZERO)` merges two different barriers
+  ///
+  /// **Trap.** Replacing the `None` of a barrier with no dependencies by
+  /// [`Seq::ZERO`]. It type-checks and reads as a simplification.
+  ///
+  /// **Failure.** A barrier over nothing and a barrier whose dependencies all
+  /// sit at zero then answer alike everywhere. [`Barrier::available`] and
+  /// [`Barrier::admits`] already give both the same answer. This method is the
+  /// only cursor reading that keeps them apart, and [`Barrier::wait_for`] relies on it
+  /// to refuse an empty barrier.
+  ///
+  /// **Mitigation.** Keep the `Option`. Ask this method or
+  /// [`Barrier::is_empty`] when the difference matters.
+  ///
   /// ```
   /// use core::sync::atomic::Ordering;
   /// use ring_barrier::Barrier;
@@ -187,6 +219,24 @@ impl<'a> Barrier<'a> {
   ///
   /// Zero when the barrier has no dependencies. See the module documentation
   /// for why that is not the same answer `ring_gating` gives an empty set.
+  ///
+  /// The count is not bounded by the ring's capacity, since capacity never
+  /// enters a barrier's answer. A caller reading into fixed storage clamps it
+  /// itself, as `ring_consume::Consumer::available_up_to` does.
+  ///
+  /// # Pitfall: zero does not mean caught up
+  ///
+  /// **Trap.** Reading `available(from) == 0` as "this consumer has read
+  /// everything its dependencies finished".
+  ///
+  /// **Failure.** A consumer that has read past its frontier also gets zero.
+  /// The subtraction saturates, so the one state a barrier exists to prevent
+  /// looks the same as being level with the frontier, and nothing here can
+  /// report it.
+  ///
+  /// **Mitigation.** Advance a consumer only to a frontier a barrier returned.
+  /// Where an overrun has to be detected, compare `from` with
+  /// [`Barrier::frontier`] directly.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;
@@ -253,6 +303,31 @@ impl<'a> Barrier<'a> {
   /// barrier reports its true frontier at `count == 0` too, never `from`. The
   /// fallback would read as consistent while being a different, fabricated
   /// rule. [`RingError::Empty`] is the honest answer.
+  ///
+  /// # Algorithm: poll, then read the frontier again
+  ///
+  /// [`ring_wait::wait_until`] polls [`Barrier::admits`] until it holds or the
+  /// budget runs out, and every poll folds the whole dependency slice. The
+  /// report is one more fold after that, so a wait that succeeds on its nth
+  /// attempt loads every dependency n + 1 times. The cost grows with both the
+  /// budget spent and the number of dependencies.
+  ///
+  /// The attempt count `wait_until` returns is dropped, because the return
+  /// value carries the frontier. A caller tuning `spins` cannot learn from this
+  /// method how many attempts a wait took.
+  ///
+  /// # Pitfall: retrying on `Empty` never ends for an empty barrier
+  ///
+  /// **Trap.** Retrying whenever this returns [`RingError::Empty`], as
+  /// [`RingError::is_transient`] advises for a consumer waiting on a producer.
+  ///
+  /// **Failure.** A barrier with no dependencies returns `Empty` on every call
+  /// and for every `count`. A positive count exhausts the budget, and a zero
+  /// count finds no frontier to report. No producer's progress can clear it,
+  /// because the barrier depends on nothing, so the retry loop never ends.
+  ///
+  /// **Mitigation.** Check [`Barrier::is_empty`] once before waiting, and treat
+  /// an empty barrier as one that will never admit anything.
   ///
   /// ```
   /// use core::sync::atomic::Ordering;

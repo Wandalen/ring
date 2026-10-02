@@ -61,9 +61,8 @@ cursor back to the borrowed slice, so a caller cannot outlive what it reads.
 ## B3. The two empty-set answers are both deliberate
 
 `available` returns 0 for an empty barrier; `ring_gating::headroom` returns a
-full capacity for an empty set. That is the family answering the same-shaped
-question two opposite ways on purpose, and the shape of mistake here is
-"fixing" one to match the other.
+full capacity for an empty set. The module documentation's "Why the empty set
+has no frontier" says why both are deliberate.
 
 ```bash
 grep -vE "^[[:space:]]*//" ring_barrier/src/lib.rs \

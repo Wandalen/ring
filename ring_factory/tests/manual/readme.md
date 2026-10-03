@@ -84,6 +84,18 @@ two bounds fail differently.**
  16 slots  fail=(16, 8, 8)  dropnewest=(16, 8, 8)  p1=(16, 8, 8)  p4=(16, 8, 8)
 ```
 
+**Re-run (2026-10-03), after `ring_core` ADR 004 made `Fail` the default.** The
+same probe, run and deleted. `p1` and `p4` take the default policy, so at 4
+slots they now match `fail` instead of `dropnewest`. Every other cell is
+unchanged, and so is the finding below. The table above is the run under the
+old `DropNewest` default.
+
+```
+  4 slots  fail=(4, 4, 4)  dropnewest=(4, 8, 4)  p1=(4, 4, 4)  p4=(4, 4, 4)
+  8 slots  fail=(8, 8, 8)  dropnewest=(8, 8, 8)  p1=(8, 8, 8)  p4=(8, 8, 8)
+ 16 slots  fail=(16, 8, 8)  dropnewest=(16, 8, 8)  p1=(16, 8, 8)  p4=(16, 8, 8)
+```
+
 | Capacity | Overflow assertion | Capacity assertion | Why |
 |---|---|---|---|
 | 4 | ✅ discriminates: `(4,4,4)` vs `(4,8,4)` | ✅ | the ring overflows |
@@ -198,6 +210,10 @@ property that keeps this stage quiet. One decision paid for twice.
 | F4 | No unused dependencies | ✅ clean, after two removals and two additions |
 | F5 | Fully covered | ✅ 15/15 on first measurement |
 | F6 | Clippy-clean in three configurations | ✅ clean in all three |
+
+**2026-10-03.** F2 re-run after `ring_core` ADR 004 moved the default to
+`Fail`. Only `p1` and `p4` at 4 slots changed, to `(4, 4, 4)`; the window is
+still bounded on both sides.
 
 **Predictions wrong: 2 of 6**, and both are about the automated suite rather
 than about the crate. That is the pattern of this stage. The implementation was

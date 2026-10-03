@@ -298,8 +298,34 @@ impl Claim {
 /// ```
 #[derive(Debug)]
 pub struct Claimer<'a> {
-  cursor: PaddedCursor,
+  cursor: ClaimerCursor<'a>,
   consumers: &'a GatingSet,
+}
+
+/// The cursor cell a [`Claimer`] moves: owned and zero-started, or borrowed
+/// from a caller that owns it.
+///
+/// Private. The distinction exists so a claimer can either bring its own
+/// cursor ([`new`](Claimer::new)) or share one its owner keeps — a ring that
+/// wants a claim grant to outlive the claimer's own construction borrows the
+/// cell from the ring ([`borrowed`](Claimer::borrowed)). Both forms move the
+/// cursor through the same compare-exchange loops; the cell is only ever read
+/// through the deref, never assigned.
+#[derive(Debug)]
+enum ClaimerCursor<'a> {
+  Owned(PaddedCursor),
+  Borrowed(&'a PaddedCursor),
+}
+
+impl core::ops::Deref for ClaimerCursor<'_> {
+  type Target = PaddedCursor;
+
+  fn deref(&self) -> &PaddedCursor {
+    match self {
+      Self::Owned(cursor) => cursor,
+      Self::Borrowed(cursor) => cursor,
+    }
+  }
 }
 
 impl<'a> Claimer<'a> {
@@ -316,7 +342,52 @@ impl<'a> Claimer<'a> {
   #[must_use]
   pub fn new(consumers: &'a GatingSet) -> Self {
     Self {
-      cursor: PaddedCursor::default(),
+      cursor: ClaimerCursor::Owned(PaddedCursor::default()),
+      consumers,
+    }
+  }
+
+  /// A claimer over a cursor cell its caller owns, starting wherever that
+  /// cell stands.
+  ///
+  /// This is the form for a ring that wants a claim grant to survive the
+  /// claimer's own lifetime: the ring owns the cell, every claimer it builds
+  /// over it continues from where the last one stopped, and nothing starts
+  /// back at zero. The caller decides the cursor's initial value — a fresh
+  /// [`PaddedCursor`] stands at sequence zero — and thereafter the cell is
+  /// moved only by this crate's compare-exchange loops, exactly as
+  /// [`new`](Self::new)'s owned cursor is.
+  ///
+  /// # This is sharing, not a second way around the gate
+  ///
+  /// Borrowing the cell gives the *owner* read access to the claim cursor
+  /// between claimers, which is the point — a ring seeds its next claimer
+  /// from the cell it holds. It gives the owner no new write access: writing
+  /// through a shared `PaddedCursor` is the same convention-violating move it
+  /// is for [`cursor`](Self::cursor)'s return value, with the same failure
+  /// modes.
+  ///
+  /// ```
+  /// use ring_claim::Claimer;
+  /// use ring_cursor::PaddedCursor;
+  /// use ring_gating::GatingSet;
+  /// use ring_types::{ Capacity, Seq };
+  ///
+  /// let consumers = GatingSet::new( Capacity::new( 4 ).unwrap(), 1 );
+  /// let cell = PaddedCursor::default();
+  ///
+  /// let first = Claimer::borrowed( &consumers, &cell );
+  /// first.claim( 2 ).unwrap();
+  /// drop( first );
+  ///
+  /// // A second claimer over the same cell continues, rather than restarting.
+  /// let second = Claimer::borrowed( &consumers, &cell );
+  /// assert_eq!( second.claimed(), Seq( 2 ) );
+  /// ```
+  #[must_use]
+  pub fn borrowed(consumers: &'a GatingSet, cursor: &'a PaddedCursor) -> Self {
+    Self {
+      cursor: ClaimerCursor::Borrowed(cursor),
       consumers,
     }
   }
@@ -356,7 +427,10 @@ impl<'a> Claimer<'a> {
   /// ```
   #[must_use]
   pub const fn cursor(&self) -> &PaddedCursor {
-    &self.cursor
+    match &self.cursor {
+      ClaimerCursor::Owned(cursor) => cursor,
+      ClaimerCursor::Borrowed(cursor) => cursor,
+    }
   }
 
   /// The gating set this claimer respects.
@@ -470,16 +544,21 @@ impl<'a> Claimer<'a> {
       });
     }
 
-    // The gate is the loop condition, so the loop re-reads it on every
-    // iteration. A failed exchange means another producer moved the cursor.
-    // The headroom computed against the old value is then stale, and granting
-    // on it would overlap that producer's range.
+    // The gate is the loop condition, and is therefore re-read on every
+    // iteration: on a failed exchange another producer moved the cursor, so
+    // the headroom computed against the old value is stale and granting on it
+    // would overlap that producer's range. The exchange is weak — a spurious
+    // failure folds into the same retry, which re-reads the gate against the
+    // returned value anyway — and the hint paces the retry before the re-read.
     let mut current = self.claimed();
     while count <= self.consumers.headroom(current) {
       let next = current.advanced_by(count as u64);
-      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+      match self.cursor.compare_exchange_weak(current, next, CLAIM_SUCCESS, GATING) {
         Ok(_) => return Ok(Claim::new(current, count)),
-        Err(actual) => current = actual,
+        Err(actual) => {
+          core::hint::spin_loop();
+          current = actual;
+        }
       }
     }
 
@@ -544,9 +623,12 @@ impl<'a> Claimer<'a> {
     let mut current = self.claimed();
     while let granted @ 1.. = max.min(self.consumers.headroom(current)) {
       let next = current.advanced_by(granted as u64);
-      match self.cursor.compare_exchange(current, next, CLAIM_SUCCESS, GATING) {
+      match self.cursor.compare_exchange_weak(current, next, CLAIM_SUCCESS, GATING) {
         Ok(_) => return Ok(Claim::new(current, granted)),
-        Err(actual) => current = actual,
+        Err(actual) => {
+          core::hint::spin_loop();
+          current = actual;
+        }
       }
     }
 

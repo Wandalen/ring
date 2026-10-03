@@ -242,6 +242,138 @@ mod threaded {
     }
   }
 
+  /// The reached-test again, with batched producers: each producer claims
+  /// groups of 32 contiguous sequences through `claim_batch`, writes them
+  /// through the guard, and publishes with the drop. All three claims of the
+  /// original must hold unchanged — the grant width changes how the
+  /// contended step is amortised, not the contract.
+  #[test]
+  fn four_producers_exchange_one_hundred_thousand_items_with_byte_parity_in_batches() {
+    const PRODUCERS: u64 = 4;
+    const PER_PRODUCER: u64 = 25_000;
+    const BATCH: usize = 32;
+    const TOTAL: usize = (PRODUCERS * PER_PRODUCER) as usize;
+
+    let encode = |producer: u64, index: u64| producer * PER_PRODUCER + index;
+
+    let mut ring: Ring<TypedSlot<u64>> = Ring::new(capacity(1024));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    let granted: Mutex<Vec<Seq>> = Mutex::new(Vec::with_capacity(TOTAL));
+    let received: Mutex<Vec<u64>> = Mutex::new(Vec::with_capacity(TOTAL));
+
+    std::thread::scope(|scope| {
+      for id in 0..PRODUCERS {
+        let granted = &granted;
+
+        scope.spawn(move || {
+          let mut mine = Vec::with_capacity(PER_PRODUCER as usize);
+          let mut next = 0u64;
+
+          while next < PER_PRODUCER {
+            let deadline = std::time::Instant::now() + PATIENCE;
+            // Ask for no more than this producer still owes: a wider grant
+            // would be written past the quota, and the byte-parity claim
+            // would rightly catch the overflow.
+            let want = usize::try_from(PER_PRODUCER - next).unwrap().min(BATCH);
+
+            match producer.claim_batch(want) {
+              Ok(mut batch) => {
+                for offset in 0..batch.len() {
+                  batch.slot_mut(offset).expect("within the grant").set(encode(id, next));
+                  mine.push(batch.sequence(offset).expect("within the grant"));
+                  next += 1;
+                }
+                drop(batch);
+              }
+              // Back-pressure: the consumer has not caught up. Bounded, as in
+              // the single-record test above — a dead consumer must fail the
+              // test, not hang it.
+              Err(RingError::Full) => {
+                assert!(
+                  std::time::Instant::now() < deadline,
+                  "producer {id} stalled at item {next}: back-pressure never cleared, \
+                   which means the consumer stopped draining"
+                );
+                std::thread::yield_now();
+              }
+              Err(other) => panic!("unexpected claim failure: {other:?}"),
+            }
+          }
+
+          granted.lock().unwrap_or_else(std::sync::PoisonError::into_inner).extend(mine);
+        });
+      }
+
+      let received = &received;
+
+      scope.spawn(move || {
+        let mut drained = Vec::with_capacity(TOTAL);
+        let mut deadline = std::time::Instant::now() + PATIENCE;
+
+        while drained.len() < TOTAL {
+          let mut batch = consumer.drain();
+
+          if batch.is_empty() {
+            assert!(
+              std::time::Instant::now() < deadline,
+              "consumer stalled after {} of {TOTAL} records: nothing further became visible",
+              drained.len()
+            );
+            std::thread::yield_now();
+            continue;
+          }
+
+          let start = batch.start();
+
+          for offset in 0..batch.len() {
+            let value = batch.get_mut(offset).and_then(TypedSlot::take).unwrap_or_else(|| {
+              panic!(
+                "sequence {:?} was drained as published but its slot was empty — \
+                 the stamp became visible before the payload write it was supposed to release",
+                start.advanced_by(offset as u64)
+              )
+            });
+            drained.push(value);
+          }
+
+          deadline = std::time::Instant::now() + PATIENCE;
+        }
+
+        received
+          .lock()
+          .unwrap_or_else(std::sync::PoisonError::into_inner)
+          .extend(drained);
+      });
+    });
+
+    let granted = granted.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let received = received.into_inner().unwrap_or_else(std::sync::PoisonError::into_inner);
+
+    assert_eq!(received.len(), TOTAL, "every offered item arrived exactly once");
+    let mut sorted = received.clone();
+    sorted.sort_unstable();
+    let expected: Vec<u64> = (0..TOTAL as u64).collect();
+    assert_eq!(sorted, expected, "the multiset of received items is the multiset offered");
+
+    assert_eq!(granted.len(), TOTAL);
+    let distinct: HashSet<Seq> = granted.iter().copied().collect();
+    assert_eq!(distinct.len(), TOTAL, "no two producers were granted the same sequence");
+
+    for id in 0..PRODUCERS {
+      let lo = encode(id, 0);
+      let hi = encode(id, PER_PRODUCER - 1);
+      let mine: Vec<u64> = received.iter().copied().filter(|value| (lo..=hi).contains(value)).collect();
+
+      assert_eq!(mine.len(), PER_PRODUCER as usize);
+      assert!(
+        mine.windows(2).all(|pair| pair[0] < pair[1]),
+        "producer {id}'s own items arrived out of its issue order"
+      );
+    }
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // Adversarial contention audit, measured rather than inferred.
   // ───────────────────────────────────────────────────────────────────────────
@@ -476,6 +608,84 @@ mod threaded {
   }
 
   // ───────────────────────────────────────────────────────────────────────────
+  // Claim-cursor persistence — a second `ends` continues, never restarts.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// A second `ends()` continues the claim cursor from the first generation's
+  /// watermark.
+  ///
+  /// The claim cursor is the ring's own cell: each `ends()` builds its
+  /// claimer over the same cell, so the second generation's first claim is
+  /// the sequence after the first generation's last, not zero.
+  #[test]
+  fn a_second_ends_continues_the_claim_cursor_rather_than_restarting_it() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      for value in 1..=3 {
+        producer.push(value).expect("room");
+      }
+      drop(consumer.drain());
+    }
+    // The first generation's claim cursor stands at 3, its consumer at 3.
+
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      let reserved = producer.claim().expect("room");
+      assert_eq!(
+        reserved.sequence(),
+        Seq(3),
+        "the second generation continues from the first's watermark"
+      );
+      drop(reserved); // publishes an empty slot at sequence 3
+      producer.push(7).expect("room"); // sequence 4
+
+      let mut batch = consumer.drain();
+      assert_eq!(batch.len(), 2, "the whole grant is published, empty slot included");
+      assert_eq!(batch.get(0).and_then(TypedSlot::get), None);
+      assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(7));
+    }
+  }
+
+  /// The defect the persistence fixes, kept as a regression test: before the
+  /// claim cursor moved into the ring, a push through a second `ends()`
+  /// answered `Ok` at sequence zero under a consumer that had moved past it —
+  /// accepted, published into a slot the consumer never rescanned, and never
+  /// delivered.
+  #[test]
+  fn a_record_pushed_through_a_second_ends_is_delivered_rather_than_lost() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      for value in 1..=3 {
+        producer.push(value).expect("room");
+      }
+      drop(consumer.drain());
+    }
+
+    {
+      let mut ends = ring.ends();
+      let (producer, mut consumer) = ends.split();
+
+      assert_eq!(
+        producer.push(4).expect("the grant continues, so the ring has room"),
+        Seq(3),
+        "the push lands on the continuation sequence, not back at zero"
+      );
+
+      let mut batch = consumer.drain();
+      assert_eq!(batch.len(), 1, "delivered — the pre-fix behaviour drained nothing here");
+      assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(4));
+    }
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
   // Total order rests on the published watermark.
   // ───────────────────────────────────────────────────────────────────────────
 
@@ -592,6 +802,129 @@ mod threaded {
     drop(held);
 
     assert_eq!(consumer.available(), 3);
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Batched claims — one gate check and one exchange per group of slots.
+  // ───────────────────────────────────────────────────────────────────────────
+
+  /// The grant is capped by headroom, not by the ask: a ring with three slots
+  /// free answers `claim_batch( 8 )` with three, and a full ring answers with
+  /// `Full` and no movement at all.
+  #[test]
+  fn a_batch_claim_grants_what_headroom_allows_rather_than_the_full_ask() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, _consumer) = ends.split();
+
+    producer.push(9).expect("room"); // producer 1, consumer 0: three free
+
+    let batch = producer.claim_batch(8).expect("three slots free");
+    assert_eq!(batch.len(), 3, "granted the headroom, not the ask");
+    assert_eq!(batch.sequence(0), Some(Seq(1)));
+    assert_eq!(batch.sequence(2), Some(Seq(3)));
+    assert_eq!(batch.sequence(3), None);
+    drop(batch);
+
+    assert_eq!(producer.claim_batch(8).err(), Some(RingError::Full));
+    assert_eq!(producer.free_capacity(), 0, "a refused claim advances nothing");
+  }
+
+  /// An unwritten offset of a dropped batch publishes an empty slot, one per
+  /// offset — the batched form of `a_claim_dropped_without_a_write_publishes_
+  /// an_empty_record` above — and the drain still counts exactly the grant's
+  /// length, in issue order.
+  #[test]
+  fn a_batch_dropped_without_writing_every_offset_publishes_an_empty_slot_per_offset() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    let mut batch = producer.claim_batch(3).expect("room");
+    batch.slot_mut(0).expect("offset 0").set(7);
+    batch.slot_mut(2).expect("offset 2").set(9);
+    drop(batch); // offset 1 was never written
+
+    let mut drained = consumer.drain();
+    assert_eq!(drained.len(), 3, "every offset of the grant is published");
+    assert_eq!(drained.get_mut(0).and_then(TypedSlot::take), Some(7));
+    assert_eq!(drained.get(1).and_then(TypedSlot::get), None, "empty, not torn");
+    assert_eq!(drained.get_mut(2).and_then(TypedSlot::take), Some(9));
+  }
+
+  /// A grant that crosses a lap wraps its slot indices and preserves issue
+  /// order — `ring_batch::drain_order`'s fold, exercised from the producer
+  /// side: sequences 3..7 over capacity 4 address slots 3, 0, 1, 2.
+  #[test]
+  fn a_batch_claim_spanning_a_lap_wraps_its_slots_and_preserves_issue_order() {
+    let mut ring: Ring<TypedSlot<u64>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    for value in 0..3 {
+      producer.push(value).expect("room");
+    }
+    drop(consumer.drain());
+
+    let mut batch = producer.claim_batch(4).expect("the whole ring is free");
+    assert_eq!(batch.start(), Seq(3));
+    for offset in 0..batch.len() {
+      batch.slot_mut(offset).expect("within the grant").set(3 + offset as u64);
+    }
+    drop(batch);
+
+    let mut drained = consumer.drain();
+    assert_eq!(drained.len(), 4);
+    let received: Vec<u64> = (0..drained.len())
+      .map(|offset| drained.get_mut(offset).and_then(TypedSlot::take).expect("published"))
+      .collect();
+    assert_eq!(received, vec![3, 4, 5, 6], "issue order, across the wrap");
+  }
+
+  /// `push_batch` drains exactly the granted prefix out of the caller's vec,
+  /// leaves the rest in order for the next attempt, and refuses a full ring
+  /// with the vec untouched — the `push` contract, per group.
+  #[test]
+  fn push_batch_drains_the_granted_prefix_and_refuses_a_full_ring_untouched() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    let mut records: Vec<u8> = (1..=6).collect();
+    assert_eq!(producer.push_batch(&mut records).expect("room for four"), 4);
+    assert_eq!(records, vec![5, 6], "the refused tail stays, in order");
+    assert_eq!(producer.push_batch(&mut records).err(), Some(RingError::Full));
+    assert_eq!(records, vec![5, 6], "a refused batch moves nothing");
+
+    let mut drained = consumer.drain();
+    assert_eq!(drained.len(), 4);
+    let received: Vec<u8> = (0..drained.len())
+      .map(|offset| drained.get_mut(offset).and_then(TypedSlot::take).expect("published"))
+      .collect();
+    assert_eq!(received, vec![1, 2, 3, 4]);
+    drop(drained);
+
+    assert_eq!(producer.push_batch(&mut records).expect("room again"), 2);
+    assert!(records.is_empty());
+    assert_eq!(producer.push_batch(&mut Vec::new()).expect("nothing to do"), 0);
+  }
+
+  /// Two copies of the `Copy` producer batch-claim disjoint ranges — the
+  /// cloned-producer cursor sharing holds for grants of any width.
+  #[test]
+  fn cloned_producers_batch_claims_are_disjoint() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+    let second = producer;
+
+    let first_batch = producer.claim_batch(2).expect("room");
+    let second_batch = second.claim_batch(2).expect("room");
+    assert_eq!(first_batch.start(), Seq::ZERO);
+    assert_eq!(second_batch.start(), Seq(2), "the second grant starts past the first");
+
+    drop((first_batch, second_batch));
+    assert_eq!(consumer.drain().len(), 4);
   }
 
   // ───────────────────────────────────────────────────────────────────────────
@@ -1261,6 +1594,73 @@ mod exhaustive {
 
       first_writer.join().expect("no panic");
       second_writer.join().expect("no panic");
+      reader.join().expect("no panic");
+    });
+  }
+
+  /// A batch publish never observes a payload before the write that preceded
+  /// its stamp.
+  ///
+  /// The batched drop stores two stamps where the single guard stores one;
+  /// the visibility argument of `docs/invariant/002_publication_ordering.md`
+  /// must hold for the pair, under every interleaving loom can pick. As in
+  /// the models above, the payload rides on loom atomics — the slot's own
+  /// memory is `UnsafeCell` loom does not model — and record `i` of a drained
+  /// batch may be observed only after the payload store that preceded its
+  /// stamp became visible.
+  ///
+  /// Mutation, M9-style: weakening `PUBLISH` to `Relaxed` must fail this
+  /// model — with a relaxed store the consumer can observe a stamp before
+  /// the payload store that preceded it, and the assertion fires.
+  #[test]
+  fn a_batch_publish_never_observes_a_payload_before_the_write_that_preceded_its_stamp() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (producer, mut consumer) = leaked_ends().split();
+
+      let writer = loom::thread::spawn(move || {
+        payloads[0].store(WRITTEN, Ordering::Relaxed);
+        payloads[1].store(WRITTEN, Ordering::Relaxed);
+        drop(producer.claim_batch(2).expect("an empty ring has room for the whole grant"));
+      });
+
+      let reader = loom::thread::spawn(move || {
+        let drained = consumer.drain();
+        for offset in 0..drained.len() {
+          assert_eq!(
+            payloads[offset].load(Ordering::Relaxed),
+            WRITTEN,
+            "drained record {offset} did not carry the write that preceded its stamp"
+          );
+        }
+      });
+
+      writer.join().expect("no panic");
+      reader.join().expect("no panic");
+    });
+  }
+
+  /// The consumer never drains further than a batch grant published.
+  ///
+  /// One producer claiming two sequences publishes two stamps from one drop;
+  /// whichever order the scan observes them in, across as many drains as it
+  /// takes, the total can never exceed the grant's length.
+  #[test]
+  fn the_consumer_never_drains_further_than_a_batch_grant_published() {
+    loom::model(|| {
+      let (producer, mut consumer) = leaked_ends().split();
+
+      let writer = loom::thread::spawn(move || {
+        drop(producer.claim_batch(2).expect("an empty ring has room for the whole grant"));
+      });
+
+      let reader = loom::thread::spawn(move || {
+        let first = consumer.drain().len();
+        let second = consumer.drain().len();
+        assert!(first + second <= 2, "drained {} of at most 2", first + second);
+      });
+
+      writer.join().expect("no panic");
       reader.join().expect("no panic");
     });
   }

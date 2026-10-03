@@ -234,7 +234,11 @@ pub struct Ends<'a, T> {
 #[derive(Debug)]
 enum EndsInner<'a, T> {
   Spsc(&'a mut ring_spsc::Ring<TypedSlot<T>>),
-  Mpsc(ring_mpsc::Ends<'a, TypedSlot<T>>),
+  // Boxed: `ring_mpsc::Ends` holds a `Claimer` over the ring's
+  // 64-byte-aligned claim cursor, so the unboxed variant is ~256 bytes against
+  // this one's 8 (`clippy::large_enum_variant`). One allocation on the cold
+  // `ends()` path; the hot `Producer`/`Consumer` paths never touch it.
+  Mpsc(Box<ring_mpsc::Ends<'a, TypedSlot<T>>>),
   #[cfg(feature = "crossbeam")]
   Crossbeam(&'a crossbeam_queue::ArrayQueue<T>),
 }
@@ -243,7 +247,7 @@ impl<'a, T: Send> EndsInner<'a, T> {
   fn of(storage: &'a mut Storage<T>) -> Self {
     match storage {
       Storage::Spsc(ring) => Self::Spsc(ring),
-      Storage::Mpsc(ring) => Self::Mpsc(ring.ends()),
+      Storage::Mpsc(ring) => Self::Mpsc(Box::new(ring.ends())),
       #[cfg(feature = "crossbeam")]
       Storage::Crossbeam(queue, _) => Self::Crossbeam(queue),
     }

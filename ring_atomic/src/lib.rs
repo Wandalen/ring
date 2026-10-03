@@ -144,6 +144,21 @@ pub trait SeqCell: Sync {
   /// The sequence found in the cell when it was not `current`, which is the
   /// multi-producer claim's retry input.
   fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq>;
+
+  /// The weak form of [`compare_exchange`](Self::compare_exchange): allowed to
+  /// fail spuriously, which a caller with a retry loop — the claim's CAS loop
+  /// is the family's only one — folds into its retry for cheaper retries on
+  /// LL/SC hardware. On a compare-and-swap machine such as x86-64 the two
+  /// forms compile identically.
+  ///
+  /// The default forwards to the strong form, so an implementor that does not
+  /// override it keeps exactly its old behaviour: the strong form never fails
+  /// spuriously, which is a valid implementation of a weak exchange. Overriding
+  /// is a performance choice, never a semantics choice — a caller must treat
+  /// this method's `Err` exactly as the strong form's.
+  fn compare_exchange_weak(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self.compare_exchange(current, new, success, failure)
+  }
 }
 
 /// The production sequence cell: one `AtomicU64`, no bookkeeping.
@@ -216,6 +231,14 @@ impl SeqCell for AtomicSeq {
     self
       .0
       .compare_exchange(current.0, new.0, success, failure)
+      .map(Seq)
+      .map_err(Seq)
+  }
+
+  fn compare_exchange_weak(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self
+      .0
+      .compare_exchange_weak(current.0, new.0, success, failure)
       .map(Seq)
       .map_err(Seq)
   }
@@ -465,5 +488,10 @@ impl SeqCell for CountingSeq {
   fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
     self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
     self.cell.compare_exchange(current, new, success, failure)
+  }
+
+  fn compare_exchange_weak(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self.compare_exchanges.fetch_add(1, Ordering::Relaxed);
+    self.cell.compare_exchange_weak(current, new, success, failure)
   }
 }

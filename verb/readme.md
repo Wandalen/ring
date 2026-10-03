@@ -3,14 +3,14 @@
 do-protocol verb scripts for the `ring` repository. The repository is one Cargo
 workspace, so every verb here reaches the whole family directly.
 
-This is the repo root's `verb/`. Every crate also has its own `verb/` (`test`,
-`test_only`, `lint`, `build`) for iterating on one crate without touching the
-others. Those are thin wrappers. Each one `exec`s this directory's own
-`_crate_dispatch` with its crate name baked in, so the logic (argument parsing,
-the cargo invocation shape) lives in one place. `_crate_dispatch` is not itself
-a verb. It takes a verb name and a crate name as its first two positional args
-and has no meaning invoked on its own, which is why `verbs` (below) skips
-anything starting with `_`.
+This is the repo root's `verb/`. Every crate but the `perf` benchmark suite has
+its own `verb/` (`test`, `test_only`, `lint`, `build`) for iterating on one
+crate without touching the others. Those are thin wrappers. Each one `exec`s
+this directory's own `_crate_dispatch` with its crate name baked in, so the
+logic (argument parsing, the cargo invocation shape) lives in one place.
+`_crate_dispatch` is not itself a verb. It takes a verb name and a crate name
+as its first two positional args and has no meaning invoked on its own, which
+is why `verbs` (below) skips anything starting with `_`.
 
 **Parameter convention.** Every parameter is `key::val` (`level::3`, `crate::ring_spsc`,
 `dry::1`), never `--flag val`. Every verb rejects an unrecognized parameter loudly
@@ -26,7 +26,7 @@ prints the command(s) the verb would run without running them.
 | `fmt` | Apply this repo's adopted rustfmt style workspace-wide (`+nightly`, `rustfmt.toml`). `check::1` verifies without writing |
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first, because incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh`, the family's gate suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
-| `bench` | Run `ring_bench`'s comparison example, the family's benchmark |
+| `bench` | Run the benchmarks — `suite::comparison` (default, `ring_bench`'s example, release), `micro` / `spsc` / `mpsc` / `batch` (`perf`, criterion), `latency`, `report` (markdown comparison of the last results) or `all`. `quick::1` validates every `perf` case without numbers; `filter::<text>`, `save::<name>`, `baseline::<name>`, `out::<file>` |
 | `publish_check` | Dry-run `cargo publish` for every publishable crate, building each from its package. `crate::<name>` narrows |
 | `clean` | Remove `target/` and gate scratch logs |
 | `verify` | Full pre-push gate, an alias for `test level::5` |

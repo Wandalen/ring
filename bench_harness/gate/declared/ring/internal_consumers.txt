@@ -1,0 +1,9 @@
+# Crates outside the ring family that may name any of its crates as a dependency, one per line,
+# `crate_name  reason`. Read by `g5_export_surface.sh`, which skips their manifests and counts
+# them in its pass line.
+#
+# Not a widening of export_surface.txt: that file is the family's contract with consumers that
+# must survive a refactor. These are in-tree tools that measure the internals themselves and
+# build in the same workspace, so a refactor that breaks one breaks it in the same change.
+
+perf  benchmark suite: measures ring_spsc and ring_mpsc directly, below the export surface, next to off-the-shelf queues

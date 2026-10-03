@@ -22,14 +22,10 @@ G18 reports a bare name with no reason as `exemption without a reason` and does
 not reach, because an omission that looks like an exemption is the failure this
 file could otherwise hide.
 
-**It currently holds zero entries**, and the `ring` family has never had one.
-Every crate here has always been declared in `ring/crates.txt` rather than
-excused from it.
-
-Zero is the reading both gates now print, and neither prints it vacuously. G18
-ends `… each claimed exactly once across N famil(ies), 0 exempted`, so the crate
-count in that line is the whole tree rather than the tree minus a subtraction
-nobody re-checked.
+**It holds one entry, `perf`**, the benchmark suite — not a family crate. Every
+family crate is declared in `ring/crates.txt` rather than excused from it.
+`perf` has bench, example and test targets only and no `src/`, so G22 reads it
+as unimplemented; a `pub` item under `src/` would expire the entry.
 
 G22 is the one that had to be taught what zero means, because an empty list is
 where a negative check stops checking. Every test it makes is a negative. An
@@ -49,8 +45,8 @@ broken against. G22 answers with two guards, and they cover different failures:
   counting. Raw size tells them apart. The curated file carries its history in
   its header and is never small, so under 200 bytes fails rather than passes.
 
-`exempt.txt` is currently well over six times the floor despite holding no
-entries. That is the shape the second guard exists to tell apart from an empty
+`exempt.txt` is currently well over six times the floor despite holding one
+entry. That is the shape the second guard exists to tell apart from an empty
 file that happens to read the same. The file clears the floor honestly, by
 explaining its own purpose at enough length, rather than by padding to the
 number.
@@ -76,6 +72,12 @@ under `ring/` at all:
 | File | Responsibility | Read by |
 |------|-----------------|---------|
 | `pinned_allowlist.txt` | Files permitted to reach libm by either route, each still required to do so | `g10_pinned_math.sh` |
+
+And one optional list `ring/` does declare:
+
+| File | Responsibility | Read by |
+|------|-----------------|---------|
+| `internal_consumers.txt` | Crates outside the family that may name any of its crates — in-tree tools that measure the internals, each with a reason | `g5_export_surface.sh` |
 
 And four directories, all under `ring/`, the only family this repository
 declares:

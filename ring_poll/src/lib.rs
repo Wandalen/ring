@@ -289,18 +289,22 @@ pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: B
 
 /// Publish from `records` in batches, retrying within `budget`, never parking.
 ///
-/// Returns how many records were published. Stops early on an attempt that
-/// moves nothing, because a second attempt against an unchanged ring can only
-/// find the same answer. The budget buys time for *another thread* to drain,
-/// not for this one to try harder.
+/// Returns `Ok( n )` when the iterator ran dry with nothing refused. Stops
+/// early on an attempt that moves nothing, because a second attempt against an
+/// unchanged ring can only find the same answer. The budget buys time for
+/// *another thread* to drain, not for this one to try harder.
 ///
-/// Every attempt pulls a record from `records` before it can know whether
-/// the ring has room. A refused attempt consumes and drops that record, so a
-/// budget above one can destroy records on a full ring. The published count
-/// that this function returns does not show the loss. A caller who needs that
-/// number can subtract. The iterator is still theirs, so what it yielded less
-/// what this returned is what was destroyed. [`Tick::push_batch`] does exactly
-/// that and records it as [`Tick::lost`].
+/// Every attempt pulls a record from `records` before it can know whether the
+/// ring has room. A refused record is held, and the next attempt offers it
+/// ahead of the iterator, so retrying destroys nothing and publication order
+/// holds.
+///
+/// # Errors
+///
+/// `( n, record )` when `n` records were published and `record` is still held
+/// because the budget ran out or an attempt moved nothing. The iterator resumes
+/// after `record`, so offering `record` first and then the rest of the
+/// iterator on the next frame loses nothing.
 ///
 /// # The budget bounds rounds, not records
 ///
@@ -325,17 +329,44 @@ pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: B
 /// let ( mut producer, _consumer ) = ends.split();
 ///
 /// let published = push_batch_within( &mut producer, &mut ( 0..5 ), Budget::once() );
-/// assert_eq!( published, 5 );
+/// assert_eq!( published, Ok( 5 ) );
+/// ```
+///
+/// Against a full ring a bigger budget buys more refusals of the same record:
+///
+/// ```
+/// use ring_config::RingConfig;
+/// use ring_core::Ring;
+/// use ring_poll::{ push_batch_within, Budget };
+/// use ring_types::OverflowPolicy;
+///
+/// let config = RingConfig::new( 4 ).unwrap().with_overflow( OverflowPolicy::Fail );
+/// let mut ring : Ring< u32 > = Ring::new( &config ).unwrap();
+/// let mut ends = ring.ends();
+/// let ( mut producer, _consumer ) = ends.split();
+///
+/// let mut records = 0..12;
+/// assert_eq!( push_batch_within( &mut producer, &mut records, Budget::new( 3 ) ), Err( ( 4, 4 ) ) );
+/// assert_eq!( records.next(), Some( 5 ), "record 4 came back, nothing was destroyed" );
 /// ```
 pub fn push_batch_within<T: Send>(
   producer: &mut Producer<'_, T>,
   records: &mut impl Iterator<Item = T>,
   budget: Budget,
-) -> usize {
+) -> Result<usize, (usize, T)> {
   let mut total = 0;
+  let mut held = None;
   let mut attempt = 0;
   while attempt < budget.attempts() {
-    let moved = producer.try_push_batch(records);
+    // The record the last attempt was refused goes first, so a retry offers it
+    // again rather than taking a new one, and publication order holds.
+    let moved = match producer.try_push_batch(&mut held.take().into_iter().chain(&mut *records)) {
+      Ok(moved) => moved,
+      Err((moved, refused)) => {
+        held = Some(refused);
+        moved
+      }
+    };
     total += moved;
     if moved == 0 {
       break;
@@ -345,7 +376,10 @@ pub fn push_batch_within<T: Send>(
       core::hint::spin_loop();
     }
   }
-  total
+  match held {
+    Some(record) => Err((total, record)),
+    None => Ok(total),
+  }
 }
 
 /// Take one record, retrying within `budget`, never parking.
@@ -403,7 +437,7 @@ pub fn recv_within<T: Send>(consumer: &mut Consumer<'_, T>, budget: Budget) -> O
 /// let mut ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
 /// let mut ends = ring.ends();
 /// let ( mut producer, mut consumer ) = ends.split();
-/// producer.try_push_batch( &mut ( 0..5 ) );
+/// producer.try_push_batch( &mut ( 0..5 ) ).unwrap();
 ///
 /// let mut out = Vec::new();
 /// assert_eq!( drain_up_to( &mut consumer, &mut out, 3 ), 3 );
@@ -425,8 +459,7 @@ pub fn drain_up_to<T: Send>(consumer: &mut Consumer<'_, T>, out: &mut Vec<T>, ma
 
 // ── Tick ──────────────────────────────────────────────────────────────────
 
-/// One system's turn on the ring: a budget, a running count of what moved, and
-/// a running count of what was destroyed getting there.
+/// One system's turn on the ring: a budget and a running count of what moved.
 ///
 /// Every method delegates to the free function of the same shape and adds only
 /// the accounting, so there is one implementation of each operation and one
@@ -480,21 +513,16 @@ pub fn drain_up_to<T: Send>(consumer: &mut Consumer<'_, T>, out: &mut Vec<T>, ma
 pub struct Tick {
   budget: Budget,
   moved: usize,
-  lost: usize,
 }
 
 impl Tick {
   /// A tick that will spend at most `budget` attempts on each operation.
   #[must_use]
   pub const fn new(budget: Budget) -> Self {
-    Self {
-      budget,
-      moved: 0,
-      lost: 0,
-    }
+    Self { budget, moved: 0 }
   }
 
-  /// Clear both counters at the frame boundary, keeping the budget.
+  /// Clear the count at the frame boundary, keeping the budget.
   ///
   /// The budget is fixed for a tick's life. There is no setter, and this does
   /// not add one. A scheduler that wants to vary the budget between frames
@@ -502,7 +530,6 @@ impl Tick {
   /// the budget it wanted to change anyway.
   pub const fn reset(&mut self) {
     self.moved = 0;
-    self.lost = 0;
   }
 
   /// The budget each of this tick's operations is held to.
@@ -513,24 +540,11 @@ impl Tick {
 
   /// What this tick has moved so far, across every operation on it.
   ///
-  /// This counts arrivals and says nothing about cost. A tick that published
-  /// four records and destroyed three getting there reports `Made( 4 )`; the
-  /// three are in [`Tick::lost`].
+  /// This counts arrivals only. A refused record is never in it: every
+  /// operation that can be refused hands the record back instead.
   #[must_use]
   pub const fn progress(&self) -> Progress {
     Progress::of(self.moved)
-  }
-
-  /// How many records this tick consumed from an iterator and did not publish.
-  ///
-  /// Only [`Tick::push_batch`] can produce a loss. `try_push_batch` pulls a
-  /// record before it can know whether the ring has room, and drops it when the
-  /// answer is no. Every other operation either publishes or hands the record
-  /// back. A caller reading [`Tick::progress`] alone sees what arrived and not
-  /// what it cost.
-  #[must_use]
-  pub const fn lost(&self) -> usize {
-    self.lost
   }
 
   /// [`push_within`] against this tick's budget, counting a success.
@@ -546,28 +560,22 @@ impl Tick {
     outcome
   }
 
-  /// [`push_batch_within`] against this tick's budget, counting what moved and
-  /// what it cost.
+  /// [`push_batch_within`] against this tick's budget, counting what moved.
   ///
-  /// The free function cannot report the loss. It returns one number, and the
-  /// records it consumed and dropped are not in it. This method counts the
-  /// iterator on the way past, so `offered - moved` is exactly what the ring
-  /// refused after the record had already been taken. That difference lands in
-  /// [`Tick::lost`], never in the returned count and never in
-  /// [`Tick::progress`].
-  pub fn push_batch<T: Send>(&mut self, producer: &mut Producer<'_, T>, records: &mut impl Iterator<Item = T>) -> usize {
-    let mut offered = 0;
-    let moved = {
-      let mut counted = records.by_ref().inspect(|_| offered += 1);
-      push_batch_within(producer, &mut counted, self.budget)
-    };
-    debug_assert!(
-      offered >= moved,
-      "the batch helper published {moved} of {offered} records it was handed"
-    );
+  /// # Errors
+  ///
+  /// `( n, record )` when the budget ran out, or an attempt moved nothing,
+  /// with `record` refused and held. Only the `n` records that arrived are
+  /// counted. `record` is the caller's to offer again on the next frame.
+  pub fn push_batch<T: Send>(
+    &mut self,
+    producer: &mut Producer<'_, T>,
+    records: &mut impl Iterator<Item = T>,
+  ) -> Result<usize, (usize, T)> {
+    let outcome = push_batch_within(producer, records, self.budget);
+    let (Ok(moved) | Err((moved, _))) = &outcome;
     self.moved += moved;
-    self.lost += offered - moved;
-    moved
+    outcome
   }
 
   /// [`recv_within`] against this tick's budget, counting a success.

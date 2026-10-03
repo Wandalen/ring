@@ -401,29 +401,54 @@ impl<'a, T: Send> Producer<'a, T> {
     }
   }
 
-  /// Publish as many of `records` as the ring will take, and report how many.
+  /// Publish as many of `records` as the ring will take, and hand back the one
+  /// it refused.
   ///
-  /// Partial acceptance is the normal case, so the return is a count rather
-  /// than a `Result`. An all-or-nothing contract would need a rollback the ring
-  /// cannot offer cheaply. This call leaves the iterator positioned after the
-  /// last record it consumed.
+  /// The same refusal rule as [`Self::try_push`]: `Err` carries what did not go
+  /// in. `Ok( n )` means nothing was refused and the iterator ran dry.
   ///
-  /// # Pitfall: the count is not the number of records kept
+  /// Partial acceptance is the normal case. An all-or-nothing contract would
+  /// need a rollback the ring cannot offer cheaply, so the records before the
+  /// refusal stay published.
   ///
-  /// **Trap.** Reading the return as how many records the ring kept, and the
-  /// iterator as holding every record it did not keep.
+  /// # Errors
   ///
-  /// **Failure.** Under [`OverflowPolicy::Fail`] the refusal consumes one record
-  /// and drops it, because the loop discards the `Err` that [`Self::try_push`]
-  /// hands it back in. In the example below, record 3 is not in the ring, not in
-  /// the iterator, and not in the count. Under [`OverflowPolicy::DropNewest`] a
-  /// full ring never refuses. `try_push` reports a discarded record as `Ok(())`,
-  /// so this drains the whole iterator and returns its length, counting every
+  /// `( n, record )` under [`OverflowPolicy::Fail`], when `n` records went in
+  /// and then the ring refused `record`. The record comes back intact and the
+  /// iterator resumes after it, so `record` followed by whatever the iterator
+  /// still yields is everything this call did not publish, in order. The call
+  /// takes at most one record past what fits.
+  ///
+  /// # Invariant: a refused batch push drops no record, on every backend
+  ///
+  /// The refused record, followed by whatever the iterator still yields, is
+  /// everything the call did not publish. The loop is built on
+  /// [`Self::try_push`]'s refusal alone, so it holds wherever `try_push` hands a
+  /// record back and needs nothing of its own from any backend.
+  ///
+  /// **Excluded.** Records an overflow policy discards rather than refuses.
+  /// [`OverflowPolicy::DropNewest`] drops the incoming record and crossbeam's
+  /// [`OverflowPolicy::DropOldest`] evicts the oldest, both inside `try_push`,
+  /// which reports success. The pitfall below covers the count that results.
+  ///
+  /// **Enforced by.** `a_refused_batch_push_drops_no_record_on_every_backend`,
+  /// with a payload that counts its own drops, and
+  /// `a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record`,
+  /// which checks the record and the iterator's position as well as the count.
+  ///
+  /// # Pitfall: under `DropNewest` the count is not the number of records kept
+  ///
+  /// **Trap.** Reading `Ok( n )` as how many records the ring kept, and the
+  /// call as one that stops when the ring is full.
+  ///
+  /// **Failure.** Under [`OverflowPolicy::DropNewest`] a full ring never
+  /// refuses. [`Self::try_push`] reports a discarded record as `Ok(())`, so this
+  /// drains the whole iterator and returns `Ok` with its length, counting every
   /// record the ring discarded. An endless iterator never returns.
   ///
-  /// **Mitigation.** To keep a refused record, push one at a time with
-  /// [`Self::try_push`], which returns it in the `Err`. To learn how many records
-  /// a lossy policy kept, count on the consumer side.
+  /// **Mitigation.** Choose [`OverflowPolicy::Fail`] when a lost record matters.
+  /// Under it the count does mean kept, and the refused record comes back.
+  /// Otherwise bound the iterator and count on the consumer side.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -436,21 +461,20 @@ impl<'a, T: Send> Producer<'a, T> {
   /// let ( mut producer, _consumer ) = ends.split();
   ///
   /// let mut records = [ 1, 2, 3, 4 ].into_iter();
-  /// assert_eq!( producer.try_push_batch( &mut records ), 2 );
-  /// assert_eq!( records.next(), Some( 4 ), "record 3 was consumed by the refusal" );
+  /// assert_eq!( producer.try_push_batch( &mut records ), Err( ( 2, 3 ) ), "record 3 comes back" );
+  /// assert_eq!( records.next(), Some( 4 ), "and the iterator resumes after it" );
   /// ```
-  #[must_use]
-  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
+  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> Result<usize, (usize, T)> {
     let mut accepted = 0;
 
     for record in records.by_ref() {
-      if self.try_push(record).is_err() {
-        break;
+      if let Err(refused) = self.try_push(record) {
+        return Err((accepted, refused));
       }
       accepted += 1;
     }
 
-    accepted
+    Ok(accepted)
   }
 
   /// Another handle onto the same ring, where the backend permits one.
@@ -570,7 +594,7 @@ impl<T: Send> Consumer<'_, T> {
   /// let mut ends = ring.ends();
   /// let ( mut producer, mut consumer ) = ends.split();
   ///
-  /// assert_eq!( producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() ), 3 );
+  /// assert_eq!( producer.try_push_batch( &mut [ 1, 2, 3 ].into_iter() ), Ok( 3 ) );
   ///
   /// let mut out = Vec::new();
   /// assert_eq!( consumer.try_recv_batch( &mut out ), 3 );

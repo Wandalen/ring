@@ -3,19 +3,21 @@
 # `attempt *= 1` never advances from its initial zero, so the budget bound never
 # fires and the loop is held together entirely by its `moved == 0` break. That
 # break does fire, which is why this survived a suite that watches only the
-# published count. But it fires one attempt later than the budget would have,
-# and by S7's reasoning that attempt costs a record.
+# published count of an ordinary iterator. But against a source that yields one
+# burst per attempt (see S7) it fires only once the ring is full, bursts past
+# the budget.
 #
-# With the break removed as well, this mutation is an infinite loop. It reads as
-# a survivor rather than a hang only because the break masks it, which is the
-# same masking that made the budget look untested.
+# The detector's ring refuses rather than drops, and that is load-bearing. A
+# full `Fail` ring makes the next attempt move nothing, which fires the break.
+# Under `DropNewest` every attempt reports its burst as moved, the break never
+# fires, and against an endless source this mutation is an infinite loop.
 
 id: S9
 crate: ring_poll
 file: src/lib.rs
-round: 2026-08-30
+round: 2026-10-01
 round-failures: 1
-detector: push_batch_within_eats_one_record_per_attempt
+detector: push_batch_within_spends_its_whole_budget_while_attempts_keep_moving_records
 
 --- from
       break;

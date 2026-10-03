@@ -157,41 +157,37 @@ distinguishes the two.
 
 ---
 
-## F4. Does `try_push_batch` really destroy the record it refuses?
+## F4. Does an optimistic push lose records?
 
 `run` checks the ring's free capacity **before** touching the buffer. The whole
 rejected-flush guarantee, that records stay staged and the call is safe to retry,
 rests on that check being necessary rather than belt-and-braces. It is
 necessary only if the alternative loses data.
 
-**Command.** Push five records through `ring_core::Producer::try_push_batch`
-into a two-slot `Fail` ring, then collect what the iterator still holds.
+**Command.** Push five records, `10` to `14`, through
+`ring_core::Producer::try_push_batch` into a two-slot `Fail` ring, then collect
+what the iterator still holds.
 
-**Prediction.** `accepted` is 2. The iterator retains two records, the fourth and fifth, and
-one record is unaccounted for, because `try_push_batch` calls `try_push`, which returns
-the refused record in an `Err`, and the loop discards it on `break`.
+**Prediction.** The result is `Err((2, 12))`. Two records are accepted, record
+`12` comes back in the `Err`, and the iterator retains `13` and `14`.
+`try_push_batch` itself loses nothing.
 
-**Result (2026-08-28): holds.**
+**Result (2026-10-02): holds.**
 
 ```
-accepted  2
+outcome   Err((2, 12))
 leftover  [13, 14]
-lost      1
 ```
 
-Record `12` is gone. It was consumed from the iterator, refused by the ring, and
-dropped with the `Err` that carried it.
-
-**So the pre-check is the guarantee, not a courtesy.** Draining first and pushing
-optimistically would silently destroy one record per rejection, and report
-`Flushed` while doing it. This also settles why `run` carries no
-`debug_assert!` on the accepted count. By the time a shortfall is observable the
-record is already gone, and an assertion that only fires in debug builds would
-promise a guarantee that evaporates exactly where the race is likely.
-
-This is not a defect in `ring_core`. `try_push_batch` is documented as reporting
-partial acceptance, and a caller that wants the remainder must not hand it a
-`Drain`.
+**So the pre-check is the guarantee, not a courtesy, and the reason is `run`'s
+iterator.** `run` pushes from `self.buffer.drain()`, which empties the buffer as
+it drops, and takes only the count from the result. Draining first and pushing
+optimistically would discard the record handed back, drop every record still in
+the drain, and report `Flushed` while doing it. This also settles why `run`
+carries no `debug_assert!` on the accepted count. By the time a shortfall is
+observable the records are already gone, and an assertion that only fires in
+debug builds would promise a guarantee that evaporates exactly where the race is
+likely.
 
 ---
 
@@ -284,12 +280,13 @@ assertion would survive the regression.
 |---|---|---|
 | 2026-08-28 | F1–F5 | 5/5 run. Three predictions held; F1's was too weak and F3's was wrong. F3 removed a field from the driver, deleted an increment from the append path, replaced one test and added another |
 | 2026-08-28 | F6 | 1/1 run. The prediction's verdict held and its stated cause was wrong. The `!Sync` comes from `ring_core`, not `ring_tls` |
+| 2026-10-02 | F4 | 1/1 run. Re-run after `try_push_batch` began handing back the refused record. The prediction held, and the pre-check is still needed, now because of the `Drain` `run` pushes from |
 
 | Stage | Date | Prediction | Outcome |
 |---|---|---|---|
 | F1 | 2026-08-28 | Two tests catch the `OnBarrier` degeneration | **Four did.** The detector is any assertion that a drive returns `NotTriggered`, not the test named for the job. Module doc corrected |
 | F2 | 2026-08-28 | `FlushPolicy` is 16 bytes | Holds at 16. Assertion written as an equality with `2 × usize`, not a literal |
 | F3 | 2026-08-28 | The V2 injection fails one test | **Wrong. All 23 passed.** The counter was redundant with buffer occupancy; the defect is unreachable; the field was deleted |
-| F4 | 2026-08-28 | `try_push_batch` loses exactly one record per refusal | Holds: 5 in, 2 accepted, 2 retained, 1 gone |
+| F4 | 2026-10-02 | `try_push_batch` hands back the refused record and loses nothing | Holds: 5 in, 2 accepted, 1 handed back, 2 retained |
 | F5 | 2026-08-28 | The criterion holds without default features | Holds at 24/24, same as `--all-features` |
 | F6 | 2026-08-28 | `Flusher` is not `Sync`, because of `TlsBuffer` | **Verdict right, cause wrong.** Not `Sync` because of `ring_core::Producer`; a `Vec` would not have blocked it |

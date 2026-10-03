@@ -995,7 +995,8 @@ fn run_contract_ring(workload: &Workload) -> Result<(usize, Vec<Record>, u128), 
   while next < workload.records_per_producer() {
     let end = usize::min(next + workload.batch(), workload.records_per_producer());
     let mut records = next as Record..end as Record;
-    reported += producer.try_push_batch(&mut records);
+    let (Ok(pushed) | Err((pushed, _))) = producer.try_push_batch(&mut records);
+    reported += pushed;
     next = end;
   }
   let write_nanos = started.elapsed().as_nanos();
@@ -1139,7 +1140,8 @@ fn run_off_the_shelf(workload: &Workload) -> Result<(usize, Vec<Record>, u128), 
   while next < workload.records_per_producer() {
     let end = usize::min(next + workload.batch(), workload.records_per_producer());
     let mut records = next as Record..end as Record;
-    reported += producer.try_push_batch(&mut records);
+    let (Ok(pushed) | Err((pushed, _))) = producer.try_push_batch(&mut records);
+    reported += pushed;
     next = end;
   }
   let write_nanos = started.elapsed().as_nanos();

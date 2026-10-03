@@ -16,13 +16,12 @@ byte-identically.
 | `s4_mpsc_consumer_empty_polarity.mutant` | The same, for `ring_mpsc`'s `Consumer::is_empty` |
 | `s5_registry_empty_polarity.mutant` | The same, for `Registry::is_empty` |
 | `s6_trace_empty_polarity.mutant` | The same, for `Trace::is_empty` |
-| `s7_batch_budget_bound.mutant` | Spends one attempt past the budget, which costs one more record |
+| `s7_batch_budget_bound.mutant` | Spends one attempt past the budget, which publishes one more burst from a bursting source |
 | `s8_batch_unproductive_break.mutant` | Inverts the early exit, stopping on the productive attempt instead |
 | `s9_batch_attempt_counter.mutant` | Freezes the attempt counter at zero, leaving only the break to end the loop |
 | `s10_free_capacity_binding.mutant` | Answers zero room forever, which the advisory contract permits and the binding one does not |
 | `s11_committed_watermark.mutant` | Returns the default sequence instead of reading the consumer cursor |
 | `s12_vanished_in_ring_term.mutant` | Subtracts the in-ring term that `vanished` should add |
-| `s13_tick_lost_subtraction.mutant` | Divides instead of subtracts a `Tick`'s loss count, panicking once a batch moves nothing |
 | `s14_bytesslot_eq_always_true.mutant` | Answers `true` from `BytesSlot::eq` regardless of payload |
 
 **Two provenances, and the id prefix carries which.** `B` and `F` entries come
@@ -38,6 +37,15 @@ Keep the distinction visible. A gate that replays only defects people tripped
 over cannot defend a crate nobody has been unlucky with yet. The survey entries
 did not require the bad luck, and they outnumber the manual ones several times
 over, from crates nobody had been unlucky with at all.
+
+## Retired
+
+A mutant whose target is gone is retired rather than left to fail G12 as
+stale. Its id is not reused, so the survey rounds above still count true.
+
+| Id | Retired | Why |
+|----|---------|-----|
+| S13 | 2026-10-01 | It divided instead of subtracted a `Tick`'s loss count, and its target line, `self.lost += offered - moved;` in `Tick::push_batch`, no longer exists. The batch push now hands the refused record back, so a tick has no loss to count and `Tick::lost` was removed ([`ring_core`'s decision](../../../../../ring_core/docs/decisions/003_the_batch_push_hands_back_the_refused_record.md)) |
 
 ## The one-polarity rule
 

@@ -65,6 +65,25 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
   Ring::new(&config).unwrap()
 }
 
+/// Counting records, `size` at a time, with one `None` after each burst.
+///
+/// `Iterator` permits a `Some` after a `None`, and `try_push_batch` stops at the
+/// first `None`. So against a ring with room, each batch attempt moves exactly
+/// one burst, and the count published reveals how many attempts ran.
+fn bursts_of(size: u32) -> impl Iterator<Item = u32> {
+  let mut next = 0;
+  let mut in_burst = 0;
+  std::iter::from_fn(move || {
+    if in_burst == size {
+      in_burst = 0;
+      return None;
+    }
+    in_burst += 1;
+    next += 1;
+    Some(next - 1)
+  })
+}
+
 // ── The reached-test ──────────────────────────────────────────────────────
 
 /// The feature's reached-test asserts that the crates from which a parking
@@ -248,7 +267,7 @@ fn a_large_budget_spins_rather_than_sleeping() {
   let mut ring = refusing_ring(4);
   let mut ends = ring.ends();
   let (mut producer, _consumer) = ends.split();
-  assert_eq!(push_batch_within(&mut producer, &mut (0..4), Budget::once()), 4);
+  assert_eq!(push_batch_within(&mut producer, &mut (0..4), Budget::once()), Ok(4));
 
   let started = Instant::now();
   let refused = push_within(&mut producer, 99, Budget::new(20_000));
@@ -424,11 +443,12 @@ fn push_batch_within_publishes_the_whole_iterator_when_it_fits() {
   let mut ends = ring.ends();
   let (mut producer, consumer) = ends.split();
 
-  assert_eq!(push_batch_within(&mut producer, &mut (0..5), Budget::once()), 5);
+  assert_eq!(push_batch_within(&mut producer, &mut (0..5), Budget::once()), Ok(5));
   assert_eq!(consumer.len(), 5);
 }
 
-/// An attempt that moves nothing ends the loop, whatever the budget says.
+/// An attempt that moves nothing ends the loop, whatever the budget says, and
+/// the record it was refused comes back.
 #[test]
 fn push_batch_within_stops_at_the_first_attempt_that_moves_nothing() {
   let mut ring = refusing_ring(2);
@@ -437,55 +457,57 @@ fn push_batch_within_stops_at_the_first_attempt_that_moves_nothing() {
   producer.try_push(1).unwrap();
   producer.try_push(2).unwrap();
 
-  assert_eq!(push_batch_within(&mut producer, &mut (0..4), Budget::new(9)), 0);
+  let mut records = 0..4;
+  assert_eq!(push_batch_within(&mut producer, &mut records, Budget::new(9)), Err((0, 0)));
+  assert_eq!(records.next(), Some(1), "only the refused record left the iterator");
 }
 
-/// A second attempt runs when the first one moved records, and stops when it
-/// stops moving them.
+/// Every productive attempt runs until the budget is spent, and no more.
+///
+/// The source yields one burst per attempt, so the published count is the
+/// number of attempts times the burst: three attempts of two records each.
+/// One attempt too many publishes eight, stopping on the productive attempt
+/// publishes two, and a counter that never advances runs until the ring is
+/// full at sixteen. The ring refuses rather than drops, which is what ends that
+/// last loop instead of leaving it to spin.
 #[test]
-fn push_batch_within_spends_a_second_attempt_after_a_productive_first() {
-  let mut ring = refusing_ring(4);
+fn push_batch_within_spends_its_whole_budget_while_attempts_keep_moving_records() {
+  let mut ring = refusing_ring(16);
   let mut ends = ring.ends();
   let (mut producer, consumer) = ends.split();
 
-  // Twelve records into four slots: attempt one takes four, attempt two takes
-  // none and breaks.
-  let mut records = 0..12;
-  assert_eq!(push_batch_within(&mut producer, &mut records, Budget::new(3)), 4);
-  assert_eq!(consumer.len(), 4);
+  let mut records = bursts_of(2);
   assert_eq!(
-    records.next(),
-    Some(6),
-    "two attempts, two records eaten — 4 by the first refusal, 5 by the second",
+    push_batch_within(&mut producer, &mut records, Budget::new(3)),
+    Ok(6),
+    "three attempts, one burst of two each",
   );
+  assert_eq!(consumer.len(), 6);
+  assert_eq!(records.next(), Some(6), "and nothing was taken past the third burst");
 }
 
-/// Every attempt after the first costs one more record.
+/// A retry offers the record the last attempt was refused, not a new one.
 ///
-/// `ring_core::Producer::try_push_batch` pulls from the iterator before it can
-/// know whether there is room, so a refusal consumes and drops the record it
-/// could not place. That crate's own doctest pins this as intended. Nothing
-/// asserted the consequence for a *budget*. Retrying is not free, and a budget
-/// of N against a full ring destroys N records rather than one.
-///
-/// The iterator is the only place that cost is visible. The published count and
-/// the consumer's length are identical whether one attempt ran or two, which is
-/// why the test above could spend a second attempt without noticing it had paid
-/// for it. Read together the two tests price the budget: one attempt eats
-/// record 4, two attempts eat 4 and 5.
+/// Against a full ring a bigger budget buys more refusals and nothing else: the
+/// held record is offered again, refused again, and handed back once the loop
+/// ends. Whatever the budget, the caller gets record 4 back and the iterator
+/// still yields 5.
 #[test]
-fn push_batch_within_eats_one_record_per_attempt() {
-  let mut ring = refusing_ring(4);
-  let mut ends = ring.ends();
-  let (mut producer, _consumer) = ends.split();
+fn push_batch_within_hands_back_the_held_record_whatever_the_budget() {
+  for attempts in [1, 3] {
+    let mut ring = refusing_ring(4);
+    let mut ends = ring.ends();
+    let (mut producer, consumer) = ends.split();
 
-  let mut records = 0..12;
-  assert_eq!(push_batch_within(&mut producer, &mut records, Budget::once()), 4);
-  assert_eq!(
-    records.next(),
-    Some(5),
-    "one attempt: 0-3 published, 4 eaten by the refusal, 5 still pending",
-  );
+    let mut records = 0..12;
+    assert_eq!(
+      push_batch_within(&mut producer, &mut records, Budget::new(attempts)),
+      Err((4, 4)),
+      "budget {attempts}: 0-3 published, 4 handed back",
+    );
+    assert_eq!(records.next(), Some(5), "budget {attempts}: 5 is still pending");
+    assert_eq!(consumer.len(), 4);
+  }
 }
 
 // ── recv_within ───────────────────────────────────────────────────────────
@@ -519,7 +541,7 @@ fn drain_up_to_stops_at_the_limit() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..5)), 5, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..5)), Ok(5), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 3), 3);
@@ -533,7 +555,7 @@ fn drain_up_to_stops_when_the_ring_empties_first() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..2)), 2, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..2)), Ok(2), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 10), 2);
@@ -546,7 +568,7 @@ fn drain_up_to_zero_touches_nothing() {
   let mut ring = ring(8);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
-  assert_eq!(producer.try_push_batch(&mut (0..3)), 3, "the arrange filled the ring");
+  assert_eq!(producer.try_push_batch(&mut (0..3)), Ok(3), "the arrange filled the ring");
 
   let mut out = Vec::new();
   assert_eq!(drain_up_to(&mut consumer, &mut out, 0), 0);
@@ -568,7 +590,7 @@ fn a_tick_accumulates_across_its_operations() {
   assert_eq!(tick.progress(), Progress::None, "nothing has moved yet");
 
   tick.push(&mut producer, 1).unwrap();
-  assert_eq!(tick.push_batch(&mut producer, &mut (2..6)), 4);
+  assert_eq!(tick.push_batch(&mut producer, &mut (2..6)), Ok(4));
   assert_eq!(tick.recv(&mut consumer), Some(1));
 
   let mut out = Vec::new();
@@ -606,37 +628,26 @@ fn a_default_tick_is_a_single_attempt() {
   assert_eq!(Tick::new(Budget::once()).budget(), Tick::default().budget());
 }
 
-/// A tick reports what its batch destroyed, and `progress` still does not.
-///
-/// `push_batch_within` returns one number and the records it consumed and
-/// dropped are not in it. The free function cannot report the loss because the
-/// caller keeps the iterator. `Tick::push_batch` counts the iterator on the way
-/// past, so the difference is available without changing the free function's
-/// signature. The second assertion checks that `progress()` is deliberately
-/// *unchanged* and still counts arrivals only.
+/// A tick counts the records that arrived, and the refused one comes back
+/// rather than being counted.
 #[test]
-fn a_tick_records_what_a_refused_batch_destroyed() {
+fn a_tick_counts_what_arrived_and_hands_back_what_was_refused() {
   let mut ring = refusing_ring(4);
   let mut ends = ring.ends();
   let (mut producer, _consumer) = ends.split();
 
   let mut tick = Tick::new(Budget::once());
   let mut records = 0..12;
-  assert_eq!(tick.push_batch(&mut producer, &mut records), 4);
+  assert_eq!(tick.push_batch(&mut producer, &mut records), Err((4, 4)));
 
-  assert_eq!(tick.progress(), Progress::Made(4), "four arrived");
-  assert_eq!(tick.lost(), 1, "and record 4 was eaten by the refusal");
-  assert_eq!(records.next(), Some(5), "5 is still pending, as ever");
+  assert_eq!(tick.progress(), Progress::Made(4), "four arrived, and 4 is not among them");
+  assert_eq!(records.next(), Some(5), "5 is still pending");
 }
 
-/// A batch against a ring that is already full moves nothing on its one
-/// attempt, and the tick still reports the record that attempt ate as lost.
-///
-/// `offered` is 1 and `moved` is 0 here. The other `push_batch` tests never hit
-/// this case, because in each of them at least one record gets through.
-/// The loss must be derived from that pair without dividing by the zero.
+/// A batch against a ring that is already full moves nothing, counts nothing,
+/// and hands back the record its one attempt was refused.
 #[test]
-fn a_tick_records_a_fully_refused_batch_as_lost_not_moved() {
+fn a_tick_counts_nothing_for_a_fully_refused_batch() {
   let mut ring = refusing_ring(1);
   let mut ends = ring.ends();
   let (mut producer, _consumer) = ends.split();
@@ -644,32 +655,17 @@ fn a_tick_records_a_fully_refused_batch_as_lost_not_moved() {
 
   let mut tick = Tick::new(Budget::once());
   let mut records = 1..5;
-  assert_eq!(tick.push_batch(&mut producer, &mut records), 0, "the ring was already full");
+  assert_eq!(
+    tick.push_batch(&mut producer, &mut records),
+    Err((0, 1)),
+    "the ring was already full, and record 1 came back",
+  );
 
   assert_eq!(tick.progress(), Progress::None, "nothing arrived");
-  assert_eq!(tick.lost(), 1, "one attempt, one record eaten by the refusal");
-  assert_eq!(records.next(), Some(2), "record 1 was eaten, 2 is still pending");
+  assert_eq!(records.next(), Some(2), "2 is still pending");
 }
 
-/// Nothing else can produce a loss, so `lost` stays at zero for every other path.
-#[test]
-fn only_a_batch_can_lose_a_record() {
-  let mut ring = refusing_ring(1);
-  let mut ends = ring.ends();
-  let (mut producer, mut consumer) = ends.split();
-
-  let mut tick = Tick::new(Budget::once());
-  tick.push(&mut producer, 1).unwrap();
-  assert_eq!(tick.push(&mut producer, 2), Err(2), "handed back, not lost");
-  assert_eq!(tick.recv(&mut consumer), Some(1));
-  assert_eq!(tick.recv(&mut consumer), None);
-  assert_eq!(tick.drain(&mut consumer, &mut Vec::new(), 4), 0);
-
-  assert_eq!(tick.progress(), Progress::Made(2));
-  assert_eq!(tick.lost(), 0);
-}
-
-/// `reset` clears both counters and keeps the budget.
+/// `reset` clears the count and keeps the budget.
 ///
 /// A tick is a per-frame object with no `Drop` and no by-value method, so
 /// nothing makes a frame end. Without `reset` the only way to get a fresh count
@@ -682,20 +678,17 @@ fn a_reset_tick_reports_no_progress_and_keeps_its_budget() {
   let (mut producer, _consumer) = ends.split();
 
   // Two slots, a budget of three, and eight records. The first attempt fills
-  // both slots and eats one more finding out the ring is full; the second
-  // attempt eats one and moves nothing, which ends the loop before the third.
-  // So four records leave the iterator, two arrive, and two are destroyed.
+  // both slots and is refused record 2; the second attempt offers record 2
+  // again and moves nothing, which ends the loop before the third.
   let mut tick = Tick::new(Budget::new(3));
   let mut records = 0..8;
-  assert_eq!(tick.push_batch(&mut producer, &mut records), 2);
+  assert_eq!(tick.push_batch(&mut producer, &mut records), Err((2, 2)));
   assert_eq!(tick.progress(), Progress::Made(2));
-  assert_eq!(tick.lost(), 2);
-  assert_eq!(records.next(), Some(4), "records 2 and 3 were consumed and dropped");
+  assert_eq!(records.next(), Some(3), "record 2 came back, so 3 is next");
 
   tick.reset();
 
   assert_eq!(tick.progress(), Progress::None, "the frame ended");
-  assert_eq!(tick.lost(), 0, "including the cost");
   assert_eq!(tick.budget(), Budget::new(3), "and the budget survived it");
 }
 
@@ -741,7 +734,7 @@ fn one_budget_buys_one_push_and_a_whole_batch() {
   let (mut batch_producer, _c2) = batch_ends.split();
   assert_eq!(
     push_batch_within(&mut batch_producer, &mut (0..4), Budget::once()),
-    4,
+    Ok(4),
     "one attempt, four records — the budget did not bound this",
   );
 }

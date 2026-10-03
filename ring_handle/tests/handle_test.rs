@@ -71,7 +71,9 @@ fn the_two_ends_travel_to_separate_threads() {
     scope.spawn(move || {
       let mut next: u32 = 0;
       while next < 32 {
-        let moved = producer.try_push_batch(&mut (next..32));
+        // The range restarts at `next`, so a refused record is offered again
+        // on the next turn rather than lost.
+        let (Ok(moved) | Err((moved, _))) = producer.try_push_batch(&mut (next..32));
         next += u32::try_from(moved).unwrap();
       }
     });
@@ -109,14 +111,25 @@ fn a_refused_push_hands_the_record_back_unchanged() {
   assert_eq!(producer.try_push(refused), Ok(()), "and it goes in once there is room");
 }
 
-/// A batch that does not fit is partially accepted, and the count says so.
+/// A batch that does not fit is partially accepted, and the record that did not
+/// fit comes back.
+///
+/// The refused record plus what the iterator still yields is everything that
+/// was not published, in order. So the next record out of the iterator is the
+/// one after the refusal, not the refusal itself.
 #[test]
-fn try_push_batch_reports_partial_acceptance() {
+fn try_push_batch_hands_back_the_record_that_did_not_fit() {
   let mut split = Split::new(refusing_ring(4));
   let mut ends = split.ends();
   let (mut producer, consumer) = ends.split();
 
-  assert_eq!(producer.try_push_batch(&mut (0..10)), 4);
+  let mut records = 0..10;
+  assert_eq!(
+    producer.try_push_batch(&mut records),
+    Err((4, 4)),
+    "four went in, record 4 came back"
+  );
+  assert_eq!(records.next(), Some(5), "and the iterator resumes after it");
   assert_eq!(consumer.len(), 4);
 }
 
@@ -130,7 +143,7 @@ fn free_capacity_and_is_full_agree() {
   assert_eq!(producer.free_capacity(), 4);
   assert!(!producer.is_full());
 
-  producer.try_push_batch(&mut (0..4));
+  assert_eq!(producer.try_push_batch(&mut (0..4)), Ok(4));
   assert_eq!(producer.free_capacity(), 0);
   assert!(producer.is_full(), "is_full is free_capacity() == 0, literally");
 }
@@ -143,7 +156,7 @@ fn try_recv_batch_moves_what_is_waiting() {
   let mut split = Split::new(ring(8));
   let mut ends = split.ends();
   let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..5));
+  assert_eq!(producer.try_push_batch(&mut (0..5)), Ok(5));
   assert!(!consumer.is_empty(), "nothing was waiting, so receiving proves nothing");
 
   let mut out = Vec::new();
@@ -164,7 +177,7 @@ fn drain_is_bounded_at_the_call_that_made_it() {
   let mut split = Split::new(ring(16));
   let mut ends = split.ends();
   let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..3));
+  assert_eq!(producer.try_push_batch(&mut (0..3)), Ok(3));
 
   let taken: Vec<u32> = {
     let mut drain = consumer.drain();
@@ -195,7 +208,7 @@ fn drain_stops_when_the_ring_empties_first() {
   let mut split = Split::new(ring(8));
   let mut ends = split.ends();
   let (mut producer, mut consumer) = ends.split();
-  producer.try_push_batch(&mut (0..2));
+  assert_eq!(producer.try_push_batch(&mut (0..2)), Ok(2));
 
   let mut drain = consumer.drain();
   assert_eq!(drain.next(), Some(0));
@@ -321,9 +334,9 @@ fn draining_at_the_same_point_is_deterministic() {
     let mut ends = split.ends();
     let (mut producer, mut consumer) = ends.split();
 
-    producer.try_push_batch(&mut (0..5));
+    assert_eq!(producer.try_push_batch(&mut (0..5)), Ok(5));
     let first: Vec<u32> = consumer.drain().collect();
-    producer.try_push_batch(&mut (5..9));
+    assert_eq!(producer.try_push_batch(&mut (5..9)), Ok(4));
     let second: Vec<u32> = consumer.drain().collect();
 
     first.into_iter().chain(second).collect()
@@ -355,7 +368,7 @@ fn the_in_house_backends_behave_alike() {
     let mut ends = split.ends();
     let (mut producer, mut consumer) = ends.split();
 
-    assert_eq!(producer.try_push_batch(&mut (0..8)), 8, "{backend:?} took the batch");
+    assert_eq!(producer.try_push_batch(&mut (0..8)), Ok(8), "{backend:?} took the batch");
     assert!(producer.is_full(), "{backend:?} reports full at capacity");
     assert_eq!(producer.try_push(99).unwrap_err(), 99, "{backend:?} hands the record back");
 
@@ -378,7 +391,7 @@ fn the_crossbeam_backend_behaves_alike() {
   let mut ends = split.ends();
   let (mut producer, mut consumer) = ends.split();
 
-  assert_eq!(producer.try_push_batch(&mut (0..8)), 8);
+  assert_eq!(producer.try_push_batch(&mut (0..8)), Ok(8));
   assert!(producer.is_full());
   assert_eq!(producer.try_push(99).unwrap_err(), 99);
 
@@ -541,7 +554,7 @@ fn debug_output_length_does_not_grow_with_item_count() {
   let mut split_many = Split::new(ring(8));
   let mut ends_many = split_many.ends();
   let (mut producer_many, consumer_many) = ends_many.split();
-  producer_many.try_push_batch(&mut (0..8));
+  assert_eq!(producer_many.try_push_batch(&mut (0..8)), Ok(8));
 
   assert_eq!(
     format!("{consumer_one:?}").len(),

@@ -38,18 +38,16 @@ contradicted the expectation.
 
 ### `Ok` is not evidence a record was kept
 
-`OverflowPolicy::default()` was `DropNewest`, so the family's own documented
-idiom, a bare `RingConfig::new( n )`, produced a ring on which `try_push`
-returned `Ok` for a record it discarded. A harness that counted those `Ok`s
-would report `contract_ring` as **lossless at 256 records in a 16-slot ring**.
-It would also report it as *fast*, and correctly, because discarding is the
-cheapest thing a queue can do.
-
-The default is now `Fail`
+Under `DropNewest`, `try_push` returns `Ok` for a record it discarded. A harness
+that counted those `Ok`s would report `contract_ring` as **lossless at 256
+records in a 16-slot ring**. It would also report it as *fast*, and correctly,
+because discarding is the cheapest thing a queue can do. The default policy,
+`Fail`
 ([`ring_core` ADR 004](../ring_core/docs/decisions/004_fail_is_the_default_overflow_policy.md)),
-so a default ring refuses and reports only what it kept. A ring that opts in to
-`DropNewest` still answers `Ok` for a discard. So `Outcome::received` is drained
-from the ring and is the only count treated as truth. `reported` keeps what the
+refuses instead, but a workload can set any policy.
+
+So `Outcome::received` is drained from the ring and is the only count treated
+as truth. `reported` keeps what the
 API claimed, and the crate publishes the gap as `silently_discarded` instead of
 hiding it. **The trap corrupts a verdict, not a record**, and the verdict is
 what this harness exists to produce.

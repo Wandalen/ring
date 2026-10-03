@@ -419,16 +419,12 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
 
 /// A `DropNewest` ring reports successes for records it did not keep.
 ///
-/// The finding that reshaped this crate. Until `ring_core`'s ADR 004,
-/// `OverflowPolicy::default()` was `DropNewest`, so a bare
-/// `RingConfig::new( n )`, the form the family's own documentation uses
-/// everywhere, produced a ring whose `try_push` returned `Ok` for a discarded
-/// record. The first working version of this harness counted those `Ok`s and
-/// reported `contract_ring` as **lossless at 256 records in a 16-slot ring**.
-/// The workload now sets `DropNewest` itself, so the test still runs the case
-/// under the `Fail` default.
+/// Under `DropNewest`, `try_push` returns `Ok` for a discarded record, so a
+/// harness counting `Ok`s reports `contract_ring` as **lossless at 256 records
+/// in a 16-slot ring**. The workload sets `DropNewest` itself, because the
+/// default, `Fail`, refuses instead.
 ///
-/// It would also have reported it as *fast*, and correctly, because discarding
+/// It would also report it as *fast*, and correctly, because discarding
 /// is the cheapest thing a queue can do. So the failure mode is the harness
 /// recommending the candidate that threw the workload away, not just a wrong
 /// number in a column. That is the verdict this crate exists to make

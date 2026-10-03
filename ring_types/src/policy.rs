@@ -105,10 +105,6 @@ pub enum OverflowPolicy {
   /// Discard the oldest unread item to make room for the new one.
   DropOldest,
   /// Publish nothing and return an error, handing the decision to the caller.
-  // Fix(overflow_default_reported_success_for_a_discard): the default was
-  //   `DropNewest`, so a full ring answered `Ok` for a record it dropped.
-  // Root cause: that default protected queued records by dropping the new one.
-  // Pitfall: an explicit `DropNewest` still does this.
   #[default]
   Fail,
 }

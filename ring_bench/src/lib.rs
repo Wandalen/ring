@@ -42,17 +42,14 @@
 //!
 //! # What a push *reported* is not what the ring *kept*
 //!
-//! Until `ring_core`'s ADR 004 moved the default to `Fail`,
-//! `OverflowPolicy::default()` was `DropNewest`, so a bare `RingConfig::new( n )`
-//! configured a ring on which `try_push` returned `Ok` for a record it
-//! discarded. This harness counted those `Ok`s as accepted records in its first
-//! working version, and [`Candidate::ContractRing`] reported **256 successes
-//! into a 16-slot ring**. The run looked lossless, kept 6% of the workload, and
-//! was fast, because discarding is the cheapest thing a queue can do.
+//! Under `OverflowPolicy::DropNewest`, `try_push` returns `Ok` for a record it
+//! discarded. On a 16-slot ring [`Candidate::ContractRing`] reports **256
+//! successes** and keeps 16. A harness that counted those `Ok`s would call the
+//! run lossless, and fast, because discarding is the cheapest thing a queue can
+//! do. The default, `Fail`, refuses instead, but a workload can set any policy.
 //!
-//! A default ring now refuses instead, but a ring that opts in to `DropNewest`
-//! still answers `Ok` for a discard. So [`Outcome::received`] is drained from
-//! the ring and is the only number treated as truth. [`Outcome::reported`]
+//! So [`Outcome::received`] is drained from the ring and is the only number
+//! treated as truth. [`Outcome::reported`]
 //! keeps what the API claimed, and the crate publishes the gap between them as
 //! [`Outcome::silently_discarded`] instead of hiding it, because that gap is
 //! the measurement that separates a path with back-pressure from one without.

@@ -247,7 +247,7 @@ impl<R: Record> Candidate for MutexDeque<R> {
     };
     let rx = MutexRx {
       queue: &self.queue,
-      taken: Vec::with_capacity(self.capacity),
+      scratch: Vec::with_capacity(self.capacity),
     };
 
     run.run(vec![tx; producers], rx)
@@ -286,7 +286,9 @@ impl<R: Record> Tx<R> for MutexTx<'_, R> {
 
 struct MutexRx<'a, R> {
   queue: &'a Mutex<VecDeque<R>>,
-  taken: Vec<R>,
+  /// A throwaway reuse buffer: records land here under the lock and leave it at the next call.
+  /// Nothing reads its contents between calls.
+  scratch: Vec<R>,
 }
 
 impl<R: Record> Rx<R> for MutexRx<'_, R> {
@@ -295,16 +297,16 @@ impl<R: Record> Rx<R> for MutexRx<'_, R> {
     record.map(sink).is_some()
   }
 
-  // Copied out under the lock and handed to `sink` after it: the lock guards the queue, not the
-  // consumer's work.
+  // Copied out under the lock into `scratch` and handed to `sink` after it: the lock guards the
+  // queue, not the consumer's work.
   fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
     {
       let mut queue = lock(self.queue);
       let n = max.min(queue.len());
-      self.taken.extend(queue.drain(..n));
+      self.scratch.extend(queue.drain(..n));
     }
-    let n = self.taken.len();
-    self.taken.drain(..).for_each(sink);
+    let n = self.scratch.len();
+    self.scratch.drain(..).for_each(sink);
 
     n
   }

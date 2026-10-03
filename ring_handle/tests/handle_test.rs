@@ -39,15 +39,16 @@ use ring_core::Ring;
 use ring_handle::Split;
 use ring_types::OverflowPolicy;
 
-/// A ring of `slots` capacity, in the default (SPSC, drop-newest) configuration.
+/// A ring of `slots` capacity, in the default (SPSC, `Fail`) configuration.
 fn ring(slots: usize) -> Ring<u32> {
   Ring::new(&RingConfig::new(slots).unwrap()).unwrap()
 }
 
 /// A ring of `slots` capacity that refuses rather than dropping.
 ///
-/// The default policy is `DropNewest`, under which a full push reports `Ok`
-/// having discarded the record, so a test *about* a refusal needs this one.
+/// `Fail` is the default, so this pins what [`ring`] already does. A test
+/// *about* a refusal uses this one, so it keeps refusing whatever the default
+/// is.
 fn refusing_ring(slots: usize) -> Ring<u32> {
   let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
   Ring::new(&config).unwrap()

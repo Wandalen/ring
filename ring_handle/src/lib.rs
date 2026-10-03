@@ -113,8 +113,9 @@ impl<T: Send> Producer<'_, T> {
   /// Publish one record, or hand it back.
   ///
   /// Never blocks. On a full ring the ring's own `OverflowPolicy` decides:
-  /// `Fail` returns the record, and `DropNewest` discards it and reports success,
-  /// so an `Ok` is not by itself evidence the record was kept.
+  /// `Fail`, the default, returns the record. On a ring built with
+  /// `DropNewest` it is discarded and reported as success, so there an `Ok` is
+  /// not by itself evidence the record was kept.
   ///
   /// # Errors
   ///
@@ -128,8 +129,8 @@ impl<T: Send> Producer<'_, T> {
   ///
   /// The same refusal rule as [`try_push`](Self::try_push): `Err` carries what
   /// did not go in. `Ok( n )` means nothing was refused and the iterator ran
-  /// dry. Under `DropNewest` the result is always `Ok`, and `n` counts the
-  /// records the policy discarded as well as the ones it kept.
+  /// dry. On a ring built with `DropNewest` the result is always `Ok`, and `n`
+  /// counts the records the policy discarded as well as the ones it kept.
   ///
   /// # Errors
   ///

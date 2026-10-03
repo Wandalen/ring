@@ -170,7 +170,7 @@ fn wait_kind_defaults_to_spin() {
 /// `DropOldest` failed one `ring_types` doctest, because `OverflowPolicy::ALL`'s own
 /// doctest asserts `contains( &DropOldest )`. Dropping `DropNewest` passed this
 /// crate **entirely**: 19/19 unit tests and 20/20 doctests green, with the
-/// `#[ default ]` policy gone from the roster. Both were caught downstream, by
+/// then-default policy gone from the roster. Both were caught downstream, by
 /// `ring_stats` (4 failures) and `ring_overflow` (5), which is the wrong place
 /// for it. `ALL` is declared here, so it is validated here.
 #[test]

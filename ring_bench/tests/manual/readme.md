@@ -96,6 +96,27 @@ shortfall into a total stall rather than a partial loss. On the cramped
 workload the measured split is three handing their refusals back, two
 absorbing, one stalling.
 
+**Re-run (2026-10-03), after `ring_core` ADR 004 made `Fail` the default.** The
+same three workloads, through `cargo run -p ring_bench --release --all-features
+--example comparison`. Every header now reads `overflow Fail`. On the cramped
+workload `contract_ring` and `off_the_shelf` read `reported 16, received 16,
+silent 0`, like every other row, so no candidate absorbs a refusal any more.
+`tls_over_ring` reads 16 and 16, as it has since the batch clamp. Roomy and
+parallel are unchanged apart from the header. The output above is the run under
+the old `DropNewest` default, kept as the history behind the change.
+
+```
+1 producer(s) x 256 records, batch 16, capacity 16, overflow Fail
+candidate          offered  reported  received  dropped   silent     write ns
+mutex_queue            256        16        16      240        0        56208
+contract_ring          256        16        16      240        0          708
+tls_over_ring          256        16        16      240        0          708
+direct_spsc            256        16        16      240        0         2625
+direct_mpsc            256        16        16      240        0        45375
+off_the_shelf          256        16        16      240        0          458
+fastest lossless: none — every candidate dropped records
+```
+
 ---
 
 ## B2. Does the suite go red when the eligibility filter is removed?
@@ -265,6 +286,18 @@ FAIL  a_dropnewest_ring_reports_successes_it_did_not_keep
 Summary  18 tests run: 17 passed, 1 failed
 ```
 
+**Re-probe (2026-10-03), under the `Fail` default: red.** Under `Fail` the
+cramped workload's `reported` equals `received` for every candidate, so the
+mapping would be invisible there. The detector now runs on `cramped_dropping`,
+which sets `DropNewest` itself. The same mutation, rewritten for the current
+formatting, fails two tests, as it does on the commit before the default moved:
+
+```
+test a_dropnewest_ring_reports_successes_it_did_not_keep ... FAILED
+test the_record_drop_input_is_guarded_before_the_subtraction_runs ... FAILED
+test result: FAILED. 29 passed; 2 failed
+```
+
 ---
 
 ## Run Record
@@ -287,3 +320,7 @@ asking the suite a question about itself, are the two that found everything.
 After this round the suite is green at 18 + 3 in all three feature
 configurations, B2 and B5 are both confirmed red under mutation, and the
 documentation is corrected against observed output.
+
+**2026-10-03.** B1 and B5 re-run after `ring_core` ADR 004 moved the default
+to `Fail`. B1: the cramped `silent` column is 0 on every row. B5: still red,
+with its detector pinned to `DropNewest`.

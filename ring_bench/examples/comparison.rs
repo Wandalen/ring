@@ -27,8 +27,8 @@ fn main() {
     .with_batch(32)
     .unwrap();
 
-  // 16 slots for 256 records. Every candidate loses, and they lose in three
-  // different ways. That is the point of the row.
+  // 16 slots for 256 records. Every candidate loses 240, and under the default
+  // policy, `Fail`, every one of them refuses what it did not keep.
   let cramped = Workload::new(RingConfig::new(16).unwrap())
     .with_records_per_producer(256)
     .unwrap()
@@ -48,14 +48,16 @@ fn main() {
   section("A — room for everything", "every candidate keeps all 256 records");
   println!("{}", Comparison::run(roomy).report());
 
-  section("B — 256 records into 16 slots", "three different ways to lose");
+  section("B — 256 records into 16 slots", "every candidate refuses what does not fit");
   println!("{}", Comparison::run(cramped).report());
   println!(
     "  reading: `silent` is the gap between what the write API reported and what\n\
-     \x20          the drain produced. Two candidates report 256 successes and keep 16.\n\
-     \x20          `tls_over_ring` keeps nothing at all — a rejected first flush leaves\n\
-     \x20          its records staged, and the harness does not retry, so every later\n\
-     \x20          append fails. Staging turns a shortfall into a stall."
+     \x20          the drain produced. It is 0 on every row because every candidate\n\
+     \x20          refuses what does not fit. Under `DropNewest`, `contract_ring` and\n\
+     \x20          `off_the_shelf` would report 256 successes and keep 16.\n\
+     \x20          `tls_over_ring` keeps one batch: its first flush fills the ring,\n\
+     \x20          the next is rejected and the harness does not retry, so every\n\
+     \x20          later append fails."
   );
 
   section("C — four producers", "the export Contract caps what the structures do not");

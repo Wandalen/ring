@@ -42,20 +42,22 @@
 //!
 //! # What a push *reported* is not what the ring *kept*
 //!
-//! `OverflowPolicy::default()` is `DropNewest`, so a bare `RingConfig::new( n )`
-//! configures a ring on which `try_push` returns `Ok` for a record it discarded.
-//! This harness counted those `Ok`s as accepted records in its first working
-//! version, and [`Candidate::ContractRing`] reported **256 successes into a
-//! 16-slot ring**. The run looked lossless, kept 6% of the workload, and was
-//! fast, because discarding is the cheapest thing a queue can do.
+//! Until `ring_core`'s ADR 004 moved the default to `Fail`,
+//! `OverflowPolicy::default()` was `DropNewest`, so a bare `RingConfig::new( n )`
+//! configured a ring on which `try_push` returned `Ok` for a record it
+//! discarded. This harness counted those `Ok`s as accepted records in its first
+//! working version, and [`Candidate::ContractRing`] reported **256 successes
+//! into a 16-slot ring**. The run looked lossless, kept 6% of the workload, and
+//! was fast, because discarding is the cheapest thing a queue can do.
 //!
-//! So [`Outcome::received`] is drained from the ring and is the only number
-//! treated as truth. [`Outcome::reported`] keeps what the API claimed, and the
-//! crate publishes the gap between them as [`Outcome::silently_discarded`]
-//! instead of hiding it, because that gap is the measurement that separates a
-//! path with back-pressure from one without. [`Outcome::conserved`] is `false`
-//! exactly when that gap is open, and a `false` is a fact about the policy
-//! rather than a failure of the run.
+//! A default ring now refuses instead, but a ring that opts in to `DropNewest`
+//! still answers `Ok` for a discard. So [`Outcome::received`] is drained from
+//! the ring and is the only number treated as truth. [`Outcome::reported`]
+//! keeps what the API claimed, and the crate publishes the gap between them as
+//! [`Outcome::silently_discarded`] instead of hiding it, because that gap is
+//! the measurement that separates a path with back-pressure from one without.
+//! [`Outcome::conserved`] is `false` exactly when that gap is open, and a
+//! `false` is a fact about the policy rather than a failure of the run.
 //!
 //! The trap is "Ok does not mean kept under `DropNewest`", and this crate is
 //! where it was paid for. The trap corrupts a *verdict*, not a record, and the
@@ -575,10 +577,10 @@ fn destination_of(workload: &Workload, record: Record) -> (usize, i64) {
 /// Three counts, and the distinction between the last two is the crate's most
 /// expensive lesson: [`offered`](Self::offered) is what the workload asked for,
 /// [`reported`](Self::reported) is what the write API said it took, and
-/// [`received`](Self::received) is what the drain actually produced. Under the
-/// default `DropNewest` policy the second can exceed the third by two orders of
-/// magnitude, so every derived judgement here is computed from `received`:
-/// losslessness, drops, and fastest.
+/// [`received`](Self::received) is what the drain actually produced. Under
+/// `DropNewest` the second can exceed the third by two orders of magnitude, so
+/// every derived judgement here is computed from `received`: losslessness,
+/// drops, and fastest.
 #[derive(Debug)]
 pub struct Outcome {
   candidate: Candidate,
@@ -858,11 +860,11 @@ pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunErro
   let stats = RingStats::new();
   // Every counter is the *drained* count, never the reported one. A record that
   // came back out claimed exactly one slot and published it; a record that did
-  // not claimed none, because a `DropNewest` discard never reaches a slot at
-  // all. That mapping is what keeps `in_flight` at zero here, so a nonzero
-  // reading would mean what `ring_stats` says it means (a slot taken and
-  // abandoned) rather than "the workload offered more than the ring could
-  // hold", which is not a leak and is already reported as `dropped`.
+  // not claimed none, because neither a refusal nor a `DropNewest` discard
+  // reaches a slot at all. That mapping is what keeps `in_flight` at zero here,
+  // so a nonzero reading would mean what `ring_stats` says it means (a slot
+  // taken and abandoned) rather than "the workload offered more than the ring
+  // could hold", which is not a leak and is already reported as `dropped`.
   //
   // Fix(in_flight_zero_is_structural): that zero is *structural*, not measured.
   // `in_flight` is `claimed - published` and both are this same expression, so
@@ -870,8 +872,8 @@ pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunErro
   // suite pin the mapping's consequence and cannot fail on their own. The check
   // that can fail, and so guards the mapping, is the expression-level one in
   // `a_dropnewest_ring_reports_successes_it_did_not_keep`, which runs the one
-  // candidate where `reported` and `received` differ and asserts all three
-  // counters against `received`.
+  // candidate where `reported` and `received` differ on a `DropNewest`
+  // workload and asserts all three counters against `received`.
   //
   // Root cause: a derived reading whose two inputs are the same expression is a
   // constant, and an assertion on a constant reads exactly like a measurement.
@@ -894,6 +896,9 @@ pub fn run(candidate: Candidate, workload: &Workload) -> Result<Outcome, RunErro
   // Pitfall: guarding a derived accessor does not guard every computation
   // that shares its expression. Each call site needs its own assertion.
   assert!(received <= offered, "received exceeded offered");
+  // Under the default `Fail` this files under `StatsCounts::failed`, whose doc
+  // says nothing was lost. Here it was: the harness discards every record a
+  // candidate hands back rather than retrying it.
   stats.record_drop(workload.config().overflow(), (offered - received) as u64);
 
   Ok(Outcome {

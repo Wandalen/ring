@@ -190,7 +190,13 @@ impl<R: Record> Tx<R> for MpscTx<'_, R> {
   }
 
   fn push_batch(&mut self, records: &[R]) -> usize {
-    let Ok(mut guard) = self.0.claim_batch(records.len()) else {
+    // The spike's boundary gate is ask-or-fail: an ask wider than the ring can
+    // never be granted (`BatchTooLarge`, not a transient `Full`), so the
+    // adapter clamps to the capacity the way any batching caller must. A
+    // clamped ask stays all-or-nothing — `Full` until the boundary slot's
+    // release marker lands, granted whole after it.
+    let want = records.len().min(self.0.ring().capacity().get());
+    let Ok(mut guard) = self.0.claim_batch(want) else {
       return 0;
     };
     let granted = guard.len();

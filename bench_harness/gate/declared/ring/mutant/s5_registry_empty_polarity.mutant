@@ -20,11 +20,9 @@ round-failures: 1
 detector: removing_a_name_frees_it_for_reuse
 
 --- from
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     self.rings.is_empty()
 --- to
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     true   // PROBE ONLY — G12, was `self.rings.is_empty()`
 --- end

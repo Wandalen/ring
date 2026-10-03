@@ -793,17 +793,9 @@ mod threaded {
   // ───────────────────────────────────────────────────────────────────────────
   // Record accounting, the class of defect no test above can see.
   // ───────────────────────────────────────────────────────────────────────────
-
-  static DROPPED: AtomicUsize = AtomicUsize::new(0);
-
-  #[derive(Default)]
-  struct Tracked;
-
-  impl Drop for Tracked {
-    fn drop(&mut self) {
-      DROPPED.fetch_add(1, Ordering::Relaxed);
-    }
-  }
+  //
+  // Each test declares its own counter. libtest runs tests as threads of one
+  // process, so a counter shared between two tests counts both at once.
 
   /// Every record written is destroyed exactly once.
   ///
@@ -816,7 +808,16 @@ mod threaded {
   /// records, which must destroy exactly the two the consumer left behind.
   #[test]
   fn every_record_written_is_destroyed_exactly_once() {
-    DROPPED.store(0, Ordering::Relaxed);
+    static DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Default)]
+    struct Tracked;
+
+    impl Drop for Tracked {
+      fn drop(&mut self) {
+        DROPPED.fetch_add(1, Ordering::Relaxed);
+      }
+    }
 
     {
       let mut ring: Ring<TypedSlot<Tracked>> = Ring::new(capacity(2));
@@ -847,7 +848,16 @@ mod threaded {
   /// A record taken out of a batch is moved, not copied.
   #[test]
   fn a_taken_record_leaves_its_slot_empty() {
-    DROPPED.store(0, Ordering::Relaxed);
+    static DROPPED: AtomicUsize = AtomicUsize::new(0);
+
+    #[derive(Default)]
+    struct Tracked;
+
+    impl Drop for Tracked {
+      fn drop(&mut self) {
+        DROPPED.fetch_add(1, Ordering::Relaxed);
+      }
+    }
 
     {
       let mut ring: Ring<TypedSlot<Tracked>> = Ring::new(capacity(2));

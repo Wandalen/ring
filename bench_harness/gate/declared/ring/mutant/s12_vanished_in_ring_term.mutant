@@ -23,11 +23,9 @@ round-failures: 1
 detector: closing_leaves_published_records_where_they_are
 
 --- from
-  pub fn vanished( &self ) -> usize
-  {
-    self.accepted.saturating_sub( self.received.len() + self.in_ring_at_end )
+  pub fn vanished(&self) -> usize {
+    self.accepted.saturating_sub(self.received.len() + self.in_ring_at_end)
 --- to
-  pub fn vanished( &self ) -> usize
-  {
-    self.accepted.saturating_sub( self.received.len() - self.in_ring_at_end )   // PROBE ONLY — G12, was `+`
+  pub fn vanished(&self) -> usize {
+    self.accepted.saturating_sub(self.received.len() - self.in_ring_at_end)   // PROBE ONLY — G12, was `+`
 --- end

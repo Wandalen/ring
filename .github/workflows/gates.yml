@@ -18,9 +18,6 @@ on:
     - cron: "0 3 * * *"
   workflow_dispatch:
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   gates:
     name: run_all.sh --family ring

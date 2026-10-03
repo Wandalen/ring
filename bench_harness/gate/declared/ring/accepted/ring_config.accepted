@@ -11,4 +11,4 @@
 # already present and cannot fail. This is an equivalent mutant, and unusually,
 # one where the mutated operator is arguably the clearer way to write it.
 
-ring/ring_config/src/lib.rs:142:27: replace > with >= in RingConfig::with_batch
+ring_config/src/lib.rs:131:27: replace > with >= in RingConfig::with_batch

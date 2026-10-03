@@ -20,11 +20,9 @@ round-failures: 1
 detector: drain_up_to_zero_takes_nothing_and_leaves_the_records_drainable
 
 --- from
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     self.available() == 0
 --- to
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     true   // PROBE ONLY — G12, was `self.available() == 0`
 --- end

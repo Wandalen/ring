@@ -808,25 +808,41 @@ mod threaded {
   // Batched claims — one gate check and one exchange per group of slots.
   // ───────────────────────────────────────────────────────────────────────────
 
-  /// The grant is capped by headroom, not by the ask: a ring with three slots
-  /// free answers `claim_batch( 8 )` with three, and a full ring answers with
-  /// `Full` and no movement at all.
+  /// The grant is ask-or-fail under the spike's boundary gate: the whole ask
+  /// is granted when its boundary slot is free, and nothing otherwise. The
+  /// adaptive prefix grant of `ring_claim::Claimer::claim_up_to` priced a
+  /// partial grant from the consumer cursor — the read the spike removes.
+  /// An ask wider than the capacity can never be satisfied by any drain and
+  /// is refused as `BatchTooLarge`, as a single `claim` wider than the ring
+  /// always was.
+  ///
+  /// Spike delta from the adaptive contract, recorded in the spike's decision
+  /// document.
   #[test]
-  fn a_batch_claim_grants_what_headroom_allows_rather_than_the_full_ask() {
+  fn a_batch_claim_is_ask_or_fail_under_the_boundary_gate() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
     let (producer, _consumer) = ends.split();
 
     producer.push(9).expect("room"); // producer 1, consumer 0: three free
 
-    let batch = producer.claim_batch(8).expect("three slots free");
-    assert_eq!(batch.len(), 3, "granted the headroom, not the ask");
+    assert_eq!(
+      producer.claim_batch(8).err(),
+      Some(RingError::BatchTooLarge {
+        requested: 8,
+        capacity: 4
+      }),
+      "no drain can ever satisfy a wider-than-capacity ask"
+    );
+
+    let batch = producer.claim_batch(3).expect("the whole ask fits inside the lap");
+    assert_eq!(batch.len(), 3);
     assert_eq!(batch.sequence(0), Some(Seq(1)));
     assert_eq!(batch.sequence(2), Some(Seq(3)));
     assert_eq!(batch.sequence(3), None);
     drop(batch);
 
-    assert_eq!(producer.claim_batch(8).err(), Some(RingError::Full));
+    assert_eq!(producer.claim_batch(3).err(), Some(RingError::Full));
     assert_eq!(producer.free_capacity(), 0, "a refused claim advances nothing");
   }
 
@@ -881,20 +897,34 @@ mod threaded {
     assert_eq!(received, vec![3, 4, 5, 6], "issue order, across the wrap");
   }
 
-  /// `push_batch` drains exactly the granted prefix out of the caller's vec,
-  /// leaves the rest in order for the next attempt, and refuses a full ring
-  /// with the vec untouched — the `push` contract, per group.
+  /// `push_batch` is all-or-nothing under the ask-or-fail gate: the whole vec
+  /// goes in as one grant, or the error comes back with the vec untouched —
+  /// the `push` contract, per group. An ask wider than the capacity is
+  /// `BatchTooLarge` rather than a partial grant.
+  ///
+  /// Spike delta from the granted-prefix contract, recorded in the spike's
+  /// decision document.
   #[test]
-  fn push_batch_drains_the_granted_prefix_and_refuses_a_full_ring_untouched() {
+  fn push_batch_is_all_or_nothing_and_refuses_a_full_ring_untouched() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
     let mut ends = ring.ends();
     let (producer, mut consumer) = ends.split();
 
     let mut records: Vec<u8> = (1..=6).collect();
-    assert_eq!(producer.push_batch(&mut records).expect("room for four"), 4);
-    assert_eq!(records, vec![5, 6], "the refused tail stays, in order");
-    assert_eq!(producer.push_batch(&mut records).err(), Some(RingError::Full));
-    assert_eq!(records, vec![5, 6], "a refused batch moves nothing");
+    assert_eq!(
+      producer.push_batch(&mut records).err(),
+      Some(RingError::BatchTooLarge {
+        requested: 6,
+        capacity: 4
+      }),
+      "a wider-than-capacity batch is refused whole"
+    );
+    assert_eq!(records, vec![1, 2, 3, 4, 5, 6], "a refused batch moves nothing");
+
+    let mut fitting = vec![1_u8, 2, 3, 4];
+    assert_eq!(producer.push_batch(&mut fitting).expect("room for four"), 4);
+    assert!(fitting.is_empty(), "the whole grant went in");
+    assert_eq!(producer.push_batch(&mut Vec::new()).expect("nothing to do"), 0);
 
     let mut drained = consumer.drain();
     assert_eq!(drained.len(), 4);
@@ -904,9 +934,9 @@ mod threaded {
     assert_eq!(received, vec![1, 2, 3, 4]);
     drop(drained);
 
-    assert_eq!(producer.push_batch(&mut records).expect("room again"), 2);
-    assert!(records.is_empty());
-    assert_eq!(producer.push_batch(&mut Vec::new()).expect("nothing to do"), 0);
+    let mut again = vec![5_u8, 6];
+    assert_eq!(producer.push_batch(&mut again).expect("room again"), 2);
+    assert!(again.is_empty());
   }
 
   /// Two copies of the `Copy` producer batch-claim disjoint ranges — the
@@ -1063,8 +1093,10 @@ mod threaded {
   /// The reason the stamp is a full `Seq` rather than a ready flag. Slot `i`
   /// carries sequences `i`, `i + capacity`, `i + 2·capacity`, …, a different
   /// value each lap. So a stale stamp fails the drain's equality test for the
-  /// same reason a never-written one does, with no clearing step on the
-  /// consumer's hot path.
+  /// same reason a never-written one does. Under the spike's release protocol
+  /// the drained slot's stamp is the release marker — the sequence advanced by
+  /// `capacity + 1` — which fails that equality for the same reason and never
+  /// reads as a publication.
   #[test]
   fn a_stale_stamp_from_the_previous_lap_does_not_read_as_published() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(2));
@@ -1075,14 +1107,77 @@ mod threaded {
     producer.push(2).expect("room");
     drop(consumer.drain());
 
-    // Slot 0 still stamps `Seq( 0 )` from the first lap; the drain is now
-    // looking for `Seq( 2 )`.
-    assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq::ZERO);
+    // Slot 0 now holds the release marker of `Seq( 0 )`: the sequence advanced
+    // by `capacity + 1`. The drain is looking for `Seq( 2 )`, and the marker is
+    // neither that nor any sequence the scan will ever look for on this slot.
+    assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq(3));
+    assert_eq!(producer.ring().stamps()[1].load(Ordering::Relaxed), Seq(4));
     assert_eq!(consumer.available(), 0);
 
     producer.push(3).expect("room");
     assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq(2));
     assert_eq!(consumer.available(), 1);
+  }
+
+  /// The release marker names the sequence the slot is free for: the drained
+  /// sequence advanced by `capacity + 1`. That value is what the boundary gate
+  /// grants a re-claim on, and it is written by the consumer's drop, after the
+  /// take, before the commit.
+  #[test]
+  fn a_drained_slot_stamps_the_marker_of_the_sequence_it_is_free_for() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    producer.push(1).expect("room");
+    producer.push(2).expect("room");
+    assert_eq!(consumer.drain().len(), 2);
+
+    // `Seq( 0 )` advanced by `capacity + 1` is `Seq( 5 )`; `Seq( 1 )`'s marker
+    // is `Seq( 6 )`. The commit stands at two.
+    assert_eq!(producer.ring().stamps()[0].load(Ordering::Relaxed), Seq(5));
+    assert_eq!(producer.ring().stamps()[1].load(Ordering::Relaxed), Seq(6));
+    assert_eq!(producer.ring().committed(), Seq(2));
+  }
+
+  /// The counterexample the release marker exists for: a claim the cursor has
+  /// passed but whose guard is still live leaves the stamp at `UNSTAMPED`, and
+  /// a gate that read a cleared stamp would regrant the slot a full lap later —
+  /// two exclusive `&mut`s to one slot. The marker gate refuses it, grants the
+  /// taken slot's next lap around it, and grants the held slot's next lap as
+  /// soon as the guard is finally dropped and drained.
+  #[test]
+  fn a_slot_whose_previous_lap_claim_was_never_published_is_never_regranted() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    let published = producer.claim().expect("room"); // sequence 0
+    let held = producer.claim().expect("room"); // sequence 1 — held, never published
+    drop(published); // publishes sequence 0
+
+    assert_eq!(consumer.drain().len(), 1, "only the published record drains");
+
+    // Laps over the taken slot are granted; the held slot's lap is not.
+    assert!(producer.claim().is_ok(), "sequence 2 — a first-lap slot — is free");
+    assert!(producer.claim().is_ok(), "sequence 3 — a first-lap slot — is free");
+    assert!(
+      producer.claim().is_ok(),
+      "sequence 4 — the taken slot's next lap — is granted on its marker"
+    );
+    assert_eq!(
+      producer.claim().err(),
+      Some(RingError::Full),
+      "sequence 5 — the held slot's next lap — must be refused while the guard is live"
+    );
+
+    drop(held); // publishes sequence 1 at last
+    assert_eq!(consumer.drain().len(), 4, "the whole contiguous run drains");
+
+    assert!(
+      producer.claim().is_ok(),
+      "the released slot's next lap is granted once its record was taken"
+    );
   }
 
   #[test]
@@ -1522,6 +1617,9 @@ mod exhaustive {
   use ring_types::Capacity;
 
   const WRITTEN: usize = 0xABC;
+  /// The second lap's payload value, distinct from [`WRITTEN`], so a model can
+  /// tell a reclaimed record from the first lap's.
+  const REWRITTEN: usize = 0xBCD;
 
   /// Ends that outlive the model's threads.
   ///
@@ -1662,6 +1760,149 @@ mod exhaustive {
 
       writer.join().expect("no panic");
       reader.join().expect("no panic");
+    });
+  }
+
+  /// A reclaimed slot is overwritten only after the record it held was taken.
+  ///
+  /// The release/reclaim edge — the core new protocol step of the spike. The
+  /// first lap is published before any concurrency; the reader then drains,
+  /// takes both records and drops the batch, which stores the release
+  /// markers; the second writer races that drop to re-claim both slots for
+  /// their next lap and overwrite the payload atomics with a second value.
+  /// Every record the second drain hands out on a reclaimed slot must carry
+  /// the second write: the gate's `Acquire` read of the marker is what orders
+  /// it after the reader's take.
+  ///
+  /// Red when the marker arithmetic is wrong: a marker that collides with a
+  /// published value makes the second drain hand out a slot nobody
+  /// republished, which either the `grants == 0` emptiness assertion or the
+  /// payload assertion catches.
+  #[test]
+  fn a_reclaimed_slot_is_overwritten_only_after_its_record_was_taken() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let grants = &*Box::leak(Box::new(AtomicUsize::new(0)));
+      let (producer, mut consumer) = leaked_ends().split();
+
+      // Lap zero, before any concurrency: both records written and published.
+      payloads[0].store(WRITTEN, Ordering::Relaxed);
+      payloads[1].store(WRITTEN, Ordering::Relaxed);
+      drop(producer.claim_batch(2).expect("an empty ring has room for the whole grant"));
+
+      let reader = loom::thread::spawn(move || {
+        let first = consumer.drain();
+        let first_len = first.len();
+        for offset in 0..first_len {
+          let seq = first.start().advanced_by(offset as u64);
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            WRITTEN,
+            "the first drain observed sequence {seq:?} before its payload write"
+          );
+        }
+        drop(first); // stores the release markers for the taken prefix
+
+        let second = consumer.drain();
+        let second_len = second.len();
+        for offset in 0..second_len {
+          let seq = second.start().advanced_by(offset as u64);
+          let expected = if seq.0 >= 2 { REWRITTEN } else { WRITTEN };
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            expected,
+            "sequence {seq:?} carried neither its first-lap nor its reclaimed write"
+          );
+        }
+        drop(second);
+
+        second_len
+      });
+
+      let second_writer = loom::thread::spawn(move || {
+        if let Ok(batch) = producer.claim_batch(2) {
+          grants.fetch_add(1, Ordering::Relaxed);
+          payloads[0].store(REWRITTEN, Ordering::Relaxed);
+          payloads[1].store(REWRITTEN, Ordering::Relaxed);
+          drop(batch);
+        }
+      });
+
+      let second_len = reader.join().expect("no panic");
+      second_writer.join().expect("no panic");
+
+      if grants.load(Ordering::Relaxed) == 0 {
+        assert_eq!(
+          second_len, 0,
+          "a stamp nobody republished read as published — the release marker collided with a publication value"
+        );
+      }
+    });
+  }
+
+  /// A slot whose previous-lap claim was never published is never regranted.
+  ///
+  /// The counterexample the release marker exists for. A claim the claim
+  /// cursor has passed but whose guard is still live leaves the stamp at
+  /// `UNSTAMPED` on the first lap. A gate that read a cleared stamp cannot
+  /// tell that from free, and the cursor — a full lap ahead between a claim
+  /// and its publish — regrants the slot out from under the live guard: two
+  /// exclusive `&mut`s to one slot. Here sequence 1 is claimed and
+  /// deliberately never published; two writers race the reclaim of both
+  /// slots, and however the interleaving goes, at most one grant may ever
+  /// land: sequence 2, whose record was taken, and never sequence 3.
+  ///
+  /// Red under the cleared-stamp design this spike replaced, which grants
+  /// sequence 3 and brings the total to two.
+  #[test]
+  fn a_loom_model_of_the_never_published_slot_never_being_regranted() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let grants = &*Box::leak(Box::new(AtomicUsize::new(0)));
+      let (producer, mut consumer) = leaked_ends().split();
+
+      // Sequence 0: written, then published. Sequence 1: claimed and
+      // deliberately never published — the guard is leaked, so its `Drop`
+      // never runs and its stamp never moves off `UNSTAMPED`.
+      payloads[0].store(WRITTEN, Ordering::Relaxed);
+      drop(producer.claim().expect("an empty ring has room"));
+      core::mem::forget(producer.claim().expect("a two-slot ring has room for two"));
+
+      let reader = loom::thread::spawn(move || {
+        let drained = consumer.drain();
+        for offset in 0..drained.len() {
+          let seq = drained.start().advanced_by(offset as u64);
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            WRITTEN,
+            "the drain observed sequence {seq:?} before its payload write"
+          );
+        }
+        drop(drained); // stores the release marker for sequence 0, if taken
+      });
+
+      let second_writer = loom::thread::spawn(move || {
+        if let Ok(reserved) = producer.claim() {
+          grants.fetch_add(1, Ordering::Relaxed);
+          payloads[0].store(REWRITTEN, Ordering::Relaxed);
+          drop(reserved);
+        }
+      });
+
+      let third_writer = loom::thread::spawn(move || {
+        if producer.claim().is_ok() {
+          grants.fetch_add(1, Ordering::Relaxed);
+        }
+      });
+
+      reader.join().expect("no panic");
+      second_writer.join().expect("no panic");
+      third_writer.join().expect("no panic");
+
+      assert!(
+        grants.load(Ordering::Relaxed) <= 1,
+        "sequence 3 — the never-published slot's next lap — was granted"
+      );
     });
   }
 }

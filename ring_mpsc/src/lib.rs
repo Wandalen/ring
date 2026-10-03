@@ -21,25 +21,36 @@
 //! is published exactly when its stamp equals the sequence addressing it. No
 //! producer waits for another to publish; the consumer pays a scan instead.
 //!
-//! # Why the stamp needs no sentinel
+//! # What a stamp says, across the slot's whole life
 //!
-//! A stamp holds the sequence whose payload occupies that slot. Sequences
-//! `i`, `i + capacity`, `i + 2·capacity`, … all address slot `i`, a different
-//! one on every lap. So the drain's test is equality against the sequence it
-//! is *looking for*, and a stale stamp from the previous lap fails it for the
-//! same reason a never-written one does. Stamps are initialised to
-//! [`UNSTAMPED`] only so that lap zero has something that is not a valid
-//! sequence to fail against.
+//! A stamp holds one of three values. [`UNSTAMPED`]: the slot has never been
+//! claimed. The sequence addressing the slot: a producer published there and
+//! the consumer has not committed past that lap yet. And the **release
+//! marker**, the published sequence advanced by `capacity + 1`: the consumer
+//! took the record, and the stamp now names exactly the next-lap sequence the
+//! slot is free for. The claim's boundary gate grants a re-claim on that
+//! marker and nothing else, so a slot whose previous-lap claim is still held —
+//! stamp still [`UNSTAMPED`] on the first lap, still the old published
+//! sequence after it — is refused, and a claim never writes a stamp of its
+//! own.
 //!
-//! This is why the stamp is a full [`Seq`] and not a one-bit ready flag. A flag
-//! would need clearing on reclamation. That is a second write to the same line,
-//! on the consumer's hot path, to re-establish what the sequence already
-//! encodes.
+//! The marker rather than a clear back to [`UNSTAMPED`] is what makes that
+//! refusal automatic. A cleared stamp cannot be told from a never-published
+//! one, and the claim cursor — which runs a full lap ahead of publication
+//! between one producer's claim and its publish — would regrant a slot a live
+//! guard still holds. The marker names the sequence it freed, and only the
+//! consumer writes it, so the gate's `Acquire` read of it is the whole
+//! consumer→producer edge: the take happened before the marker, and the
+//! overwrite happens after the gate read it.
+//!
+//! The stamp stays a full [`Seq`], one distinct value per lap, which is what
+//! lets the release marker name the lap it frees and never collide with the
+//! published values the drain scans for. A one-bit ready flag can do neither.
 //!
 //! # The claim is lock-free, not wait-free
 //!
-//! [`ring_claim::Claimer::claim`] is a compare-exchange loop, because it checks
-//! headroom against the consumer and grants in one step. A better claim could
+//! The claim is a compare-exchange loop, because it checks the boundary slot's
+//! release marker and grants in one step. A better claim could
 //! not remove the loop. A `fetch_add` claim on a *bounded* ring hands out
 //! sequences past the consumer's tail and then has to undo them, and there is
 //! no wait-free undo. **Wait-freedom and bounded capacity are exclusive at the
@@ -89,7 +100,8 @@
 //! **Enforced by.** Not the compiler, which accepts any `Ordering`.
 //! `the_orderings_are_the_ones_the_publication_invariant_names` pins the
 //! ordering constants' values, and the loom models in `tests/mpsc_test.rs`'s
-//! `exhaustive` module check the publish edge under `--cfg loom`.
+//! `exhaustive` module check the publish edge and the spike's release/reclaim
+//! edge under `--cfg loom`.
 //! `docs/workaround/readme.md` records that nothing behavioural checks
 //! `COMMIT`.
 //!
@@ -292,11 +304,12 @@ pub const OBSERVE: Ordering = Ordering::Acquire;
 
 /// The ordering the consumer releases drained slots with.
 ///
-/// `Release`, paired with the producers' [`ring_cursor::GATING`] read of the
-/// same cursor inside [`ring_claim::Claimer::claim`]'s headroom check. The
-/// consumer's payload reads precede this store in program order and must not
-/// sink below it, or a producer that observes the advance overwrites a slot
-/// still being read.
+/// `Release`. The consumer's payload reads precede this store in program order
+/// and must not sink below it. Since the spike's boundary gate, the producers
+/// no longer read this cursor on the claim path — the gate reads the release
+/// markers [`Batch::drop`] stores first — so the commit is the consumer's own
+/// bookmark and the input of the advisory [`Producer::free_capacity`], and
+/// this ordering guards those readers rather than the producers' gate.
 ///
 /// The external design corpus gets this one wrong, and this crate diverges from
 /// it on purpose. It advances the read cursor `Relaxed`, justified as "the
@@ -326,6 +339,15 @@ pub const COMMIT: Ordering = Ordering::Release;
 /// assert_eq!( ring_cursor::GATING, Ordering::Acquire );
 /// ```
 pub const OWN: Ordering = Ordering::Relaxed;
+
+/// The ordering the boundary-gated claim's successful compare-exchange runs at.
+///
+/// `AcqRel`, the same value `ring_claim::Claimer::claim` uses for its
+/// `CLAIM_SUCCESS`; duplicated here because that constant is private to its
+/// crate and this spike's claim loop runs in `ring_mpsc`. A successful
+/// exchange releases this producer's stamp writes to every later claimer and
+/// acquires whatever the producer whose cursor value it replaced had done.
+const CLAIM_SUCCESS: Ordering = Ordering::AcqRel;
 
 /// A ring many threads write and one thread reads.
 ///
@@ -412,17 +434,22 @@ pub struct Ring<S> {
 // it claimed and has not yet stamped, and the consumer reads only slots whose
 // stamp equals the sequence addressing them. The producer writes a stamp after
 // the payload and before the claim of the next lap's sequence for that slot,
-// and `Claimer`'s headroom check gates that claim behind the consumer's commit.
-// The stamp carries the producer→consumer happens-before edge (`PUBLISH` store,
-// `OBSERVE` load) and the consumer cursor carries the consumer→producer one
-// (`COMMIT` store, `GATING` load). `S : Send` is required because a record is
-// written on a producer's thread and read on the consumer's.
+// and the claim's boundary gate grants that claim only on the slot's release
+// marker — the value `Batch::drop` stores after taking the record — so a slot
+// is overwritten only once its record is out. The stamp carries the
+// producer→consumer happens-before edge (`PUBLISH` store, `OBSERVE` load) and
+// the release marker carries the consumer→producer one (`PUBLISH` store of the
+// marker, `GATING` load in the boundary gate); the consumer cursor is the
+// consumer's own bookmark and feeds only the advisory `free_capacity`.
+// `S : Send` is required because a record is written on a producer's thread and
+// read on the consumer's.
 //
 // The disjointness argument holds only for the first `ends` on a ring. A second
 // call starts a new claim cursor at zero while the consumer cursor and stamps
-// keep their values, so the headroom check no longer keeps two claims off one
-// slot. `Ring::ends` documents it as a pitfall until the claim cursor carries
-// over.
+// keep their values, so neither the old headroom check nor the boundary gate
+// keeps two claims off one slot. `Ring::ends` documents it as a pitfall; the
+// claim cursor carries over since the fix, which is what makes a second call
+// sound.
 unsafe impl<S: Send> Sync for Ring<S> {}
 
 impl<S: Slot + Default> Ring<S> {
@@ -601,6 +628,39 @@ impl<S> Ring<S> {
     end
   }
 
+  /// Whether a grant ending at `boundary` may be issued.
+  ///
+  /// The spike's capacity gate, read instead of the consumer cursor. A grant
+  /// is free when its whole range is free; releases are a contiguous prefix
+  /// of the claim order — the consumer commits contiguous runs and a live
+  /// [`Batch`] pins its whole range — so the boundary, the grant's largest
+  /// sequence, is the only slot that has to be asked.
+  ///
+  /// A `boundary` below the capacity is a first-lap sequence: the claim
+  /// cursor sits at or before it, so the slot was never claimed and nothing
+  /// can be writing it. Free without a read.
+  ///
+  /// Otherwise the gate reads the slot's stamp once, `Acquire`, and grants
+  /// exactly when it holds the release marker of the boundary's previous-lap
+  /// sequence — `boundary + 1`, the value [`Batch::drop`] stored when it took
+  /// that record. A slot whose previous-lap claim is still held reads
+  /// [`UNSTAMPED`] on the first lap or the old published sequence on a later
+  /// one, never the marker, and is refused — the claim cursor, which can run
+  /// a full lap ahead of publication between a claim and its publish, must
+  /// not regrant a slot a live guard still owns.
+  ///
+  /// **Do not weaken the comparison below.** Only equality with the marker is
+  /// correct, exactly as `contiguous_end` accepts only equality with the
+  /// sequence it is looking for. `a_slot_whose_previous_lap_claim_was_never_published_is_never_regranted`
+  /// catches the cleared-stamp variant of this mistake.
+  fn boundary_free(&self, boundary: Seq) -> bool {
+    if boundary.0 < self.capacity().get() as u64 {
+      return true;
+    }
+
+    self.stamp(boundary).load(GATING) == boundary.next()
+  }
+
   /// The stamp cell addressing `seq`.
   fn stamp(&self, seq: Seq) -> &AtomicSeq {
     let index = (seq.0 as usize) & self.capacity().mask();
@@ -700,15 +760,16 @@ impl<S> Ring<S> {
   ///   can have claimed `seq`, because the claim is a compare-exchange over one
   ///   cursor. The consumer cannot be reading it, because the stamp has not
   ///   been stored. No producer of a later lap can have claimed it, because
-  ///   the claim's headroom check gates on the consumer's commit, which cannot
-  ///   pass this sequence before it is even drained.
+  ///   the claim's boundary gate grants the next lap only on the release
+  ///   marker this slot's drain stores, which cannot exist before the record
+  ///   is even taken.
   /// - **A published, not-yet-committed consumer batch.** Reached through
   ///   [`Batch::get_mut`], between `drain`/`drain_up_to` and the batch's
   ///   `Drop`. The producer that published `seq` has already released its own
   ///   `&mut` (the stamp store happens in [`Reserved`]'s `Drop`, strictly after
   ///   its last write). No later producer may claim `seq` again until this
-  ///   batch's `Drop` commits it. That is the same headroom gate as above, seen
-  ///   from the consumer's side.
+  ///   batch's `Drop` stores the release marker. That is the same boundary
+  ///   gate as above, seen from the consumer's side.
   #[allow(clippy::mut_from_ref)]
   unsafe fn slot_mut(&self, seq: Seq) -> &mut S {
     // SAFETY: the caller is the slot's sole owner under one of the two regimes
@@ -856,7 +917,7 @@ impl<'a, S> Producer<'a, S> {
   /// drop( ( first, second ) );
   /// ```
   pub fn claim(&self) -> Result<Reserved<'a, S>, RingError> {
-    let claim = self.claimer.claim(1)?;
+    let claim = self.claim_gated(1)?;
 
     Ok(Reserved {
       ring: self.ring,
@@ -864,19 +925,61 @@ impl<'a, S> Producer<'a, S> {
     })
   }
 
-  /// Reserve up to `max` sequences with one gate check and one exchange.
+  /// The spike's boundary-gated claim: `count` contiguous sequences for one
+  /// stamp read and one compare-exchange, with no consumer-cursor read.
   ///
-  /// The batched form of [`claim`]: the claimer grants `1..=max` contiguous
-  /// sequences — whatever headroom the gate allows at the value the exchange
-  /// runs against — and the whole grant costs one read of the consumer cursor
-  /// and one compare-exchange, no matter how many sequences it covers. A
-  /// producer that writes records in groups amortises the contended step over
-  /// the group instead of paying it per record.
+  /// The loop shape is `ring_claim::Claimer::claim`'s — load the claim cursor,
+  /// ask the gate, win the range with a `compare_exchange_weak`, spin on
+  /// loss — with the headroom check replaced by [`Ring::boundary_free`]. The
+  /// gate reads the boundary slot's own cache line, the line the grant is
+  /// about to write anyway, which is the whole point of the spike: the
+  /// consumer's line stops flying to every producer on every record.
   ///
-  /// The grant is *adaptive*: a ring with three slots free answers a
-  /// `claim_batch( 64 )` with three sequences, so a producer under pressure
-  /// keeps making progress at whatever width the ring allows rather than
-  /// spinning until the full width appears.
+  /// Callers guarantee `count >= 1`; a zero-width claim is refused by
+  /// [`claim_batch`](Self::claim_batch) before reaching here.
+  fn claim_gated(&self, count: usize) -> Result<Claim, RingError> {
+    debug_assert!(count >= 1, "a zero-width claim is refused by the callers");
+    let mut current = self.ring.claim_cursor.load(GATING);
+
+    loop {
+      let boundary = current.advanced_by(count as u64 - 1);
+
+      if self.ring.boundary_free(boundary) {
+        let next = current.advanced_by(count as u64);
+
+        match self
+          .ring
+          .claim_cursor
+          .compare_exchange_weak(current, next, CLAIM_SUCCESS, GATING)
+        {
+          Ok(_) => return Ok(Claim::new(current, count)),
+          Err(actual) => {
+            core::hint::spin_loop();
+            current = actual;
+          }
+        }
+      } else {
+        return Err(RingError::Full);
+      }
+    }
+  }
+
+  /// Reserve `max` sequences with one gate check and one exchange.
+  ///
+  /// The batched form of [`claim`]: the grant is **ask-or-fail** — the whole
+  /// `max` range is granted when its boundary slot is free, and nothing is
+  /// granted otherwise. One stamp read and one compare-exchange cover the
+  /// whole grant, no matter how many sequences it carries; a producer that
+  /// writes records in groups amortises the contended step over the group
+  /// instead of paying it per record.
+  ///
+  /// The spike replaces the adaptive `1..=max` grant of
+  /// `ring_claim::Claimer::claim_up_to`, which priced a partial grant from
+  /// the consumer cursor — the read this spike exists to remove. A ring with
+  /// three slots' worth of release markers up now answers a
+  /// `claim_batch( 64 )` with [`RingError::Full`] where the adaptive grant
+  /// answered with three sequences; the caller retries at its own width.
+  /// Recorded as a semantic delta in the spike's decision record.
   ///
   /// The returned [`ReservedBatch`] reaches its slots by offset and publishes
   /// the whole grant when dropped — including any offset that was never
@@ -889,8 +992,11 @@ impl<'a, S> Producer<'a, S> {
   ///
   /// # Errors
   ///
-  /// [`RingError::Full`] when nothing is granted — the ring is full, or `max`
-  /// is zero. Nothing advances.
+  /// [`RingError::Full`] when the boundary slot is not free — including when
+  /// fewer than `max` slots are free, where the adaptive grant would have
+  /// granted a prefix — or when `max` is zero. Nothing advances.
+  /// [`RingError::BatchTooLarge`] when `max` exceeds the capacity, which no
+  /// amount of draining can ever satisfy.
   ///
   /// ```
   /// use ring_mpsc::Ring;
@@ -908,8 +1014,20 @@ impl<'a, S> Producer<'a, S> {
   /// drop( batch );
   /// ```
   pub fn claim_batch(&self, max: usize) -> Result<ReservedBatch<'a, S>, RingError> {
-    let claim = self.claimer.claim_up_to(max)?;
+    let capacity = self.ring.capacity().get();
 
+    if max > capacity {
+      return Err(RingError::BatchTooLarge {
+        requested: max,
+        capacity,
+      });
+    }
+
+    if max == 0 {
+      return Err(RingError::Full);
+    }
+
+    let claim = self.claim_gated(max)?;
     Ok(ReservedBatch { ring: self.ring, claim })
   }
 
@@ -920,6 +1038,13 @@ impl<'a, S> Producer<'a, S> {
   /// structural property of a contended claim, and it is why the value is a
   /// hint rather than a guarantee. The only reliable question is whether
   /// [`claim`] succeeded.
+  ///
+  /// Under the spike's boundary gate the figure is computed from the consumer
+  /// cursor while the gate itself reads the boundary slot's release marker, so
+  /// the two can disagree in flight — the cursor-based figure may still count
+  /// room a not-yet-released slot does not have, and may miss room the
+  /// markers already opened. The value stays a hint; the hint's contract is
+  /// unchanged.
   ///
   /// [`claim`]: Self::claim
   ///
@@ -1047,19 +1172,19 @@ impl<'a, T> Producer<'a, TypedSlot<T>> {
     Ok(seq)
   }
 
-  /// Claim, write and publish as many of `records` as the ring has room for.
+  /// Claim, write and publish all of `records` as one grant, or none of them.
   ///
   /// The batched convenience over [`claim_batch`](Producer::claim_batch): one
-  /// gate check and one exchange for the whole group, the granted prefix
-  /// drained from `records` and written into the slots, the grant published
-  /// when the guard drops. Returns how many records went in; the rest stay in
-  /// `records`, in order, for the next attempt. An empty `records` returns
+  /// gate check and one exchange for the whole group, `records` drained into
+  /// the slots, the grant published when the guard drops. Returns how many
+  /// records went in — all of them, or none. An empty `records` returns
   /// `Ok( 0 )` without touching the ring.
   ///
   /// # Errors
   ///
-  /// [`RingError::Full`] when nothing was granted — `records` is left
-  /// untouched, exactly as [`push`] leaves the value with its caller.
+  /// [`RingError::Full`] when the grant was refused with any of `records`
+  /// still outstanding — `records` is left untouched, exactly as [`push`]
+  /// leaves the value with its caller.
   ///
   /// [`push`]: Self::push
   ///
@@ -1178,7 +1303,7 @@ impl<S> DerefMut for Reserved<'_, S> {
     // SAFETY: this guard holds an unpublished claim on `self.seq`. It was
     // granted by a compare-exchange no other producer won, the consumer cannot
     // reach it before the stamp is stored, and the next lap's claim of the same
-    // slot is gated behind the consumer's commit of this one.
+    // slot is gated behind the release marker this slot's drain will store.
     unsafe { self.ring.slot_mut(self.seq) }
   }
 }
@@ -1299,9 +1424,9 @@ impl<S> ReservedBatch<'_, S> {
     // sole ownership of every sequence in it — no other producer can win the
     // same range while the grant stands, the consumer cannot reach any of the
     // sequences before their stamps are stored by the drop, and the next
-    // lap's claim of any sequence in the range is gated behind the consumer's
-    // commit of this one. `Reserved`'s safety argument, per sequence of the
-    // range.
+    // lap's claim of any sequence in the range is gated behind the release
+    // markers this range's drain will store. `Reserved`'s safety argument, per
+    // sequence of the range.
     Some(unsafe { ring.slot_mut(seq) })
   }
 }
@@ -1447,15 +1572,18 @@ impl<'a, S> Consumer<'a, S> {
   /// For a consumer that wants a bounded amount of work per tick rather than
   /// whatever accumulated.
   ///
-  /// # Algorithm: scan the stamps, commit once
+  /// # Algorithm: scan the stamps, release the slots, commit once
   ///
   /// The drain loads the stamps forward from [`position`](Self::position), one
   /// load per slot, and stops at the first that is not yet published. It hands
-  /// the run out as one [`Batch`], whose `Drop` commits it with a single store
-  /// to the consumer cursor. Finding a run costs a load per record and releasing
-  /// it costs one store per batch. A drain that finds nothing still pays the
-  /// load at the gap and a `COMMIT` store to the consumer cursor, whose line
-  /// every producer's headroom check reads.
+  /// the run out as one [`Batch`], whose `Drop` stores each slot's release
+  /// marker — the write the spike's claim gate reads — and then commits the
+  /// run with a single store to the consumer cursor. Finding a run costs a
+  /// load per record; releasing it costs one marker store per record plus one
+  /// commit per batch. The markers ride the slot lines the take just touched,
+  /// and the commit's line is no longer on any producer's hot path. A drain
+  /// that finds nothing still pays the load at the gap and a `COMMIT` store
+  /// to the consumer cursor.
   ///
   /// Two alternatives were weighed. Tracking publication with a second cursor
   /// would make each producer wait for the one before it, which the module
@@ -1608,14 +1736,30 @@ impl<S> Batch<'_, S> {
 }
 
 impl<S> Drop for Batch<'_, S> {
-  /// Commit, releasing the slots for reuse.
+  /// Release the batch's slots for their next lap, then commit.
   ///
-  /// The `Release` here pairs with the [`ring_cursor::GATING`] load inside
-  /// every producer's headroom check. Weakening it lets a producer that sees
-  /// the advance overwrite a slot whose read is still in flight. That is the
-  /// same torn read as a missing publish barrier, arriving from the opposite
-  /// direction.
+  /// Each drained slot's stamp becomes its **release marker** — the sequence
+  /// it held advanced by `capacity + 1`, the next-lap sequence the slot is
+  /// free for — stored `Release`, in issue order, before the commit. The
+  /// claim's boundary gate grants a re-claim exactly on that marker, and the
+  /// `Release` here pairs with the gate's `Acquire` read: the payload take
+  /// (the caller's `get_mut`/`take`, strictly before this drop) happened
+  /// before the marker, so a producer that reads it overwrites a slot whose
+  /// record is out. Weakening either side is the same torn overwrite as a
+  /// missing publish barrier, arriving from the opposite direction.
+  ///
+  /// The markers run in issue order and the commit follows them, so a
+  /// boundary marker implies every earlier slot of the run is released too —
+  /// the prefix argument the boundary-only gate rests on. The commit keeps
+  /// its `Release` for the consumer cursor's remaining readers: the
+  /// consumer's own next scan and the advisory `free_capacity`.
   fn drop(&mut self) {
+    let stride = self.ring.capacity().get() as u64 + 1;
+
+    for seq in self.sequences() {
+      self.ring.stamp(seq).store(seq.advanced_by(stride), PUBLISH);
+    }
+
     self
       .ring
       .consumer_cursor()

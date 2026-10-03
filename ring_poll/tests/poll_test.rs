@@ -65,6 +65,12 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
   Ring::new(&config).unwrap()
 }
 
+/// A ring of `slots` capacity that discards the incoming record when full.
+fn dropping_ring(slots: usize) -> Ring<u32> {
+  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::DropNewest);
+  Ring::new(&config).unwrap()
+}
+
 /// Counting records, `size` at a time, with one `None` after each burst.
 ///
 /// `Iterator` permits a `Some` after a `None`, and `try_push_batch` stops at the
@@ -417,7 +423,7 @@ fn a_multi_attempt_budget_spends_every_attempt_before_giving_up() {
 /// is unreachable for the same reason.
 #[test]
 fn push_within_under_drop_newest_reports_success_and_keeps_nothing() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
   producer.try_push(1).unwrap();

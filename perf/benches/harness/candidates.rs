@@ -147,9 +147,9 @@ impl<R: Record> Rx<R> for SpscRx<'_, R> {
 
   fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
     let batch = self.0.drain_up_to(max);
-    batch.iter().filter_map(TypedSlot::get).for_each(|&record| sink(record));
-
-    batch.len()
+    // An empty slot — a dropped `ReservedBatch` publishes one per unwritten offset — is not a
+    // record: the count is what `sink` saw, or the checker and the driver drift apart.
+    batch.iter().filter_map(TypedSlot::get).map(|&record| sink(record)).count()
   }
 }
 
@@ -212,9 +212,9 @@ impl<R: Record> Rx<R> for MpscRx<'_, R> {
 
   fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
     let batch = self.0.drain_up_to(max);
-    batch.iter().filter_map(TypedSlot::get).for_each(|&record| sink(record));
-
-    batch.len()
+    // An empty slot — a dropped `ReservedBatch` publishes one per unwritten offset — is not a
+    // record: the count is what `sink` saw, or the checker and the driver drift apart.
+    batch.iter().filter_map(TypedSlot::get).map(|&record| sink(record)).count()
   }
 }
 

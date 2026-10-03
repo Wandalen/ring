@@ -22,12 +22,12 @@
 //! whose entire purpose is to wait cheaply. That multiplier is the reason this
 //! crate needs its own measurement rather than inheriting `ring_cursor`'s.
 //!
-//! ## Why one `#[ test ]`, and why a control arm
+//! ## Why a per-thread counter, and why the control arms
 //!
 //! Both for the reasons `ring_cursor/tests/allocation_test.rs` states at
-//! length: the counter is process-global, and a silently broken counter
-//! reports zero for everything, which is the answer this file is looking
-//! for.
+//! length. Other threads allocate while this test runs, and a silently broken
+//! counter reports zero for everything, which is the answer this file is
+//! looking for.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -42,17 +42,20 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::cell::Cell;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use ring_barrier::Barrier;
 use ring_cursor::{PaddedCursor, SeqCell};
 use ring_types::{RingError, Seq, WaitKind};
 
-/// Allocation calls seen since the process started.
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+  /// Allocation calls this thread has made since it started.
+  static ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
 
-/// Bytes requested since the process started.
-static BYTES: AtomicUsize = AtomicUsize::new(0);
+  /// Bytes this thread has requested since it started.
+  static BYTES: Cell<usize> = const { Cell::new(0) };
+}
 
 /// `std::alloc::System`, plus a tally.
 ///
@@ -62,13 +65,14 @@ static BYTES: AtomicUsize = AtomicUsize::new(0);
 struct Counting;
 
 // SAFETY: every method forwards its arguments unchanged to
-// `std::alloc::System`, which upholds the trait's contract; the two
-// `fetch_add` calls touch only this file's own statics and never the
-// allocation itself.
+// `std::alloc::System`, which upholds the trait's contract. The two counter
+// updates touch only this file's own thread-locals and never the allocation
+// itself. Those thread-locals are `const`-initialised and have no destructor,
+// so reaching them neither allocates nor re-enters this allocator.
 unsafe impl GlobalAlloc for Counting {
   unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-    ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-    BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+    ALLOCATIONS.set(ALLOCATIONS.get() + 1);
+    BYTES.set(BYTES.get() + layout.size());
     // SAFETY: `layout` is passed through untouched, so the caller's own
     // guarantee that it is non-zero-sized and well-formed still holds.
     unsafe { std::alloc::System.alloc(layout) }
@@ -85,13 +89,13 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static ALLOCATOR: Counting = Counting;
 
-/// Allocations and bytes charged while `body` ran.
+/// Allocations and bytes this thread charged while `body` ran.
 fn measure<R>(body: impl FnOnce() -> R) -> (usize, usize, R) {
-  let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
-  let bytes_before = BYTES.load(Ordering::Relaxed);
+  let calls_before = ALLOCATIONS.get();
+  let bytes_before = BYTES.get();
   let value = body();
-  let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
-  let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
+  let calls = ALLOCATIONS.get() - calls_before;
+  let bytes = BYTES.get() - bytes_before;
   (calls, bytes, value)
 }
 
@@ -118,6 +122,33 @@ fn every_barrier_operation_allocates_nothing() {
      mean nothing"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // `over`, `len` and `is_empty` were already zero before the fold changed.
   // They are measured anyway, because a table with some rows measured and

@@ -15,23 +15,26 @@
 //! missing guard. It measures, rather than reasons about, the one property
 //! those documents now assert.
 //!
-//! ## Why one `#[ test ]` and not several
+//! ## Why the counter is per thread
 //!
-//! The counter is process-global. `cargo nextest` gives each test its own
-//! process, but plain `cargo test` runs a file's tests on a thread pool in one
-//! process, where two concurrent measurements would each see the other's
-//! allocations. Writing the whole measurement as one test makes the file
-//! correct under both runners rather than only the one the family happens to
-//! use.
+//! The measuring thread is not the only one allocating. libtest's main thread
+//! does its own bookkeeping while a test runs, and plain `cargo test` runs a
+//! file's other tests beside it on a thread pool. A process-global counter
+//! charged all of that to whichever measurement was open. On CI it failed
+//! `ring_barrier`'s longest measurement about one run in five, always with
+//! 4 allocations of 900 bytes. A counter owned by the thread that reads it
+//! sees only what the measured body allocated, under either runner.
 //!
 //! ## Why the control arm is not optional
 //!
 //! An allocation counter can be silently broken: miscompiled away, never
 //! installed, or counting into a different static. It then reports zero for
 //! everything, which is the answer this file is looking for. `a_control_that_must
-//! _allocate` below forces a real allocation through the same counter in the
-//! same process, so a zero from the measured calls means "nothing allocated"
-//! rather than "nothing was watching".
+//! _allocate` below forces a real allocation through the same counter on the
+//! same thread, so a zero from the measured calls means "nothing allocated"
+//! rather than "nothing was watching". A second arm has another thread
+//! allocate during a measurement that must still read zero, so the counter
+//! cannot drift back to charging the whole process.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
@@ -46,16 +49,19 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::cell::Cell;
+use core::sync::atomic::{AtomicBool, Ordering};
 
 use ring_cursor::PaddedCursor;
 use ring_types::Seq;
 
-/// Allocation calls seen since the process started.
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+  /// Allocation calls this thread has made since it started.
+  static ALLOCATIONS: Cell<usize> = const { Cell::new(0) };
 
-/// Bytes requested since the process started.
-static BYTES: AtomicUsize = AtomicUsize::new(0);
+  /// Bytes this thread has requested since it started.
+  static BYTES: Cell<usize> = const { Cell::new(0) };
+}
 
 /// `std::alloc::System`, plus a tally.
 ///
@@ -65,13 +71,14 @@ static BYTES: AtomicUsize = AtomicUsize::new(0);
 struct Counting;
 
 // SAFETY: every method forwards its arguments unchanged to
-// `std::alloc::System`, which upholds the trait's contract; the two
-// `fetch_add` calls touch only this file's own statics and never the
-// allocation itself.
+// `std::alloc::System`, which upholds the trait's contract. The two counter
+// updates touch only this file's own thread-locals and never the allocation
+// itself. Those thread-locals are `const`-initialised and have no destructor,
+// so reaching them neither allocates nor re-enters this allocator.
 unsafe impl GlobalAlloc for Counting {
   unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-    ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-    BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+    ALLOCATIONS.set(ALLOCATIONS.get() + 1);
+    BYTES.set(BYTES.get() + layout.size());
     // SAFETY: `layout` is passed through untouched, so the caller's own
     // guarantee that it is non-zero-sized and well-formed still holds.
     unsafe { std::alloc::System.alloc(layout) }
@@ -88,13 +95,13 @@ unsafe impl GlobalAlloc for Counting {
 #[global_allocator]
 static ALLOCATOR: Counting = Counting;
 
-/// Allocations and bytes charged while `body` ran.
+/// Allocations and bytes this thread charged while `body` ran.
 fn measure<R>(body: impl FnOnce() -> R) -> (usize, usize, R) {
-  let calls_before = ALLOCATIONS.load(Ordering::Relaxed);
-  let bytes_before = BYTES.load(Ordering::Relaxed);
+  let calls_before = ALLOCATIONS.get();
+  let bytes_before = BYTES.get();
   let value = body();
-  let calls = ALLOCATIONS.load(Ordering::Relaxed) - calls_before;
-  let bytes = BYTES.load(Ordering::Relaxed) - bytes_before;
+  let calls = ALLOCATIONS.get() - calls_before;
+  let bytes = BYTES.get() - bytes_before;
   (calls, bytes, value)
 }
 
@@ -129,6 +136,33 @@ fn the_gating_fold_allocates_nothing_at_every_arity() {
      which is less than the elements alone need"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // The empty case was already free before the `Vec` was removed. An empty
   // `collect()` yields `Vec::new()`, which never reaches the allocator. It is

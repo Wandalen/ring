@@ -38,7 +38,7 @@ fn every_named_field_is_carried() {
 fn defaults_are_the_documented_ones() {
   let cfg = RingConfig::new(8).unwrap();
   assert_eq!(cfg.wait(), WaitKind::Spin);
-  assert_eq!(cfg.overflow(), OverflowPolicy::DropNewest);
+  assert_eq!(cfg.overflow(), OverflowPolicy::Fail);
   assert_eq!(cfg.producers(), 1);
   assert_eq!(cfg.batch(), 1);
 }

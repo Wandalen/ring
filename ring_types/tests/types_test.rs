@@ -204,12 +204,13 @@ fn overflow_policies_partition_by_reporting() {
   assert_eq!(OverflowPolicy::ALL.iter().filter(|p| p.drops_silently()).count(), 2);
 }
 
-/// The default drops the incoming item rather than evicting a queued one, so
-/// an unconfigured ring never discards data a consumer has already been
-/// promised.
+/// The default refuses, so an unconfigured ring neither evicts a queued item
+/// nor reports success for an incoming one it discarded.
 #[test]
-fn overflow_policy_defaults_to_drop_newest() {
-  assert_eq!(OverflowPolicy::default(), OverflowPolicy::DropNewest);
+fn overflow_policy_defaults_to_fail() {
+  assert_eq!(OverflowPolicy::default(), OverflowPolicy::Fail);
+  assert!(OverflowPolicy::default().reports_failure());
+  assert!(!OverflowPolicy::default().drops_silently());
 }
 
 // ---- RingError ------------------------------------------------------------

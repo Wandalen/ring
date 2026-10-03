@@ -59,6 +59,12 @@ fn refusing_ring(slots: usize) -> Ring<u32> {
   Ring::new(&config).unwrap()
 }
 
+/// A ring of `slots` capacity that discards the incoming record when full.
+fn dropping_ring(slots: usize) -> Ring<u32> {
+  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::DropNewest);
+  Ring::new(&config).unwrap()
+}
+
 // ── The reached-test ──────────────────────────────────────────────────────
 
 /// The feature's reached-test: close stops publication, drain recovers what
@@ -221,7 +227,7 @@ fn a_full_guarded_producer_refuses_with_the_transient_arm() {
 /// ring makes pushes visibly fail; filling one does not.
 #[test]
 fn a_full_drop_newest_ring_reports_success_and_keeps_nothing() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (producer, mut consumer) = ends.split();
 
@@ -518,7 +524,7 @@ fn a_batch_into_a_full_refusing_ring_hands_back_the_record_that_was_refused() {
 /// by exactly the overflow. Here that is three claimed, one stored.
 #[test]
 fn a_batch_into_a_full_drop_newest_ring_counts_records_it_did_not_keep() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (producer, mut consumer) = ends.split();
 

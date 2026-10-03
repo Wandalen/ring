@@ -20,11 +20,9 @@ round-failures: 1
 detector: the_log_can_be_cleared_between_scenarios
 
 --- from
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     self.entries.is_empty()
 --- to
-  pub fn is_empty( &self ) -> bool
-  {
+  pub fn is_empty(&self) -> bool {
     true   // PROBE ONLY — G12, was `self.entries.is_empty()`
 --- end

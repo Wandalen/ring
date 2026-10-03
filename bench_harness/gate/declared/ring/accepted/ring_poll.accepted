@@ -37,14 +37,14 @@
 # burst per attempt makes the attempt count observable in the published total.
 # They are held by `mutant/S7`, `S8` and `S9`.
 
-ring/ring_poll/src/lib.rs:298:17: replace < with <= in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with <= in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with == in push_within
-ring/ring_poll/src/lib.rs:307:20: replace < with > in push_within
-ring/ring_poll/src/lib.rs:378:16: replace < with <= in push_batch_within
-ring/ring_poll/src/lib.rs:378:16: replace < with == in push_batch_within
-ring/ring_poll/src/lib.rs:378:16: replace < with > in push_batch_within
-ring/ring_poll/src/lib.rs:414:17: replace < with <= in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with <= in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with == in recv_within
-ring/ring_poll/src/lib.rs:421:16: replace < with > in recv_within
+ring_poll/src/lib.rs:273:17: replace < with <= in push_within
+ring_poll/src/lib.rs:279:20: replace < with <= in push_within
+ring_poll/src/lib.rs:279:20: replace < with == in push_within
+ring_poll/src/lib.rs:279:20: replace < with > in push_within
+ring_poll/src/lib.rs:375:16: replace < with <= in push_batch_within
+ring_poll/src/lib.rs:375:16: replace < with == in push_batch_within
+ring_poll/src/lib.rs:375:16: replace < with > in push_batch_within
+ring_poll/src/lib.rs:407:17: replace < with <= in recv_within
+ring_poll/src/lib.rs:412:16: replace < with <= in recv_within
+ring_poll/src/lib.rs:412:16: replace < with == in recv_within
+ring_poll/src/lib.rs:412:16: replace < with > in recv_within

@@ -15,4 +15,4 @@
 # `is_empty` in the same sweep and are held by `mutant/S2` through `S6`. That
 # this one looks identical and is not is the reason both directories exist.
 
-ring/ring_store/src/lib.rs:190:5: replace Buffer<S>::is_empty -> bool with false
+ring_store/src/lib.rs:182:5: replace Buffer<S>::is_empty -> bool with false

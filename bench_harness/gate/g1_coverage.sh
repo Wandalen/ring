@@ -502,6 +502,11 @@ note=""
 if [ "$lines" -lt "$total" ]; then
   short="$( awk '{ split( $2, a, "/" ); if ( a[ 1 ] < a[ 2 ] ) printf "%s %s ", $1, $2 }' <<<"$per_file" )"
   pct="$( awk "BEGIN{ printf \"%.2f\", 100 * $lines / $total }" )"
+  # Name the lines, not only the files. The ptrace engine runs only on x86_64
+  # Linux, so a shortfall seen in CI may not reproduce anywhere else.
+  echo "    uncovered, as tarpaulin reports them:"
+  awk '/^\|\| Uncovered Lines:/ { f = 1; next } /^\|\| Tested\/Total Lines:/ { f = 0 } f' <<<"$out" \
+    | grep -E "^\|\| ([^ ]*/)?(${scoped})/src/" | sed 's/^|| /        /'
   fail "line coverage ${pct}% (${lines}/${total}), need 100%${note} — short: ${short}"
 fi
 

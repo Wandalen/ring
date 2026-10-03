@@ -105,13 +105,10 @@ pub enum OverflowPolicy {
   /// Discard the oldest unread item to make room for the new one.
   DropOldest,
   /// Publish nothing and return an error, handing the decision to the caller.
-  // Fix(overflow_default_reported_success_for_a_discard): `#[ default ]` sat on
-  //   `DropNewest`, so a ring from a bare `RingConfig::new( n )` answered `Ok` for a
-  //   record it destroyed, and `try_push_batch` drained the whole iterator.
-  // Root cause: the default protected records already queued and gave up the
-  //   incoming one silently, behind an `Ok`.
-  // Pitfall: `DropNewest` is one `with_overflow` away and still answers `Ok` for a
-  //   discard; see `ring_core::Producer::try_push`.
+  // Fix(overflow_default_reported_success_for_a_discard): the default was
+  //   `DropNewest`, so a full ring answered `Ok` for a record it dropped.
+  // Root cause: that default protected queued records by dropping the new one.
+  // Pitfall: an explicit `DropNewest` still does this.
   #[default]
   Fail,
 }

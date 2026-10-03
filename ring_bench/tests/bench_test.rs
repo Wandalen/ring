@@ -101,6 +101,15 @@ fn cramped() -> Workload {
     .unwrap()
 }
 
+/// [`cramped`] under `DropNewest`, where a full ring answers `Ok` and discards.
+fn cramped_dropping() -> Workload {
+  Workload::new(RingConfig::new(16).unwrap().with_overflow(OverflowPolicy::DropNewest))
+    .with_records_per_producer(256)
+    .unwrap()
+    .with_batch(32)
+    .unwrap()
+}
+
 /// Four producers, 1024 records, 4096 slots. Only the unbounded candidates run.
 fn parallel() -> Workload {
   Workload::new(RingConfig::new(4096).unwrap())
@@ -424,11 +433,11 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
 /// trustworthy, which is why this test asserts it rather than noting it.
 #[test]
 fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
-  let workload = cramped();
+  let workload = cramped_dropping();
   assert_eq!(
     workload.config().overflow(),
     OverflowPolicy::DropNewest,
-    "the default policy, which nobody in this test set",
+    "the policy this test is about, set explicitly",
   );
 
   let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
@@ -1343,7 +1352,10 @@ fn every_drained_record_decodes_to_a_producer_the_workload_describes() {
 /// 240.
 #[test]
 fn the_overflow_gap_never_reaches_the_accumulator_table() {
-  let workload = cramped().with_semantics(AccumulatorSemantics::Delta).with_cells(1).unwrap();
+  let workload = cramped_dropping()
+    .with_semantics(AccumulatorSemantics::Delta)
+    .with_cells(1)
+    .unwrap();
 
   let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
   assert_eq!(

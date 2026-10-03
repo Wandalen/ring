@@ -500,18 +500,20 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
   assert!(comparison.fastest().is_none(), "no candidate kept the workload");
 }
 
-/// Under `OverflowPolicy::Fail` the gap closes and every candidate agrees.
+/// Under `OverflowPolicy::Fail`, the default, the gap closes and every
+/// candidate agrees.
 ///
 /// The counterpart to the test above, and the reason the crate reports the gap
 /// instead of designing it out. The gap is a property of the configuration, not
-/// of the paths. Same capacity, same records, one field changed.
+/// of the paths. Same capacity, same records, the policy left at its default.
 #[test]
 fn a_failing_policy_closes_the_gap_for_every_candidate() {
-  let workload = Workload::new(RingConfig::new(16).unwrap().with_overflow(OverflowPolicy::Fail))
-    .with_records_per_producer(256)
-    .unwrap()
-    .with_batch(32)
-    .unwrap();
+  let workload = cramped();
+  assert_eq!(
+    workload.config().overflow(),
+    OverflowPolicy::Fail,
+    "the default policy, which nobody in this test set",
+  );
 
   let comparison = Comparison::run(workload);
   assert!(comparison.conserved(), "every candidate reported exactly what it kept");

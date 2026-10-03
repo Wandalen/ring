@@ -6,27 +6,25 @@
 # in ../accepted/ for exactly that reason. It is false here, and the difference
 # is what this declaration exists to hold.
 #
-# `ring_core::Producer::try_push_batch` pulls a record from the iterator before
-# it can know whether there is room, so a refusal consumes and drops the record
-# it could not place. That crate's own doctest pins this as intended. So every
-# extra attempt against a full ring destroys one more record, and the attempt
-# count is observable after all: not in the published total, not in the
-# consumer's length, but in what is left of the caller's iterator.
-#
-# `try_push` hands the record back on failure. `try_push_batch` eats it. That is
-# the entire difference between this file and the two accepted survivors.
+# One attempt here is a whole `try_push_batch`, which stops at the first `None`
+# its iterator yields. `Iterator` allows a `Some` after a `None`, so a source
+# that yields a burst, then `None` once, then the next burst makes each attempt
+# move exactly one burst, and the published count is the number of attempts.
+# Against a ring with room, one attempt too many is one burst too many.
 
 id: S7
 crate: ring_poll
 file: src/lib.rs
-round: 2026-08-30
+round: 2026-10-01
 round-failures: 1
-detector: push_batch_within_eats_one_record_per_attempt
+detector: push_batch_within_spends_its_whole_budget_while_attempts_keep_moving_records
 
 --- from
+  let mut held = None;
+  let mut attempt = 0;
   while attempt < budget.attempts() {
-    let moved = producer.try_push_batch(records);
 --- to
+  let mut held = None;
+  let mut attempt = 0;
   while attempt <= budget.attempts() {   // PROBE ONLY — G12, was `<`
-    let moved = producer.try_push_batch(records);
 --- end

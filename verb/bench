@@ -1,26 +1,80 @@
 #!/usr/bin/env bash
-#@ purpose: Run ring_bench's comparison example, the family's own benchmark.
+#@ purpose: Run the benchmarks and print the comparison. suite::<name>, default comparison:
+#@          comparison (ring_bench's example), micro / spsc / mpsc / batch (perf, criterion),
+#@          latency (perf, percentiles), report (markdown tables of the last results), all.
+#@          quick::1 runs every perf case once to validate it, no numbers; filter::<text> narrows;
+#@          save::<name> / baseline::<name> save or compare a criterion baseline; out::<file>
+#@          writes the report to a file.
 #@ tags: verb, bench
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 _dry_run=0
+_suite=comparison
+_quick=0
+_filter=
+_save=
+_baseline=
+_out=
 for _arg in "$@"; do
   case "$_arg" in
-    dry::1) _dry_run=1 ;;
+    dry::1)       _dry_run=1 ;;
+    quick::1)     _quick=1 ;;
+    suite::*)     _suite="${_arg#suite::}" ;;
+    filter::*)    _filter="${_arg#filter::}" ;;
+    save::*)      _save="${_arg#save::}" ;;
+    baseline::*)  _baseline="${_arg#baseline::}" ;;
+    out::*)       _out="${_arg#out::}" ;;
     *)
-      echo "verb/bench: unrecognized parameter '$_arg' — expected dry::1" >&2
+      echo "verb/bench: unrecognized parameter '$_arg' — expected suite::<name>, quick::1, filter::<text>, save::<name>, baseline::<name>, out::<file> or dry::1" >&2
       exit 2
       ;;
   esac
 done
 
-_cmd=( cargo run -p ring_bench --all-features --example comparison )
+_names='comparison, micro, spsc, mpsc, batch, latency, report, all'
+case "$_suite" in
+  comparison|micro|spsc|mpsc|batch|latency|report) _suites=( "$_suite" ) ;;
+  all) _suites=( comparison micro spsc mpsc batch latency report ) ;;
+  *)
+    echo "verb/bench: suite::$_suite is not one of $_names" >&2
+    exit 2
+    ;;
+esac
 
-if (( _dry_run )); then
-  printf '%s\n' "${_cmd[*]}"
-  exit 0
+# What each kind of target takes after `--`.
+_criterion=() _latency=() _report=()
+if (( _quick )); then
+  _criterion+=( --test )
+  _latency+=( --test )
+fi
+[ -n "$_save" ] && _criterion+=( --save-baseline "$_save" )
+if [ -n "$_baseline" ]; then
+  _criterion+=( --baseline "$_baseline" )
+  _report+=( --baseline "$_baseline" )
+fi
+[ -n "$_out" ] && _report+=( --out "$_out" )
+if [ -n "$_filter" ]; then
+  _criterion+=( "$_filter" )
+  _latency+=( "$_filter" )
+  _report+=( "$_filter" )
 fi
 
-exec "${_cmd[@]}"
+_run() {
+  if (( _dry_run )); then
+    printf '%s\n' "$*"
+  else
+    "$@"
+  fi
+}
+
+for _s in "${_suites[@]}"; do
+  case "$_s" in
+    comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
+    latency)    _run cargo bench -p perf --bench latency -- "${_latency[@]}" ;;
+    # A quick run saves nothing, so there would be nothing new to report.
+    report)     (( _quick )) || _run cargo run -q -p perf --example report -- "${_report[@]}" ;;
+    *)          _run cargo bench -p perf --bench "$_s" -- "${_criterion[@]}" ;;
+  esac
+done

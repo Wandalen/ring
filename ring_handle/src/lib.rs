@@ -123,11 +123,37 @@ impl<T: Send> Producer<'_, T> {
     self.inner.try_push(record)
   }
 
-  /// Publish as many records as the ring will take, and report how many.
+  /// Publish as many records as the ring will take, and hand back the one it
+  /// refused.
   ///
-  /// Partial acceptance is the normal case; the iterator is left positioned at
-  /// the first record that did not fit.
-  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> usize {
+  /// The same refusal rule as [`try_push`](Self::try_push): `Err` carries what
+  /// did not go in. `Ok( n )` means nothing was refused and the iterator ran
+  /// dry. Under `DropNewest` the result is always `Ok`, and `n` counts the
+  /// records the policy discarded as well as the ones it kept.
+  ///
+  /// # Errors
+  ///
+  /// `( n, record )` when `n` records went in and then the ring refused
+  /// `record`. The iterator resumes after it, so `record` followed by whatever
+  /// the iterator still yields is everything that was not published, in order.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_core::Ring;
+  /// use ring_handle::Split;
+  /// use ring_types::OverflowPolicy;
+  ///
+  /// let config = RingConfig::new( 4 ).unwrap().with_overflow( OverflowPolicy::Fail );
+  /// let ring : Ring< u32 > = Ring::new( &config ).unwrap();
+  /// let mut split = Split::new( ring );
+  /// let mut ends = split.ends();
+  /// let ( mut producer, _consumer ) = ends.split();
+  ///
+  /// let mut records = 0..10;
+  /// assert_eq!( producer.try_push_batch( &mut records ), Err( ( 4, 4 ) ) );
+  /// assert_eq!( records.next(), Some( 5 ) );
+  /// ```
+  pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> Result<usize, (usize, T)> {
     self.inner.try_push_batch(records)
   }
 
@@ -193,7 +219,7 @@ impl<'a, T: Send> Consumer<'a, T> {
   /// let mut split = Split::new( ring );
   /// let mut ends = split.ends();
   /// let ( mut producer, mut consumer ) = ends.split();
-  /// producer.try_push_batch( &mut ( 0..3 ) );
+  /// producer.try_push_batch( &mut ( 0..3 ) ).unwrap();
   ///
   /// let taken : Vec< u32 > = consumer.drain().collect();
   /// assert_eq!( taken, vec![ 0, 1, 2 ] );

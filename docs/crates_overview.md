@@ -240,7 +240,7 @@ c.drain();
 ```
 
 ### `ring_mpsc`. Multi-producer ring.
-`Ring::new(cap)`, `ends()->Ends`, `Ends::split()->(Producer:Copy,Consumer:!Clone/!Sync)`, `Reserved(DerefMut)->publish on drop`, `published_through()`. Per-slot stamp (=seq when published) + consumer scan. No producer waits for its predecessor (unlike `Publisher::publish`); the consumer pays for the scan. `ring_publish`/`ring_consume` deliberately *not* used (cursor-advance shape doesn't fit).
+`Ring::new(cap)`, `ends()->Ends`, `Ends::split()->(Producer:Copy,Consumer:!Clone/!Sync)`, `Reserved(DerefMut)->publish on drop`, `claim_batch(max)->ReservedBatch` (one gate check and one CAS per grant of `1..=max` contiguous; drop publishes every stamp — an unwritten offset publishes an empty record), `push_batch(&mut Vec<T>)`, `published_through()`. Per-slot stamp (=seq when published) + consumer scan. No producer waits for its predecessor (unlike `Publisher::publish`); the consumer pays for the scan. `ring_publish`/`ring_consume` deliberately *not* used (cursor-advance shape doesn't fit).
 > Granny: many senders, one mailman. Each sender stamps its box with its ticket number when done; mailman scans forward "is the stamp what I expect?" No sender waits for another sender. The mailman does a bit more looking instead. Sender handle is copyable (pass it to threads), mailman handle is not.
 ```rust
 let mut r : Ring< TypedSlot< u8 > > = Ring::new( cap );

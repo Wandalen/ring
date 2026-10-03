@@ -440,14 +440,14 @@ fn crossbeam_honours_drop_oldest_by_evicting() {
 // Batch shapes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// A partial batch push reports its count and leaves the iterator positioned.
+/// A partial batch push reports its count and hands back the refused record.
 ///
 /// The iterator's position is the part worth pinning. The refused record was
-/// already taken from the iterator when the push failed, so a caller resuming
-/// from it resumes *after* the refusal, not at it. That is a real edge, and a
-/// caller who assumes otherwise silently drops one record per refusal.
+/// already taken from the iterator when the push failed, so the iterator
+/// resumes *after* it. The record comes back in the `Err`, so the two together
+/// are everything that was not published, in order.
 #[test]
-fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
+fn a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record() {
   const CAPACITY: usize = 2;
 
   for backend in every_backend() {
@@ -456,17 +456,65 @@ fn a_partial_batch_push_reports_its_count_and_consumes_the_refused_record() {
     let (mut producer, _consumer) = ends.split();
 
     let mut records = 0..5_u32;
-    let accepted = producer.try_push_batch(&mut records);
-
     assert_eq!(
-      accepted, CAPACITY,
-      "{backend:?} accepted a different count than it had room for"
+      producer.try_push_batch(&mut records),
+      Err((CAPACITY, 2)),
+      "{backend:?}: two went in, then record 2 was refused and handed back"
     );
     assert_eq!(
       records.next(),
       Some(3),
-      "{backend:?}: record 2 was taken from the iterator by the refusal, so 3 is next"
+      "{backend:?}: the iterator resumes after the refused record"
     );
+  }
+}
+
+/// A batch push into a full `Fail` ring destroys no record on any backend.
+///
+/// The payload counts its own drops, so a record the call swallows shows up as
+/// a drop while the ring, the iterator and the call's result are all still
+/// alive. The result is held in a named binding rather than `let _`, which
+/// would drop a handed-back record on the spot and count it as lost. Then the
+/// record that came back is checked to be the one refused, record 4, rather
+/// than some other record the call happened to keep alive.
+#[test]
+fn a_refused_batch_push_drops_no_record_on_every_backend() {
+  use std::sync::Arc;
+  use std::sync::atomic::{AtomicUsize, Ordering};
+
+  #[derive(Debug)]
+  struct Tracked(u32, Arc<AtomicUsize>);
+  impl Drop for Tracked {
+    fn drop(&mut self) {
+      self.1.fetch_add(1, Ordering::SeqCst);
+    }
+  }
+
+  // Every backend is measured before anything is asserted, so a failure names
+  // all of them rather than stopping at the first.
+  let measured: Vec<_> = every_backend()
+    .into_iter()
+    .map(|backend| {
+      let drops = Arc::new(AtomicUsize::new(0));
+      let mut ring: Ring<Tracked> = ring_on(backend, 4, OverflowPolicy::Fail).unwrap();
+      let mut ends = ring.ends();
+      let (mut producer, _consumer) = ends.split();
+
+      let mut records = (0..6).map(|id| Tracked(id, Arc::clone(&drops)));
+      let outcome = producer.try_push_batch(&mut records);
+      let destroyed = drops.load(Ordering::SeqCst);
+      let handed_back = outcome.map_err(|(accepted, refused)| (accepted, refused.0));
+
+      (backend, destroyed, handed_back)
+    })
+    .collect();
+
+  assert!(
+    measured.iter().all(|(_, destroyed, _)| *destroyed == 0),
+    "a refused record was destroyed, per backend: {measured:?}"
+  );
+  for (backend, _, outcome) in measured {
+    assert_eq!(outcome, Err((4, 4)), "{backend:?}: four went in, then record 4 came back");
   }
 }
 
@@ -479,7 +527,7 @@ fn an_empty_batch_push_is_a_no_op() {
     let (mut producer, consumer) = ends.split();
 
     let mut nothing = core::iter::empty();
-    assert_eq!(producer.try_push_batch(&mut nothing), 0);
+    assert_eq!(producer.try_push_batch(&mut nothing), Ok(0));
     assert!(consumer.is_empty(), "{backend:?} published something from an empty iterator");
   }
 }

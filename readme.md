@@ -21,7 +21,8 @@ measured benchmark.*
 
 The family is the `ring_*` mechanism crates plus `bench_harness`, its
 family-neutral stage-gate and workload oracle. Together they form this
-repository's Cargo workspace ([`Cargo.toml`](Cargo.toml)).
+repository's Cargo workspace ([`Cargo.toml`](Cargo.toml)), with
+[`perf/`](perf/readme.md), the benchmark suite, beside them.
 
 ## Quickstart
 
@@ -141,6 +142,7 @@ The reasoning, its costs, and its removal conditions are recorded in
 | [`ring_debug/`](ring_debug/readme.md) | Runtime invariant checks over a live ring |
 | [`ring_testkit/`](ring_testkit/readme.md) | Determinism-test fixtures driving scripted claim and drain sequences |
 | [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements of mutex, ring, and thread-local staging |
+| [`perf/`](perf/readme.md) | Benchmark suite — the ring family against off-the-shelf queues, under one driver; not a family crate |
 
 ## Tooling
 

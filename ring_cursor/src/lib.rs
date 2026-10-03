@@ -237,6 +237,10 @@ impl SeqCell for PaddedCursor {
   fn compare_exchange(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
     self.0.get().compare_exchange(current, new, success, failure)
   }
+
+  fn compare_exchange_weak(&self, current: Seq, new: Seq, success: Ordering, failure: Ordering) -> Result<Seq, Seq> {
+    self.0.get().compare_exchange_weak(current, new, success, failure)
+  }
 }
 
 /// A ring's two cursors, on two cache lines, with the capacity that relates

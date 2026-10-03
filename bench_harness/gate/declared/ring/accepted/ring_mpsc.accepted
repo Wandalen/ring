@@ -19,4 +19,4 @@
 # `Ring::committed`, both real one-polarity defects found in the same sweep and
 # both now held by `mutant/S4` and `mutant/S11`.
 
-ring_mpsc/src/lib.rs:933:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
+ring_mpsc/src/lib.rs:996:5: replace Producer<'a, S>::on_distinct_lines -> bool with true

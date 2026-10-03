@@ -6,6 +6,7 @@ and `bench_harness/docs/` documents `bench_harness` itself.
 
 | Path | Responsibility |
 |------|-----------------|
+| [`benchmarking_guide.md`](benchmarking_guide.md) | How to run the benchmark suite (`perf`): quick check, full runs, comparison tables, baselines, Windows notes |
 | [`capstone/`](capstone/readme.md) | Rust bootcamp capstone assignment. Production-readiness topics, one file per topic |
 | [`crates_overview.md`](crates_overview.md) | Family-level crate guide. What each crate does, with usage and a plain-words explanation |
 

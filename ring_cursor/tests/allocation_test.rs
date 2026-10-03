@@ -46,7 +46,7 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use ring_cursor::PaddedCursor;
 use ring_types::Seq;
@@ -129,6 +129,33 @@ fn the_gating_fold_allocates_nothing_at_every_arity() {
      which is less than the elements alone need"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // The empty case was already free before the `Vec` was removed. An empty
   // `collect()` yields `Vec::new()`, which never reaches the allocator. It is

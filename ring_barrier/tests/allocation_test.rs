@@ -42,7 +42,7 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use ring_barrier::Barrier;
 use ring_cursor::{PaddedCursor, SeqCell};
@@ -118,6 +118,33 @@ fn every_barrier_operation_allocates_nothing() {
      mean nothing"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // `over`, `len` and `is_empty` were already zero before the fold changed.
   // They are measured anyway, because a table with some rows measured and

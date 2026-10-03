@@ -49,7 +49,7 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use ring_claim::Claimer;
 use ring_gating::GatingSet;
@@ -130,6 +130,33 @@ fn no_claim_and_no_gate_read_allocates() {
      mean nothing"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // The finding's first row: 1000 gate reads, which measured 1000 allocations.
   let (calls, bytes, _) = measure(|| {

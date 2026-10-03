@@ -45,7 +45,7 @@
 #![allow(unsafe_code)]
 
 use core::alloc::{GlobalAlloc, Layout};
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use ring_barrier::Barrier;
 use ring_consume::Consumer;
@@ -120,6 +120,33 @@ fn no_read_of_the_available_range_allocates() {
      mean nothing"
   );
   drop(buffer);
+
+  // The second control: an allocation made on another thread is not charged
+  // here. libtest's main thread allocates while a test runs, and a counter
+  // that charged those allocations to this thread would fail at random.
+  let started = AtomicBool::new(false);
+  let finished = AtomicBool::new(false);
+  std::thread::scope(|scope| {
+    scope.spawn(|| {
+      while !started.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+      drop(core::hint::black_box(Vec::<Seq>::with_capacity(8)));
+      finished.store(true, Ordering::Release);
+    });
+    let (calls, bytes, ()) = measure(|| {
+      started.store(true, Ordering::Release);
+      while !finished.load(Ordering::Acquire) {
+        core::hint::spin_loop();
+      }
+    });
+    assert_eq!(
+      (calls, bytes),
+      (0, 0),
+      "another thread allocated during the measurement — the counter charged \
+       this thread for allocations it never made"
+    );
+  });
 
   // The finding's rows, in the order its table lists them. `position()` never
   // consulted the barrier and so never allocated; the three that follow did.

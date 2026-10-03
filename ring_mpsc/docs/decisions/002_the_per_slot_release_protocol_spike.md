@@ -1,0 +1,161 @@
+# The claim gates on the boundary slot's release marker, if the spike's numbers hold
+
+Status: Rejected by measurement — the protocol is sound but slower where it
+mattered
+
+## Context
+
+The batched claim removed the contention cliff (ADR 001), but the per-record
+path still pays one shared cache line per claim: `Claimer::claim` loads the
+consumer cursor (`headroom → slowest()`, `Acquire`) and the consumer keeps
+rewriting that line. At one producer the sweep measured 32.5 M/s against
+`ArrayQueue`'s 70.7, and 19.6 ns per single-threaded push+pop pair against
+rtrb's 4.4 — while the crate wins the single-threaded fill/drain, which says
+the instructions are not the cost; the cross-core line transfer is. The
+hypothesis, and the spike that tests it, were recorded as open in ADR 001's
+alternatives.
+
+The spike is a prototype on its own branch, not a landing. Its question:
+does removing the consumer-cursor read close the per-record gap without
+regressing the batched path, with the whole correctness suite green?
+
+## Decision under test
+
+- **Release markers.** `Batch::drop` stores each drained slot's stamp as its
+  release marker — the sequence it held advanced by `capacity + 1`, the
+  next-lap sequence the slot is free for — `Release`, in issue order, before
+  the commit. The consumer touches those lines taking the payload anyway.
+- **Boundary gate.** The claim loads the claim cursor, then reads the grant's
+  boundary slot once, `Acquire`. A first-lap boundary is free without a read.
+  A later lap grants exactly on the previous lap's marker. No consumer-cursor
+  read on the claim path.
+- **Ask-or-fail batches.** `claim_batch` grants the whole ask or nothing,
+  replacing `claim_up_to`'s adaptive width, which priced a partial grant from
+  the consumer cursor. An ask wider than the capacity is `BatchTooLarge`.
+- **Unchanged.** The claim cursor and its CAS loop, `contiguous_end`'s
+  equality rule, publish-on-drop guards, the consumer's scan,
+  `free_capacity`/`headroom` (still cursor-based, still advisory),
+  `ring_claim` and `ring_publish` (untouched).
+
+## Why a marker rather than a clear (the soundness note)
+
+The sketch this spike started from cleared stamps to `UNSTAMPED` on commit.
+That is unsound, and the spike found it before measuring: a claim the cursor
+has passed but whose guard is still live leaves its stamp at `UNSTAMPED`
+(first lap), and a gate that reads a cleared stamp cannot tell that from
+free. The claim cursor runs a full lap ahead of publication between one
+producer's claim and its publish, so it would regrant the slot out from
+under the live guard — two exclusive `&mut`s to one slot. The marker names
+the sequence it freed; the gate accepts only the previous lap's marker; the
+held slot is refused by arithmetic alone, with no claim-side stamp write and
+no consumer-cursor read. Pinned by
+`a_slot_whose_previous_lap_claim_was_never_published_is_never_regranted` and
+a loom model of the same race, both verified red under the cleared-stamp
+mutation.
+
+The memory-ordering pair is one direct edge: the consumer's marker store
+(`Release`, after the payload take) and the gate's stamp load (`Acquire`).
+Releases of a batch run in issue order before the commit, so a boundary
+marker implies every earlier slot of the run is released too — the prefix
+argument the boundary-only check rests on. The claim cursor cannot outrun
+the release frontier by a full lap, because the boundary marker certifies
+the previous lap's consumption exactly.
+
+## Semantic deltas (spike, recorded)
+
+- `claim_batch` is ask-or-fail: a ring with fewer than `max` slots free now
+  answers `Full` where the adaptive grant answered with a prefix;
+  `push_batch` is all-or-nothing and a wider-than-capacity ask is
+  `BatchTooLarge`.
+- `free_capacity`/`headroom` keep their cursor computation but can disagree
+  with the gate in flight in either direction; the advisory contract is
+  unchanged.
+- `stamps()` observers see release markers between a slot's laps, where they
+  previously saw the last published sequence.
+
+## Verification gate (this spike)
+
+- ring_mpsc: 43 integration tests (41 + 2 new), 33 doctests, 5 compile_fail,
+  clippy `-D warnings`, fmt — green.
+- Loom 6/6: the four existing publication models plus the release/reclaim
+  edge and the never-regranted counterexample; both new models verified red
+  under the cleared-stamp mutation.
+- Workspace suite across the family — see the verdict below.
+
+## Measurement (2026-10-04, one host, one A/B pair)
+
+Same host and harness as ADR 001's sweep (12 logical CPUs, Windows, QPC
+about 32 ns, criterion baselines saved on `benches` and compared on the
+spike — self-consistent within the pair, not an absolute baseline; the
+session's own baseline at one producer measured 41.1 M/s where the 2026-10-02
+run recorded 32.5, so cross-run absolute comparisons stay forbidden). The
+repro is `verb/bench suite::mpsc` and friends with the spike branch checked
+out; the full tables were generated by
+`verb/bench suite::report baseline::relspike`.
+
+**Against the spike's own success criteria — both failed.**
+
+Per-record sweep, `mpsc/push1_popN`, capacity 1024, change against the
+saved baseline:
+
+| producers → | 1 | 2 | 4 | 8 | 11 |
+|---|---:|---:|---:|---:|---:|
+| mpsc per record | **26.4 M/s (−35.7%)** | 27.1 (+44.9%) | 14.2 (+21.4%) | 8.5 (+14.1%) | 6.1 (−8.8%) |
+| mpsc push32 | 219.6 (−2.7%) | 173.6 (−17.4%) | 155.1 (−24.2%) | 173.1 (−16.7%) | 135.3 (−28.3%) |
+
+- **One producer, the target of the spike: 35.7% worse.** The mechanism the
+  discovery report blamed — the consumer-cursor line read per claim — was
+  not the dominant per-record cost. The gate moved onto the slot's stamp,
+  but the slot line is shared with the payload the consumer is reading, and
+  the protocol adds a consumer-side store per record; at one producer that
+  buys nothing and pays twice. The single-threaded fill/drain rows regressed
+  4–7% the same way, and the pure-refusal micro (`push_full`) doubled
+  (+106.9%): a refused claim now reads a line the consumer owns.
+- **The batched path — the crate's adopted direction (ADR 001) — regressed
+  everywhere that matters**: −17% to −28% across the two-to-eleven producer
+  sweep, −14.5% to −20.3% on the batch suite's 8/32/128, −14.5%
+  oversubscribed. The old consumer paid one cursor store per *batch*; the
+  marker protocol forces one store per *record* on the drain, which is the
+  pipeline's bottleneck at width. That is the batch advantage spent.
+- **The mid band is the one honest win**: +44.9% at two producers, +21.4%
+  at four, +14.1% at eight on the per-record path — where the old gate's
+  cursor line was read-hot across all producers, per-slot stamp gates read
+  disjoint lines. Real, but it cannot pay for the batched regression.
+- Ping-pong one-way 100.5 ns against 96.2 — inside run noise. Oversubscribed
+  per-record +1.4%: unchanged.
+
+## Verdict
+
+**No-go.** The protocol is sound — the correctness gate is fully green,
+including two loom models verified red under the cleared-stamp mutation —
+and the measurements refute the hypothesis it was built to test: removing
+the consumer-cursor read does not close the per-record gap, because the
+read was not what the gap costs. What the per-record path loses to
+`ArrayQueue` at one producer is not recoverable by moving the gate onto the
+slot stamp when the move makes the consumer write per record; the crate's
+batched advantage rests on exactly the amortisation the marker protocol
+gives up.
+
+Recorded as the answer to ADR 001's open alternative: gating the claim off
+the slot stamps costs the drain a store per record and the producer the
+payload line in its gate; under this family's shapes — one consumer that
+amortises its commit across a batch — that trade loses. A revisit trigger,
+if one ever matters: a drain-side design where release is amortisable across
+a batch the way the cursor commit is, or evidence that the two-to-eight
+producer per-record band is worth a batched-path regression on its own. The
+spike branch (`mpsc-release-protocol-spike`, 6715e57 + the harness clamp)
+is kept for reference until then and is not promoted.
+
+## Consequences
+
+- `ring_mpsc` on `benches`/`master` keeps the cursor-gated claim and the
+  adaptive batched grant; nothing lands from the spike. The spike branch
+  also carries the one harness fix the ask-or-fail semantics forced (the
+  mpsc adapter clamps its batch ask to the capacity — an ask wider than the
+  ring is a permanent refusal under the gate, and the driver's produce loop
+  spins forever on a permanent refusal); `master`'s adapter is untouched
+  because the adaptive grant there never refuses a within-capacity ask.
+- The soundness analysis above survives as the reference for any future
+  stamp-gate attempt: the cleared-stamp design is unsound (the
+  counterexample and its loom model are on the spike branch), and the marker
+  design is the sound variant of it — measured, and rejected on the numbers.

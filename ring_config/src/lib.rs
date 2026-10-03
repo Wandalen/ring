@@ -87,8 +87,8 @@ impl RingConfig {
   /// ```
   /// use ring_types::OverflowPolicy;
   /// use ring_config::RingConfig;
-  /// let cfg = RingConfig::new( 8 ).unwrap().with_overflow( OverflowPolicy::Fail );
-  /// assert_eq!( cfg.overflow(), OverflowPolicy::Fail );
+  /// let cfg = RingConfig::new( 8 ).unwrap().with_overflow( OverflowPolicy::DropNewest );
+  /// assert_eq!( cfg.overflow(), OverflowPolicy::DropNewest );
   /// ```
   #[must_use]
   pub const fn with_overflow(mut self, overflow: OverflowPolicy) -> Self {

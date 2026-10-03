@@ -69,12 +69,14 @@ _run() {
   fi
 }
 
+# The "${arr[@]+"${arr[@]}"}" idiom: under `set -u`, bash below 4.4 rejects an empty array
+# expansion as unbound, and macOS still ships bash 3.2.
 for _s in "${_suites[@]}"; do
   case "$_s" in
     comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
-    latency)    _run cargo bench -p perf --bench latency -- "${_latency[@]}" ;;
+    latency)    _run cargo bench -p perf --bench latency -- "${_latency[@]+"${_latency[@]}"}" ;;
     # A quick run saves nothing, so there would be nothing new to report.
-    report)     (( _quick )) || _run cargo run -q -p perf --example report -- "${_report[@]}" ;;
-    *)          _run cargo bench -p perf --bench "$_s" -- "${_criterion[@]}" ;;
+    report)     (( _quick )) || _run cargo run -q -p perf --example report -- "${_report[@]+"${_report[@]}"}" ;;
+    *)          _run cargo bench -p perf --bench "$_s" -- "${_criterion[@]+"${_criterion[@]}"}" ;;
   esac
 done

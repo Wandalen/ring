@@ -42,20 +42,29 @@ use ring_cursor::{CursorPair, SeqCell};
 use ring_shutdown::{Refusal, Shutdown, Wake, for_space_or_close, reset, wait_for_close};
 use ring_types::{Capacity, OverflowPolicy, RingError, Seq, WaitKind};
 
-/// A ring of `slots` capacity, in the default (SPSC, drop-newest) configuration.
+/// A ring of `slots` capacity, in the default (SPSC, `Fail`) configuration.
 fn ring(slots: usize) -> Ring<u32> {
   Ring::new(&RingConfig::new(slots).unwrap()).unwrap()
 }
 
 /// A ring of `slots` capacity that refuses rather than dropping.
 ///
-/// The default overflow policy is `DropNewest`, under which a full ring
-/// reports `Ok` and discards the record, so [`Refusal::Full`] is unreachable
-/// there. Every test below that is *about* the `Full` arm uses this instead,
-/// and [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] covers
-/// the default's own behaviour rather than leaving it untested.
+/// `Fail` is the default, so this pins what [`ring`] already does. Every test
+/// below that is *about* the `Full` arm uses this, so it reaches that arm
+/// whatever the default is.
 fn refusing_ring(slots: usize) -> Ring<u32> {
   let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
+  Ring::new(&config).unwrap()
+}
+
+/// A ring of `slots` capacity that discards the incoming record when full.
+///
+/// Under `DropNewest` a full ring reports `Ok` and discards the record, so
+/// [`Refusal::Full`] is unreachable there.
+/// [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] covers that
+/// opt-in rather than leaving it untested.
+fn dropping_ring(slots: usize) -> Ring<u32> {
+  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::DropNewest);
   Ring::new(&config).unwrap()
 }
 
@@ -189,8 +198,8 @@ fn a_guarded_producer_refuses_a_closed_ring_and_returns_the_record() {
 /// A full ring refuses with `Full`, which is the arm a caller retries on.
 ///
 /// Under `OverflowPolicy::Fail` only. See
-/// [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] for what the
-/// *default* policy does instead, which is the one that surprises people.
+/// [`a_full_drop_newest_ring_reports_success_and_keeps_nothing`] for what an
+/// opted-in `DropNewest` does instead, which is the one that surprises people.
 #[test]
 fn a_full_guarded_producer_refuses_with_the_transient_arm() {
   let mut ring = refusing_ring(2);
@@ -211,17 +220,17 @@ fn a_full_guarded_producer_refuses_with_the_transient_arm() {
   assert_eq!(refused.into_record(), 3);
 }
 
-/// Under the default policy a full guarded push reports success and loses the
+/// Under `DropNewest` a full guarded push reports success and loses the
 /// record, with `is_blocked` true and `try_push` still returning `Ok`.
 ///
-/// This is not a defect in the guard. `OverflowPolicy::DropNewest` is
-/// `RingConfig`'s default and its whole contract is to discard rather than
-/// refuse, so [`Refusal::Full`] is unreachable there. The trap is that the
-/// *close* refusal and the *full* non-refusal look nothing alike. Closing a
-/// ring makes pushes visibly fail; filling one does not.
+/// This is not a defect in the guard. `OverflowPolicy::DropNewest`'s whole
+/// contract is to discard rather than refuse, so [`Refusal::Full`] is
+/// unreachable there. The trap is that the *close* refusal and the *full*
+/// non-refusal look nothing alike. Closing a ring makes pushes visibly fail;
+/// filling one does not.
 #[test]
 fn a_full_drop_newest_ring_reports_success_and_keeps_nothing() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (producer, mut consumer) = ends.split();
 
@@ -510,7 +519,7 @@ fn a_batch_into_a_full_refusing_ring_hands_back_the_record_that_was_refused() {
   assert_eq!(recovered, [1, 2]);
 }
 
-/// Under the default policy the batch count is not a count of what is stored.
+/// Under `DropNewest` the batch count is not a count of what is stored.
 ///
 /// `DropNewest` makes every push report `Ok`, so nothing is ever refused and
 /// the returned number is the length of the iterator rather than the number of
@@ -518,7 +527,7 @@ fn a_batch_into_a_full_refusing_ring_hands_back_the_record_that_was_refused() {
 /// by exactly the overflow. Here that is three claimed, one stored.
 #[test]
 fn a_batch_into_a_full_drop_newest_ring_counts_records_it_did_not_keep() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (producer, mut consumer) = ends.split();
 

@@ -344,6 +344,47 @@ fn a_refused_record_comes_back_on_every_backend() {
   }
 }
 
+/// A ring from a bare `RingConfig::new( n )` hands a refused record back.
+///
+/// The caller never chose a policy, so `Ok` has to mean the record is in the
+/// ring. Built without [`ring_on`], which pins a policy, so the default is what
+/// is under test.
+#[test]
+fn a_ring_from_a_bare_config_refuses_rather_than_drops_on_every_backend() {
+  for backend in every_backend() {
+    let config = RingConfig::new(2).expect("a power of two");
+    let mut ring: Ring<u32> = match backend {
+      Backend::Spsc => Ring::new(&config),
+      Backend::Mpsc => Ring::new(&config.with_producers(2)),
+      #[cfg(feature = "crossbeam")]
+      Backend::Crossbeam => Ring::new_crossbeam(&config),
+    }
+    .expect("the default policy is accepted everywhere");
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    assert_eq!(producer.try_push(0), Ok(()), "{backend:?} refused with room");
+    assert_eq!(producer.try_push(1), Ok(()), "{backend:?} refused with room");
+    assert_eq!(
+      producer.try_push(2),
+      Err(2),
+      "{backend:?} answered Ok for a record it destroyed"
+    );
+
+    let mut rest = 3..6_u32;
+    assert_eq!(
+      producer.try_push_batch(&mut rest),
+      Err((0, 3)),
+      "{backend:?} counted a destroyed record as pushed"
+    );
+    assert_eq!(rest.next(), Some(4), "{backend:?} drained the iterator into a full ring");
+
+    let mut received = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut received), 2, "{backend:?} held other than two");
+    assert_eq!(received, [0, 1], "{backend:?} lost or reordered an accepted record");
+  }
+}
+
 /// Under `DropNewest`, a full ring discards the record and reports success.
 #[test]
 fn drop_newest_discards_the_incoming_record_without_an_error() {

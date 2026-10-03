@@ -53,11 +53,12 @@ use ring_flush::{ConfigError, FlushCause, FlushOutcome, FlushPolicy, Flusher};
 use ring_tls::TlsBuffer;
 use ring_types::{OverflowPolicy, RingError};
 
-/// A ring that refuses rather than dropping, so a rejected flush is reachable.
+/// A ring that refuses rather than dropping.
 ///
-/// `RingConfig::new` defaults to `OverflowPolicy::DropNewest`, under which a
-/// full push returns `Ok` having silently discarded the record. That would
-/// make `FlushOutcome::Rejected` unreachable and the capacity check untestable.
+/// `OverflowPolicy::Fail` is `RingConfig::new`'s default, and it is pinned here
+/// anyway so these tests do not lean on the default. `FlushOutcome::Rejected`
+/// does not depend on it: it comes from `Flusher`'s `free_capacity` check
+/// before the push, under any policy.
 fn ring(slots: usize) -> Ring<u32> {
   let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
   Ring::new(&config).unwrap()

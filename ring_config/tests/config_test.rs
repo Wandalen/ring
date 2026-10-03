@@ -21,13 +21,13 @@ fn every_named_field_is_carried() {
   let cfg = RingConfig::new(1024)
     .unwrap()
     .with_wait(WaitKind::Park)
-    .with_overflow(OverflowPolicy::Fail)
+    .with_overflow(OverflowPolicy::DropNewest)
     .with_producers(4)
     .with_batch(64);
 
   assert_eq!(cfg.capacity().get(), 1024);
   assert_eq!(cfg.wait(), WaitKind::Park);
-  assert_eq!(cfg.overflow(), OverflowPolicy::Fail);
+  assert_eq!(cfg.overflow(), OverflowPolicy::DropNewest);
   assert_eq!(cfg.producers(), 4);
   assert_eq!(cfg.batch(), 64);
 }
@@ -38,7 +38,7 @@ fn every_named_field_is_carried() {
 fn defaults_are_the_documented_ones() {
   let cfg = RingConfig::new(8).unwrap();
   assert_eq!(cfg.wait(), WaitKind::Spin);
-  assert_eq!(cfg.overflow(), OverflowPolicy::DropNewest);
+  assert_eq!(cfg.overflow(), OverflowPolicy::Fail);
   assert_eq!(cfg.producers(), 1);
   assert_eq!(cfg.batch(), 1);
 }
@@ -85,7 +85,7 @@ fn setters_commute() {
   let forward = RingConfig::new(32)
     .unwrap()
     .with_wait(WaitKind::None)
-    .with_overflow(OverflowPolicy::Fail)
+    .with_overflow(OverflowPolicy::DropNewest)
     .with_producers(2)
     .with_batch(8);
 
@@ -93,7 +93,7 @@ fn setters_commute() {
     .unwrap()
     .with_batch(8)
     .with_producers(2)
-    .with_overflow(OverflowPolicy::Fail)
+    .with_overflow(OverflowPolicy::DropNewest)
     .with_wait(WaitKind::None);
 
   assert_eq!(forward, backward);

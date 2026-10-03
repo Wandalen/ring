@@ -42,7 +42,7 @@ use ring_types::{OverflowPolicy, RingError};
 // **No `Default`, deliberately, and the omission needs saying.** A policy
 // meeting a full ring causes every `Resolution`, so a default would be a value
 // nothing produced, an outcome asserted about a publish that never happened.
-// `OverflowPolicy` derives `Default` with `#[ default ]` on `DropNewest` and is
+// `OverflowPolicy` derives `Default` with `#[ default ]` on `Fail` and is
 // the right shape for it, because a configuration has to have a value before
 // anything happens to it. The two declarations sit eight lines apart in two
 // crates and differ by one token, so a good-faith normalisation adding

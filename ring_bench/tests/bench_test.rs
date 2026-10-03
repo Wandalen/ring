@@ -92,9 +92,18 @@ fn roomy() -> Workload {
     .unwrap()
 }
 
-/// 256 records into 16 slots, where every candidate drops by a different mechanism.
+/// 256 records into 16 slots, where no candidate can keep the workload.
 fn cramped() -> Workload {
   Workload::new(RingConfig::new(16).unwrap())
+    .with_records_per_producer(256)
+    .unwrap()
+    .with_batch(32)
+    .unwrap()
+}
+
+/// [`cramped`] under `DropNewest`, where a full ring answers `Ok` and discards.
+fn cramped_dropping() -> Workload {
+  Workload::new(RingConfig::new(16).unwrap().with_overflow(OverflowPolicy::DropNewest))
     .with_records_per_producer(256)
     .unwrap()
     .with_batch(32)
@@ -382,13 +391,13 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
     assert_eq!(outcome.silently_discarded(), outcome.reported() - outcome.received());
   }
 
-  // The staged candidate is the one that discards nothing. `Flusher` checks
-  // `free_capacity` before touching the buffer and reports `Rejected` rather
-  // than handing a record to a full ring. `ring_flush` documents that a
-  // rejection must be retried and that it will not retry for you; a harness
-  // that retried would be measuring its own retry loop. So this candidate
-  // loses records to refusals it declines to retry, and never to a silent
-  // discard.
+  // The staged candidate is the one that discards nothing under every policy.
+  // `Flusher` checks `free_capacity` before touching the buffer and reports
+  // `Rejected` rather than handing a record to a full ring. `ring_flush`
+  // documents that a rejection must be retried and that it will not retry for
+  // you; a harness that retried would be measuring its own retry loop. So this
+  // candidate loses records to refusals it declines to retry, and never to a
+  // silent discard.
   //
   // Fix(workload_batch_was_unclamped): this used to assert `reported() == 0`.
   // The staged candidate kept nothing at all because `Workload::batch()`
@@ -410,25 +419,23 @@ fn a_cramped_run_drops_and_the_drop_is_counted_from_the_drain() {
 
 /// A `DropNewest` ring reports successes for records it did not keep.
 ///
-/// The finding that reshaped this crate. `OverflowPolicy::default()` is
-/// `DropNewest`, so a bare `RingConfig::new( n )`, the form the family's own
-/// documentation uses everywhere, produces a ring whose `try_push` returns
-/// `Ok` for a discarded record. The first working version of this harness
-/// counted those `Ok`s and reported `contract_ring` as **lossless at 256
-/// records in a 16-slot ring**.
+/// Under `DropNewest`, `try_push` returns `Ok` for a discarded record, so a
+/// harness counting `Ok`s reports `contract_ring` as **lossless at 256 records
+/// in a 16-slot ring**. The workload sets `DropNewest` itself, because the
+/// default, `Fail`, refuses instead.
 ///
-/// It would also have reported it as *fast*, and correctly, because discarding
+/// It would also report it as *fast*, and correctly, because discarding
 /// is the cheapest thing a queue can do. So the failure mode is the harness
 /// recommending the candidate that threw the workload away, not just a wrong
 /// number in a column. That is the verdict this crate exists to make
 /// trustworthy, which is why this test asserts it rather than noting it.
 #[test]
 fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
-  let workload = cramped();
+  let workload = cramped_dropping();
   assert_eq!(
     workload.config().overflow(),
     OverflowPolicy::DropNewest,
-    "the default policy, which nobody in this test set",
+    "the policy this test is about, set explicitly",
   );
 
   let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
@@ -442,9 +449,10 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
   );
 
   // This test pins the counters, on the one candidate where `reported` and
-  // `received` differ, because `the_counters_are_the_runs_own_totals` cannot
-  // pin them. It runs `MutexQueue`, whose two counts are equal, so the whole
-  // mapping is invisible to it. Manual stage B5 caught this by reintroducing
+  // `received` differ on a `DropNewest` workload, because
+  // `the_counters_are_the_runs_own_totals` cannot pin them. It runs
+  // `MutexQueue`, whose two counts are equal, so the whole mapping is
+  // invisible to it. Manual stage B5 caught this by reintroducing
   // the original defect and watching all 18 tests stay green.
   let stats = through_the_factory.stats();
   assert_eq!(stats.claimed(), through_the_factory.received() as u64);
@@ -491,18 +499,20 @@ fn a_dropnewest_ring_reports_successes_it_did_not_keep() {
   assert!(comparison.fastest().is_none(), "no candidate kept the workload");
 }
 
-/// Under `OverflowPolicy::Fail` the gap closes and every candidate agrees.
+/// Under `OverflowPolicy::Fail`, the default, the gap closes and every
+/// candidate agrees.
 ///
 /// The counterpart to the test above, and the reason the crate reports the gap
 /// instead of designing it out. The gap is a property of the configuration, not
-/// of the paths. Same capacity, same records, one field changed.
+/// of the paths. Same capacity, same records, the policy left at its default.
 #[test]
 fn a_failing_policy_closes_the_gap_for_every_candidate() {
-  let workload = Workload::new(RingConfig::new(16).unwrap().with_overflow(OverflowPolicy::Fail))
-    .with_records_per_producer(256)
-    .unwrap()
-    .with_batch(32)
-    .unwrap();
+  let workload = cramped();
+  assert_eq!(
+    workload.config().overflow(),
+    OverflowPolicy::Fail,
+    "the default policy, which nobody in this test set",
+  );
 
   let comparison = Comparison::run(workload);
   assert!(comparison.conserved(), "every candidate reported exactly what it kept");
@@ -660,7 +670,7 @@ fn the_counters_are_the_runs_own_totals() {
   // line pins the mapping's consequence and cannot fail by itself. The
   // assertion that guards the mapping is in
   // `a_dropnewest_ring_reports_successes_it_did_not_keep`, on the one candidate
-  // where `reported` and `received` differ.
+  // where `reported` and `received` differ on a `DropNewest` workload.
   assert_eq!(stats.in_flight(), 0);
 
   // Never recorded. No candidate blocks, so there is no wait to time. Asserting
@@ -1343,7 +1353,10 @@ fn every_drained_record_decodes_to_a_producer_the_workload_describes() {
 /// 240.
 #[test]
 fn the_overflow_gap_never_reaches_the_accumulator_table() {
-  let workload = cramped().with_semantics(AccumulatorSemantics::Delta).with_cells(1).unwrap();
+  let workload = cramped_dropping()
+    .with_semantics(AccumulatorSemantics::Delta)
+    .with_cells(1)
+    .unwrap();
 
   let through_the_factory = run(Candidate::ContractRing, &workload).unwrap();
   assert_eq!(

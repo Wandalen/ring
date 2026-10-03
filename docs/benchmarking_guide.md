@@ -1,30 +1,14 @@
 # How to run the benchmarks
 
-How to run the repository's benchmark suite (`perf`) and read its results. Commands work in Git
-Bash and PowerShell alike unless noted. What each suite measures, in detail:
-[`../perf/readme.md`](../perf/readme.md).
-
-## What is compared
-
-The suite races six queue implementations — the candidates — on the same track: every candidate
-gets the same capacity and the same record type. Most suites measure time per operation or
-records per second through criterion; the `latency` suite reports arrival-delay percentiles from
-its own driver.
-
-| Candidate | Queue |
-|-----------|-------|
-| `spsc` | `ring_spsc` — this repository's single-producer, single-consumer (SPSC) ring |
-| `mpsc` | `ring_mpsc` — this repository's multi-producer, single-consumer (MPSC) ring |
-| `rtrb` | `rtrb` 0.4 — an established SPSC ring, the reference point |
-| `sync_channel` | `std::sync::mpsc::sync_channel` — the standard library's bounded channel |
-| `arrayqueue` | `crossbeam_queue::ArrayQueue` — a bounded multi-producer, multi-consumer (MPMC) array queue |
-| `mutex` | `Mutex<VecDeque<T>>` — the naive baseline |
+How to run the repository's benchmark suite (`perf`) and read its results. What the suite
+compares, which suite measures what, and the exact benchmark ids are documented in
+[`../perf/readme.md`](../perf/readme.md) — this guide adds the workflow around it: validation,
+the run order, where results land, baselines, and the platform traps. Requires a Rust toolchain.
+Linux runs everything as-is; Windows and macOS have notes below.
 
 ## Step 1 — Get the code
 
-The suite lives in `perf/` at the repository root; `master` carries it. Requires a Rust
-toolchain, and on Windows Git Bash for the `verb` wrapper — the `cargo` commands run in any
-terminal.
+The suite lives in `perf/` at the repository root; `master` carries it.
 
 ```sh
 git checkout master
@@ -55,29 +39,26 @@ The first build is slow: the bench profile uses fat LTO (link-time optimization)
 codegen unit so the family's helpers inline across crates the way the comparison crates' do,
 and that costs compile time. Rebuilds are faster.
 
-On Windows, `spsc_pinned: no CPU topology to read, skipped` is expected — see Windows notes.
+On Windows and macOS, `spsc_pinned: no CPU topology to read, skipped` is expected — see
+platform notes.
 
 ## Step 3 — Measure
 
-| Suite | Measures |
-|-------|----------|
-| `micro` | one thread alone: pushing a record and popping it back, pushing into a full queue and being refused, popping from an empty queue, and filling the queue to capacity before draining it — each reported as time per operation |
-| `spsc` | one producer thread and one consumer thread: across queue sizes, across record sizes, and with the two threads placed on one shared core or on separate cores |
-| `mpsc` | several producer threads against one consumer: how the queue holds up as the producer count grows, as the capacity changes, and when there are more producers than logical CPUs |
-| `batch` | one producer moving several records in a single operation — 1, 8, 32 or 128 at a time |
-| `latency` | how late records arrive relative to their scheduled send time, as percentiles; prints the per-clock-read cost first, since every number carries up to one |
-| `comparison` | `ring_bench`'s comparison example — the family's own harness |
+Six suites: `micro` (one thread alone), `spsc` (one producer, one consumer), `mpsc` (producers
+against one consumer), `batch` (several records per operation), `latency` (arrival-delay
+percentiles), `comparison` (the family's own example). Modes, parameters and record types per
+suite: [`../perf/readme.md`](../perf/readme.md).
 
-One suite at a time, Git Bash:
+One suite at a time:
 
 ```sh
-./verb/bench suite::micro     # or spsc | mpsc | batch | latency | comparison
+./verb/bench suite::spsc     # or micro | mpsc | batch | latency | comparison
 ```
 
 PowerShell:
 
 ```powershell
-cargo bench -p perf --bench micro   # or spsc | mpsc | batch | latency
+cargo bench -p perf --bench spsc    # or micro | mpsc | batch | latency
 cargo run --release -p ring_bench --all-features --example comparison
 ```
 
@@ -98,59 +79,104 @@ The report pivots the last results into one markdown page — candidates and mod
 parameters as columns, the best of each column in bold:
 
 ```sh
-cargo run -q -p perf --example report -- --out perf_report.md
+cargo run -q -p perf --example report -- --out target/perf_report.md
 ```
 
 Without `--out` it prints to stdout. A trailing word filters groups by substring: `-- spsc`
-keeps `spsc`, `spsc_payload`, `spsc_pinned`. The report's first line identifies the machine,
-rustc version and commit — compare only runs whose machine line matches.
+keeps `spsc`, `spsc_payload`, `spsc_pinned`. Write the report into `target/`: an untracked file
+at the repository root would put "with uncommitted changes" into every later report's machine
+line.
+
+The machine line names the CPU, governor, clocksource, rustc version and commit — on Linux.
+Elsewhere it falls back to the architecture and thread count, which does not distinguish chip
+generations. Compare runs from the same machine, and read cross-machine tables with care.
 
 ## Step 5 — Baselines (before/after)
+
+Baselines exist for the criterion suites (`micro`, `spsc`, `mpsc`, `batch`). The `latency`
+driver ignores the flags — it takes only `--test` and a name filter — and the `comparison`
+example prints to stdout only, so neither saves or reads a baseline.
 
 ```sh
 cargo bench -p perf --bench spsc -- --save-baseline before   # on the "before" commit
 # change the code
 cargo bench -p perf --bench spsc -- --baseline before        # on the "after" commit
-cargo run -q -p perf --example report -- --baseline before --out perf_report.md
+cargo run -q -p perf --example report -- --baseline before --out target/perf_report.md
 ```
 
 The report then shows each cell's change against the baseline, positive when faster. Criterion
-saves baselines per benchmark — compare each suite against its own baseline, on the same machine.
+saves baselines per benchmark — compare each suite against its own baseline, on the same
+machine. Git Bash shorthand: `./verb/bench suite::spsc save::before`, then on the other commit
+`./verb/bench suite::spsc baseline::before` and `./verb/bench suite::report baseline::before
+out::target/perf_report.md`.
 
-Git Bash shorthand: `./verb/bench suite::spsc save::before`, then on the other commit
-`./verb/bench suite::spsc baseline::before` and `./verb/bench suite::report baseline::before out::perf_report.md`.
+A run with `--baseline` stops when a suite it covers has no baseline of that name — criterion
+panics with `Baseline 'before' must exist before comparison is allowed`. Save the baseline for
+every suite you plan to compare, or compare suite by suite.
 
-## Windows notes
+**Measure the noise floor first.** Before trusting any before/after delta, run an unchanged
+commit against its own baseline: same suite, same machine, back to back. Criterion will still
+flag some benchmarks as improved or regressed — those deltas are the machine's noise, not
+signal, and only deltas outside that spread mean something. The floor is wide in practice:
+every thread runs unpinned (only `spsc_pinned` pins), and laptops mix performance and
+efficiency cores; on such machines the spread reaches tens of percent in both directions.
 
-PowerShell and cmd cannot execute the `verb/bench` bash script: Windows resolves an
-extensionless file through its default file association, which usually opens a text editor.
-Either run it in Git Bash, call it via `bash ./verb/bench ...`, or use the `cargo` commands
-above directly.
+## Platform notes
 
-- `spsc_pinned` skips itself on Windows. It reads Linux sysfs to find two hardware threads
-  sharing one physical core (SMT, simultaneous multithreading) and pairs on separate cores;
-  that file layout does not exist here, so it prints `spsc_pinned: no CPU topology to read,
-  skipped` and stops. All other groups run.
-- The report's machine line degrades on Windows: the processor model falls back to the
-  architecture, governor and clocksource read as `unknown`. The numbers are unaffected.
+### Windows
+
+- PowerShell and cmd cannot execute the `verb/bench` bash script: Windows resolves an
+  extensionless file through its default file association, which usually opens a text editor.
+  Run it from a Git Bash terminal, or from PowerShell through Git for Windows' own bash:
+  `& "C:\Program Files\Git\bin\bash.exe" ./verb/bench suite::spsc`. Plain `bash` from
+  PowerShell is usually WSL's launcher — the script then runs against Linux cargo, not this
+  toolchain.
+- `spsc_pinned` skips itself: the topology file it reads exists only on Linux. All other
+  groups run.
+- The machine line shows the architecture instead of the processor model; governor and
+  clocksource read as `unknown`. The numbers are unaffected.
+
+### macOS
+
+- The stock `/bin/bash` is 3.2, where `set -u` rejects `verb/bench`'s empty-array expansion:
+  every run without `quick::1` dies with `_criterion[@]: unbound variable` before any suite
+  starts. Use a Homebrew bash, or the plain `cargo` commands, until `verb/bench` itself is
+  fixed.
+- `spsc_pinned` skips with the same message as on Windows: macOS exposes no core-topology file
+  to this harness, and threads cannot be pinned through it.
+- The machine line reads `aarch64, … unknown` and does not name the chip: an M1 and an M4 with
+  the same thread count produce the same line. A matching machine line is not matching
+  silicon.
+- `Instant` can tick in coarse steps on Apple silicon — tens of nanoseconds. The reported
+  clock-read cost is not the tick size; latency p50s in the tens of nanoseconds sit within one
+  or two ticks of each other. Read them as approximate.
+
+### Linux
+
+The reference platform: core topology resolves, `spsc_pinned` runs, and the machine line names
+the processor, governor and clocksource.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
 | `error: package ID specification 'perf' did not match any packages` | the branch lacks the suite | switch to a branch with `perf/` (Step 1) |
-| `./verb/bench` opens a text editor | PowerShell cannot run bash scripts | Git Bash, `bash ./verb/bench ...`, or the cargo commands |
+| `./verb/bench` opens a text editor | PowerShell cannot run bash scripts | Git Bash, or Git Bash's bash by full path (Windows notes) |
+| the run stops at `Baseline 'X' must exist before comparison is allowed` | a covered suite has no baseline of that name | save it for every suite you compare (Step 5), or compare suite by suite |
 | `verb/bench: unrecognized parameter ...` | a typo in an option | options: `suite::`, `quick::1`, `filter::`, `save::`, `baseline::`, `out::`, `dry::1` |
 | `verb/bench: suite::X is not one of ...` | wrong suite name | one of `comparison`, `micro`, `spsc`, `mpsc`, `batch`, `latency`, `report`, `all` |
 | `No criterion results under target/criterion` | the report ran before any benchmark | run Step 3 first |
 | the first build takes very long | fat LTO and one codegen unit in `[profile.bench]` | expected; rebuilds are faster |
 | a test panics, naming a candidate | the harness detected a lost, duplicated, reordered or torn record | that is a finding — no number is printed for that run |
-| `spsc_pinned: no CPU topology to read, skipped` | no Linux sysfs topology on Windows | expected, nothing to do |
+| `spsc_pinned: no CPU topology to read, skipped` | no core-topology file on Windows or macOS | expected, nothing to do |
 
 ## Fair measurements
 
-- Close background programs; on Windows pick the best-performance power plan and run plugged in.
-- Compare only same-machine numbers, through baselines rather than memory.
+- Establish the noise floor first (Step 5): an unchanged commit against its own baseline draws
+  the spread that counts as noise.
+- Close background programs; pick the best-performance power plan where the OS offers one.
+- Compare only same-machine numbers, through baselines rather than memory; off Linux, a
+  matching machine line means the same architecture and thread count, not the same silicon.
 - The harness controls for the rest: a fresh queue per run, checksum and per-producer order on
   every record, the first 200 ms of a latency run excluded, identical capacity and record type
   for every candidate.

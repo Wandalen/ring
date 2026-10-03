@@ -49,19 +49,28 @@ use ring_core::Ring;
 use ring_poll::{Budget, PARKING_CRATES, Progress, Tick, drain_up_to, push_batch_within, push_within, recv_within};
 use ring_types::OverflowPolicy;
 
-/// A ring of `slots` capacity, in the default (SPSC, drop-newest) configuration.
+/// A ring of `slots` capacity, in the default (SPSC, `Fail`) configuration.
 fn ring(slots: usize) -> Ring<u32> {
   Ring::new(&RingConfig::new(slots).unwrap()).unwrap()
 }
 
 /// A ring of `slots` capacity that refuses rather than dropping.
 ///
-/// The default overflow policy is `DropNewest`, under which a full ring reports
-/// `Ok` and discards the record. Every test below that is *about* running out
-/// of budget uses this instead. The default's own behaviour is still tested, by
-/// [`push_within_under_drop_newest_reports_success_and_keeps_nothing`].
+/// `Fail` is the default, so this pins what [`ring`] already does. Every test
+/// below that is *about* running out of budget uses this, so it keeps running
+/// out whatever the default is.
 fn refusing_ring(slots: usize) -> Ring<u32> {
   let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::Fail);
+  Ring::new(&config).unwrap()
+}
+
+/// A ring of `slots` capacity that discards the incoming record when full.
+///
+/// Under `DropNewest` a full ring reports `Ok` and discards the record. That
+/// opt-in is still tested, by
+/// [`push_within_under_drop_newest_reports_success_and_keeps_nothing`].
+fn dropping_ring(slots: usize) -> Ring<u32> {
+  let config = RingConfig::new(slots).unwrap().with_overflow(OverflowPolicy::DropNewest);
   Ring::new(&config).unwrap()
 }
 
@@ -410,14 +419,14 @@ fn a_multi_attempt_budget_spends_every_attempt_before_giving_up() {
   assert_eq!(push_within(&mut producer, 3, Budget::new(4)), Ok(()));
 }
 
-/// Under the default policy a full push reports success and keeps nothing.
+/// Under `DropNewest` a full push reports success and keeps nothing.
 ///
 /// This is `OverflowPolicy::DropNewest`'s behaviour, and every helper here passes
 /// it through. It was first found in `ring_shutdown`, whose `Refusal::Full` arm
 /// is unreachable for the same reason.
 #[test]
 fn push_within_under_drop_newest_reports_success_and_keeps_nothing() {
-  let mut ring = ring(2);
+  let mut ring = dropping_ring(2);
   let mut ends = ring.ends();
   let (mut producer, mut consumer) = ends.split();
   producer.try_push(1).unwrap();

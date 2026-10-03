@@ -46,6 +46,7 @@ check that the gates cover both.
 - [`free_capacity` keeps one `usize` signature on every backend, binding at SPSC and advisory elsewhere](docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md)
 - [`crossbeam-queue`'s `ArrayQueue` is an interim third backend inside `ring_core`, behind the `crossbeam` feature](docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md)
 - [`try_push_batch` hands back the record it refused, as `Err((n, record))`](docs/decisions/003_the_batch_push_hands_back_the_refused_record.md)
+- [`Fail` is the default overflow policy, so `Ok` from a ring nobody configured means the record was kept](docs/decisions/004_fail_is_the_default_overflow_policy.md)
 
 ## Known limitations
 

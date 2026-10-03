@@ -84,12 +84,16 @@ impl WaitKind {
 ///
 /// The overflow-policy feature is explicit that there is **no variant that
 /// overwrites unread data silently**. `DropOldest` does discard an unread item,
-/// and `ring_overflow` reports that as a loss. A publish that reports success
-/// has not always kept the item. Under `DropNewest`, `ring_core`'s `try_push`
-/// returns `Ok(())` on a full ring and discards the incoming item.
+/// and `ring_overflow` reports that as a loss.
+///
+/// The default is `Fail`, so a full ring hands the record back and `Ok` means
+/// kept. `DropNewest` is opt-in, and under it a publish that reports success
+/// has not always kept the item: `ring_core`'s `try_push` returns `Ok(())` on a
+/// full ring and discards the incoming item.
 ///
 /// ```
 /// use ring_types::OverflowPolicy;
+/// assert_eq!( OverflowPolicy::default(), OverflowPolicy::Fail );
 /// assert_eq!( OverflowPolicy::ALL.len(), 3 );
 /// assert!( OverflowPolicy::Fail.reports_failure() );
 /// assert!( !OverflowPolicy::DropNewest.reports_failure() );
@@ -97,11 +101,11 @@ impl WaitKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum OverflowPolicy {
   /// Discard the item being published; the ring's contents are untouched.
-  #[default]
   DropNewest,
   /// Discard the oldest unread item to make room for the new one.
   DropOldest,
   /// Publish nothing and return an error, handing the decision to the caller.
+  #[default]
   Fail,
 }
 

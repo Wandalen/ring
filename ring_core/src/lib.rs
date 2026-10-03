@@ -320,7 +320,8 @@ impl<'a, T: Send> Producer<'a, T> {
   /// Publish one record, or hand it back.
   ///
   /// Never blocks. On a full ring the configured [`OverflowPolicy`] decides:
-  /// `Fail` returns the record, `DropNewest` discards it and reports success.
+  /// `Fail`, the default, returns the record, and an opted-in `DropNewest`
+  /// discards it and reports success.
   /// `DropOldest` cannot arrive here. [`Ring::new`] refuses it, and
   /// `Ring::new_crossbeam`, which exists only under the `crossbeam` feature,
   /// is the only path that accepts it. Without that feature the policy has no
@@ -332,16 +333,18 @@ impl<'a, T: Send> Producer<'a, T> {
   /// Returning the value rather than a unit error makes a refusal recoverable
   /// without a copy.
   ///
-  /// # Pitfall: `Ok` does not mean kept under `DropNewest`
+  /// # Pitfall: `Ok` does not mean kept under an opted-in `DropNewest`
   ///
   /// **Trap.** Counting each `Ok(())` as a record the ring holds.
   ///
-  /// **Failure.** Under [`OverflowPolicy::DropNewest`], the default, the
-  /// discarded records count too. A publisher tallying `Ok`s reports throughput
-  /// it did not achieve, and only a consumer-side count shows the gap.
+  /// **Failure.** Under [`OverflowPolicy::DropNewest`], set with
+  /// [`RingConfig::with_overflow`], the discarded records count too. A publisher tallying
+  /// `Ok`s reports throughput it did not achieve, and only a consumer-side
+  /// count shows the gap.
   ///
-  /// **Mitigation.** Choose [`OverflowPolicy::Fail`] when a lost record matters.
-  /// Under it `Ok` does mean kept. Otherwise count on the consumer side.
+  /// **Mitigation.** Keep the default, [`OverflowPolicy::Fail`], when a lost
+  /// record matters. Under it `Ok` does mean kept. Otherwise count on the
+  /// consumer side.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -432,7 +435,7 @@ impl<'a, T: Send> Producer<'a, T> {
   /// `a_partial_batch_push_reports_its_count_and_hands_back_the_refused_record`,
   /// which checks the record and the iterator's position as well as the count.
   ///
-  /// # Pitfall: under `DropNewest` the count is not the number of records kept
+  /// # Pitfall: `Ok( n )` does not mean kept under an opted-in `DropNewest`
   ///
   /// **Trap.** Reading `Ok( n )` as how many records the ring kept, and the
   /// call as one that stops when the ring is full.
@@ -442,9 +445,9 @@ impl<'a, T: Send> Producer<'a, T> {
   /// drains the whole iterator and returns `Ok` with its length, counting every
   /// record the ring discarded. An endless iterator never returns.
   ///
-  /// **Mitigation.** Choose [`OverflowPolicy::Fail`] when a lost record matters.
-  /// Under it the count does mean kept, and the refused record comes back.
-  /// Otherwise bound the iterator and count on the consumer side.
+  /// **Mitigation.** Keep the default, [`OverflowPolicy::Fail`], when a lost
+  /// record matters. Under it the count does mean kept, and the refused record
+  /// comes back. Otherwise bound the iterator and count on the consumer side.
   ///
   /// ```
   /// use ring_config::RingConfig;

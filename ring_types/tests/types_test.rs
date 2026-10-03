@@ -169,8 +169,8 @@ fn wait_kind_defaults_to_spin() {
 /// `ring_types`, `ring_stats` and `ring_overflow` against each. Dropping
 /// `DropOldest` failed one `ring_types` doctest, because `OverflowPolicy::ALL`'s own
 /// doctest asserts `contains( &DropOldest )`. Dropping `DropNewest` passed this
-/// crate **entirely**: 19/19 unit tests and 20/20 doctests green, with the
-/// `#[ default ]` policy gone from the roster. Both were caught downstream, by
+/// crate **entirely**: 19/19 unit tests and 20/20 doctests green, with
+/// `DropNewest` gone from the roster. Both were caught downstream, by
 /// `ring_stats` (4 failures) and `ring_overflow` (5), which is the wrong place
 /// for it. `ALL` is declared here, so it is validated here.
 #[test]
@@ -204,12 +204,13 @@ fn overflow_policies_partition_by_reporting() {
   assert_eq!(OverflowPolicy::ALL.iter().filter(|p| p.drops_silently()).count(), 2);
 }
 
-/// The default drops the incoming item rather than evicting a queued one, so
-/// an unconfigured ring never discards data a consumer has already been
-/// promised.
+/// The default refuses, so an unconfigured ring neither evicts a queued item
+/// nor reports success for an incoming one it discarded.
 #[test]
-fn overflow_policy_defaults_to_drop_newest() {
-  assert_eq!(OverflowPolicy::default(), OverflowPolicy::DropNewest);
+fn overflow_policy_defaults_to_fail() {
+  assert_eq!(OverflowPolicy::default(), OverflowPolicy::Fail);
+  assert!(OverflowPolicy::default().reports_failure());
+  assert!(!OverflowPolicy::default().drops_silently());
 }
 
 // ---- RingError ------------------------------------------------------------

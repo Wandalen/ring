@@ -134,10 +134,14 @@ fn capacity_reaches_the_built_ring_unchanged() {
 /// `overflow` reaches the built ring, and the two supported policies differ in
 /// the way `ring_core` documents: `Fail` hands the record back, `DropNewest`
 /// reports success and discards it.
+///
+/// A bare config refuses like `Fail`, so a contract consumer who never names
+/// `ring_types` gets a ring whose `Ok` means kept.
 #[test]
 fn the_overflow_policy_reaches_the_built_ring() {
   let cfg = RingConfig::new(4).expect("a power of two");
 
+  assert_eq!(accepted_when_overfilled(cfg), 4, "the default refuses once the ring is full");
   assert_eq!(accepted_when_overfilled(cfg.with_overflow(OverflowPolicy::Fail)), 4);
   assert_eq!(accepted_when_overfilled(cfg.with_overflow(OverflowPolicy::DropNewest)), 8);
 }

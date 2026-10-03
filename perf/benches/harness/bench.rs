@@ -58,7 +58,7 @@ impl<'c> ThreadedGroup<'c> {
     let (full, empty) = (full as f64 / records as f64, empty as f64 / records as f64);
     let worst_ns = shape.gaps.then_some(worst.as_nanos() as f64);
     let gap = worst_ns
-      .map(|ns| format!(", worst gap {}", output::duration(ns)))
+      .map(|ns| format!(", max gap over samples {}", output::duration(ns)))
       .unwrap_or_default();
     println!("{:24}spins:  full {full:.3}/record, empty {empty:.3}/record{gap}", "");
     if !output::quick() {

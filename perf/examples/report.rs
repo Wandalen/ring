@@ -306,7 +306,7 @@ fn spins(report: &mut String, mut measured: Vec<(String, &Value)>) {
     "</summary>\n\n"
   });
   report.push_str(if gaps {
-    "| benchmark | full | empty | worst gap |\n|---|---:|---:|---:|\n"
+    "| benchmark | full | empty | max gap over samples |\n|---|---:|---:|---:|\n"
   } else {
     "| benchmark | full | empty |\n|---|---:|---:|\n"
   });

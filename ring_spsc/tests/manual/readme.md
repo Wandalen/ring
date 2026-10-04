@@ -99,9 +99,11 @@ Number **first**, then drop comments. The reverse order,
 `grep -v ... | grep -n ...`, numbers the *filtered* stream, so every line
 number it prints is the position in a file that does not exist on disk.
 
-**Expected:** no output at all, not one hit. The producer path is a load, a
-compare, a write and a release store; the consumer path is a load, a subtract,
-N reads and a release store. A `compare_exchange` appearing here would not be a
+**Expected:** no output at all, not one hit. The producer path is a compare
+against its own fields, a write and a release store, plus a load of the
+consumer cursor when the ring looks full; the consumer path is a compare, a load
+of the producer cursor when it knows of fewer records than it was asked for, N
+reads and a release store. A `compare_exchange` appearing here would not be a
 lock, but it would mean the single-writer property had been given up, and with
 it every argument in the module documentation's "Orderings" section.
 

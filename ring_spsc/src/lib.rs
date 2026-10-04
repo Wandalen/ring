@@ -28,10 +28,10 @@
 //! # Orderings, and why they are not uniform
 //!
 //! Each cursor has exactly one writer. That is why an end can read **its
-//! own** cursor at [`OWN`] (`Relaxed`). This thread performed the store it is
-//! reading back, and program order already sequences the load after it. The
-//! end reads the **other** end's cursor at [`ring_cursor::GATING`]
-//! (`Acquire`), and that load is what makes the peer's slot writes visible.
+//! own** cursor at [`OWN`] (`Relaxed`), which it does once, when
+//! [`Ring::split`] creates it. The end reads the **other** end's cursor at
+//! [`ring_cursor::GATING`] (`Acquire`), and that load is what makes the peer's
+//! slot writes visible.
 //!
 //! [`ring_cursor::CursorPair`] offers `free_slots`, `pending` and `may_claim`
 //! over the same two cursors, and this crate chooses not to call them in the
@@ -39,6 +39,32 @@
 //! because a `CursorPair` does not know which end is asking. Here every caller
 //! does know, so the asymmetric form is available, and the symmetric one
 //! would pay for a fence the single-writer property already provides.
+//!
+//! # Each end keeps a copy of both cursors
+//!
+//! Each cursor sits on a cache line both threads touch. The consumer polls the
+//! producer's line for new records, and the producer checks the consumer's
+//! line for room. A load from a line the other core has just written waits for
+//! the line to cross between cores, and the instructions after it wait too. A
+//! store does not wait; it goes into the store buffer. So an end loads a shared
+//! line only when nothing it already holds can answer.
+//!
+//! - **Its own position is a field.** The end reads it back from there, never
+//!   from the shared cursor, and stores to the cursor only to publish or to
+//!   commit. The guard that publishes or commits advances the field in its
+//!   `Drop`, next to the store, so a guard leaked with `mem::forget` leaves the
+//!   field and the cursor unchanged together.
+//! - **Its last reading of the peer is a field too.** It is a lower bound on
+//!   the peer's cursor, because cursors only advance. It was taken at
+//!   [`ring_cursor::GATING`], so everything the peer did before the reading is
+//!   visible. The producer reloads it only when the ring looks full by it. The
+//!   consumer reloads it only when it holds fewer records than a drain asks
+//!   for. A stale reading can make an end reload sooner than needed. It cannot
+//!   let an end claim or drain a slot it may not.
+//!
+//! The queries that promise a current reading ([`Producer::free_capacity`],
+//! [`Producer::is_full`], [`Consumer::available`] and [`Consumer::is_empty`])
+//! still load the peer's cursor every time.
 //!
 //! # The unsafe, and where its argument lives
 //!
@@ -189,17 +215,17 @@ use ring_types::{Capacity, RingError, Seq};
 
 /// The ordering an end reads **its own** cursor with.
 ///
-/// `Relaxed` is sound because each cursor has exactly one writer. The thread
-/// performing this load is the thread that performed the store it is reading
-/// back, and program order already sequences the two. No inter-thread edge is
-/// being established, so none needs to be paid for.
+/// It does so once, in [`Ring::split`], which creates the end with its
+/// position. From then on the end keeps the position in a field and only
+/// stores to the cursor.
 ///
-/// An end moved to another thread breaks the second sentence above. The
-/// loading thread is then not the one that stored. It stays sound because each
-/// end is `Send` and not `Sync`, so the move is the only way to hand it over,
-/// and every safe way to move a value between threads (spawning, joining, a
-/// channel, a mutex) carries the happens-before edge this crate does not
-/// supply.
+/// `Relaxed` is sound because each cursor has exactly one writer and `split`
+/// takes `&mut Ring`. The last store to the cursor was made by this thread or
+/// by an end of an earlier pair, and that pair had to be gone before this
+/// thread could borrow the ring mutably. Every safe way to get that borrow
+/// back from another thread (joining, the end of a scope, a channel, a mutex)
+/// carries the happens-before edge this crate does not supply. So the load
+/// reads the last store, and no inter-thread edge needs to be paid for.
 ///
 /// Contrast [`ring_cursor::GATING`], the ordering an end reads the *other*
 /// end's cursor with. There the load is what makes the peer's slot writes
@@ -416,7 +442,9 @@ impl<S> Ring<S> {
   /// Once the first pair is gone the ring may be split again, and the cursors
   /// carry over. The second pair continues where the first stopped, not at zero,
   /// as `a_second_pair_may_be_split_once_the_first_is_gone` in
-  /// `tests/spsc_test.rs` checks.
+  /// `tests/spsc_test.rs` checks. That holds because each end starts from both
+  /// cursors as they stand here, its own read at [`OWN`] and the other's at
+  /// [`GATING`], the same orderings it uses afterwards.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -438,14 +466,19 @@ impl<S> Ring<S> {
   /// ```
   pub fn split(&mut self) -> (Producer<'_, S>, Consumer<'_, S>) {
     let shared: &Self = self;
+    let capacity = shared.capacity().get() as u64;
 
     (
       Producer {
         ring: shared,
+        position: shared.cursors.producer().load(OWN),
+        limit: shared.cursors.consumer().load(GATING).advanced_by(capacity),
         _one_thread: PhantomData,
       },
       Consumer {
         ring: shared,
+        position: shared.cursors.consumer().load(OWN),
+        produced: shared.cursors.producer().load(GATING),
         _one_thread: PhantomData,
       },
     )
@@ -485,13 +518,15 @@ impl<S> Ring<S> {
   /// the first is left thinking the second one violates this doc. The two are:
   ///
   /// - **The producer end, on a claimed-not-yet-published `seq`.** The `seq`
-  ///   equals this end's own cursor, which the producer has not yet advanced.
-  ///   That places the slot outside the consumer's readable set, whose
-  ///   exclusive upper bound is that same cursor value. The slot must also be
-  ///   free, meaning at least one lap behind the consumer's cursor as read at
-  ///   [`GATING`]; otherwise it still holds a record the consumer has not read.
-  ///   `Producer::claim` is the only such caller and checks exactly that before
-  ///   constructing the [`Reservation`] this is reached through.
+  ///   is this end's position, equal to its own cursor, which the producer has
+  ///   not yet advanced. That places the slot outside the consumer's readable
+  ///   set, whose exclusive upper bound is that same cursor value. The slot
+  ///   must also be free, meaning at least one lap behind the consumer's cursor
+  ///   as read at [`GATING`]; otherwise it still holds a record the consumer
+  ///   has not read. `Producer::claim` is the only such caller. It checks that
+  ///   against its last reading of the consumer cursor, which is never ahead of
+  ///   the real one, before constructing the [`Reservation`] this is reached
+  ///   through.
   /// - **The consumer end, on a published-not-yet-committed `seq`.** It is
   ///   reached through [`Batch::get_mut`], between `drain`/`drain_up_to` and
   ///   the batch's `Drop`. Publication is the producer cursor advancing past
@@ -544,6 +579,13 @@ impl<S> core::fmt::Debug for Ring<S> {
 #[derive(Debug)]
 pub struct Producer<'a, S> {
   ring: &'a Ring<S>,
+  /// The next sequence to claim, which is also how far this end has published.
+  /// It equals the producer cursor whenever no [`Reservation`] is live, because
+  /// only this end writes that cursor and the reservation's `Drop` moves both.
+  position: Seq,
+  /// The first sequence this end may not claim, by its last reading of the
+  /// consumer cursor: that reading plus the capacity.
+  limit: Seq,
   /// `Cell` is `Send` and not `Sync`, so this marker makes the end movable to a
   /// thread and unshareable between two. Without it the end would inherit
   /// `Sync` from `&Ring`, and two threads holding `&Producer` could each claim
@@ -567,8 +609,8 @@ impl<S> Producer<'_, S> {
   /// assert_eq!( producer.position(), Seq( 1 ) );
   /// ```
   #[must_use]
-  pub fn position(&self) -> Seq {
-    self.ring.cursors.producer().load(OWN)
+  pub const fn position(&self) -> Seq {
+    self.position
   }
 
   /// How many pushes are guaranteed to succeed right now.
@@ -640,13 +682,13 @@ impl<S> Producer<'_, S> {
 
   /// Published minus committed, which is how many slots are spoken for.
   ///
-  /// The one place the asymmetric orderings are spelled out: this end's own
-  /// cursor at [`OWN`], the consumer's at [`GATING`].
+  /// The consumer's cursor is loaded fresh at [`GATING`] rather than taken
+  /// from `limit`, because the queries built on this promise a current
+  /// reading.
   fn occupancy(&self) -> u64 {
-    let produced = self.ring.cursors.producer().load(OWN);
     let consumed = self.ring.cursors.consumer().load(GATING);
 
-    consumed.distance_to(produced)
+    consumed.distance_to(self.position)
   }
 
   /// Take the next slot, to be published when the returned value is dropped.
@@ -656,6 +698,10 @@ impl<S> Producer<'_, S> {
   /// check can distinguish "claimed and about to publish" from "claimed and
   /// abandoned". Making the publish the drop makes the case unreachable,
   /// including on unwind.
+  ///
+  /// It loads the consumer cursor only when the ring looks full by this end's
+  /// last reading of it. Until then the room that reading showed is still
+  /// there, because only this end takes slots.
   ///
   /// # Errors
   ///
@@ -676,13 +722,19 @@ impl<S> Producer<'_, S> {
   /// assert_eq!( consumer.drain().get( 0 ).map( BytesSlot::read ), Some( &b"hi"[ .. ] ) );
   /// ```
   pub fn claim(&mut self) -> Result<Reservation<'_, S>, RingError> {
-    if self.is_full() {
-      return Err(RingError::Full);
+    if self.position >= self.limit {
+      let consumed = self.ring.cursors.consumer().load(GATING);
+      self.limit = consumed.advanced_by(self.ring.capacity().get() as u64);
+
+      if self.position >= self.limit {
+        return Err(RingError::Full);
+      }
     }
 
-    let seq = self.ring.cursors.producer().load(OWN);
-
-    Ok(Reservation { ring: self.ring, seq })
+    Ok(Reservation {
+      ring: self.ring,
+      position: &mut self.position,
+    })
   }
 
   /// Claim a slot, write it through `write`, and publish.
@@ -766,7 +818,9 @@ impl<T: Send> Producer<'_, TypedSlot<T>> {
 #[derive(Debug)]
 pub struct Reservation<'a, S> {
   ring: &'a Ring<S>,
-  seq: Seq,
+  /// The producer's position, which is this slot's sequence until `Drop`
+  /// advances it past the slot.
+  position: &'a mut Seq,
 }
 
 impl<S> Reservation<'_, S> {
@@ -785,7 +839,7 @@ impl<S> Reservation<'_, S> {
   /// ```
   #[must_use]
   pub const fn sequence(&self) -> Seq {
-    self.seq
+    *self.position
   }
 }
 
@@ -797,27 +851,33 @@ impl<S> Deref for Reservation<'_, S> {
     // shared reference is strictly weaker than the `&mut` that call is
     // entitled to, and it is derived from the same claimed-not-published
     // sequence.
-    unsafe { self.ring.slot_mut(self.seq) }
+    unsafe { self.ring.slot_mut(*self.position) }
   }
 }
 
 impl<S> DerefMut for Reservation<'_, S> {
   fn deref_mut(&mut self) -> &mut S {
-    // SAFETY: `self.seq` is claimed and not published. It is the producer
-    // cursor's current value, which `Drop` has not yet advanced, so it is at or
-    // above the consumer's exclusive readable bound. `claim` checked it is also
-    // at least one lap behind the consumer, so no unread record is being
-    // overwritten. This is the only `Reservation`, because `claim` borrows the
-    // `Producer` mutably for this value's whole life.
-    unsafe { self.ring.slot_mut(self.seq) }
+    // SAFETY: `*self.position` is claimed and not published. It equals the
+    // producer cursor's current value, which `Drop` has not yet advanced, so it
+    // is at or above the consumer's exclusive readable bound. `claim` checked
+    // it is also at least one lap behind the consumer, so no unread record is
+    // being overwritten. This is the only `Reservation`, because `claim`
+    // borrows the `Producer` mutably for this value's whole life.
+    unsafe { self.ring.slot_mut(*self.position) }
   }
 }
 
 impl<S> Drop for Reservation<'_, S> {
   /// Publish, with the one release store that is the producer path's entire
   /// synchronization.
+  ///
+  /// The producer's position advances here rather than in `claim`. A
+  /// reservation leaked with `mem::forget` never reaches this, so it moves
+  /// neither the position nor the cursor, and the next claim takes the same
+  /// sequence again.
   fn drop(&mut self) {
-    self.ring.cursors.producer().store(self.seq.next(), HANDOFF);
+    *self.position = self.position.next();
+    self.ring.cursors.producer().store(*self.position, HANDOFF);
   }
 }
 
@@ -828,6 +888,13 @@ impl<S> Drop for Reservation<'_, S> {
 #[derive(Debug)]
 pub struct Consumer<'a, S> {
   ring: &'a Ring<S>,
+  /// The next sequence to drain, which is also how far this end has
+  /// committed. It equals the consumer cursor whenever no [`Batch`] is live,
+  /// because only this end writes that cursor and the batch's `Drop` moves
+  /// both.
+  position: Seq,
+  /// The producer cursor, by this end's last reading of it.
+  produced: Seq,
   /// See [`Producer`]'s field of the same name.
   _one_thread: PhantomData<Cell<()>>,
 }
@@ -849,8 +916,8 @@ impl<S> Consumer<'_, S> {
   /// assert_eq!( consumer.position(), Seq( 1 ) );
   /// ```
   #[must_use]
-  pub fn position(&self) -> Seq {
-    self.ring.cursors.consumer().load(OWN)
+  pub const fn position(&self) -> Seq {
+    self.position
   }
 
   /// How many published records have not been drained.
@@ -890,10 +957,9 @@ impl<S> Consumer<'_, S> {
   /// ```
   #[must_use]
   pub fn available(&self) -> usize {
-    let consumed = self.ring.cursors.consumer().load(OWN);
     let produced = self.ring.cursors.producer().load(GATING);
 
-    consumed.distance_to(produced) as usize
+    self.position.distance_to(produced) as usize
   }
 
   /// Whether there is nothing to drain.
@@ -918,7 +984,7 @@ impl<S> Consumer<'_, S> {
   /// ```
   #[must_use]
   pub fn is_empty(&self) -> bool {
-    self.ring.cursors.consumer().load(OWN) == self.ring.cursors.producer().load(GATING)
+    self.position == self.ring.cursors.producer().load(GATING)
   }
 
   /// Take everything published since the last drain.
@@ -930,6 +996,9 @@ impl<S> Consumer<'_, S> {
   /// The returned batch commits on drop, and that is what makes the borrow
   /// sound. The slots become reusable at the commit, so a borrow that could
   /// outlive it would point at memory the producer may already be overwriting.
+  ///
+  /// [`drain_up_to`](Self::drain_up_to) with no bound, so it always loads the
+  /// producer cursor.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -946,14 +1015,7 @@ impl<S> Consumer<'_, S> {
   /// assert_eq!( batch.iter().filter_map( TypedSlot::get ).copied().collect::< Vec< _ > >(), [ 10, 20 ] );
   /// ```
   pub fn drain(&mut self) -> Batch<'_, S> {
-    let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
-
-    Batch {
-      ring: self.ring,
-      start,
-      len: start.distance_to(produced) as usize,
-    }
+    self.drain_up_to(usize::MAX)
   }
 
   /// Take at most `max` published records.
@@ -961,6 +1023,12 @@ impl<S> Consumer<'_, S> {
   /// The bounded form, for a caller that must not spend an unbounded amount of
   /// time in one drain, such as one working to a frame budget. What is left
   /// over stays published, and the next drain returns it.
+  ///
+  /// It loads the producer cursor only when the records this end already knows
+  /// of are fewer than `max`. Otherwise the answer is `max` either way, because
+  /// the producer cursor only advances. A consumer working through a backlog in
+  /// small drains leaves the producer's line alone until the backlog runs
+  /// short.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -977,13 +1045,14 @@ impl<S> Consumer<'_, S> {
   /// assert_eq!( consumer.drain_up_to( 2 ).len(), 1, "and the remainder" );
   /// ```
   pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
-    let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    if (self.position.distance_to(self.produced) as usize) < max {
+      self.produced = self.ring.cursors.producer().load(GATING);
+    }
 
     Batch {
       ring: self.ring,
-      start,
-      len: max.min(start.distance_to(produced) as usize),
+      len: max.min(self.position.distance_to(self.produced) as usize),
+      position: &mut self.position,
     }
   }
 }
@@ -999,7 +1068,9 @@ impl<S> Consumer<'_, S> {
 #[derive(Debug)]
 pub struct Batch<'a, S> {
   ring: &'a Ring<S>,
-  start: Seq,
+  /// The consumer's position, which is the batch's first sequence until
+  /// `Drop` advances it past the batch.
+  position: &'a mut Seq,
   len: usize,
 }
 
@@ -1021,7 +1092,7 @@ impl<S> Batch<'_, S> {
   /// ```
   #[must_use]
   pub const fn start(&self) -> Seq {
-    self.start
+    *self.position
   }
 
   /// How many records the batch covers.
@@ -1073,7 +1144,7 @@ impl<S> Batch<'_, S> {
     // and not committed when `drain` computed it. Its upper bound came from a
     // `GATING` load of the producer cursor, and its lower bound is this end's
     // own cursor, which only this value's `Drop` will advance.
-    Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
+    Some(unsafe { self.ring.slot(self.position.advanced_by(offset as u64)) })
   }
 
   /// The record `offset` places into the batch, mutably, or `None` past its end.
@@ -1129,7 +1200,7 @@ impl<S> Batch<'_, S> {
     // SAFETY: as `get`, plus exclusivity. `&mut self` on the batch is the
     // consumer's own exclusive borrow, and the producer cannot reach this range
     // until this batch's `Drop` advances the consumer cursor past it.
-    Some(unsafe { self.ring.slot_mut(self.start.advanced_by(offset as u64)) })
+    Some(unsafe { self.ring.slot_mut(self.position.advanced_by(offset as u64)) })
   }
 
   /// The batch's records, in the order they were published.
@@ -1166,15 +1237,16 @@ impl<S> Drop for Batch<'_, S> {
   /// cursor already holds, so no reader could tell it happened. It would still
   /// take the cursor's line from the producer, which reads that line to decide
   /// whether the ring is full, on every empty poll of a consumer that keeps up.
+  ///
+  /// The consumer's position advances here, next to the store, for the reason
+  /// `Reservation`'s `Drop` gives. A forgotten batch commits nothing, and the
+  /// next drain returns its records again.
   fn drop(&mut self) {
     if self.len == 0 {
       return;
     }
 
-    self
-      .ring
-      .cursors
-      .consumer()
-      .store(self.start.advanced_by(self.len as u64), HANDOFF);
+    *self.position = self.position.advanced_by(self.len as u64);
+    self.ring.cursors.consumer().store(*self.position, HANDOFF);
   }
 }

@@ -1192,11 +1192,12 @@ mod exhaustive {
       });
 
       // A retry until the claim succeeds, not one look as in the first model.
-      // With one look, loom ran one execution, in which the claim came first
-      // and failed. The drain's load of its own cursor hid the claim's earlier
-      // load from loom's search, so loom never tried the commit first. The
-      // retry makes every execution reach the write. `yield_now` tells loom
-      // the loop waits on another thread.
+      // With one look, while the drain still loaded its own cursor, loom ran
+      // one execution, in which the claim came first and failed. That load hid
+      // the claim's earlier load from loom's search, so loom never tried the
+      // commit first. The retry makes every execution reach the write, whatever
+      // order loom tries first. `yield_now` tells loom the loop waits on
+      // another thread.
       loop {
         if let Ok(reservation) = producer.claim() {
           slot.with_mut(|_| ());
@@ -1228,6 +1229,13 @@ mod exhaustive {
   /// its own `seq` from it. A's publish then drives the cursor to 2 against a
   /// capacity of 1. That is the producer lapping the consumer, reached through
   /// nothing but this crate's own public API.
+  ///
+  /// That second read is gone. Each end now keeps its position in a field, so
+  /// a bit-copy never sees the other copy's publish. Both copies claim
+  /// sequence 0, write the one slot and publish 1, so this interleaving now
+  /// loses a record instead of lapping the consumer. The assertion holds either
+  /// way. The `saturating_sub` stays, because it costs nothing and the next
+  /// violation may take a shape this test does not.
   ///
   /// # Why Not Caught
   ///
@@ -1303,11 +1311,11 @@ mod exhaustive {
       let p1_after = first.join().expect("the first racer");
       second.join().expect("the second racer");
 
-      // The racers land on 1 (the safe outcome) or past it (the lapped state,
-      // which loom does reach for this interleaving). Either way,
-      // `free_capacity` must answer with a small, sane number a caller could
-      // act on safely, never panic and never wrap past the ring's true
-      // capacity.
+      // The racers land on 1. Before each end kept its own position they could
+      // also land past it, the lapped state, which loom reached for this
+      // interleaving. Either way, `free_capacity` must answer with a small,
+      // sane number a caller could act on safely, never panic and never wrap
+      // past the ring's true capacity.
       let reported = p1_after.free_capacity();
       assert!(
         reported <= 1,

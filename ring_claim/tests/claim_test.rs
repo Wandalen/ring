@@ -288,7 +288,7 @@ fn the_producer_cursor_occupies_its_own_cache_line() {
   // Every producer writes a `Claimer`, and the gating side reads it. If its
   // cursor shared a line with anything else, the crate's hottest contention
   // point would sit in the same line as something read on a different path.
-  assert_eq!(core::mem::size_of::<ring_cursor::PaddedCursor>(), 64);
+  assert_eq!(core::mem::size_of::<ring_cursor::PaddedCursor>(), 128);
 }
 
 // ── exclusivity under contention ───────────────────────────────────────────

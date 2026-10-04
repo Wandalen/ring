@@ -47,7 +47,8 @@ The registry stays as it is, and each extension waits for a named consumer that 
   `names()` and `get_mut` do not compose under the borrow checker. That costs a `String` and a second lookup per ring,
   measured at about thirty times a `values_mut()` sweep over the same `HashMap`.
 - `register` hands the refused `Split` back inside its error, as `Registry::register` documents. Every `Result` it
-  returns is 448 bytes wide, on the `Ok` path too, and `.expect()` or `.unwrap()` on it needs `T: Debug`, because the
+  returns is 768 bytes wide (448 when this record was written; it follows the cursor padding inside `Split<T>`), on
+  the `Ok` path too, and `.expect()` or `.unwrap()` on it needs `T: Debug`, because the
   error contains `Split<T>`. The one consumer, `ring_factory::Factory::build_named`, drops the handed-back ring on
   purpose, so nothing exercises the capability yet.
 - `RegistryError` is not `#[non_exhaustive]`. Its doc says an enum "leaves room for that to change without a breaking

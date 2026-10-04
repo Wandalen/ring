@@ -1,24 +1,26 @@
 //! `ring_cursor`'s padded cursor and the pair it comes in.
 //!
 //! This file carries the reached-test for `docs/feature/169_padded_cursor.md`,
-//! which has three clauses: `align_of::<PaddedCursor>() == 64`,
-//! `size_of::<PaddedCursor>() == 64`, and two `PaddedCursor` values in one
-//! struct sitting at least 64 bytes apart.
+//! which has three clauses: `align_of::<PaddedCursor>()` and
+//! `size_of::<PaddedCursor>()` both equal to the line size, and two
+//! `PaddedCursor` values in one struct sitting at least a line apart. The
+//! feature states the line as 64 bytes, the value `ring_align::CACHE_LINE` had
+//! when it was written; it is 128 since `ring_align`'s ADR 001 was amended.
 //!
 //! ## Why three clauses and not one
 //!
 //! Each of the first two is satisfiable while the feature fails.
 //!
-//! A type of size 8 with `align_of == 64` satisfies the first clause and packs
+//! A type of size 8 with `align_of == 128` satisfies the first clause and packs
 //! two neighbours 8 bytes apart in an array, because alignment says where a value may
-//! start, not how much room it occupies. A type of size 64 with `align_of == 8`
+//! start, not how much room it occupies. A type of size 128 with `align_of == 8`
 //! satisfies the second and can start at offset 8, straddling two lines and
 //! sharing both. Only the conjunction says "one per line".
 //!
 //! The third clause is a different kind of statement altogether. The first two
 //! are about a type; the third is about two real fields at two real addresses,
 //! and it is the one that would notice if a future `CursorPair` layout packed
-//! the cursors together despite each still measuring 64 bytes on its own.
+//! the cursors together despite each still measuring a line on its own.
 //!
 //! ## What is not asserted here, and why
 //!
@@ -54,18 +56,18 @@ fn cap(slots: usize) -> Capacity {
 fn a_padded_cursor_occupies_exactly_one_cache_line() {
   assert_eq!(
     core::mem::align_of::<PaddedCursor>(),
-    64,
+    128,
     "clause 1: a cursor starts on a line boundary"
   );
   assert_eq!(
     core::mem::size_of::<PaddedCursor>(),
-    64,
+    128,
     "clause 2: and takes the whole line, so the next value starts on the next one"
   );
   assert_eq!(
     core::mem::size_of::<PaddedCursor>(),
     CACHE_LINE,
-    "the 64 above is ring_align::CACHE_LINE, not a coincidence"
+    "the 128 above is ring_align::CACHE_LINE, not a coincidence"
   );
 }
 
@@ -369,7 +371,7 @@ fn many_producers_on_one_cursor_lose_nothing() {
 
 #[test]
 fn a_padded_cursor_is_its_atomic_and_nothing_else() {
-  // 64 bytes of which 8 carry a sequence. If the type ever grows a field, the
+  // A line of which 8 bytes carry a sequence. If the type ever grows a field, the
   // size stops being CACHE_LINE and the first test catches it. This one says
   // why that would be wrong. The padding is meant to be empty, not to be
   // budget for state that belongs elsewhere.

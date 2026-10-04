@@ -17,31 +17,31 @@ code must exclude `///` and `//!` lines before counting anything, because a
 grep over a Rust file otherwise reads documentation as code. Run from the
 workspace root.
 
-## M1. The padding comes from `ring_align`, not from a literal 64
+## M1. The padding comes from `ring_align`, not from a literal line size
 
-The number 64 appearing anywhere in this crate's own source is the failure. It
-would mean the family has two independent statements of its cache-line size,
-and a future port that raises `ring_align::CACHE_LINE` to 128 would move one
-and not the other.
+A literal line size (64 or 128) appearing anywhere in this crate's own source
+is the failure. It would mean the family has two independent statements of its
+cache-line size, and a port that raises `ring_align::CACHE_LINE`, as the move
+from 64 to 128 did, would change one and not the other.
 
 This is the check the crate is most likely to fail later. Writing
-`#[ repr( align( 64 ) ) ]` directly on `PaddedCursor` is the obvious
+`#[ repr( align( 128 ) ) ]` directly on `PaddedCursor` is the obvious
 implementation. It is shorter, has one fewer dependency, and passes every
 layout test. The test suite would notice nothing.
 
 ```bash
-grep -nE "\b64\b" ring_cursor/src/lib.rs \
+grep -nE "\b(64|128)\b" ring_cursor/src/lib.rs \
   | grep -vE "^[0-9]+:[[:space:]]*(///|//!)"
 ```
 
-**Expected:** no output. Every 64 in the file is in prose or a doc example
-(where a literal is the assertion, not a definition). The type itself gets its
+**Expected:** no output. Every 64 or 128 in the file is in prose. The doc
+examples compare against `ring_align::CACHE_LINE` too. The type itself gets its
 alignment from `ring_align::CacheAligned`'s own attribute and never restates
 it.
 
 ## M2. The cursor carries no state beyond its sequence
 
-The first test asserts `size_of == 64`. A field added inside the existing
+The first test asserts `size_of == 128`. A field added inside the existing
 padding would not change that number, because 8 bytes of sequence plus 8 bytes
 of something else still rounds to one line. The size assertion cannot see it.
 

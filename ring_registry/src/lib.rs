@@ -115,9 +115,11 @@ impl<T> Registry<T> {
   /// # The `result_large_err` allow
   ///
   /// `clippy::result_large_err` fires here, and correctly. The `Err` variant is
-  /// **exactly 448 bytes**, fixed across every `T` because `Split< T >` is a
-  /// handle, not the record. The lint itself measured that number; it is not an
-  /// estimate. This method refuses both of the remedies the lint suggests:
+  /// **768 bytes**, fixed across every `T` because `Split< T >` is a handle, not
+  /// the record. The lint itself measured that number; it is not an estimate.
+  /// It follows the layout of the ring inside the handle, cursor padding
+  /// included, so it moves with `ring_align::CACHE_LINE`. This method refuses
+  /// both of the remedies the lint suggests:
   ///
   /// - *Shrink the payload.* The payload **is** the point. Dropping the
   ///   `Split< T >` from the error is exactly the data loss the refusal
@@ -125,7 +127,7 @@ impl<T> Registry<T> {
   ///   be destroyed by a failed registration instead of by a successful one.
   /// - *Box it.* That allocates on the failure path, to fix a size the caller
   ///   already pays on the success path anyway. `register` takes the same
-  ///   `Split< T >` by value, so the 448 bytes cross this boundary either way.
+  ///   `Split< T >` by value, so the same bytes cross this boundary either way.
   ///   It would also make the error awkward to destructure.
   ///
   /// A third option, outside the lint's own suggestions, is refused too.

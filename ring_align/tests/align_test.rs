@@ -3,7 +3,7 @@
 //! Claims the padding half of `docs/feature/169_padded_cursor.md`. In the
 //! feature's own words, "the padding is the whole point", because two cursors
 //! sharing a line make every write by either invalidate the other's cached copy.
-//! A test can decide the structural assertion, 64-byte size and alignment. The
+//! A test can decide the structural assertion, line-sized size and alignment. The
 //! throughput claim the feature also makes needs a number nobody has stated yet.
 //!
 //! The cursor type that consumes these wrappers is `ring_cursor`; this crate
@@ -11,10 +11,11 @@
 
 use ring_align::{CACHE_LINE, CacheAligned, on_distinct_lines};
 
-/// The constant is 64, the line size on the family's stated target platforms.
+/// The constant is 128, the largest line size among the family's targets. Apple
+/// Silicon uses 128; a 64-byte host pays padding for it, not correctness.
 #[test]
-fn cache_line_is_sixty_four() {
-  assert_eq!(CACHE_LINE, 64);
+fn cache_line_is_one_hundred_twenty_eight() {
+  assert_eq!(CACHE_LINE, 128);
 }
 
 /// The direction of a future change to `CACHE_LINE` matters, and before this
@@ -25,18 +26,18 @@ fn cache_line_is_sixty_four() {
 /// wrong number it divides by
 /// (-> `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
 /// Pinned as a floor rather than an exact value, because
-/// `cache_line_is_sixty_four` above already pins the value. So a deliberate
+/// `cache_line_is_one_hundred_twenty_eight` above already pins the value. So a deliberate
 /// raise still passes and only a decrease trips this.
 #[test]
 fn cache_line_must_not_shrink_below_the_current_known_minimum() {
   // `core::hint::black_box` defeats the compiler's constant-folding of
-  // `CACHE_LINE >= 64` (both operands are literals today), which otherwise
+  // `CACHE_LINE >= 128` (both operands are literals today), which otherwise
   // trips `clippy::assertions_on_constants`. The comparison is a genuine
   // runtime regression guard against a future *decrease* of the constant,
   // not dead code the lint should silence.
   assert!(
-    core::hint::black_box(CACHE_LINE) >= 64,
-    "CACHE_LINE dropped below 64 - every assertion in this suite would still \
+    core::hint::black_box(CACHE_LINE) >= 128,
+    "CACHE_LINE dropped below 128 - every assertion in this suite would still \
      pass while the padding guarantee silently stopped holding, see \
      docs/pitfall/001_a_constant_too_small_buys_nothing.md"
   );
@@ -101,7 +102,7 @@ fn two_unwrapped_fields_share_a_line() {
   // adjacency, not allocator luck. A bare `Naive` on the stack can land
   // with `producer` at the tail of one line and `consumer` in the next.
   // The wrapper pads around the pair, never between its fields.
-  #[repr(align(64))]
+  #[repr(align(128))]
   struct Aligned(Naive);
 
   let pair = Aligned(Naive {

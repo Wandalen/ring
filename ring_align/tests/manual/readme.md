@@ -8,22 +8,24 @@ Run from the workspace root.
 
 ## M1: the constant matches the host's real cache line
 
-`CACHE_LINE` is 64. That is correct on x86-64 and on common AArch64, and *wrong*
-on Apple Silicon, which uses 128. A value too small is the failure that matters.
-Two cursors 64 bytes apart still share a 128-byte line, so the padding silently
-buys nothing while every test still passes.
+`CACHE_LINE` is 128, the largest line among the family's targets: Apple Silicon
+uses 128, x86-64 and common AArch64 use 64. A value too small is the failure
+that matters. Two cursors 64 bytes apart still share a 128-byte line, so the
+padding silently buys nothing while every test still passes. A value too large
+only spends memory.
 
 ```bash
-getconf LEVEL1_DCACHE_LINESIZE
+getconf LEVEL1_DCACHE_LINESIZE   # Linux
+sysctl -n hw.cachelinesize       # macOS
 ```
 
-**Expected:** `64` on this host. If it reports 128, the constant is wrong for
-this machine and the padding is decorative. Record that in the Run Record
-rather than adjusting the test.
+**Expected:** `64` or `128`, either way no larger than `CACHE_LINE`. A larger
+reading means the constant is wrong for this machine and the padding is
+decorative. Record that in the Run Record rather than adjusting the test.
 
 ## M2: the crate really contains no `unsafe`
 
-The module doc claims none is needed because `#[repr(align(64))]` is a safe
+The module doc claims none is needed because `#[repr(align(128))]` is a safe
 attribute. The workspace denies `unsafe_code`, so this should be structurally
 impossible. Check the claim directly anyway, rather than trusting that the lint
 is wired up.
@@ -44,7 +46,7 @@ permitted to opt out of the lint.
 
 ## M3: the padding is observable on real addresses, not just in `size_of`
 
-`size_of` says a wrapped value is 64 bytes. That does not by itself prove two of
+`size_of` says a wrapped value is one line. That does not by itself prove two of
 them in a struct land on different lines, because the compiler could in
 principle lay them out otherwise. The test asserts it on real addresses, with a negative
 control.
@@ -76,3 +78,4 @@ reasonable.
 | 2026-08-28 | M2 | ✅ | Two `unsafe` hits in `src/`, both inside the module doc comment stating none is needed. No `unsafe` block/fn/impl, no `allow`. The check's original command grepped the crate root and so matched this plan file's own search string. The command above now scopes to `src/` and the manifest. |
 | 2026-08-28 | M3 | ✅ | Both pass, including the negative control: the unpadded pair really does share a line, so the padded assertion is measuring the padding. |
 | 2026-08-28 | M4 | ✅ | 7 doc tests pass. `on_distinct_lines`'s example uses plain integer addresses (0/63, 63/64, 128/130), not stack locals. Stack locals were a real failure earlier in the stage and are the reason the check is written the way it is. |
+| 2026-10-04 | M1 | ✅ | `sysctl -n hw.cachelinesize` reports 128 on an Apple M4 Pro, the host the `ring_spsc` and `ring_mpsc` benchmarks ran on. With `CACHE_LINE` at 64 the padding was decorative here; it is now 128. |

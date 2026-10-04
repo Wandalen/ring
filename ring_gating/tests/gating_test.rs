@@ -336,7 +336,7 @@ fn the_cursors_in_a_set_are_cache_line_separated() {
   let set = GatingSet::new(cap(4), 4);
 
   for window in set.cursors().windows(2) {
-    assert_eq!(window[1].addr() - window[0].addr(), 64);
+    assert_eq!(window[1].addr() - window[0].addr(), 128);
   }
 }
 

@@ -13,15 +13,16 @@ behaviour, which is also read by hand against
 
 ## Decisions
 
-- [`CACHE_LINE` is one unconditional 64 for every target, raised by hand at port time](docs/decisions/001_cache_line_is_one_unconditional_constant.md)
+- [`CACHE_LINE` is one unconditional 128 for every target, raised by hand at port time](docs/decisions/001_cache_line_is_one_unconditional_constant.md)
 
 ## Known limitations
 
-- `CacheAligned` pads every wrapped value to a whole 64-byte line, so a wrapped
-  `u64` spends 56 of its 64 bytes on padding. That pays only when another
-  thread writes a neighbouring value. A wrapped value owns its whole line, so
-  wrapping one of two hot fields already puts them on different lines. The
-  128-byte-line host is covered in the decision above.
+- `CacheAligned` pads every wrapped value to a whole 128-byte line, so a
+  wrapped `u64` spends 120 of its 128 bytes on padding. That pays only when
+  another thread writes a neighbouring value. A wrapped value owns its whole
+  line, so wrapping one of two hot fields already puts them on different lines.
+  On a 64-byte-line host the padding is twice what separation needs, as the
+  decision above records.
 
 ## Run it
 

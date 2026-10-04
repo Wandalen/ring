@@ -107,6 +107,13 @@ pub struct Ring<T> {
   overflow: OverflowPolicy,
 }
 
+// Without the crossbeam feature the two variants are 512 and 256 bytes, and the
+// gap is cursor padding, which exists to be large. Boxing one ring moves the gap
+// onto the other variant, so the allow is the fix, not a deferral.
+#[allow(
+  clippy::large_enum_variant,
+  reason = "a ring is built once and owned in place; the size is its cache-line padding"
+)]
 #[derive(Debug)]
 enum Storage<T> {
   Spsc(ring_spsc::Ring<TypedSlot<T>>),
@@ -234,9 +241,9 @@ pub struct Ends<'a, T> {
 #[derive(Debug)]
 enum EndsInner<'a, T> {
   Spsc(&'a mut ring_spsc::Ring<TypedSlot<T>>),
-  // Boxed: `ring_mpsc::Ends` holds a `Claimer` over the ring's
-  // 64-byte-aligned claim cursor, so the unboxed variant is ~256 bytes against
-  // this one's 8 (`clippy::large_enum_variant`). One allocation on the cold
+  // Boxed: `ring_mpsc::Ends` holds a `Claimer` over the ring's line-aligned
+  // claim cursor, so the unboxed variant is 512 bytes against this one's 8
+  // (`clippy::large_enum_variant`). One allocation on the cold
   // `ends()` path; the hot `Producer`/`Consumer` paths never touch it.
   Mpsc(Box<ring_mpsc::Ends<'a, TypedSlot<T>>>),
   #[cfg(feature = "crossbeam")]

@@ -9,7 +9,7 @@
 //! line. This crate holds the constant and the wrapper; `ring_cursor` holds the
 //! cursors that use them.
 //!
-//! No `unsafe` is needed for any of it, because `#[ repr( align( 64 ) ) ]` is a
+//! No `unsafe` is needed for any of it, because `#[ repr( align( 128 ) ) ]` is a
 //! safe attribute. So this crate compiles under the workspace-wide
 //! `unsafe-code = "deny"`, like most of the family. It once held an entry in
 //! `ring/bench_harness/gate/declared/ring/unsafe_allowlist.txt` permitting an
@@ -18,17 +18,19 @@
 
 #![deny(missing_docs)]
 
-/// Bytes in a cache line on the family's target platforms.
+/// Bytes in a cache line on the family's target platforms, rounded up to the
+/// largest of them.
 ///
-/// 64 on x86-64 and on AArch64's common configuration. Apple Silicon uses 128.
+/// Apple Silicon uses 128. x86-64 and AArch64's common configuration use 64.
 /// A value too small is the failure that matters, because two cursors 64 bytes
-/// apart still share a 128-byte line. So a future port raises this rather than
-/// making it conditional per crate.
+/// apart still share a 128-byte line. A value too large only spends memory, so
+/// the constant takes the largest line rather than becoming conditional per
+/// crate (→ `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
 ///
 /// ```
-/// assert_eq!( ring_align::CACHE_LINE, 64 );
+/// assert_eq!( ring_align::CACHE_LINE, 128 );
 /// ```
-pub const CACHE_LINE: usize = 64;
+pub const CACHE_LINE: usize = 128;
 
 // `on_distinct_lines` below computes `a / CACHE_LINE` as a line index. That
 // equals the true line index only because lines are naturally aligned, which
@@ -59,7 +61,7 @@ const _: () = assert!(
 /// assert_eq!( core::mem::size_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// ```
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[repr(align(64))]
+#[repr(align(128))]
 pub struct CacheAligned<T>(T);
 
 impl<T> CacheAligned<T> {
@@ -119,9 +121,9 @@ impl<T> CacheAligned<T> {
 /// ```
 /// use ring_align::on_distinct_lines;
 ///
-/// assert!( !on_distinct_lines( 0, 63 ) );    // both in line 0
-/// assert!( on_distinct_lines( 63, 64 ) );    // straddling the boundary
-/// assert!( !on_distinct_lines( 128, 130 ) ); // both in line 2
+/// assert!( !on_distinct_lines( 0, 127 ) );   // both in line 0
+/// assert!( on_distinct_lines( 127, 128 ) );  // straddling the boundary
+/// assert!( !on_distinct_lines( 256, 258 ) ); // both in line 2
 /// ```
 #[must_use]
 pub const fn on_distinct_lines(a: usize, b: usize) -> bool {

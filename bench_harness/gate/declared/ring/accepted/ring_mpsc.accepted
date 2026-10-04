@@ -1,9 +1,10 @@
 # The alignment canary, across two allocations rather than one struct.
 #
-# `Producer::on_distinct_lines` is the only one of the three that computes the
-# comparison itself, because its two cursors are not fields of a shared parent:
-# one lives in the ring's gating set, the other in the claimer. Its own doc says
-# so, and says why it checks at all. A sibling change that dropped the padding
+# `Producer::on_distinct_lines` is the only one of the three that is handed two
+# cursors that are not fields of a shared parent: the claim cursor lives in the
+# ring, the consumer cursor in its gating set's `Vec`. It compares them with
+# `ring_align::on_distinct_lines`. Its own doc says so, and says why it checks
+# at all. A sibling change that dropped the padding
 # would cost this crate a contended line on its hottest path and break nothing
 # that compiles.
 #
@@ -19,4 +20,4 @@
 # `Ring::committed`, both real one-polarity defects found in the same sweep and
 # both now held by `mutant/S4` and `mutant/S11`.
 
-ring_mpsc/src/lib.rs:996:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
+ring_mpsc/src/lib.rs:998:5: replace Producer<'a, S>::on_distinct_lines -> bool with true

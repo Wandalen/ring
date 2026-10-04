@@ -976,9 +976,11 @@ impl<'a, S> Producer<'a, S> {
   /// change that dropped the alignment would cost this crate a contended line
   /// on its hottest path and break nothing that compiles.
   ///
-  /// The two cursors are in different allocations, one in the ring's gating
-  /// set and one in the claimer. So this is a check on `PaddedCursor`'s
-  /// alignment rather than on their layout relative to each other.
+  /// The two cursors are in different allocations, the claim cursor in the
+  /// ring itself and the consumer cursor in its gating set's `Vec`. So this is
+  /// a check on `PaddedCursor`'s alignment rather than on their layout relative
+  /// to each other. The line test is `ring_align`'s, so it moves with
+  /// `ring_align::CACHE_LINE` rather than restating a size.
   ///
   /// ```
   /// use ring_mpsc::Ring;
@@ -996,7 +998,7 @@ impl<'a, S> Producer<'a, S> {
     let claim = self.claimer.cursor().addr();
     let consume = self.ring.consumer_cursor().addr();
 
-    claim.abs_diff(consume) >= 64
+    ring_align::on_distinct_lines(claim, consume)
   }
 
   /// The ring this end writes into.

@@ -51,16 +51,16 @@ fn a_wrapped_value_occupies_exactly_one_line() {
   assert_eq!(core::mem::size_of::<CacheAligned<u8>>(), CACHE_LINE);
   assert_eq!(core::mem::align_of::<CacheAligned<u64>>(), CACHE_LINE);
   assert_eq!(core::mem::size_of::<CacheAligned<u64>>(), CACHE_LINE);
-  assert_eq!(core::mem::size_of::<CacheAligned<[u8; 63]>>(), CACHE_LINE);
+  assert_eq!(core::mem::size_of::<CacheAligned<[u8; CACHE_LINE - 1]>>(), CACHE_LINE);
 }
 
 /// A payload larger than a line still gets whole lines, so two of them never
 /// share one.
 #[test]
 fn an_oversized_payload_rounds_up_to_whole_lines() {
-  let size = core::mem::size_of::<CacheAligned<[u8; 65]>>();
+  let size = core::mem::size_of::<CacheAligned<[u8; CACHE_LINE + 1]>>();
   assert_eq!(size % CACHE_LINE, 0, "size {size} is not a whole number of lines");
-  assert_eq!(size, 128);
+  assert_eq!(size, 2 * CACHE_LINE);
 }
 
 /// The observable consequence, and the one the feature cares about, is that two
@@ -115,14 +115,15 @@ fn two_unwrapped_fields_share_a_line() {
 }
 
 /// `on_distinct_lines` reads line boundaries, not raw distance. Two addresses
-/// 2 bytes apart can straddle a boundary, and two 62 apart can share a line.
+/// 1 byte apart can straddle a boundary, and two a line minus one apart can
+/// share a line.
 #[test]
 fn distinct_lines_follows_boundaries_not_distance() {
-  assert!(!on_distinct_lines(0, 63), "0 and 63 are both in line 0");
-  assert!(on_distinct_lines(63, 64), "63 and 64 straddle the boundary");
-  assert!(on_distinct_lines(0, 64));
-  assert!(!on_distinct_lines(64, 127));
-  assert!(on_distinct_lines(127, 128));
+  assert!(!on_distinct_lines(0, CACHE_LINE - 1), "both in line 0");
+  assert!(on_distinct_lines(CACHE_LINE - 1, CACHE_LINE), "the two straddle the boundary");
+  assert!(on_distinct_lines(0, CACHE_LINE));
+  assert!(!on_distinct_lines(CACHE_LINE, 2 * CACHE_LINE - 1));
+  assert!(on_distinct_lines(2 * CACHE_LINE - 1, 2 * CACHE_LINE));
   assert!(!on_distinct_lines(100, 100));
 }
 

@@ -20,17 +20,17 @@
 //!
 //! ## Why size and alignment are both asserted
 //!
-//! Alignment alone does not separate two cursors. A 64-aligned type of size 8
+//! Alignment alone does not separate two cursors. A line-aligned type of size 8
 //! placed in an array would still put two neighbours 8 bytes apart, because
 //! alignment constrains where a value may *start*, not how much room it takes.
-//! `#[ repr( align( 64 ) ) ]` happens to round the size up too, so both hold.
+//! `#[ repr( align( .. ) ) ]` happens to round the size up too, so both hold.
 //! The acceptance criterion still names both because only their conjunction says
 //! "one per line", and a future layout change could break the second while
 //! leaving the first intact.
 //!
 //! [`CursorPair::on_distinct_lines`] is the third assertion, and the only one
 //! taken from real addresses rather than from the type. `size_of` is a promise
-//! about a type; two fields being 64 bytes apart is the fact the promise was
+//! about a type; two fields being a line apart is the fact the promise was
 //! made about.
 //!
 //! ## Which orderings this crate names and which it fixes
@@ -166,8 +166,8 @@ pub fn slowest(cursors: &[PaddedCursor]) -> Option<Seq> {
 /// let cursor = PaddedCursor::new( Seq( 5 ) );
 /// assert_eq!( cursor.load( Ordering::Acquire ), Seq( 5 ) );
 ///
-/// assert_eq!( core::mem::size_of::< PaddedCursor >(), 64 );
-/// assert_eq!( core::mem::align_of::< PaddedCursor >(), 64 );
+/// assert_eq!( core::mem::size_of::< PaddedCursor >(), ring_align::CACHE_LINE );
+/// assert_eq!( core::mem::align_of::< PaddedCursor >(), ring_align::CACHE_LINE );
 /// ```
 #[derive(Debug, Default)]
 pub struct PaddedCursor(CacheAligned<AtomicSeq>);
@@ -207,7 +207,7 @@ impl PaddedCursor {
   /// use ring_cursor::PaddedCursor;
   ///
   /// let cursor = PaddedCursor::default();
-  /// assert_eq!( cursor.addr() % 64, 0, "a 64-aligned value starts on a line boundary" );
+  /// assert_eq!( cursor.addr() % ring_align::CACHE_LINE, 0, "a line-aligned value starts on a line boundary" );
   /// ```
   #[must_use]
   pub fn addr(&self) -> usize {

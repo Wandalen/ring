@@ -7,4 +7,23 @@
 #
 # See accepted/readme.md, "The alignment canaries".
 
-ring_spsc/src/lib.rs:405:5: replace Ring<S>::on_distinct_lines -> bool with true
+ring_spsc/src/lib.rs:431:5: replace Ring<S>::on_distinct_lines -> bool with true
+
+# The bounded drain's reload test, off by one in the harmless direction.
+#
+# `Consumer::drain_up_to` reloads the producer cursor only when the records it
+# already knows of are fewer than `max`. Turning `<` into `<=` also reloads when
+# they are exactly `max`. The batch is `max` long either way, because the
+# producer cursor only advances, so no input separates the two by what the call
+# returns or what the ring does next. The mutant costs one load of the line the
+# producer writes. That load is what the cache exists to skip, and only a load
+# counter or a clock sees it.
+#
+# The same kind as `ring_bench`'s timing-only entries: killable in principle,
+# by instrumenting `ring_spsc`'s cursors with a counting cell, which this crate
+# does not do. The behavioural half (`<` against `==` and `>`) is defended:
+# both of those time out against
+# `a_bounded_drain_returns_everything_published_up_to_its_bound` and the
+# threaded tests.
+
+ring_spsc/src/lib.rs:1048:60: replace < with <= in Consumer<'_, S>::drain_up_to

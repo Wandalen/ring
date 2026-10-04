@@ -12,7 +12,7 @@ than gaps. The survey subtracts these and reports what is left, so a sweep says
 | `ring_cursor.accepted` | The alignment canary, true by the layout of one struct |
 | `ring_mpsc.accepted` | The alignment canary, true across two separate allocations |
 | `ring_poll.accepted` | Eleven mutations of a retry loop that a single-threaded test cannot observe |
-| `ring_spsc.accepted` | The alignment canary, delegated rather than recomputed |
+| `ring_spsc.accepted` | The alignment canary, delegated rather than recomputed, and a bounded drain's reload test that differs only in cost |
 | `ring_wait.accepted` | Two mutations of a spin hint's iteration count |
 
 One file per crate, named `<crate>.accepted`. A crate with no file here has

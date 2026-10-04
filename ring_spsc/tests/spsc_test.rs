@@ -396,6 +396,43 @@ mod threaded {
     assert_eq!(producer.position(), Seq(LAPS * CAPACITY as u64));
   }
 
+  #[test]
+  fn a_forgotten_reservation_leaves_its_sequence_to_the_next_claim() {
+    // The publish is the guard's drop, so a guard that never drops published
+    // nothing, and the sequence it held is still the next one to claim. A
+    // producer that moved its position at claim time instead would skip that
+    // sequence here, and a later publish would hand the consumer a slot
+    // nobody wrote.
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let (mut producer, consumer) = ring.split();
+
+    core::mem::forget(producer.claim().unwrap());
+
+    assert_eq!(producer.position(), Seq::ZERO);
+    assert_eq!(consumer.available(), 0, "nothing was published");
+    assert_eq!(producer.claim().unwrap().sequence(), Seq::ZERO);
+    assert_eq!(producer.position(), Seq(1), "and the second claim's drop published it");
+  }
+
+  #[test]
+  fn a_claim_refused_on_a_full_ring_succeeds_once_the_consumer_commits() {
+    // `a_full_ring_reports_rather_than_blocks` checks the room comes back
+    // through `is_full`. This checks it through `claim` itself, the path a
+    // push takes. A producer that decided fullness from a reading of the
+    // consumer it never refreshed would refuse here forever.
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(2));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    assert_eq!(producer.claim().err(), Some(RingError::Full));
+
+    drop(consumer.drain_up_to(1));
+
+    assert_eq!(producer.claim().unwrap().sequence(), Seq(2));
+    assert_eq!(producer.try_push(4), Err(4), "one slot came back, and it is taken again");
+  }
+
   // ── the consumer's API ─────────────────────────────────────────────────────
 
   #[test]
@@ -616,6 +653,71 @@ mod threaded {
     }
   }
 
+  #[test]
+  fn a_forgotten_batch_leaves_its_records_to_the_next_drain() {
+    // The commit is the batch's drop, so a batch that never drops committed
+    // nothing. A consumer that moved its position at drain time instead would
+    // skip these records, and the producer would never get their slots back.
+    let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(4));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+
+    core::mem::forget(consumer.drain());
+
+    assert_eq!(consumer.position(), Seq::ZERO);
+    assert_eq!(producer.free_capacity(), 2, "no slot came back");
+
+    let batch = consumer.drain();
+    assert_eq!(batch.start(), Seq::ZERO);
+    assert_eq!(batch.iter().filter_map(TypedSlot::get).copied().collect::<Vec<_>>(), [1, 2]);
+  }
+
+  #[test]
+  fn a_bounded_drain_returns_everything_published_up_to_its_bound() {
+    // The second drain starts with one record left over from the first and two
+    // more published since. All three fit its bound, so all three come back. A
+    // consumer that went on what it last saw of the producer whenever that
+    // still showed a record would return the leftover alone.
+    let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(8));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    assert_eq!(consumer.drain_up_to(1).len(), 1);
+
+    producer.try_push(3).unwrap();
+    producer.try_push(4).unwrap();
+
+    let batch = consumer.drain_up_to(4);
+    assert_eq!(
+      batch.iter().filter_map(TypedSlot::get).copied().collect::<Vec<_>>(),
+      [2, 3, 4]
+    );
+  }
+
+  #[test]
+  fn drain_takes_everything_published_after_a_bounded_drain() {
+    // The same sequence as the test above, ending in the unbounded form, whose
+    // promise is everything published since the last drain.
+    let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(8));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    assert_eq!(consumer.drain_up_to(1).len(), 1);
+
+    producer.try_push(3).unwrap();
+    producer.try_push(4).unwrap();
+
+    let batch = consumer.drain();
+    assert_eq!(
+      batch.iter().filter_map(TypedSlot::get).copied().collect::<Vec<_>>(),
+      [2, 3, 4]
+    );
+  }
+
   // ── the two ends together ──────────────────────────────────────────────────
 
   #[test]
@@ -770,6 +872,35 @@ mod threaded {
 
     assert_eq!(producer.position(), Seq(1), "the ring kept its state");
     assert_eq!(consumer.position(), Seq(1));
+  }
+
+  #[test]
+  fn a_second_pair_inherits_a_full_ring_as_full() {
+    // The test above carries positions over. This carries over the records
+    // between them. A second producer that started from an empty ring rather
+    // than from the cursors would overwrite both records before the second
+    // consumer read them.
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(2));
+
+    {
+      let (mut producer, _consumer) = ring.split();
+      producer.try_push(1).unwrap();
+      producer.try_push(2).unwrap();
+    }
+
+    let (mut producer, mut consumer) = ring.split();
+
+    assert_eq!(producer.try_push(3), Err(3), "the first pair left the ring full");
+    assert_eq!(
+      consumer
+        .drain()
+        .iter()
+        .filter_map(TypedSlot::get)
+        .copied()
+        .collect::<Vec<_>>(),
+      [1, 2]
+    );
+    assert_eq!(producer.try_push(3), Ok(()));
   }
 
   // ── what the storage owes its records ──────────────────────────────────────
@@ -932,6 +1063,7 @@ mod threaded {
 /// pair. But the value whose visibility the test asserts is one loom can see.
 #[cfg(loom)]
 mod exhaustive {
+  use loom::cell::UnsafeCell;
   use loom::sync::Arc;
   use loom::sync::atomic::{AtomicUsize, Ordering};
   use ring_slot::TypedSlot;
@@ -1025,6 +1157,56 @@ mod exhaustive {
       });
 
       producing.join().expect("the producer thread");
+      draining.join().expect("the drain thread");
+    });
+  }
+
+  #[test]
+  fn a_slot_is_never_reclaimed_before_the_consumers_reads_of_it_are_visible() {
+    // The mirror of the first model. There the consumer must see the producer's
+    // write; here the producer must see the consumer's read before it
+    // overwrites the slot. One slot and two pushes, so the second claim
+    // succeeds only on the consumer's commit. The two models above never fill
+    // their ring, so neither reaches a claim that depends on a commit.
+    //
+    // Loom does not see slot memory, so a loom `UnsafeCell` stands in for the
+    // one slot. Loom panics on a write to it that is not ordered after the
+    // read, which is what a claim reading the consumer cursor weaker than
+    // `GATING` produces.
+    loom::model(|| {
+      let (mut producer, mut consumer) = leaked_ring(1).split();
+      let slot = Arc::new(UnsafeCell::new(()));
+
+      // Before the spawn, so the drain below always finds it.
+      producer.push_with(|slot| slot.set(1)).expect("an empty ring admits one");
+
+      let draining = loom::thread::spawn({
+        let slot = Arc::clone(&slot);
+        move || {
+          let batch = consumer.drain();
+          assert_eq!(batch.len(), 1, "the push before the spawn is always visible");
+
+          // While the batch is live, so before its commit.
+          slot.with(|_| ());
+        }
+      });
+
+      // A retry until the claim succeeds, not one look as in the first model.
+      // With one look, loom ran one execution, in which the claim came first
+      // and failed. The drain's load of its own cursor hid the claim's earlier
+      // load from loom's search, so loom never tried the commit first. The
+      // retry makes every execution reach the write. `yield_now` tells loom
+      // the loop waits on another thread.
+      loop {
+        if let Ok(reservation) = producer.claim() {
+          slot.with_mut(|_| ());
+          drop(reservation);
+          break;
+        }
+
+        loom::thread::yield_now();
+      }
+
       draining.join().expect("the drain thread");
     });
   }

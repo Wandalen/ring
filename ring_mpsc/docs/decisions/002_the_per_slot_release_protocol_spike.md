@@ -128,6 +128,39 @@ regression (−35.7%) and the across-the-board batched regression
 sweep as mixed — +34.0% at four producers, −12.3%/−10.2% at the extremes,
 −3.1% at eight — inside the suite's noise rather than a uniform loss.
 
+## Cross-ISA check (Raspberry Pi 5, aarch64, 4 cores, governor performance)
+
+The same A/B pair on a weakly-ordered machine (baseline `pi_base` saved on
+`benches`, compared on the spike, rustc 1.99.0, kernel 6.12+rpi) settles the
+two questions the x86 pairs could not. The pair's controls hold flat enough
+to read (arrayqueue within −2.6%…+0.2% across the producers sweep); two
+fill/drain cells at 16384 reading +31%/+110% are baseline-side outliers,
+flagged and excluded.
+
+**The protocol's verdict holds on the second ISA, and the x86 mid-band win
+does not travel.** Two to three producers — the band that gained 16–43% on
+x86 — reads −1.0% to −6.4% per record and −10.0% to −14.8% batched; capacity
+at four producers −4.1% to −13.6%; oversubscribed (eight producers on four
+cores) −14.2% per record and −22.5% batched; the batch suite −13.3% to
+−17.1% at 32/128; fill/drain push32 −14% to −19%. The refusal micro's
+doubling reproduces (+46.7%). On weakly-ordered hardware the consumer's
+`Release` marker store (STLR) has a real price, and the cross-core cursor
+contention the disjoint gate lines relieve was never as severe on four
+cores: the trade loses by more than it did on x86.
+
+**The measurement the original review asked for — and a bigger finding
+underneath it.** `ring_spsc` against rtrb on the two-thread path measures
+4.4–4.7× at `push1_pop1`, 11–18× at `push1_popN` (12.7 against 233 M/s at
+capacity 16384), and 7–15× across payload sizes. The same modes on the x86
+host measured 1.2–1.5×. The 5–15× gap that review predicted is real,
+Linux/ARM-sized, and invisible on x86-TSO — where every Acquire load is a
+plain load and the family's ordering discipline is free. The cursor-read
+hypothesis this spike refuted on x86 and the ARM numbers now point the same
+direction: the family's two-thread paths pay per-operation ordering on the
+one architecture where ordering is not free, while rtrb's one-Release-store
+fast path (producer-cached head) does not. The follow-up the review ordered
+— ring_spsc first — gets its evidence here.
+
 ## Verdict
 
 **Not promotable, for the reason the spike set out to test — and for that
@@ -136,7 +169,8 @@ producer; the clean pair holds that row flat (−2.8%, 26.8 against
 `ArrayQueue`'s ~75 M/s). The hypothesis underneath — that the consumer-cursor
 line read was the dominant per-record cost — is now cleanly refuted: with
 the read gone and a sound marker protocol in its place, the one-producer
-number does not move.
+number does not move. The cross-ISA check strengthens the refusal: on
+aarch64 the protocol loses at every width it touched.
 
 What the measurements do establish, reproducibly, is a trade rather than a
 win: the two-to-eight-producer per-record band and the four-producer

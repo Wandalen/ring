@@ -1453,9 +1453,9 @@ impl<'a, S> Consumer<'a, S> {
   /// load per slot, and stops at the first that is not yet published. It hands
   /// the run out as one [`Batch`], whose `Drop` commits it with a single store
   /// to the consumer cursor. Finding a run costs a load per record and releasing
-  /// it costs one store per batch. A drain that finds nothing still pays the
-  /// load at the gap and a `COMMIT` store to the consumer cursor, whose line
-  /// every producer's headroom check reads.
+  /// it costs one store per batch. A drain that finds nothing pays the load at
+  /// the gap and nothing more. Its batch commits nothing, so it leaves alone the
+  /// consumer cursor's line, which every producer's headroom check reads.
   ///
   /// Two alternatives were weighed. Tracking publication with a second cursor
   /// would make each producer wait for the one before it, which the module
@@ -1615,7 +1615,16 @@ impl<S> Drop for Batch<'_, S> {
   /// the advance overwrite a slot whose read is still in flight. That is the
   /// same torn read as a missing publish barrier, arriving from the opposite
   /// direction.
+  ///
+  /// An empty batch commits nothing. Its store would write the value the
+  /// cursor already holds, so no producer could tell it happened. It would
+  /// still take the cursor's line exclusive, away from every producer whose
+  /// headroom check reads it, on each empty poll of a consumer that keeps up.
   fn drop(&mut self) {
+    if self.len == 0 {
+      return;
+    }
+
     self
       .ring
       .consumer_cursor()

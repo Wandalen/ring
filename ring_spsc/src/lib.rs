@@ -1161,7 +1161,16 @@ impl<S> Drop for Batch<'_, S> {
   /// The producer sees the whole batch freed at once. A full ring drained in
   /// one batch goes from full to empty in a single step, and anything watching
   /// [`Producer::free_capacity`] never sees the space come back gradually.
+  ///
+  /// An empty batch commits nothing. Its store would write the value the
+  /// cursor already holds, so no reader could tell it happened. It would still
+  /// take the cursor's line from the producer, which reads that line to decide
+  /// whether the ring is full, on every empty poll of a consumer that keeps up.
   fn drop(&mut self) {
+    if self.len == 0 {
+      return;
+    }
+
     self
       .ring
       .cursors

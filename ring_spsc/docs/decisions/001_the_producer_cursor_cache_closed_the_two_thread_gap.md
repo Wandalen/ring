@@ -122,10 +122,15 @@ strict-alternation shapes at 3–25% where the cache buys nothing.
 ## Consequences
 
 - Promotion: a PR from `spsc-cached-head-spike` carries the prototype, the
-  model and this record. The x86 no-regression pair is the one open item —
-  its first attempt failed the controls-flatness check (untouched candidates
-  swinging ±20–60%) and is re-running; the Pi is the primary arena and the
-  x86 numbers land in the PR as they come.
+  model and this record. The x86 no-regression check took three pairs, and
+  none of them held the untouched controls flat on the two-thread rows (the
+  third, the best, still swung rtrb from −40% to +149% at one capacity), so
+  the honest x86 statement is bounded: within that noise the cached head
+  shows no systematic regression — its rows sit inside the control band, and
+  single-threaded fill/drain moves in the same direction as the Pi
+  (+5…+26%). The x86 platform was never where the gap lived (1.2–1.5×
+  there), and the repository's Linux CI runs the full suite on the PR as a
+  further gate.
 - The remaining honest gaps, recorded rather than claimed away: payload
   64/256 bytes (2.3–2.7× — payload-copy shaped), `push1_pop1`'s strict
   alternation (−4%), and the consumer-side branch mispredicts (secondary;

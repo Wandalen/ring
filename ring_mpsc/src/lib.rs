@@ -1103,7 +1103,7 @@ impl<'a, S> Producer<'a, S> {
 /// make this end refuse a ring that has room, never overwrite a record the
 /// consumer has not taken.
 ///
-/// [`Producer`]: struct::Producer
+/// [`Producer`]: crate::Producer
 #[derive(Debug)]
 pub struct PrimaryProducer<'a, S> {
   ring: &'a Ring<S>,
@@ -1231,7 +1231,7 @@ impl<'a, S> PrimaryProducer<'a, S> {
   /// The real cursors, not the cache — the same advisory contract
   /// [`Producer::free_capacity`] documents.
   ///
-  /// [`Producer::free_capacity`]: struct.Producer::free_capacity
+  /// [`Producer::free_capacity`]: Producer::free_capacity
   #[must_use]
   pub fn free_capacity(&self) -> usize {
     self.claimer.headroom()
@@ -1250,9 +1250,7 @@ impl<T: Send> PrimaryProducer<'_, TypedSlot<T>> {
   /// # Errors
   ///
   /// [`RingError::Full`], with `record` returned to the caller — exactly as
-  /// [`Producer::try_push`], which this mirrors over the cached gate.
-  ///
-  /// [`Producer::try_push`]: struct.Producer::try_push
+  /// `Producer::try_push`, which this mirrors over the cached gate.
   pub fn try_push(&mut self, record: T) -> Result<(), T> {
     let Ok(mut reservation) = self.claim() else {
       return Err(record);

@@ -35,5 +35,6 @@ cargo test --doc -p ring_align --all-features
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
+| `docs/benchmarks/` | Before/after measurements of performance changes, each naming the machine it ran on |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `align_test.rs` and the manual plan under `manual/` |

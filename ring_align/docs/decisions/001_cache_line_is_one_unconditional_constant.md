@@ -27,7 +27,8 @@ It was `64` until the family was first benchmarked on Apple Silicon, an M4 Pro w
 separated nothing. Whether two cursors shared a line depended on where the ring landed in memory, and that changed
 between processes: batched `ring_mpsc` at 8 producers ran at 91–95 or 137–143 M/s depending only on placement.
 That is the trigger this record named, and the edit is the one it prescribed. 128 is the largest line among the
-family's targets, so no target is now under-padded.
+family's targets, so no target is now under-padded. The before/after measurements, with the machine they ran on, are
+in [docs/benchmarks/001_cache_line_128.md](../benchmarks/001_cache_line_128.md).
 
 The cost lands on 64-byte hosts, which get twice the padding separation needs. A `PaddedCursor` is 128 bytes there
 instead of 64, and a ring holds a handful of them. On x86-64 the extra line is not pure waste either: the spatial

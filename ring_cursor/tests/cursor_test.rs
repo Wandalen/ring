@@ -6,7 +6,7 @@
 //! `PaddedCursor` values in one struct sitting at least a line apart. The
 //! feature states the line as 64 bytes, the value `ring_align::CACHE_LINE` had
 //! when it was written. It now follows the target architecture (`ring_align`'s
-//! ADR 002), 128 on x86-64 and AArch64, so the clauses compare against
+//! ADR 002): 128 on x86-64 and Apple AArch64, 64 on other AArch64. So the clauses compare against
 //! `CACHE_LINE`.
 //!
 //! ## Why three clauses and not one

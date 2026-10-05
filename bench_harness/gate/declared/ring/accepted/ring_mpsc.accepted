@@ -9,7 +9,7 @@
 # that compiles.
 #
 # Separate allocations do not weaken the conclusion. Both are `PaddedCursor`,
-# both are line-aligned (`ring_align::CACHE_LINE`, 128 on x86-64 and AArch64), and two distinct
+# both are line-aligned (`ring_align::CACHE_LINE`, 128 on x86-64 and Apple AArch64), and two distinct
 # addresses that are each a multiple of a line fall on different lines wherever
 # they were allocated. The method is
 # unconditionally true, and unkillable while `align_of::< PaddedCursor >()` is

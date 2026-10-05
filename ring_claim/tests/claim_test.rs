@@ -283,9 +283,10 @@ fn the_producer_cursor_is_readable_and_starts_at_zero() {
   assert_eq!(claimer.cursor().load(Ordering::Acquire), Seq(3));
 }
 
-// Pinned by literal on the two architectures the family runs on, where
-// `ring_align::CACHE_LINE` is 128. This crate does not depend on `ring_align`.
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+// Pinned by literal on the targets where `ring_align::CACHE_LINE` is 128 and the
+// family runs: x86-64, and AArch64 on Apple. This crate does not depend on
+// `ring_align`.
+#[cfg(any(target_arch = "x86_64", all(target_arch = "aarch64", target_vendor = "apple")))]
 #[test]
 fn the_producer_cursor_occupies_its_own_cache_line() {
   // Every producer writes a `Claimer`, and the gating side reads it. If its

@@ -18,36 +18,35 @@
 
 #![deny(missing_docs)]
 
-/// Bytes in a cache line on the target architecture, the same table as
-/// `crossbeam-utils`' `CachePadded` (0.8.23):
+/// Bytes in a cache line on the build target, `crossbeam-utils`' `CachePadded`
+/// table (0.8.23) with one change for AArch64:
 ///
-/// | Architecture | Bytes |
+/// | Target | Bytes |
 /// |---|---|
-/// | x86-64, AArch64, arm64ec, powerpc64 | 128 |
+/// | x86-64, powerpc64, and AArch64 with `target_vendor = "apple"` | 128 |
 /// | arm, mips, mips32r6, mips64, mips64r6, sparc, hexagon | 32 |
 /// | m68k | 16 |
 /// | s390x | 256 |
-/// | every other | 64 |
+/// | every other, including non-Apple AArch64 and arm64ec | 64 |
 ///
-/// The table is keyed on the architecture because that is all a build can see.
-/// Rust exposes no `cfg` for the processor model, and line size varies within
-/// one architecture. Apple Silicon has 128-byte lines and AWS Graviton 64, both
-/// AArch64. So the table takes the larger line wherever an architecture has
-/// both. A value too small is the failure that matters, because two cursors 64
-/// bytes apart still share a 128-byte line. A value too large only spends
-/// memory. On x86-64 the 128 is not pure padding either: the spatial prefetcher
-/// on Intel cores since Sandy Bridge fetches lines in adjacent pairs
+/// The table is keyed on what a build can see, the architecture and the vendor.
+/// Rust exposes no `cfg` for the processor model. On AArch64, Apple Silicon has
+/// 128-byte lines and Arm's own cores (Graviton, Ampere, Cortex) have 64, so the
+/// vendor splits the row where `crossbeam-utils` takes 128 for all of it. The
+/// cost is Linux on Apple Silicon, which builds as `aarch64-unknown-linux-gnu`
+/// and gets 64 on a 128-byte chip; that case is accepted. On x86-64 the line is
+/// 64 bytes, but the spatial prefetcher on Intel cores since Sandy Bridge fetches
+/// lines in adjacent pairs, so the row stays at 128
 /// (→ `docs/decisions/002_cache_line_follows_the_target_architecture.md`).
 ///
 /// ```
-/// # #[ cfg( any( target_arch = "x86_64", target_arch = "aarch64" ) ) ]
+/// # #[ cfg( any( target_arch = "x86_64", all( target_arch = "aarch64", target_vendor = "apple" ) ) ) ]
 /// assert_eq!( ring_align::CACHE_LINE, 128 );
 /// ```
 pub const CACHE_LINE: usize = if cfg!(any(
   target_arch = "x86_64",
-  target_arch = "aarch64",
-  target_arch = "arm64ec",
   target_arch = "powerpc64",
+  all(target_arch = "aarch64", target_vendor = "apple"),
 )) {
   128
 } else if cfg!(any(
@@ -97,15 +96,14 @@ const _: () = assert!(
 /// assert_eq!( core::mem::size_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// ```
 // `repr(align)` takes only an integer literal (E0693), so the table above is
-// restated here as one `cfg_attr` per row, with the same predicates.
-// `a_wrapped_value_occupies_exactly_one_line` fails if the two disagree.
+// restated here as one `cfg_attr` per row, with the same predicates. The
+// `const` assertion below the type fails the build if the two disagree.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 #[cfg_attr(
   any(
     target_arch = "x86_64",
-    target_arch = "aarch64",
-    target_arch = "arm64ec",
     target_arch = "powerpc64",
+    all(target_arch = "aarch64", target_vendor = "apple"),
   ),
   repr(align(128))
 )]
@@ -126,9 +124,8 @@ const _: () = assert!(
 #[cfg_attr(
   not(any(
     target_arch = "x86_64",
-    target_arch = "aarch64",
-    target_arch = "arm64ec",
     target_arch = "powerpc64",
+    all(target_arch = "aarch64", target_vendor = "apple"),
     target_arch = "arm",
     target_arch = "mips",
     target_arch = "mips32r6",
@@ -148,7 +145,7 @@ pub struct CacheAligned<T>(T);
 // architectures no test run reaches.
 const _: () = assert!(
   core::mem::align_of::<CacheAligned<u8>>() == CACHE_LINE,
-  "CACHE_LINE and CacheAligned's repr(align) disagree for this target_arch"
+  "CACHE_LINE and CacheAligned's repr(align) disagree for this target"
 );
 
 impl<T> CacheAligned<T> {

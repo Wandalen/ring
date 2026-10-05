@@ -11,22 +11,27 @@
 
 use ring_align::{CACHE_LINE, CacheAligned, on_distinct_lines};
 
-/// The constant follows `crossbeam-utils`' per-architecture table
+/// The constant follows the per-target table
 /// (-> `docs/decisions/002_cache_line_follows_the_target_architecture.md`).
 ///
-/// Restated here from `std::env::consts::ARCH`, a second source for the
-/// architecture than the crate's `cfg!`s. So a wrong row fails on the machine
-/// that runs it rather than agreeing with itself.
+/// Restated here from `std::env::consts::ARCH` and `OS`, a second source for
+/// the target than the crate's `cfg!`s. So a wrong row fails on the machine
+/// that runs it rather than agreeing with itself. Apple's operating systems
+/// stand in for `target_vendor = "apple"`.
 #[test]
 fn cache_line_follows_the_architecture_table() {
-  let expected = match std::env::consts::ARCH {
-    "x86_64" | "aarch64" | "arm64ec" | "powerpc64" => 128,
+  use std::env::consts::{ARCH, OS};
+
+  let apple = matches!(OS, "macos" | "ios" | "tvos" | "watchos" | "visionos");
+  let expected = match ARCH {
+    "x86_64" | "powerpc64" => 128,
+    "aarch64" if apple => 128,
     "arm" | "mips" | "mips32r6" | "mips64" | "mips64r6" | "sparc" | "hexagon" => 32,
     "m68k" => 16,
     "s390x" => 256,
     _ => 64,
   };
-  assert_eq!(CACHE_LINE, expected, "on {}", std::env::consts::ARCH);
+  assert_eq!(CACHE_LINE, expected, "on {ARCH} / {OS}");
 }
 
 /// The direction of a future change to `CACHE_LINE` matters, and before this
@@ -40,9 +45,9 @@ fn cache_line_follows_the_architecture_table() {
 /// `cache_line_follows_the_architecture_table` above already pins the value. So
 /// a deliberate raise still passes and only a decrease trips this.
 ///
-/// Only on x86-64 and AArch64, where the floor is Apple Silicon's 128-byte
-/// line, the reason this table exists.
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+/// Only on the 128-byte rows the family runs on: x86-64, and AArch64 on Apple,
+/// whose 128-byte line is the reason this table exists.
+#[cfg(any(target_arch = "x86_64", all(target_arch = "aarch64", target_vendor = "apple")))]
 #[test]
 fn cache_line_must_not_shrink_below_the_current_known_minimum() {
   // `core::hint::black_box` defeats the compiler's constant-folding of

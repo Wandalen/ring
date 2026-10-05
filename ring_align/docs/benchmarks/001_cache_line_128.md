@@ -2,7 +2,8 @@
 
 These measurements support [ADR 002](../decisions/002_cache_line_follows_the_target_architecture.md), which
 replaced ADR 001's unconditional 64. They were taken for an unconditional 128, the step before ADR 002's
-per-architecture table. The table keeps AArch64 at 128, so the numbers stand for it. The commit under test is
+per-target table. The table keeps AArch64 at 128 on Apple targets (`target_vendor = "apple"`, which includes
+the measured `aarch64-apple-darwin`), so the numbers stand for it. The commit under test is
 `perf(ring_align)!: pad to 128-byte cache lines` on `perf/cache-line-128`.
 
 It was measured as `a8037d0`. The branch was later rebased under a docs-only commit, so on the branch it is `3d7e8fd`,

@@ -53,7 +53,7 @@ acceptance being correct *for the reason the method exists*.
 
 `on_distinct_lines` asks whether two cursors share a cache line. It answers
 `true` today for every input that can be built, because `PaddedCursor` has
-`align_of == CACHE_LINE` (128 on x86-64 and AArch64), so two distinct ones sit at distinct multiples
+`align_of == CACHE_LINE` (128 on x86-64 and Apple AArch64), so two distinct ones sit at distinct multiples
 of a line. Nothing
 can make it answer `false` without breaking that alignment. `ring_align`'s and
 `ring_cursor`'s own tests assert that alignment directly, and both crates swept

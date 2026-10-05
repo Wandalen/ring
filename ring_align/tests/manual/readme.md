@@ -8,8 +8,8 @@ Run from the workspace root.
 
 ## M1: the constant matches the host's real cache line
 
-`CACHE_LINE` follows the target architecture (decision 002): 128 on x86-64 and
-AArch64, where Apple Silicon uses 128 and most other parts 64. A value too small is the failure
+`CACHE_LINE` follows the build target (decision 002): 128 on x86-64 and on
+Apple AArch64, 64 on other AArch64. A value too small is the failure
 that matters. Two cursors 64 bytes apart still share a 128-byte line, so the
 padding silently buys nothing while every test still passes. A value too large
 only spends memory.

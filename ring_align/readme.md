@@ -13,18 +13,19 @@ behaviour, which is also read by hand against
 
 ## Decisions
 
-- [`CACHE_LINE` follows the target architecture, using `crossbeam-utils`' table](docs/decisions/002_cache_line_follows_the_target_architecture.md)
+- [`CACHE_LINE` follows the build target: `crossbeam-utils`' table, with 64 for non-Apple AArch64](docs/decisions/002_cache_line_follows_the_target_architecture.md)
 - [`CACHE_LINE` is one unconditional 64 for every target](docs/decisions/001_cache_line_is_one_unconditional_constant.md), superseded by 002
 
 ## Known limitations
 
-- `CacheAligned` pads every wrapped value to a whole line, 128 bytes on x86-64
-  and AArch64, so a wrapped `u64` spends 120 of its 128 bytes on padding there.
-  That pays only when another thread writes a neighbouring value. A wrapped
-  value owns its whole line, so wrapping one of two hot fields already puts
-  them on different lines. A build sees the architecture, not the processor,
-  so a 64-byte-line part of a 128-byte architecture (AWS Graviton, most x86-64)
-  gets twice the padding separation needs, as decision 002 records.
+- `CacheAligned` pads every wrapped value to a whole line: 128 bytes on x86-64
+  and Apple AArch64, 64 on other AArch64. A wrapped `u64` spends 120 of its 128
+  bytes on padding on the 128-byte targets. That pays only when another thread
+  writes a neighbouring value. A wrapped value owns its whole line, so wrapping
+  one of two hot fields already puts them on different lines.
+- A build sees the architecture and vendor, not the processor (decision 002).
+  So Linux on Apple Silicon (`aarch64-unknown-linux-gnu`) gets 64 on a
+  128-byte chip, and x86-64 gets 128 on a 64-byte line, for the prefetcher.
 
 ## Run it
 

@@ -135,7 +135,8 @@ The same A/B pair on a weakly-ordered machine (baseline `pi_base` saved on
 two questions the x86 pairs could not. The pair's controls hold flat enough
 to read (arrayqueue within −2.6%…+0.2% across the producers sweep); two
 fill/drain cells at 16384 reading +31%/+110% are baseline-side outliers,
-flagged and excluded.
+flagged and excluded. (This first pair mixed suites against a drifted
+baseline; the addendum below supersedes it with a dedicated one.)
 
 **The protocol's verdict holds on the second ISA, and the x86 mid-band win
 does not travel.** Two to three producers — the band that gained 16–43% on
@@ -160,6 +161,36 @@ direction: the family's two-thread paths pay per-operation ordering on the
 one architecture where ordering is not free, while rtrb's one-Release-store
 fast path (producer-cached head) does not. The follow-up the review ordered
 — ring_spsc first — gets its evidence here.
+
+### Addendum: the dedicated aarch64 pair (2026-10-05, supersedes the mixed report's rows)
+
+A dedicated pair — baseline `mpsc_pi_base` saved on `benches`, the boundary
+gate compared at this branch's tip, controls flat (arrayqueue −1.0%…+8.7%
+across the producers sweep, sync_channel −0.9%…+11.1% except one 64-slot
+cell):
+
+| producers → | 1 | 2 | 3 |
+|---|---:|---:|---:|
+| per record (`push1_popN`) | 10.9 M/s (−14.2%) | 7.7 (+0.1%) | 6.9 (−6.4%) |
+| batched (`push32_popN`) | 130.3 (−18.2%) | 127.7 (−12.1%) | 124.9 (−14.1%) |
+
+Capacity at four producers: `push1` −6.2%/−4.0%, `push32` −8.9%/−17.6%.
+Oversubscribed (8 producers on 4 cores): `push1` −12.5%, `push32` −9.7%.
+The single-threaded `push_pop` pair is flat (+0.0%) — the gate costs nothing
+uncontended and buys nothing either.
+
+The boundary gate loses on aarch64 at every width the suite touches:
+batched −9.7%…−18.2%, per record −6.4%…−14.2% (the one-producer cell
+carries ±10% control drift, so read it as "no win" rather than as a
+precise loss), capacity −4%…−18%. The NO-GO is confirmed on both
+instruction sets, and the marker store the protocol adds to the consumer —
+an `STLR` here — is again the suspected tax: the gate removes one consumer-
+line read per claim and adds one consumer-side store per record, and on
+both architectures the store has cost more than the read saved. The
+flamegraph taken on the spike side shows `claim_gated` at 32.6% of process
+samples — the gate check plus the claim exchange remain the producer's
+whole life, which is the shape the review's report predicted and the
+cached-head work on `ring_spsc` later confirmed from the other side.
 
 ## Verdict
 

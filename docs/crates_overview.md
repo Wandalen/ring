@@ -81,8 +81,8 @@ let cap = Capacity::new( 1024 ).unwrap(); // Err if not pow2
 ```
 
 ### `ring_align`. Cache-line separation. Leaf.
-`CACHE_LINE=128` + `CacheAligned<T>` (`#[repr(align(128))]` ⇒ size==align ⇒ one value per line). Exists so padding decision is made once; `ring_cursor` just wears it. Prevents false-sharing between producer/consumer cursors.
-> Granny: two people shouting into the same small room make each other slow even if they talk about different things. Give each their own room (128 bytes). This crate is just "rooms are 128 bytes big".
+`CACHE_LINE` per target arch (crossbeam-utils' table: 128 on x86-64/aarch64) + `CacheAligned<T>` (matching `#[repr(align(N))]` ⇒ size==align ⇒ one value per line). Exists so padding decision is made once; `ring_cursor` just wears it. Prevents false-sharing between producer/consumer cursors.
+> Granny: two people shouting into the same small room make each other slow even if they talk about different things. Give each their own room (128 bytes on most machines). This crate is just "how big is a room on this kind of machine".
 ```rust
 use ring_align::{ CacheAligned, CACHE_LINE };
 let p = CacheAligned::new( 7u64 );

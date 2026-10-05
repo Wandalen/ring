@@ -1,7 +1,8 @@
 # `CACHE_LINE` 64 → 128: before and after, on an Apple M4 Pro
 
-These measurements support the amendment to
-[ADR 001](../decisions/001_cache_line_is_one_unconditional_constant.md). The commit under test is
+These measurements support [ADR 002](../decisions/002_cache_line_follows_the_target_architecture.md), which
+replaced ADR 001's unconditional 64. They were taken for an unconditional 128, the step before ADR 002's
+per-architecture table. The table keeps AArch64 at 128, so the numbers stand for it. The commit under test is
 `perf(ring_align)!: pad to 128-byte cache lines` on `perf/cache-line-128`.
 
 It was measured as `a8037d0`. The branch was later rebased under a docs-only commit, so on the branch it is `3d7e8fd`,

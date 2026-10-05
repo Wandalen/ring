@@ -9,7 +9,7 @@
 //! line. This crate holds the constant and the wrapper; `ring_cursor` holds the
 //! cursors that use them.
 //!
-//! No `unsafe` is needed for any of it, because `#[ repr( align( 128 ) ) ]` is a
+//! No `unsafe` is needed for any of it, because `#[ repr( align( N ) ) ]` is a
 //! safe attribute. So this crate compiles under the workspace-wide
 //! `unsafe-code = "deny"`, like most of the family. It once held an entry in
 //! `ring/bench_harness/gate/declared/ring/unsafe_allowlist.txt` permitting an
@@ -18,24 +18,60 @@
 
 #![deny(missing_docs)]
 
-/// Bytes in a cache line on the family's target platforms, rounded up to the
-/// largest of them.
+/// Bytes in a cache line on the target architecture, the same table as
+/// `crossbeam-utils`' `CachePadded` (0.8.23):
 ///
-/// Apple Silicon uses 128. x86-64 and AArch64's common configuration use 64.
-/// A value too small is the failure that matters, because two cursors 64 bytes
-/// apart still share a 128-byte line. A value too large only spends memory, so
-/// the constant takes the largest line rather than becoming conditional per
-/// crate (→ `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
+/// | Architecture | Bytes |
+/// |---|---|
+/// | x86-64, AArch64, arm64ec, powerpc64 | 128 |
+/// | arm, mips, mips32r6, mips64, mips64r6, sparc, hexagon | 32 |
+/// | m68k | 16 |
+/// | s390x | 256 |
+/// | every other | 64 |
+///
+/// The table is keyed on the architecture because that is all a build can see.
+/// Rust exposes no `cfg` for the processor model, and line size varies within
+/// one architecture. Apple Silicon has 128-byte lines and AWS Graviton 64, both
+/// AArch64. So the table takes the larger line wherever an architecture has
+/// both. A value too small is the failure that matters, because two cursors 64
+/// bytes apart still share a 128-byte line. A value too large only spends
+/// memory. On x86-64 the 128 is not pure padding either: the spatial prefetcher
+/// on Intel cores since Sandy Bridge fetches lines in adjacent pairs
+/// (→ `docs/decisions/002_cache_line_follows_the_target_architecture.md`).
 ///
 /// ```
+/// # #[ cfg( any( target_arch = "x86_64", target_arch = "aarch64" ) ) ]
 /// assert_eq!( ring_align::CACHE_LINE, 128 );
 /// ```
-pub const CACHE_LINE: usize = 128;
+pub const CACHE_LINE: usize = if cfg!(any(
+  target_arch = "x86_64",
+  target_arch = "aarch64",
+  target_arch = "arm64ec",
+  target_arch = "powerpc64",
+)) {
+  128
+} else if cfg!(any(
+  target_arch = "arm",
+  target_arch = "mips",
+  target_arch = "mips32r6",
+  target_arch = "mips64",
+  target_arch = "mips64r6",
+  target_arch = "sparc",
+  target_arch = "hexagon",
+)) {
+  32
+} else if cfg!(target_arch = "m68k") {
+  16
+} else if cfg!(target_arch = "s390x") {
+  256
+} else {
+  64
+};
 
 // `on_distinct_lines` below computes `a / CACHE_LINE` as a line index. That
 // equals the true line index only because lines are naturally aligned, which
-// holds only when `CACHE_LINE` is a power of two. Every value this family has
-// used (64, 128) is one, and nothing checked it until now.
+// holds only when `CACHE_LINE` is a power of two. Every value in the table
+// above (16, 32, 64, 128, 256) is one, and this checks the one compiled in.
 // `ring_types::Capacity::new` asserts the analogous precondition for its own
 // number. This is the compile-time form, since a `pub const` needs no runtime
 // `Result`.
@@ -60,9 +96,60 @@ const _: () = assert!(
 /// assert_eq!( core::mem::align_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// assert_eq!( core::mem::size_of::< CacheAligned< u64 > >(), CACHE_LINE );
 /// ```
+// `repr(align)` takes only an integer literal (E0693), so the table above is
+// restated here as one `cfg_attr` per row, with the same predicates.
+// `a_wrapped_value_occupies_exactly_one_line` fails if the two disagree.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[repr(align(128))]
+#[cfg_attr(
+  any(
+    target_arch = "x86_64",
+    target_arch = "aarch64",
+    target_arch = "arm64ec",
+    target_arch = "powerpc64",
+  ),
+  repr(align(128))
+)]
+#[cfg_attr(
+  any(
+    target_arch = "arm",
+    target_arch = "mips",
+    target_arch = "mips32r6",
+    target_arch = "mips64",
+    target_arch = "mips64r6",
+    target_arch = "sparc",
+    target_arch = "hexagon",
+  ),
+  repr(align(32))
+)]
+#[cfg_attr(target_arch = "m68k", repr(align(16)))]
+#[cfg_attr(target_arch = "s390x", repr(align(256)))]
+#[cfg_attr(
+  not(any(
+    target_arch = "x86_64",
+    target_arch = "aarch64",
+    target_arch = "arm64ec",
+    target_arch = "powerpc64",
+    target_arch = "arm",
+    target_arch = "mips",
+    target_arch = "mips32r6",
+    target_arch = "mips64",
+    target_arch = "mips64r6",
+    target_arch = "sparc",
+    target_arch = "hexagon",
+    target_arch = "m68k",
+    target_arch = "s390x",
+  )),
+  repr(align(64))
+)]
 pub struct CacheAligned<T>(T);
+
+// The constant and the `cfg_attr`s state the table twice. A mismatch on the
+// target being built is a compile error here, so `cargo check --target` covers
+// architectures no test run reaches.
+const _: () = assert!(
+  core::mem::align_of::<CacheAligned<u8>>() == CACHE_LINE,
+  "CACHE_LINE and CacheAligned's repr(align) disagree for this target_arch"
+);
 
 impl<T> CacheAligned<T> {
   /// Wrap a value so it occupies a cache line alone.
@@ -119,11 +206,11 @@ impl<T> CacheAligned<T> {
 /// and two stack locals in a doc example would say nothing.
 ///
 /// ```
-/// use ring_align::on_distinct_lines;
+/// use ring_align::{ on_distinct_lines, CACHE_LINE };
 ///
-/// assert!( !on_distinct_lines( 0, 127 ) );   // both in line 0
-/// assert!( on_distinct_lines( 127, 128 ) );  // straddling the boundary
-/// assert!( !on_distinct_lines( 256, 258 ) ); // both in line 2
+/// assert!( !on_distinct_lines( 0, CACHE_LINE - 1 ) );                  // both in line 0
+/// assert!( on_distinct_lines( CACHE_LINE - 1, CACHE_LINE ) );          // straddling the boundary
+/// assert!( !on_distinct_lines( 2 * CACHE_LINE, 2 * CACHE_LINE + 2 ) ); // both in line 2
 /// ```
 #[must_use]
 pub const fn on_distinct_lines(a: usize, b: usize) -> bool {

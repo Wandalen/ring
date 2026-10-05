@@ -8,8 +8,8 @@ Run from the workspace root.
 
 ## M1: the constant matches the host's real cache line
 
-`CACHE_LINE` is 128, the largest line among the family's targets: Apple Silicon
-uses 128, x86-64 and common AArch64 use 64. A value too small is the failure
+`CACHE_LINE` follows the target architecture (decision 002): 128 on x86-64 and
+AArch64, where Apple Silicon uses 128 and most other parts 64. A value too small is the failure
 that matters. Two cursors 64 bytes apart still share a 128-byte line, so the
 padding silently buys nothing while every test still passes. A value too large
 only spends memory.
@@ -25,7 +25,7 @@ decorative. Record that in the Run Record rather than adjusting the test.
 
 ## M2: the crate really contains no `unsafe`
 
-The module doc claims none is needed because `#[repr(align(128))]` is a safe
+The module doc claims none is needed because `#[repr(align(N))]` is a safe
 attribute. The workspace denies `unsafe_code`, so this should be structurally
 impossible. Check the claim directly anyway, rather than trusting that the lint
 is wired up.

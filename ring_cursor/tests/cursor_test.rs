@@ -5,15 +5,17 @@
 //! `size_of::<PaddedCursor>()` both equal to the line size, and two
 //! `PaddedCursor` values in one struct sitting at least a line apart. The
 //! feature states the line as 64 bytes, the value `ring_align::CACHE_LINE` had
-//! when it was written; it is 128 since `ring_align`'s ADR 001 was amended.
+//! when it was written. It now follows the target architecture (`ring_align`'s
+//! ADR 002), 128 on x86-64 and AArch64, so the clauses compare against
+//! `CACHE_LINE`.
 //!
 //! ## Why three clauses and not one
 //!
 //! Each of the first two is satisfiable while the feature fails.
 //!
-//! A type of size 8 with `align_of == 128` satisfies the first clause and packs
+//! A type of size 8 with `align_of == CACHE_LINE` satisfies the first clause and packs
 //! two neighbours 8 bytes apart in an array, because alignment says where a value may
-//! start, not how much room it occupies. A type of size 128 with `align_of == 8`
+//! start, not how much room it occupies. A type of size `CACHE_LINE` with `align_of == 8`
 //! satisfies the second and can start at offset 8, straddling two lines and
 //! sharing both. Only the conjunction says "one per line".
 //!
@@ -56,18 +58,13 @@ fn cap(slots: usize) -> Capacity {
 fn a_padded_cursor_occupies_exactly_one_cache_line() {
   assert_eq!(
     core::mem::align_of::<PaddedCursor>(),
-    128,
+    CACHE_LINE,
     "clause 1: a cursor starts on a line boundary"
   );
   assert_eq!(
     core::mem::size_of::<PaddedCursor>(),
-    128,
-    "clause 2: and takes the whole line, so the next value starts on the next one"
-  );
-  assert_eq!(
-    core::mem::size_of::<PaddedCursor>(),
     CACHE_LINE,
-    "the 128 above is ring_align::CACHE_LINE, not a coincidence"
+    "clause 2: and takes the whole line, so the next value starts on the next one"
   );
 }
 

@@ -328,6 +328,9 @@ fn every_cursor_starts_at_zero() {
   assert_eq!(set.slowest(), Some(Seq::ZERO));
 }
 
+// Pinned by literal on the two architectures the family runs on, where
+// `ring_align::CACHE_LINE` is 128. This crate does not depend on `ring_align`.
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[test]
 fn the_cursors_in_a_set_are_cache_line_separated() {
   // A `GatingSet` is where several consumers' cursors are most likely to end

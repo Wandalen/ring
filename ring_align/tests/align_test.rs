@@ -11,11 +11,22 @@
 
 use ring_align::{CACHE_LINE, CacheAligned, on_distinct_lines};
 
-/// The constant is 128, the largest line size among the family's targets. Apple
-/// Silicon uses 128; a 64-byte host pays padding for it, not correctness.
+/// The constant follows `crossbeam-utils`' per-architecture table
+/// (-> `docs/decisions/002_cache_line_follows_the_target_architecture.md`).
+///
+/// Restated here from `std::env::consts::ARCH`, a second source for the
+/// architecture than the crate's `cfg!`s. So a wrong row fails on the machine
+/// that runs it rather than agreeing with itself.
 #[test]
-fn cache_line_is_one_hundred_twenty_eight() {
-  assert_eq!(CACHE_LINE, 128);
+fn cache_line_follows_the_architecture_table() {
+  let expected = match std::env::consts::ARCH {
+    "x86_64" | "aarch64" | "arm64ec" | "powerpc64" => 128,
+    "arm" | "mips" | "mips32r6" | "mips64" | "mips64r6" | "sparc" | "hexagon" => 32,
+    "m68k" => 16,
+    "s390x" => 256,
+    _ => 64,
+  };
+  assert_eq!(CACHE_LINE, expected, "on {}", std::env::consts::ARCH);
 }
 
 /// The direction of a future change to `CACHE_LINE` matters, and before this
@@ -24,10 +35,14 @@ fn cache_line_is_one_hundred_twenty_eight() {
 /// Raising it only spends memory. Lowering it silently defeats every guarantee
 /// in this crate, because `on_distinct_lines` stays calibrated to the same
 /// wrong number it divides by
-/// (-> `docs/decisions/001_cache_line_is_one_unconditional_constant.md`).
+/// (-> `docs/decisions/002_cache_line_follows_the_target_architecture.md`).
 /// Pinned as a floor rather than an exact value, because
-/// `cache_line_is_one_hundred_twenty_eight` above already pins the value. So a deliberate
-/// raise still passes and only a decrease trips this.
+/// `cache_line_follows_the_architecture_table` above already pins the value. So
+/// a deliberate raise still passes and only a decrease trips this.
+///
+/// Only on x86-64 and AArch64, where the floor is Apple Silicon's 128-byte
+/// line, the reason this table exists.
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 #[test]
 fn cache_line_must_not_shrink_below_the_current_known_minimum() {
   // `core::hint::black_box` defeats the compiler's constant-folding of

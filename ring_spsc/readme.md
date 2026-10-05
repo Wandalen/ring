@@ -61,6 +61,7 @@ RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/workaround/` | Why the crate opts out of the workspace `unsafe` deny. See [docs/workaround/readme.md](docs/workaround/readme.md) |
+| `docs/benchmarks/` | Before/after measurements of performance changes, each naming the machine it ran on |
 | `src/lib.rs` | The `Ring`, its two ends, and the two publish/commit guards |
 | `tests/spsc_test.rs` | This crate's reached-test, the tests around the public API, and a `loom` model of every interleaving |
 | `tests/manual/readme.md` | The source readings and mutation checks automation cannot make |

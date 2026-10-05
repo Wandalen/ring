@@ -3,4 +3,4 @@
 # once it stops matching the crate on disk.
 crate: ring_claim
 swept: 2026-10-05
-digest: c78bbeb5fa4fb2f1f4abe0712a18b5364898462c8b9045e7af4a7deb403fc6a9
+digest: 31ad20896f2fcbcfa36284122036de971f9945fed0d71a6847cd3ae3e0641bab

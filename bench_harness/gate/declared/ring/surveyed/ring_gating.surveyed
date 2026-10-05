@@ -3,4 +3,4 @@
 # once it stops matching the crate on disk.
 crate: ring_gating
 swept: 2026-10-05
-digest: 99f49bca098da5b661f85e182d1f3ea62efd149ad59b46c138ee87bdff7e6d4f
+digest: 64f7190699dc7babf9ad08a317366bb0e0db67e8e3d8c27bbc5d0836f31f4479

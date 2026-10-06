@@ -9,19 +9,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use harness::candidates::{
-  Candidate,
-  CrossbeamQueue,
-  Mpsc,
-  MpscPrimary,
-  MutexDeque,
-  Record,
-  Rtrb,
-  Run,
-  Rx,
-  Spsc,
-  SyncChannel,
-  Tx,
-  Wide,
+  Candidate, CrossbeamQueue, Mpsc, MpscPrimary, MutexDeque, Record, Rtrb, Run, Rx, Spsc, SyncChannel, Tx, Wide,
 };
 use harness::driver::{self, Mode, Shape};
 use harness::latency::{self, Load, Stamped};

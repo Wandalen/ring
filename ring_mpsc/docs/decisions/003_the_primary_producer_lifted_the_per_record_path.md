@@ -1,4 +1,4 @@
-# The primary producer's cached cursors roughly double the per-record two-thread path
+# The primary producer's cached cursors lift the per-record two-thread path by 55% like-for-like
 
 Status: Accepted — measured GO on aarch64; the x86 no-regression pair runs
 in this branch's PR window
@@ -65,13 +65,18 @@ recording the blind spot.
 
 ## Measurement (Pi 5, aarch64, one session; `mpsc-primary` against the ordinary per-record path, rtrb as the untouched control — flat within ±1.6%)
 
-Two-thread, capacity 1024, against the ordinary per-record path's own
-numbers (~10.9–11.0 M/s at one producer):
+Two-thread, capacity 1024. One cell in this table has a matched ordinary
+run to compare against: `push1_popN` at 1024 slots, over
+`mpsc/push1_popN` at one producer, 10.9 M/s. The harness registers the
+ordinary `Mpsc` in that mode and capacity alone — the `push1_pop1` row
+runs a different consumer mode, the 64 and 16384 columns a different
+capacity — so the other five cells keep their absolute numbers and no
+percentage:
 
 | two-thread, `mpsc-primary` | 64 | 1024 | 16384 |
 |---|---:|---:|---:|
-| `push1_pop1` | 14.6 M/s (+33%) | **20.6 (+87%)** | 16.8 (+53%) |
-| `push1_popN` | 17.0 (+55%) | 16.9 (+55%) | 17.0 (+55%) |
+| `push1_pop1` | 14.6 M/s | **20.6** | 16.8 |
+| `push1_popN` | 17.0 | **16.9 (+55%)** | 17.0 |
 
 - Single-threaded fill/drain: +28…+40% (`push1_popN` 64.2–65.4 against
   46.2–46.6 M/s; `push1_pop1` 46.1–46.5 against 35.9–36.1).
@@ -108,11 +113,13 @@ the platform never paid the loads this spike removes.
 
 ## Verdict
 
-**GO.** The primary handle roughly doubles the per-record two-thread path
-at moderate capacity, improves every single-threaded shape measured, and
-regresses nothing in the suite — on the architecture where the family's
-per-record costs live. The residual distance to rtrb is the claim exchange
-and the stamp scan, not the cursor reads this spike removed.
+**GO.** On the one matched pair (`push1_popN`, 1024 slots) the primary
+lifts the two-thread per-record path by 55%. Every single-threaded shape
+measured improved — fill/drain +28…+40%, `push_pop` −7%, `push_full`
+−11% — and nothing in the suite regressed, on the architecture where the
+family's per-record costs live. The residual distance to rtrb is the
+claim exchange and the stamp scan, not the cursor reads this spike
+removed.
 
 ## Consequences
 

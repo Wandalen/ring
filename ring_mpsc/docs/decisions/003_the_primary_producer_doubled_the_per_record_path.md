@@ -54,7 +54,7 @@ recording the blind spot.
 
 ## Deltas
 
-- `mem::forget(Reservation)`: the claim's exchange moved the shared cursor
+- `mem::forget(Reserved)`: the claim's exchange moved the shared cursor
   past the forgotten sequence and there is no stamp, so the consumer stalls
   at the hole and later records are unreachable behind it — the ring's
   documented lost-claim pitfall, unchanged from the ordinary producer.

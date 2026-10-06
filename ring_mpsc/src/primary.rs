@@ -100,7 +100,7 @@ pub struct PrimaryProducer<'a, S> {
   /// run ahead of it, and a claim granted on it can never overwrite a record
   /// the consumer has not taken.
   cached_head: Seq,
-  /// See [`Producer`]'s field of the same name.
+  /// See [`Consumer`]'s field of the same name.
   _one_thread: PhantomData<Cell<()>>,
 }
 
@@ -224,8 +224,9 @@ impl<T: Send> PrimaryProducer<'_, TypedSlot<T>> {
   ///
   /// # Errors
   ///
-  /// [`RingError::Full`], with `record` returned to the caller — exactly as
-  /// `Producer::try_push`, which this mirrors over the cached gate.
+  /// [`RingError::Full`], with `record` handed back unconsumed — unlike
+  /// [`Producer::push`], which drops the value on a full ring — so a retry
+  /// may pass the same record again.
   pub fn try_push(&mut self, record: T) -> Result<(), T> {
     let Ok(mut reservation) = self.claim() else {
       return Err(record);

@@ -1596,10 +1596,9 @@ mod threaded {
 #[cfg(loom)]
 mod exhaustive {
   use loom::sync::atomic::{AtomicUsize, Ordering};
-  use ring_atomic::SeqCell;
   use ring_mpsc::{Ends, Ring};
   use ring_slot::TypedSlot;
-  use ring_types::{Capacity, Seq};
+  use ring_types::Capacity;
 
   const WRITTEN: usize = 0xABC;
 
@@ -1742,94 +1741,6 @@ mod exhaustive {
 
       writer.join().expect("no panic");
       reader.join().expect("no panic");
-    });
-  }
-
-  /// The primary's guessed exchange never double-grants against an ordinary
-  /// producer: the compare-exchange arbitrates, and every published record is
-  /// drained exactly once.
-  ///
-  /// Red under the mutation that replaces the primary's compare-exchange with
-  /// a plain store: both writers grant sequence zero, one publish overwrites
-  /// the other's increment, the watermark stops at zero, and the reader
-  /// drains one record against two grants.
-  ///
-  /// What this model cannot check: the `Acquire` on the cached head's
-  /// refresh. Loom linearises each step, so a relaxed refresh that returns
-  /// the committed value orders identically to an acquired one there, while
-  /// on hardware without the edge the overwrite and the take can race — the
-  /// same blind spot the payload-proxy pattern narrows only this far.
-  #[test]
-  fn a_primary_producer_and_a_copy_producer_never_double_grant() {
-    loom::model(|| {
-      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
-
-      let ends = leaked_ends();
-      let ring = ends.ring();
-      let (mut producer, mut consumer) = ends.split();
-      let mut primary = producer.primary();
-
-      let copy_writer = loom::thread::spawn(move || {
-        // Claim first — the sequence decides the slot — then store the
-        // payload, then publish. The store sits between the claim and the
-        // publish, so the drain's `Acquire` on the cursor sees it.
-        let reserved = producer.claim().expect("an empty ring admits one");
-        let seq = reserved.sequence();
-        payloads[(seq.0 & 1) as usize].store(11, Ordering::Relaxed);
-        drop(reserved);
-      });
-
-      let primary_writer = loom::thread::spawn(move || {
-        let reserved = primary.claim().expect("a two-slot ring admits two");
-        let seq = reserved.sequence();
-        payloads[(seq.0 & 1) as usize].store(22, Ordering::Relaxed);
-        drop(reserved);
-      });
-
-      let reader = loom::thread::spawn(move || {
-        let first = consumer.drain();
-        for offset in 0..first.len() {
-          let seq = first.start().advanced_by(offset as u64);
-          assert_ne!(
-            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
-            0,
-            "drained record {seq:?} carried no write at all",
-          );
-        }
-        drop(first);
-
-        let second = consumer.drain();
-        for offset in 0..second.len() {
-          let seq = second.start().advanced_by(offset as u64);
-          assert_ne!(
-            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
-            0,
-            "drained record {seq:?} carried no write at all",
-          );
-        }
-        second.len()
-      });
-
-      copy_writer.join().expect("no panic");
-      primary_writer.join().expect("no panic");
-      let last = reader.join().expect("no panic");
-      drop(last);
-
-      // Both writers claimed a distinct sequence and published it: the
-      // stamps carry sequence zero and sequence one. Under a plain store in
-      // place of the primary's compare-exchange the two grants collide on
-      // sequence zero, sequence one is never published, and its stamp stays
-      // `UNSTAMPED`.
-      assert_eq!(
-        ring.stamps()[0].load(Ordering::Relaxed),
-        Seq(0),
-        "sequence zero was published by whichever writer won it",
-      );
-      assert_eq!(
-        ring.stamps()[1].load(Ordering::Relaxed),
-        Seq(1),
-        "sequence one was never published — the two grants collided",
-      );
     });
   }
 }

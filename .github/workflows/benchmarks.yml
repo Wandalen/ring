@@ -1,0 +1,144 @@
+# Benchmarks across the three architectures the family targets, as a cross-run signal.
+#
+# Runs `verb/bench suite::all` — ring_bench's comparison example, perf's criterion suites
+# (micro / spsc / mpsc / batch), the latency percentiles, then the markdown tables of
+# `perf/examples/report.rs` — once per runner: x86_64 linux (`ubuntu-latest`), aarch64
+# linux (`ubuntu-24.04-arm`), apple silicon (`macos-14`, M1). Each runner's report goes
+# into the run summary and a `benchmark-report-<arch>` artifact, for watching numbers
+# across runs of the same label.
+#
+# Separate from `ci.yml` because benchmarks are too slow (fat-LTO builds plus measurement,
+# hours on a hosted runner) and too noisy (shared hardware, unfamiliar neighbors on the
+# host) for per-PR CI — nothing here blocks a merge. Numbers measured on a shared hosted
+# runner are a regression signal between runs, never a source for readme tables: those are
+# intra-run comparisons taken on one dedicated machine, and cross-runner numbers are not
+# comparable to them. Every report's first line carries the machine context (cpu, cores,
+# governor, kernel, clocksource, rustc, commit) for exactly that check.
+#
+# Schedule: `master` pushes that touch the benchmarked code + nightly + manual dispatch.
+# gates.yml and loom.yml run unfiltered on every `master` push and own the 03:00 cron; this
+# workflow filters by path because bench numbers only change when the mechanisms or the
+# harness do. The paths below are the workspace closure of `ring_bench` (the comparison
+# example) and `perf` (the criterion suites), checked with `cargo tree -p ring_bench -e
+# normal` — crates the benches never build (ring_publish, ring_consume, ring_barrier,
+# ring_wait, ring_event, the rest of the tail) are deliberately absent.
+#
+# No windows runner: the family targets linux/macOS deployment, and windows numbers from a
+# shared runner are the noisiest of the three platforms.
+
+name: Benchmarks
+
+on:
+  push:
+    branches: [master]
+    paths:
+      # The benchmark suites.
+      - perf/**
+      - ring_bench/**
+      # The family crates ring_bench and perf build, in workspace (dependency) order.
+      - ring_types/**
+      - ring_seqno/**
+      - ring_index/**
+      - ring_align/**
+      - ring_atomic/**
+      - ring_config/**
+      - ring_slot/**
+      - ring_cursor/**
+      - ring_store/**
+      - ring_gating/**
+      - ring_claim/**
+      - ring_overflow/**
+      - ring_batch/**
+      - ring_spsc/**
+      - ring_mpsc/**
+      - ring_core/**
+      - ring_handle/**
+      - ring_tls/**
+      - ring_flush/**
+      - ring_stats/**
+      - ring_registry/**
+      - ring_factory/**
+      # The manifests that wire the closure together, and this workflow.
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/benchmarks.yml
+  schedule:
+    # An hour after gates.yml / loom.yml ("0 3 * * *"), so the nightly jobs do not contend
+    # for runners at the same minute.
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: verb/bench suite — comparison, micro, spsc, mpsc, batch, latency, report, all
+        required: false
+        default: all
+        type: string
+      quick:
+        description: quick::1 — validate every case once, no meaningful numbers
+        required: false
+        default: false
+        type: boolean
+
+# Runs queue instead of cancelling: a benchmark killed mid-measurement leaves no numbers
+# behind, so superseding it would only throw away the old run's result for nothing.
+concurrency:
+  group: benchmarks-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  # No RUSTFLAGS "-D warnings", unlike ci.yml: a warning cannot change what a benchmark
+  # measures, and denying it would kill the run over prose.
+
+jobs:
+  bench:
+    name: verb/bench on ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, arch: x86_64-linux }
+          - { os: ubuntu-24.04-arm, arch: aarch64-linux }
+          - { os: macos-14, arch: aarch64-macos }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+      # rust-cache stores ~/.cargo only — registry, index, toolchains. The workspace's
+      # target/ directory, criterion's results and target/perf/ stay uncached, so every run
+      # re-measures on a clean tree: cached results would describe an old checkout, not
+      # this one.
+      - uses: Swatinem/rust-cache@v2
+      - name: benchmarks (verb/bench)
+        # shell: bash so the verb runs identically on every runner in the matrix, macOS
+        # included. Inputs go through env instead of inline ${{ }} so quoting stays boring.
+        shell: bash
+        env:
+          BENCH_SUITE: ${{ inputs.suite || 'all' }}
+          BENCH_QUICK: ${{ inputs.quick == true }}
+        run: |
+          args=( "suite::$BENCH_SUITE" )
+          if [ "$BENCH_QUICK" = "true" ]; then
+            args+=( quick::1 )
+          fi
+          bash verb/bench "${args[@]}"
+      - name: report to a file (perf/examples/report.rs)
+        # quick::1 saves nothing, so a quick run's report carries the machine line and a
+        # "no criterion results" note instead of tables. The step stays unconditional so
+        # every run still produces the artifact the next two steps expect.
+        run: cargo run -q -p perf --example report -- --out bench-report.md
+      - name: report into the run summary
+        shell: bash
+        run: cat bench-report.md >> "$GITHUB_STEP_SUMMARY"
+      - name: upload the report and the raw results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-report-${{ matrix.arch }}
+          path: |
+            bench-report.md
+            target/perf/
+          # target/perf/ (spin counts, latency.json) only appears after a run that saves,
+          # so a quick run uploads the report alone. target/criterion stays behind:
+          # hundreds of MB of HTML nobody reads here.
+          if-no-files-found: warn

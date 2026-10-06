@@ -80,7 +80,9 @@
 //!
 //! Each published sequence is drained exactly once, and the drained order is
 //! the order the claims were granted, which is the order the compare-exchanges
-//! in [`ring_claim::Claimer::claim`] won. Producers finish writing in any
+//! won: the ordinary claims in [`ring_claim::Claimer::claim`] and the primary's
+//! guessed exchange in [`PrimaryProducer::claim`] arbitrate on the same cursor.
+//! Producers finish writing in any
 //! order. The drain turns that back into claim order by stopping at the first
 //! sequence not yet published (see [`Ring::published_through`]). How the
 //! consumer splits the stream into batches cannot change the order, because
@@ -321,10 +323,11 @@ pub const OBSERVE: Ordering = Ordering::Acquire;
 /// The ordering the consumer releases drained slots with.
 ///
 /// `Release`, paired with the producers' [`ring_cursor::GATING`] read of the
-/// same cursor inside [`ring_claim::Claimer::claim`]'s headroom check. The
-/// consumer's payload reads precede this store in program order and must not
-/// sink below it, or a producer that observes the advance overwrites a slot
-/// still being read.
+/// same cursor — in [`ring_claim::Claimer::claim`]'s headroom check, and in
+/// [`PrimaryProducer::claim`]'s refresh of its cached head, the fast path's
+/// one consumer-line read. The consumer's payload reads precede this store in
+/// program order and must not sink below it, or a producer that observes the
+/// advance overwrites a slot still being read.
 ///
 /// The external design corpus gets this one wrong, and this crate diverges from
 /// it on purpose. It advances the read cursor `Relaxed`, justified as "the
@@ -723,13 +726,20 @@ impl<S> Ring<S> {
   /// of this function recorded that a reader who stops at the first is left
   /// thinking the second one violates this doc. The two call sites are:
   ///
-  /// - **An unpublished producer claim.** It called [`Producer::claim`] and
-  ///   the returned [`Reserved`] has not yet been dropped. No other producer
-  ///   can have claimed `seq`, because the claim is a compare-exchange over one
-  ///   cursor. The consumer cannot be reading it, because the stamp has not
-  ///   been stored. No producer of a later lap can have claimed it, because
-  ///   the claim's headroom check gates on the consumer's commit, which cannot
-  ///   pass this sequence before it is even drained.
+  /// - **An unpublished producer claim.** The [`Reserved`] was minted by
+  ///   [`Producer::claim`] or by [`PrimaryProducer::claim`], and has not yet
+  ///   been dropped. No other producer can have claimed `seq`, because both
+  ///   claims grant by winning a compare-exchange on the live claim cursor —
+  ///   the ordinary claim reads the cursor as its expected value, the primary
+  ///   exchanges its cached guess, which fails safely back to the live value.
+  ///   The consumer cannot be reading it, because the stamp has not been
+  ///   stored. No producer of a later lap can have claimed it, because both
+  ///   grants gate on the consumer's commit: the ordinary claim's headroom
+  ///   check reads the cursor, and the primary's cached head is an observation
+  ///   of the consumer cursor that only ever lags the commit, taken at
+  ///   [`GATING`] — a grant on the cache can only refuse a free slot, never
+  ///   overwrite an undrained one. The commit cannot pass this sequence before
+  ///   it is even drained.
   /// - **A published, not-yet-committed consumer batch.** Reached through
   ///   [`Batch::get_mut`], between `drain`/`drain_up_to` and the batch's
   ///   `Drop`. The producer that published `seq` has already released its own

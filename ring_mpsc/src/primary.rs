@@ -1,6 +1,6 @@
 //! The exclusive writing end with a cached capacity gate.
 //!
-//! [`Producer`](crate::Producer) is `Copy`, which is what lets any number of
+//! [`Producer`] is `Copy`, which is what lets any number of
 //! threads write, and it is also what forbids private mutable state: a
 //! `Copy` type cannot carry a per-handle cache. [`PrimaryProducer`] is the
 //! one handle per ring that trades the sharing away for a faster claim — its
@@ -11,7 +11,7 @@
 //!
 //! The handle is not `Clone` and not `Sync`: the cache is meaningful only
 //! while one thread feeds it. `Send`, so it can be moved onto a thread.
-//! Ordinary [`Producer`](crate::Producer) copies stay usable beside it — the
+//! Ordinary [`Producer`] copies stay usable beside it — the
 //! claim cursor's compare-exchange arbitrates between them, and a cache that
 //! lags can only make this end refuse a ring that has room, never overwrite
 //! a record the consumer has not taken.
@@ -27,7 +27,7 @@ impl<'a, S> Producer<'a, S> {
   /// from the cache and wins the slot with a compare-exchange whose expected
   /// value is the cached tail — a guess that is exact whenever this handle is
   /// the only active claimer, and that fails safely to the actual value when
-  /// it is not. The ordinary [`Producer`](crate::Producer) stays usable
+  /// it is not. The ordinary [`Producer`] stays usable
   /// beside it: copies of it claim through the same cursor, and the
   /// compare-exchange arbitrates.
   ///
@@ -69,7 +69,7 @@ impl<'a, S> Producer<'a, S> {
 
 /// The exclusive writing end with a cached capacity gate.
 ///
-/// [`Producer`](crate::Producer) is `Copy`, which is what lets any number of
+/// [`Producer`] is `Copy`, which is what lets any number of
 /// threads write, and it is also what forbids private mutable state: a
 /// `Copy` type cannot carry a per-handle cache. [`PrimaryProducer`] is the
 /// one handle per ring that trades the sharing away for a faster claim — its
@@ -80,12 +80,11 @@ impl<'a, S> Producer<'a, S> {
 ///
 /// The handle is not `Clone` and not `Sync`: the cache is meaningful only
 /// while one thread feeds it. `Send`, so it can be moved onto a thread.
-/// Ordinary [`Producer`](crate::Producer) copies stay usable beside it — the
+/// Ordinary [`Producer`] copies stay usable beside it — the
 /// claim cursor's compare-exchange arbitrates between them, and a cache that
 /// lags can only make this end refuse a ring that has room, never overwrite
 /// a record the consumer has not taken.
 ///
-/// [`Producer`]: crate::Producer
 #[derive(Debug)]
 pub struct PrimaryProducer<'a, S> {
   ring: &'a Ring<S>,

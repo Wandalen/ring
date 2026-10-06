@@ -12,6 +12,8 @@ Not a family crate: bench, example and test targets only, no `src/`. Exempted fr
 ./verb/bench suite::all                  # every suite, then the comparison tables
 ./verb/bench suite::mpsc filter::mutex   # one suite, filtered by benchmark id
 ./verb/bench suite::report out::cmp.md   # tables from the last results, to a file
+./verb/bench suite::readme               # micro, spsc, mpsc, then the readme's table regenerated
+./verb/bench suite::readme quick::1      # the same, validated: the table to stdout, no numbers
 ./verb/bench suite::all quick::1         # every case once, validated, no numbers
 ./verb/bench suite::spsc save::before    # on the other commit: baseline::before, then
 ./verb/bench suite::report baseline::before
@@ -79,6 +81,15 @@ line, then one table per group — candidates and modes down, parameters across,
 records per second or time per operation, the best of each column in bold — with the spin counts
 and gaps folded under it, then the latency tables. `baseline::<name>` adds each cell's change
 against a criterion baseline saved with `save::<name>`.
+
+The root readme's `Measured results` table comes from the same medians. `./verb/bench suite::readme`
+runs the suites its rows read (`micro`, `spsc`, `mpsc`), then `cargo run -p perf --example
+readme_results` renders those rows and splices them into `readme.md` between its
+`measured-results` markers, under a machine line. A row whose benchmark ids the run did not
+produce is left out with a warning, never estimated — the primary-handle rows wait on #21 — and a
+run that produced none of them leaves the readme alone. `quick::1` sends the fragment to
+`out::<file>` or stdout instead of writing the readme, from whatever the last timed run left. CI
+never writes this table: it stays an intra-run comparison on one machine.
 
 ## Adding a candidate
 

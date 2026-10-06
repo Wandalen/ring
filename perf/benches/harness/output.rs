@@ -4,6 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
+use std::thread;
 use std::{env, fs};
 
 /// Cargo's target directory, found the way criterion finds it: `CARGO_TARGET_DIR`, else
@@ -77,4 +78,54 @@ pub fn duration(ns: f64) -> String {
     n if n < 1e9 => format!("{:.2} ms", n / 1e6),
     n => format!("{:.2} s", n / 1e9),
   }
+}
+
+/// Records per second in the unit that keeps it readable: `334.1 M/s`, `1.17 G/s`.
+pub fn rate(per_second: f64) -> String {
+  let (value, unit) = scaled(per_second);
+  format!("{value} {unit}")
+}
+
+/// [`rate`] split into its number and its unit, so a range prints one unit for both of its ends.
+pub fn scaled(per_second: f64) -> (String, &'static str) {
+  match per_second {
+    r if r >= 1e9 => (format!("{:.2}", r / 1e9), "G/s"),
+    r if r >= 1e6 => (format!("{:.1}", r / 1e6), "M/s"),
+    r => (format!("{:.1}", r / 1e3), "K/s"),
+  }
+}
+
+/// The machine line every printed result starts with: numbers without it are not comparable.
+pub fn machine() -> String {
+  let read = |path: &str| fs::read_to_string(path).ok().map(|text| text.trim().to_string());
+  let run = |program: &str, args: &[&str]| {
+    let out = Command::new(program).args(args).output().ok()?;
+    out
+      .status
+      .success()
+      .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
+  };
+  let cpu = read("/proc/cpuinfo")
+    .and_then(|info| {
+      info
+        .lines()
+        .find(|line| line.starts_with("model name"))?
+        .split(':')
+        .nth(1)
+        .map(|name| name.trim().to_string())
+    })
+    .unwrap_or_else(|| env::consts::ARCH.to_string());
+  let threads = thread::available_parallelism().map_or(0, usize::from);
+  let governor = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor").unwrap_or_else(|| "unknown".into());
+  let kernel = read("/proc/sys/kernel/osrelease").unwrap_or_else(|| env::consts::OS.into());
+  let clock = read("/sys/devices/system/clocksource/clocksource0/current_clocksource").unwrap_or_else(|| "unknown".into());
+  let rustc = run("rustc", &["-V"]).unwrap_or_else(|| "rustc unknown".into());
+  let commit = run("git", &["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".into());
+  let dirty = run("git", &["status", "--porcelain"]).is_some_and(|status| !status.is_empty());
+
+  format!(
+    "{cpu}, {threads} logical CPUs, governor {governor}, kernel {kernel}, clocksource {clock}, {rustc}; report made at \
+     commit {commit}{}.",
+    if dirty { " with uncommitted changes" } else { "" }
+  )
 }

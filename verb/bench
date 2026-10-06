@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 #@ purpose: Run the benchmarks and print the comparison. suite::<name>, default comparison:
 #@          comparison (ring_bench's example), micro / spsc / mpsc / batch (perf, criterion),
-#@          latency (perf, percentiles), report (markdown tables of the last results), all.
-#@          quick::1 runs every perf case once to validate it, no numbers; filter::<text> narrows;
+#@          latency (perf, percentiles), report (markdown tables of the last results), readme
+#@          (micro, spsc and mpsc, then the root readme's measured-results table regenerated in
+#@          place), all.
+#@          quick::1 runs every perf case once to validate it, no numbers; with readme the table
+#@          then goes to out::<file> or stdout, never into readme.md, and its numbers are whatever
+#@          the last timed run left; filter::<text> narrows (a readme run's table is partial then);
 #@          save::<name> / baseline::<name> save or compare a criterion baseline; out::<file>
-#@          writes the report to a file.
+#@          writes the report or the readme fragment to a file.
 #@ tags: verb, bench
 set -euo pipefail
 
@@ -33,9 +37,9 @@ for _arg in "$@"; do
   esac
 done
 
-_names='comparison, micro, spsc, mpsc, batch, latency, report, all'
+_names='comparison, micro, spsc, mpsc, batch, latency, report, readme, all'
 case "$_suite" in
-  comparison|micro|spsc|mpsc|batch|latency|report) _suites=( "$_suite" ) ;;
+  comparison|micro|spsc|mpsc|batch|latency|report|readme) _suites=( "$_suite" ) ;;
   all) _suites=( comparison micro spsc mpsc batch latency report ) ;;
   *)
     echo "verb/bench: suite::$_suite is not one of $_names" >&2
@@ -75,6 +79,24 @@ for _s in "${_suites[@]}"; do
     latency)    _run cargo bench -p perf --bench latency -- "${_latency[@]}" ;;
     # A quick run saves nothing, so there would be nothing new to report.
     report)     (( _quick )) || _run cargo run -q -p perf --example report -- "${_report[@]}" ;;
+    # The table's rows read micro, spsc and mpsc, then the generator splices the readme or writes
+    # the fragment out. A filtered run leaves the table partial; a quick one saves nothing, so the
+    # fragment goes to out:: or stdout and the readme keeps what it had.
+    readme)
+      if [ -n "$_filter" ]; then
+        echo "verb/bench: suite::readme with filter::$_filter — the readme table will be partial" >&2
+      fi
+      _run cargo bench -p perf --bench micro -- "${_criterion[@]}"
+      _run cargo bench -p perf --bench spsc -- "${_criterion[@]}"
+      _run cargo bench -p perf --bench mpsc -- "${_criterion[@]}"
+      _readme=( --example readme_results -- )
+      if [ -n "$_out" ]; then
+        _readme+=( --out "$_out" )
+      elif (( _quick )); then
+        _readme+=( --stdout )
+      fi
+      _run cargo run -q -p perf "${_readme[@]}"
+      ;;
     *)          _run cargo bench -p perf --bench "$_s" -- "${_criterion[@]}" ;;
   esac
 done

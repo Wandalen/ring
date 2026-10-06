@@ -10,7 +10,9 @@ one producer over `push1_popN` moves 10.9–11.0 M/s on the Raspberry Pi 5
 (against `arrayqueue`'s 21.6 and rtrb's 190+) and 26.8–35.5 M/s on the x86
 host (against 75–90). The sibling crate's cached cursors
 (`ring_spsc/docs/decisions/001`) closed that crate's version of the gap by
-making its push fast path load-free.
+making its push fast path load-free. That record lands with PR #20, which
+this PR neither includes nor depends on; the reference resolves once that
+PR merges, in either order.
 
 The same idea applied naively to this crate is structurally unavailable:
 [`Producer`] is `Copy + Sync` — copies of it are how threads join — and a

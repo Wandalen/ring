@@ -19,6 +19,7 @@ records why, what bounds the unsafe code, and when to delete it.
 ## Decisions
 
 - [The producer claims k sequences per gate check and exchange, on the sweep's measured win](docs/decisions/001_the_batched_claim_path_won_its_sweep.md)
+- [The boundary-slot release-marker gate removed the consumer-cursor read and lost on both instruction sets](docs/decisions/002_the_per_slot_release_protocol_spike.md)
 - [The primary producer's cached cursors lift the per-record two-thread path by 55% like-for-like](docs/decisions/003_the_primary_producer_lifted_the_per_record_path.md)
 
 ## Known limitations

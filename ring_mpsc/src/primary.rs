@@ -1,9 +1,9 @@
-//! The exclusive writing end with a cached capacity gate.
+//! The writing end with a cached capacity gate, minted once per ring.
 //!
 //! [`Producer`] is `Copy`, which is what lets any number of
 //! threads write, and it is also what forbids private mutable state: a
 //! `Copy` type cannot carry a per-handle cache. [`PrimaryProducer`] is the
-//! one handle per ring that trades the sharing away for a faster claim — its
+//! handle that trades the sharing away for a faster claim — its
 //! fast path grants from a private cache of both cursors and performs no
 //! atomic load, where the ordinary producer reads the claim cursor as its
 //! exchange's expected value and the consumer cursor for headroom on every
@@ -14,13 +14,16 @@
 //! Ordinary [`Producer`] copies stay usable beside it — the
 //! claim cursor's compare-exchange arbitrates between them, and a cache that
 //! lags can only make this end refuse a ring that has room, never overwrite
-//! a record the consumer has not taken.
+//! a record the consumer has not taken. A second primary is safe for the
+//! same reason, but each pays a failed exchange whenever the other has
+//! claimed since; one primary per ring is the shape the fast path is built
+//! for.
 
 use super::*;
 
 impl<'a, S> Producer<'a, S> {
-  /// Mint the exclusive primary handle: a producer whose claim fast path
-  /// performs no atomic load.
+  /// Mint the primary handle: a producer whose claim fast path
+  /// performs no atomic load while it is the ring's only active primary.
   ///
   /// The primary carries a private cache of both cursors (see the module
   /// documentation's "The primary producer's cursor cache"). Its claim grants
@@ -29,7 +32,9 @@ impl<'a, S> Producer<'a, S> {
   /// the only active claimer, and that fails safely to the actual value when
   /// it is not. The ordinary [`Producer`] stays usable
   /// beside it: copies of it claim through the same cursor, and the
-  /// compare-exchange arbitrates.
+  /// compare-exchange arbitrates. A second primary is safe for the same
+  /// reason, but each pays a failed exchange whenever the other has claimed
+  /// since.
   ///
   /// The handle is not `Copy` and not `Clone` — the cache is meaningful only
   /// while one thread feeds it — and is not `Sync`. Minting consumes nothing:
@@ -67,12 +72,12 @@ impl<'a, S> Producer<'a, S> {
   }
 }
 
-/// The exclusive writing end with a cached capacity gate.
+/// The writing end with a cached capacity gate, minted once per ring.
 ///
 /// [`Producer`] is `Copy`, which is what lets any number of
 /// threads write, and it is also what forbids private mutable state: a
 /// `Copy` type cannot carry a per-handle cache. [`PrimaryProducer`] is the
-/// one handle per ring that trades the sharing away for a faster claim — its
+/// handle that trades the sharing away for a faster claim — its
 /// fast path grants from a private cache of both cursors and performs no
 /// atomic load, where the ordinary producer reads the claim cursor as its
 /// exchange's expected value and the consumer cursor for headroom on every
@@ -83,7 +88,10 @@ impl<'a, S> Producer<'a, S> {
 /// Ordinary [`Producer`] copies stay usable beside it — the
 /// claim cursor's compare-exchange arbitrates between them, and a cache that
 /// lags can only make this end refuse a ring that has room, never overwrite
-/// a record the consumer has not taken.
+/// a record the consumer has not taken. A second primary is safe for the
+/// same reason, but each pays a failed exchange whenever the other has
+/// claimed since; one primary per ring is the shape the fast path is built
+/// for.
 ///
 #[derive(Debug)]
 pub struct PrimaryProducer<'a, S> {

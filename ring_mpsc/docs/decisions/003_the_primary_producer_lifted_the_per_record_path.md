@@ -28,8 +28,10 @@ core between records: the consumer's drain reads it every batch.
 
 ## Decision
 
-`Producer::primary(&mut self) -> PrimaryProducer` mints an exclusive,
-non-`Copy`, non-`Sync` handle carrying two cached cursors:
+`Producer::primary(&mut self) -> PrimaryProducer` mints a non-`Copy`,
+non-`Sync` handle carrying two cached cursors, one per ring by intent (a
+second is safe — the compare-exchange arbitrates — but each pays a failed
+exchange whenever the other has claimed since):
 
 - `cached_tail` — this handle's guess at the shared claim cursor's value.
   The claim is a compare-exchange with the guess as its expected value: a

@@ -58,8 +58,8 @@
 //! joins, and a `Copy` type cannot carry private mutable state. So the
 //! ordinary claim reads both cursor lines on every attempt — the claim cursor
 //! as the exchange's expected value, the consumer cursor for headroom.
-//! [`PrimaryProducer`] is the exception: an exclusive, non-`Copy` handle
-//! minted from a producer, carrying a private cache of both cursors. Its fast
+//! [`PrimaryProducer`] is the exception: a non-`Copy` handle minted once
+//! per ring, carrying a private cache of both cursors. Its fast
 //! path performs one compare-exchange and no loads: the cached tail is the
 //! exchange's guessed expected value (a wrong guess fails safely and hands
 //! back the actual value), and the cached head can only lag the consumer

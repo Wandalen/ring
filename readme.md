@@ -104,6 +104,27 @@ in-house rings earning the operating history `ring_bench` exists to produce.
 The reasoning, its costs, and its removal conditions are recorded in
 [`ring_core/docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md`](ring_core/docs/decisions/002_crossbeam_queue_is_an_interim_backend_inside_ring_core.md).
 
+## Measured results
+
+Raspberry Pi 5 (aarch64, 4 cores), criterion medians, one run per side.
+Every cell is an intra-run comparison against the row's own alternative
+(rtrb 0.4, `std::sync::mpsc::sync_channel`, `crossbeam_queue::ArrayQueue`,
+`Mutex<VecDeque>`), so no number is a cross-machine baseline.
+
+| Claim | in-house | nearest alternative | Δ |
+|---|---|---:|---:|
+| `ring_spsc`: two-thread throughput, 16384 slots | **334 M/s** | rtrb 244 | **+37%** |
+| `ring_spsc`: two-thread throughput, 1024 slots | **192 M/s** | rtrb 189 | +2% |
+| `ring_spsc`: 8-byte records, two-thread | **194 M/s** | rtrb 192 | +1% |
+| `ring_mpsc`: batched producers (`push32`), 1–13 producers | **125–290 M/s** | sync_channel ≤ 55, ArrayQueue ≤ 90, mutex ≤ 274 | leads its class |
+| `ring_mpsc`: primary handle, `push1_popN`, 1024 slots | **16.9 M/s** | ordinary handle 10.9 | **+55%** |
+| `ring_mpsc`: primary handle, single-thread fill/drain | **65.4 M/s** | ordinary handle 46.6 | **+40%** |
+
+rtrb still leads the strict single-record pair (3.4–3.6 ns against 13–16)
+and small-capacity two-thread; `ArrayQueue` leads `ring_mpsc`'s unbatched
+path at high producer counts on x86. Absolute numbers are not portable
+across machines — every comparison above is intra-run.
+
 ## Crates
 
 | Directory | Responsibility |

@@ -351,16 +351,6 @@ pub const COMMIT: Ordering = Ordering::Release;
 /// ```
 pub const OWN: Ordering = Ordering::Relaxed;
 
-/// The ordering the primary producer's successful claim exchange runs at.
-///
-/// `AcqRel`, the same value `ring_claim::Claimer::claim` uses for its
-/// `CLAIM_SUCCESS`; duplicated here because that constant is private to its
-/// crate and the primary producer's guessed-exchange loop runs in
-/// `ring_mpsc`. A successful exchange releases this producer's slot writes to
-/// every later claimer and acquires whatever the producer whose cursor value
-/// it replaced had done.
-const CLAIM_SUCCESS: Ordering = Ordering::AcqRel;
-
 /// A ring many threads write and one thread reads.
 ///
 /// Four fields: the slot array, one stamp per slot, the gating set holding
@@ -1175,19 +1165,15 @@ impl<'a, S> PrimaryProducer<'a, S> {
       }
 
       let expected = self.cached_tail;
-      match self
-        .ring
-        .claim_cursor
-        .compare_exchange_weak(expected, expected.next(), CLAIM_SUCCESS, GATING)
-      {
+      match self.claimer.claim_guessed(expected) {
         // The guess was current: the sequence is ours, the cursor is already
         // advanced by this exchange, and the cache mirrors it — no cursor
         // load was paid for any of it.
-        Ok(_) => {
-          self.cached_tail = expected.next();
+        Ok(claim) => {
+          self.cached_tail = claim.start().next();
           return Ok(Reserved {
             ring: self.ring,
-            seq: expected,
+            seq: claim.start(),
           });
         }
         Err(actual) => {

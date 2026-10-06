@@ -93,6 +93,38 @@ mod threaded {
     assert_eq!(consumer.drain().len(), 1, "only the record before the hole drains",);
     assert_eq!(consumer.drain().len(), 0, "the hole never fills");
   }
+
+  /// A cached tail gone stale, met by a refreshed head already past it.
+  ///
+  /// The second lap's records are claimed by ordinary producers, so the
+  /// primary's cached tail stays behind, and only its own exchange moves it.
+  /// The gate then compares a refreshed head of 8 against a stale tail of 4,
+  /// and admits the claim only because `Seq::distance_to` saturates to 0 when
+  /// the head runs past the tail; the exchange on the stale guess fails and
+  /// adopts the live cursor, which is where sequence 8 comes from. Without
+  /// that saturation the primary would answer `Full` here and keep answering
+  /// it, because nothing but a successful exchange advances the cache.
+  #[test]
+  fn a_primary_whose_cache_went_stale_claims_again_after_two_laps() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    let mut primary = producer.primary();
+    for record in 1..=4 {
+      primary.try_push(record).expect("an empty ring admits four");
+    }
+    assert_eq!(consumer.drain().len(), 4);
+
+    for record in 5..=8 {
+      producer.push(record).expect("room again");
+    }
+    assert_eq!(consumer.drain().len(), 4);
+
+    let reserved = primary.claim().expect("not Full: the stale cache recovers");
+    assert_eq!(reserved.sequence(), Seq(8));
+    drop(reserved);
+  }
 }
 
 #[cfg(loom)]

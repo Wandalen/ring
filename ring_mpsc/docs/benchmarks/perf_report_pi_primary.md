@@ -1,6 +1,6 @@
 # Benchmark comparison
 
-aarch64, 4 logical CPUs, governor performance, kernel 6.12.87+rpt-rpi-2712, clocksource arch_sys_counter, rustc 1.99.0 (b940084d7 2026-09-28); report made at commit 87ec045 with uncommitted changes.
+aarch64, 4 logical CPUs, governor performance, kernel 6.12.87+rpt-rpi-2712, clocksource arch_sys_counter, rustc 1.99.0 (b940084d7 2026-09-28); report made at commit 87ec045. The uncommitted changes in the tree at the time were the intra-doc-link fixes in `ring_mpsc/src/lib.rs` and the harness-test import reformat, both landed in bbaac2a — documentation and test-file only, so no measured code differed from 87ec045.
 
 ## push_pop
 

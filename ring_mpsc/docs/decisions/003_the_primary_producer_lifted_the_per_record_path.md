@@ -65,6 +65,8 @@ recording the blind spot.
 
 ## Measurement (Pi 5, aarch64, one session; `mpsc-primary` against the ordinary per-record path, rtrb as the untouched control — flat within ±1.6%)
 
+The full generated report: [perf_report_pi_primary.md](../benchmarks/perf_report_pi_primary.md).
+
 Two-thread, capacity 1024. One cell in this table has a matched ordinary
 run to compare against: `push1_popN` at 1024 slots, over
 `mpsc/push1_popN` at one producer, 10.9 M/s. The harness registers the

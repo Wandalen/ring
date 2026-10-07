@@ -32,9 +32,10 @@ on:
   push:
     branches: [master]
     paths:
-      # The benchmark suites.
+      # The benchmark suites, and the driver script the bench step runs.
       - perf/**
       - ring_bench/**
+      - verb/bench
       # The family crates ring_bench and perf build, in workspace (dependency) order.
       - ring_types/**
       - ring_seqno/**

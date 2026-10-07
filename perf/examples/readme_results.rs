@@ -14,12 +14,11 @@
 #[path = "../benches/harness/mod.rs"]
 mod harness;
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::{env, fs};
 
 use harness::output;
 use harness::readme::{self, Id, Row};
-use serde_json::Value;
 
 /// The readme table's rows, in its order. The last two read the `mpsc-primary` candidate the
 /// primary-handle spike benches (open #21); until that lands in this tree they are skipped with a
@@ -161,7 +160,7 @@ fn value(words: &mut impl Iterator<Item = String>, flag: &str) -> String {
 fn main() {
   let args = Args::parse();
   let criterion = output::criterion_dir();
-  let data = results(&criterion);
+  let data = readme::results(&criterion);
   let (fragment, skipped) = readme::render(&ROWS, &data, &output::machine());
   for row in &skipped {
     eprintln!("readme_results: {row}");
@@ -189,57 +188,4 @@ fn main() {
 fn stop(message: String) -> ! {
   eprintln!("readme_results: {message}");
   std::process::exit(2);
-}
-
-/// Every benchmark's median under criterion's directory, keyed the way `report` prints ids:
-/// `<group>/<function>/<value>`. What a filtered run skipped simply is not there.
-fn results(criterion: &Path) -> readme::Data {
-  let mut files = Vec::new();
-  find(criterion, &mut files);
-  let mut data = readme::Data::new();
-  for file in files {
-    let Some(new_dir) = file.parent() else {
-      continue;
-    };
-    let (Some(benchmark), Some(median)) = (json(&file), median(new_dir)) else {
-      continue;
-    };
-    let text = |field: &str| benchmark[field].as_str().map(str::to_string);
-    let (Some(group), Some(function)) = (text("group_id"), text("function_id")) else {
-      continue;
-    };
-    let key = match text("value_str") {
-      Some(value) => format!("{group}/{function}/{value}"),
-      None => format!("{group}/{function}"),
-    };
-    data.insert(
-      key,
-      readme::Measurement {
-        elements: benchmark["throughput"]["Elements"].as_u64().unwrap_or(1),
-        median_ns: median,
-      },
-    );
-  }
-
-  data
-}
-
-fn find(dir: &Path, files: &mut Vec<PathBuf>) {
-  let Ok(read) = fs::read_dir(dir) else { return };
-  for entry in read.flatten() {
-    let path = entry.path();
-    if path.is_dir() {
-      find(&path, files);
-    } else if path.ends_with("new/benchmark.json") {
-      files.push(path);
-    }
-  }
-}
-
-fn json(path: &Path) -> Option<Value> {
-  serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
-}
-
-fn median(dir: &Path) -> Option<f64> {
-  json(&dir.join("estimates.json"))?["median"]["point_estimate"].as_f64()
 }

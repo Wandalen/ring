@@ -11,7 +11,7 @@ use std::time::Duration;
 use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Record, Rtrb, Run, Rx, Spsc, SyncChannel, Tx, Wide};
 use harness::driver::{self, Mode, Shape};
 use harness::latency::{self, Load, Stamped};
-use harness::readme::{Data, Id, Measurement, Row, render, splice};
+use harness::readme::{Data, Id, Measurement, Row, render, results, splice};
 use harness::topology;
 
 const RECORDS: u64 = 40_000;
@@ -401,4 +401,42 @@ fn a_readme_without_both_markers_is_never_touched() {
   assert!(splice("no markers at all\n", "*line*\n").is_err());
   assert!(splice("<!-- measured-results:start -->\nonly the start\n", "*line*\n").is_err());
   assert!(splice("<!-- measured-results:end -->\nonly the end\n", "*line*\n").is_err());
+}
+
+/// `results()` against a synthetic criterion tree: the two shapes a row consumes — a single-value
+/// id and a sweep value — and a full id whose estimates carry no median, the shape a criterion
+/// output-format drift would leave behind, which the parse must skip, never estimate.
+#[test]
+fn results_parses_a_criterion_tree_into_the_render_data() {
+  let root = std::env::temp_dir().join(format!("ring_readme_results_test_{}", std::process::id()));
+  let _ = std::fs::remove_dir_all(&root);
+  for (path, benchmark, estimates) in [
+    (
+      "spsc/spsc/push1_popN/16384",
+      r#"{"group_id":"spsc","function_id":"spsc/push1_popN","value_str":"16384","throughput":{"Elements":1}}"#,
+      r#"{"median":{"point_estimate":3000000.0}}"#,
+    ),
+    (
+      "mpsc_producers/mpsc/push32_popN/1",
+      r#"{"group_id":"mpsc_producers","function_id":"mpsc/push32_popN","value_str":"1","throughput":{"Elements":64}}"#,
+      r#"{"median":{"point_estimate":4000000.0}}"#,
+    ),
+    (
+      "spsc/rtrb/push1_popN/16384",
+      r#"{"group_id":"spsc","function_id":"spsc/push1_popN","value_str":"16384"}"#,
+      r#"{}"#,
+    ),
+  ] {
+    let new_dir = root.join(path).join("new");
+    std::fs::create_dir_all(&new_dir).expect("create the criterion tree");
+    std::fs::write(new_dir.join("benchmark.json"), benchmark).expect("benchmark.json");
+    std::fs::write(new_dir.join("estimates.json"), estimates).expect("estimates.json");
+  }
+  let data = results(&root);
+  std::fs::remove_dir_all(&root).expect("clean the temp tree");
+  let single = &data["spsc/spsc/push1_popN/16384"];
+  assert_eq!((single.elements, single.median_ns), (1, 3_000_000.0));
+  let sweep = &data["mpsc_producers/mpsc/push32_popN/1"];
+  assert_eq!((sweep.elements, sweep.median_ns), (64, 4_000_000.0));
+  assert_eq!(data.len(), 2, "{data:?}");
 }

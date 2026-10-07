@@ -1,10 +1,14 @@
-//! The root readme's measured-results table: what a row reads, and the markdown a criterion run
-//! renders it into. The pure half of `examples/readme_results.rs`, which finds the results and
-//! splices the table into the readme; kept here so the tests can render one without a benchmark
-//! run behind it.
+//! The root readme's measured-results table: what a row reads, the markdown a criterion run
+//! renders it into, and the criterion tree those numbers are parsed from. The whole of
+//! `examples/readme_results.rs` except its row table and argument parsing; kept here so the tests
+//! can render, parse and splice without a benchmark run behind them.
 
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use serde_json::Value;
 
 use super::output;
 
@@ -179,4 +183,59 @@ pub fn splice(readme: &str, fragment: &str) -> Result<String, String> {
   let body = readme[start..].find('\n').ok_or_else(|| format!("{START} ends the file"))? + start + 1;
   let end = readme[body..].find(END).ok_or_else(|| format!("no {END} marker"))? + body;
   Ok(format!("{}{}{}", &readme[..body], fragment, &readme[end..]))
+}
+
+/// Every benchmark's median under criterion's directory, keyed the way `report` prints ids:
+/// `<group>/<function>/<value>`. What a filtered run skipped simply is not there. A file whose
+/// benchmark or estimates JSON does not parse — the shape a criterion output-format drift would
+/// produce — is skipped, never estimated.
+pub fn results(criterion: &Path) -> Data {
+  let mut files = Vec::new();
+  find(criterion, &mut files);
+  let mut data = Data::new();
+  for file in files {
+    let Some(new_dir) = file.parent() else {
+      continue;
+    };
+    let (Some(benchmark), Some(median)) = (json(&file), median(new_dir)) else {
+      continue;
+    };
+    let text = |field: &str| benchmark[field].as_str().map(str::to_string);
+    let (Some(group), Some(function)) = (text("group_id"), text("function_id")) else {
+      continue;
+    };
+    let key = match text("value_str") {
+      Some(value) => format!("{group}/{function}/{value}"),
+      None => format!("{group}/{function}"),
+    };
+    data.insert(
+      key,
+      Measurement {
+        elements: benchmark["throughput"]["Elements"].as_u64().unwrap_or(1),
+        median_ns: median,
+      },
+    );
+  }
+
+  data
+}
+
+fn find(dir: &Path, files: &mut Vec<PathBuf>) {
+  let Ok(read) = fs::read_dir(dir) else { return };
+  for entry in read.flatten() {
+    let path = entry.path();
+    if path.is_dir() {
+      find(&path, files);
+    } else if path.ends_with("new/benchmark.json") {
+      files.push(path);
+    }
+  }
+}
+
+fn json(path: &Path) -> Option<Value> {
+  serde_json::from_str(&fs::read_to_string(path).ok()?).ok()
+}
+
+fn median(dir: &Path) -> Option<f64> {
+  json(&dir.join("estimates.json"))?["median"]["point_estimate"].as_f64()
 }

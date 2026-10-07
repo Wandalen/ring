@@ -336,6 +336,7 @@ pub fn load_row(test: &str, candidate: &str, load: &Load, latency: &Latency) -> 
     "saturated": latency.saturated,
     "p50_ns": h.value_at_quantile(0.5),
     "p90_ns": h.value_at_quantile(0.9),
+    "p95_ns": h.value_at_quantile(0.95),
     "p99_ns": h.value_at_quantile(0.99),
     "p999_ns": h.value_at_quantile(0.999),
     "p9999_ns": h.value_at_quantile(0.9999),
@@ -408,8 +409,8 @@ pub fn markdown(rows: &[Value]) -> String {
         );
       }
     } else {
-      out.push_str("| producers | offered | candidate | delivered | p50 | p90 | p99 | p99.9 | p99.99 | max |\n");
-      out.push_str("|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|\n");
+      out.push_str("| producers | offered | candidate | delivered | p50 | p90 | p95 | p99 | p99.9 | p99.99 | max |\n");
+      out.push_str("|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|\n");
       for row in &rows {
         let same_load = |other: &&&Value| other["producers"] == row["producers"] && other["rate"] == row["rate"];
         let best = rows
@@ -420,9 +421,9 @@ pub fn markdown(rows: &[Value]) -> String {
           .min();
         let rate = |field: &str| format!("{:.2} M/s", row[field].as_f64().unwrap_or(f64::NAN) / 1e6);
         let cells = if row["saturated"] == true {
-          vec!["saturated".to_string(); 6]
+          vec!["saturated".to_string(); 7]
         } else {
-          ["p50_ns", "p90_ns", "p99_ns", "p999_ns", "p9999_ns", "max_ns"]
+          ["p50_ns", "p90_ns", "p95_ns", "p99_ns", "p999_ns", "p9999_ns", "max_ns"]
             .iter()
             .map(|field| {
               let ns = row[*field].as_u64().unwrap_or(0);

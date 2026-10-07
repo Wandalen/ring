@@ -60,9 +60,12 @@ The six `push_full/mpsc` runs span 1.50–1.54 ns before and 1.76–1.78 ns afte
 
 The same change was first measured on top of `perf/cache-line-128`, which pads cursors to 128 bytes and carries
 `ring_spsc`'s end-local cursor copies. The base was `384e982`, and the change was `8d661a7`, on `296fc9a`, which adds
-only Markdown to `384e982`, all with the same `ring_mpsc` source as here apart from the change itself. Some of the runs
-used earlier local builds of the same two commits that were never pushed. They differ from the pushed ones only in
-Markdown and mutant-survey files, which the benchmarks do not compile.
+only Markdown to `384e982`. Some of the runs used earlier local builds of the same two commits that were never pushed.
+They differ from the pushed ones only in Markdown and mutant-survey files, which the benchmarks do not compile.
+
+That base's `ring_mpsc` is not quite master's. It also carries `e57df95`, under which `Producer::on_distinct_lines`
+asks `ring_align::on_distinct_lines` instead of comparing the two addresses against 64 itself, and `ring_mpsc` depends
+on `ring_align`.
 
 The paired A/B used the same method on 2026-10-05. Its ratios match the ones above.
 

@@ -1520,7 +1520,7 @@ impl<S> Batch<'_, S> {
   /// Whether the batch is empty, which is what a drain of an empty ring yields.
   ///
   /// The batch already exists by the time this is checked, so this answers a
-  /// settled fact about a drain that already committed, not a live question
+  /// settled fact about a drain that already happened, not a live question
   /// about the ring. `consumer.drain().is_empty()` discards every currently
   /// published record as a side effect of the `drain()` call alone. For a
   /// non-destructive check, call [`Consumer::is_empty`] instead.

@@ -69,12 +69,33 @@ _run() {
   fi
 }
 
+# The option arrays above stay empty on a plain run (CI's default), and an
+# empty `"${arr[@]}"` under `set -u` is an unbound-variable error on bash 3.2 —
+# still the default `bash` on the macOS runners — while newer bash expands it
+# to nothing, which is why only the macOS job failed. So each command is built
+# first and `--` plus the options are appended only when there are any, the
+# same guard `verb/gate` uses. `_cmd` itself is never empty, so running it is
+# safe on every bash.
 for _s in "${_suites[@]}"; do
   case "$_s" in
     comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
-    latency)    _run cargo bench -p perf --bench latency -- "${_latency[@]}" ;;
+    latency)
+      _cmd=( cargo bench -p perf --bench latency )
+      (( ${#_latency[@]} > 0 )) && _cmd+=( -- "${_latency[@]}" )
+      _run "${_cmd[@]}"
+      ;;
     # A quick run saves nothing, so there would be nothing new to report.
-    report)     (( _quick )) || _run cargo run -q -p perf --example report -- "${_report[@]}" ;;
-    *)          _run cargo bench -p perf --bench "$_s" -- "${_criterion[@]}" ;;
+    report)
+      if ! (( _quick )); then
+        _cmd=( cargo run -q -p perf --example report )
+        (( ${#_report[@]} > 0 )) && _cmd+=( -- "${_report[@]}" )
+        _run "${_cmd[@]}"
+      fi
+      ;;
+    *)
+      _cmd=( cargo bench -p perf --bench "$_s" )
+      (( ${#_criterion[@]} > 0 )) && _cmd+=( -- "${_criterion[@]}" )
+      _run "${_cmd[@]}"
+      ;;
   esac
 done

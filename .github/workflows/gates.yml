@@ -26,6 +26,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.98.0
+        with:
+          # trybuild's pinned .stderr files quote sysroot sources, and rustc
+          # omits the snippet when the source is unreadable. Without rust-src
+          # the ring_handle compile-fail suite mismatches here while passing
+          # under ci.yml, which installs this component.
+          components: rust-src
       - uses: taiki-e/install-action@nextest
       - uses: taiki-e/install-action@cargo-tarpaulin
       - uses: Swatinem/rust-cache@v2

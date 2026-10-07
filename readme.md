@@ -114,11 +114,16 @@ Every cell is an intra-run comparison against the row's own alternative
 | Claim | in-house | nearest alternative | Δ |
 |---|---|---:|---:|
 | `ring_spsc`: two-thread throughput, 16384 slots | **334 M/s** | rtrb 244 | **+37%** |
-| `ring_spsc`: two-thread throughput, 1024 slots | **192 M/s** | rtrb 189 | +2% |
-| `ring_spsc`: 8-byte records, two-thread | **194 M/s** | rtrb 192 | +1% |
+| `ring_spsc`: two-thread throughput, 1024 slots | **192 M/s** | rtrb 189 | +2%† |
+| `ring_spsc`: 8-byte records, two-thread | **194 M/s** | rtrb 192 | +1%† |
 | `ring_mpsc`: batched producers (`push32`), 1–13 producers | **125–290 M/s** | sync_channel ≤ 55, ArrayQueue ≤ 90, mutex ≤ 274 | leads its class |
 | `ring_mpsc`: primary handle, `push1_popN`, 1024 slots | **16.9 M/s** | ordinary handle 10.9 | **+55%** |
 | `ring_mpsc`: primary handle, single-thread fill/drain | **65.4 M/s** | ordinary handle 46.6 | **+40%** |
+
+† no noise floor was established for these rows: per
+[`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
+measurements, unpinned threads swing tens of percent either way, so a
++1–2% gap sits inside that spread — not a confirmed lead over rtrb.
 
 rtrb still leads the strict single-record pair (3.4–3.6 ns against 13–16)
 and small-capacity two-thread; `ArrayQueue` leads `ring_mpsc`'s unbatched

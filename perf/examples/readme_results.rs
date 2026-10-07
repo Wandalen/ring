@@ -26,6 +26,7 @@ use harness::readme::{self, Id, Row};
 const ROWS: [Row; 6] = [
   Row {
     claim: "`ring_spsc`: two-thread throughput, 16384 slots",
+    unfloored: false,
     inhouse: &[Id {
       group: "spsc",
       function: "spsc/push1_popN",
@@ -39,6 +40,9 @@ const ROWS: [Row; 6] = [
   },
   Row {
     claim: "`ring_spsc`: two-thread throughput, 1024 slots",
+    // These two and no others are what the readme's † footnote covers: their noise floor was
+    // never established, so the generated table must carry the mark its footnote explains.
+    unfloored: true,
     inhouse: &[Id {
       group: "spsc",
       function: "spsc/push1_popN",
@@ -52,6 +56,7 @@ const ROWS: [Row; 6] = [
   },
   Row {
     claim: "`ring_spsc`: 8-byte records, two-thread",
+    unfloored: true,
     inhouse: &[Id {
       group: "spsc_payload",
       function: "spsc/push1_popN",
@@ -67,6 +72,7 @@ const ROWS: [Row; 6] = [
   // renders the range across them.
   Row {
     claim: "`ring_mpsc`: batched producers (`push32`), 1–13 producers",
+    unfloored: false,
     inhouse: &[Id {
       group: "mpsc_producers",
       function: "mpsc/push32_popN",
@@ -82,6 +88,7 @@ const ROWS: [Row; 6] = [
   // does: one producer, one consumer, 1024 slots, `push1_popN`.
   Row {
     claim: "`ring_mpsc`: primary handle, `push1_popN`, 1024 slots",
+    unfloored: false,
     inhouse: &[Id {
       group: "spsc",
       function: "mpsc-primary/push1_popN",
@@ -95,6 +102,7 @@ const ROWS: [Row; 6] = [
   },
   Row {
     claim: "`ring_mpsc`: primary handle, single-thread fill/drain",
+    unfloored: false,
     inhouse: &[Id {
       group: "fill_drain",
       function: "mpsc-primary/push1_popN",

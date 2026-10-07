@@ -309,6 +309,7 @@ fn readme_rows() -> [Row; 2] {
   [
     Row {
       claim: "`ring_spsc`: two-thread throughput, 16384 slots",
+      unfloored: false,
       inhouse: &[Id {
         group: "spsc",
         function: "spsc/push1_popN",
@@ -322,6 +323,7 @@ fn readme_rows() -> [Row; 2] {
     },
     Row {
       claim: "`ring_mpsc`: batched producers (`push32`), 1–13 producers",
+      unfloored: false,
       inhouse: &[Id {
         group: "mpsc_producers",
         function: "mpsc/push32_popN",
@@ -406,6 +408,33 @@ fn a_readme_without_both_markers_is_never_touched() {
 /// `results()` against a synthetic criterion tree: the two shapes a row consumes — a single-value
 /// id and a sweep value — and a full id whose estimates carry no median, the shape a criterion
 /// output-format drift would leave behind, which the parse must skip, never estimate.
+/// The † the readme's footnote promises: a row with no established noise floor marks its Δ, so a
+/// regenerated table cannot dangle a footnote that refers to nothing.
+#[test]
+fn an_unfloored_row_marks_its_delta_with_the_readme_s_dagger() {
+  let rows = [Row {
+    claim: "`ring_spsc`: two-thread throughput, 1024 slots",
+    inhouse: &[Id {
+      group: "spsc",
+      function: "spsc/push1_popN",
+      value: Some("1024"),
+    }],
+    alternative: &[Id {
+      group: "spsc",
+      function: "rtrb/push1_popN",
+      value: Some("1024"),
+    }],
+    unfloored: true,
+  }];
+  let data = readme_data(&[
+    ("spsc/spsc/push1_popN/1024", 1_000_000, 5_150_000.0),
+    ("spsc/rtrb/push1_popN/1024", 1_000_000, 5_200_000.0),
+  ]);
+  let (fragment, skipped) = render(&rows, &data, "test machine");
+  assert!(skipped.is_empty(), "{skipped:?}");
+  assert!(fragment.contains("| **194.2 M/s** | rtrb 192.3 | +1%† |"), "{fragment}");
+}
+
 #[test]
 fn results_parses_a_criterion_tree_into_the_render_data() {
   let root = std::env::temp_dir().join(format!("ring_readme_results_test_{}", std::process::id()));

@@ -60,7 +60,6 @@ on:
       - ring_factory/**
       # The manifests that wire the closure together, and this workflow.
       - Cargo.toml
-      - Cargo.lock
       - .github/workflows/benchmarks.yml
   schedule:
     # An hour after gates.yml / loom.yml ("0 3 * * *"), so the nightly jobs do not contend

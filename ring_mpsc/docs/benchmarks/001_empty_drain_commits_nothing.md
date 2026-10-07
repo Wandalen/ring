@@ -101,6 +101,35 @@ paired runs skip. Nobody has repeated it on master.
 The `ArrayQueue` control drifted 1.3–2.1x between the before and after sessions of the sweep. Read its deltas against
 that drift.
 
+## The single-thread shift, disassembled
+
+Both sides' `micro` executables were rebuilt from `c65f4e4` and `750cd22` on 2026-10-07 with the same toolchain and
+disassembled with `objdump -d`.
+
+- **`push_full` executes the same instructions on both sides.** Its loop and `MpscTx::try_push`, the one function the
+  loop calls, match instruction for instruction once addresses are masked. Only their addresses differ. After the
+  change, `Batch`'s drop glue is a function of its own, placed ahead of them in the binary. That moves `try_push` 164
+  bytes, from 76 to 112 bytes past a 128-byte boundary.
+- **`push_pop` executes different instructions.** Its loop drains, so it inlines `Batch::drop`. Before, the landing
+  pad that drops a `Batch` during an unwind inlined the drop as well, one `stlr` reading the batch's fields from
+  registers. After, the drop has a branch, and LLVM calls `drop_glue::<Batch>` out of line on that cold path. The
+  call takes the batch by address, so the loop now stores the batch's three fields to the stack on every iteration,
+  one `stp` and one `str` that the before loop does not have. The unwind edge comes from the slot bounds checks that
+  run while a batch is alive. `#[inline(always)]` on `Batch::drop` leaves the glue out of line and the loop unchanged.
+
+### Placement held equal (ns, median and range of 6 runs, 2026-10-07)
+
+The paired run alternated four executables. Two are each side as built by default. The other two are each side built
+with `RUSTFLAGS="-C llvm-args=-align-all-functions=7"`, which starts every function on a 128-byte boundary, so every
+function these cells execute starts at the same offset on both sides.
+
+| Cell | Before | After | Before, aligned | After, aligned |
+|---|---|---|---|---|
+| `push_full/mpsc` | 1.75 (1.74–1.76) | 1.51 (1.50–1.53) | 1.50 (1.49–1.52) | 1.49 (1.49–1.50) |
+| `push_pop/mpsc` | 4.24 (4.23–4.29) | 4.23 (4.15–4.26) | 4.02 (3.99–4.06) | 4.28 (4.21–4.35) |
+| `push_full/arrayqueue` (control) | 1.48 | 1.48 | 1.48 | 1.48 |
+| `push_pop/arrayqueue` (control) | 3.52 | 3.51 | 3.50 | 3.51 |
+
 ## Reading
 
 - **The gain is where the consumer often finds the ring empty: one producer, and empty polls.**
@@ -112,13 +141,25 @@ that drift.
 - **The gain does not depend on the padding.** It shows at 64 bytes and at 128 bytes, at 1.76x and 1.94x.
 - **The control does not explain the gain.** `ArrayQueue` in the same paired binaries moved 1.05x here and 0.77x on
   the 128-byte base.
-- **`push_pop` +11% and `push_full` +17%, on both bases.** `push_full` never executes `Batch::drop`, the only function
-  the commit changes. `ArrayQueue`'s single-thread cells in the same binaries did not move. That points at how the
-  compiler laid out or inlined `ring_mpsc`'s own code after the change, not at the protocol. Not confirmed with a
-  disassembly.
+- **`push_full`'s +17% is code placement.** Both sides run the same instructions. With functions aligned they measure
+  1.50 and 1.49 ns. Rebuilt by default on 2026-10-07, the gap comes back on the other side, before at 1.75 ns and
+  after at 1.51.
+- **`push_pop` pays about 0.26 ns, 6%, for the change.** That is the aligned pair's difference. The two stores per
+  iteration are what the disassembly shows the loop gaining, so they are the likely cause. The default builds of
+  2026-10-07 hide it, because before's build loses 0.22 ns to placement there. The +0.45 ns of 2026-10-05 is about
+  this cost plus a placement shift the size of `push_full`'s.
+  - The cost is per drain, not per record, so this cell, which drains one record at a time, shows it at its largest.
+  - It buys the 40–44% cheaper empty poll and the 1.76x batched push above.
+  - Removing it means removing the unwind edge, which means unchecked slot indexing. That is outside this change.
 
 ## Reproduce
 
 1. Build each side with `cargo bench -p perf --bench mpsc --no-run` and `cargo bench -p perf --bench micro --no-run`.
 2. Copy each executable they print out of `target/release/deps/`.
 3. Alternate the copies on the two filters above.
+4. For the placement-controlled pair, build `micro` again with
+   `RUSTFLAGS="-C llvm-args=-align-all-functions=7"` and a separate `CARGO_TARGET_DIR`, and alternate all four
+   executables on `'^(push_pop|push_full)/(mpsc|arrayqueue)$'`.
+5. For the disassembly, find the `Bencher::iter` instances for `PushFull` and `PushPop` over `MpscTx` and the
+   `MpscTx::try_push` symbol with `nm -C -n`, then disassemble each address range with
+   `objdump -d --no-show-raw-insn --start-address=… --stop-address=…`.

@@ -772,6 +772,76 @@ mod threaded {
     assert_eq!(consumer.position(), Seq(1));
   }
 
+  /// The claim cache's two plausible failure modes, pinned green.
+  ///
+  /// A cache that restarted at zero on a re-split would re-grant sequences the
+  /// previous generation published; a cache that can only lag the consumer
+  /// must refuse conservatively and then succeed on the refresh, never wedge.
+  /// Both paths of `claim` are exercised here: the first claim after the
+  /// re-split takes the refresh (the cache says full, the ring is empty), and
+  /// the second takes the fast path.
+  #[test]
+  fn claims_after_a_re_split_and_after_a_drain_continue_through_the_cache() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(2));
+
+    let (mut producer, mut consumer) = ring.split();
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    drop(consumer.drain());
+
+    let (mut producer, mut consumer) = ring.split();
+    assert_eq!(producer.position(), Seq(2), "the shared cursor carried over");
+
+    // The cache starts at zero for the head, so this claim takes the slow
+    // path — and its sequence comes from the carried-over tail cache, not
+    // from zero.
+    let mut reservation = producer.claim().unwrap();
+    assert_eq!(
+      reservation.sequence(),
+      Seq(2),
+      "a re-split cache must not re-grant published sequences",
+    );
+    reservation.set(3);
+    drop(reservation);
+
+    // The next claim hits the cached-full wall, refreshes against the
+    // consumer's commit, and succeeds.
+    producer.try_push(4).unwrap();
+
+    let drained: Vec<u8> = consumer.drain().iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(drained, [3, 4]);
+  }
+
+  /// A reservation leaked with `mem::forget` is the one way to keep a claim
+  /// unpublished, and the cached bookkeeping changes the documented failure
+  /// shape. The uncached bookkeeping re-granted the leaked sequence to the
+  /// next claim, putting two owners on one slot and stalling the ring. The
+  /// cached bookkeeping skips it: the shared cursor stays behind until the
+  /// next publish, which lands past the leak, and the consumer receives the
+  /// leaked slot's never-written contents as a record. Still a caller
+  /// precondition violation — pinned here as a defined outcome, not a
+  /// licence.
+  #[test]
+  fn a_leaked_reservation_skips_its_sequence_rather_than_regranting_it() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap(); // sequence 0, published
+
+    // Sequence 1: claimed and deliberately never published.
+    std::mem::forget(producer.claim().unwrap());
+
+    producer.try_push(2).unwrap(); // sequence 2; its publish lands past the leak
+
+    let drained: Vec<Option<u8>> = consumer.drain().iter().map(|slot| TypedSlot::get(slot).copied()).collect();
+    assert_eq!(
+      drained,
+      [Some(1), None, Some(2)],
+      "the leaked sequence reads as its never-written slot, once",
+    );
+    assert_eq!(consumer.position(), Seq(3));
+  }
+
   // ── what the storage owes its records ──────────────────────────────────────
 
   /// A payload that records its own destruction.
@@ -941,6 +1011,10 @@ mod exhaustive {
   /// What the producer writes. Any value the cell cannot hold by accident;
   /// zero would be indistinguishable from "never written".
   const WRITTEN: usize = 0xABC;
+
+  /// The second lap's payload value, distinct from [`WRITTEN`], so a model can
+  /// tell a reclaimed record from the first lap's.
+  const REWRITTEN: usize = 0xBCD;
 
   /// A ring with a `'static` lifetime, so its two ends can be moved onto
   /// `loom::thread::spawn`'s `'static` closures.
@@ -1132,6 +1206,106 @@ mod exhaustive {
         "free_capacity() reported {reported} against a capacity of 1 — it must \
          saturate to a value no caller could mistake for real headroom, never \
          wrap past the ring's true capacity.",
+      );
+    });
+  }
+
+  /// The cached head never grants a slot the consumer has not committed.
+  ///
+  /// The cache is the fast path: the producer claims from its own fields and
+  /// re-reads the consumer cursor only when the cache says full. The
+  /// soundness argument is that the cached head can only lag — it is written
+  /// from an `Acquire` observation and never extrapolated — so a granted
+  /// lapped claim always follows an observed commit, and the consumer's take
+  /// of the old record is ordered before the producer's overwrite.
+  ///
+  /// Red under the overclaim mutations: deleting the refresh, or letting the
+  /// cache report progress the consumer never made, grants the lap-one slot
+  /// while the reader is still taking the lap-zero records, and the reader's
+  /// length and payload assertions fire.
+  ///
+  /// What this model cannot check: the `Acquire` on the refresh itself. Loom
+  /// linearises each step, so a relaxed refresh that returns the committed
+  /// value orders identically to an acquired one here, while on hardware
+  /// without the edge the overwrite and the take can race. That ordering is
+  /// argued in the module documentation and pinned by the ordering-constants
+  /// test, not modelled — the same blind spot the payload-proxy pattern was
+  /// built to narrow, narrowed again only this far.
+  #[test]
+  fn the_cached_head_never_grants_a_slot_the_consumer_has_not_committed() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let granted = &*Box::leak(Box::new(AtomicUsize::new(0)));
+
+      let (mut producer, mut consumer) = leaked_ring(2).split();
+
+      // Lap zero, on the model's own thread: both records written and
+      // published, and the producer's cache left reporting full.
+      payloads[0].store(WRITTEN, Ordering::Relaxed);
+      producer.try_push(1).expect("an empty ring admits one");
+      payloads[1].store(WRITTEN, Ordering::Relaxed);
+      producer.try_push(2).expect("a two-slot ring admits two");
+
+      let reader = loom::thread::spawn(move || {
+        // Both lap-zero records were published before the threads spawned,
+        // and the writer cannot publish past them until this thread commits —
+        // so the first drain is exactly two, under every interleaving.
+        let first = consumer.drain();
+        assert_eq!(
+          first.len(),
+          2,
+          "the first drain saw {} records against two published before the race",
+          first.len(),
+        );
+        for offset in 0..first.len() {
+          let seq = first.start().advanced_by(offset as u64);
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            WRITTEN,
+            "lap-zero record {seq:?} did not carry the write that preceded its publish",
+          );
+        }
+        drop(first); // the commits the cached head must be refreshed from
+
+        // The lap-one record, if it was granted and published before this
+        // drain, carries the second write — never the first lap's stale value.
+        let second = consumer.drain();
+        for offset in 0..second.len() {
+          let seq = second.start().advanced_by(offset as u64);
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            REWRITTEN,
+            "reclaimed record {seq:?} carried the first lap's stale value",
+          );
+        }
+        second.len()
+      });
+
+      let writer = loom::thread::spawn(move || {
+        // The cache reports full after lap zero, so this claim refreshes the
+        // head — the model's subject. The payload store sits inside the
+        // closure, before the publish, exactly as in the model above.
+        let pushed = producer
+          .push_with(|slot| {
+            slot.set(3);
+            payloads[0].store(REWRITTEN, Ordering::Relaxed);
+          })
+          .is_ok();
+
+        if pushed {
+          granted.fetch_add(1, Ordering::Relaxed);
+        }
+      });
+
+      let second_len = reader.join().expect("the reader thread");
+      writer.join().expect("the writer thread");
+
+      // A record drained on lap one was published, so it was granted; and
+      // nothing beyond the grant was ever published.
+      assert!(
+        second_len <= granted.load(Ordering::Relaxed),
+        "the consumer drained {second_len} reclaimed record(s) against {} grant(s)",
+        granted.load(Ordering::Relaxed),
       );
     });
   }

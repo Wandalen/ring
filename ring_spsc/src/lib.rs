@@ -40,6 +40,29 @@
 //! does know, so the asymmetric form is available, and the symmetric one
 //! would pay for a fence the single-writer property already provides.
 //!
+//! # The producer's cursor cache
+//!
+//! `claim`'s fast path loads nothing. The producer keeps the next sequence to
+//! claim and its latest observation of the consumer cursor in its own fields —
+//! lawful because the end is `&mut`-exclusive — and grants from the two cached
+//! values. The observation can only lag the real cursor: the consumer's cursor
+//! is monotone and the cache is refreshed to it, never extrapolated past it. A
+//! claim is granted only when the lagged value itself proves the slot consumed
+//! (`cached_head > seq − capacity`), so staleness can refuse a ring that has
+//! room, and never overwrite a record the consumer has not taken.
+//!
+//! When the cache says full, one [`GATING`] load refreshes it — the single
+//! consumer-line read the fast path exists to avoid — and that load is also
+//! the edge that orders the consumer's take of the old record before the
+//! producer's overwrite of the slot: the take precedes the consumer's commit
+//! store, the refresh observes that store, and the write follows the refresh.
+//! Every claim of a lapped slot is therefore backed by an observation, never
+//! by hope. The load's `Acquire` is soundness-required, and it is the one part
+//! of the protocol the loom models cannot check: loom linearises each step, so
+//! a relaxed refresh that returns the committed value is indistinguishable
+//! from an acquired one there, while on hardware without the edge the
+//! overwrite and the take can race.
+//!
 //! # The unsafe, and where its argument lives
 //!
 //! The producer writes slots while the consumer reads slots, through shared
@@ -314,7 +337,12 @@ pub struct Ring<S> {
 // the producer only writes the slot for the sequence it has claimed and not yet
 // published, the consumer only reads slots that are published and not yet
 // committed, and a published-not-committed sequence is by construction below
-// the producer's current position. The cursors are atomics and carry the
+// the producer's current position. The claim's capacity decision runs on the
+// producer's cached cursors, whose soundness is the monotonicity recorded on
+// the `cached_head` field: the cache can only lag the consumer cursor, and a
+// lapped claim is granted only when the cached observation itself proves the
+// record consumed, at the `GATING` load that orders the consumer's take before
+// the producer's overwrite. The cursors are atomics and carry the
 // happens-before edge (`HANDOFF` store, `GATING` load) that makes each side's
 // slot writes visible to the other before the other may touch that slot.
 // `S : Send` is required because a record is written on the producer's thread
@@ -439,9 +467,16 @@ impl<S> Ring<S> {
   pub fn split(&mut self) -> (Producer<'_, S>, Consumer<'_, S>) {
     let shared: &Self = self;
 
+    // The tail cache must start at the shared cursor's actual value: on a ring
+    // split a second time it carries over, and a cache that restarted at zero
+    // would re-grant sequences the first generation published. The head cache
+    // starts at zero on purpose — it can only lag a nonzero consumer cursor,
+    // and the first full ring refreshes it.
     (
       Producer {
         ring: shared,
+        cached_tail: shared.cursors.producer().load(OWN),
+        cached_head: Seq::ZERO,
         _one_thread: PhantomData,
       },
       Consumer {
@@ -488,10 +523,11 @@ impl<S> Ring<S> {
   ///   equals this end's own cursor, which the producer has not yet advanced.
   ///   That places the slot outside the consumer's readable set, whose
   ///   exclusive upper bound is that same cursor value. The slot must also be
-  ///   free, meaning at least one lap behind the consumer's cursor as read at
-  ///   [`GATING`]; otherwise it still holds a record the consumer has not read.
-  ///   `Producer::claim` is the only such caller and checks exactly that before
-  ///   constructing the [`Reservation`] this is reached through.
+  ///   free, meaning at least one lap behind the consumer's cursor; `claim`
+  ///   is the only such caller, and it checks that through its cached
+  ///   observation of the consumer cursor, whose value was read at [`GATING`]
+  ///   and can only lag the real one — so a granted claim never overwrites a
+  ///   record the consumer has not taken.
   /// - **The consumer end, on a published-not-yet-committed `seq`.** It is
   ///   reached through [`Batch::get_mut`], between `drain`/`drain_up_to` and
   ///   the batch's `Drop`. Publication is the producer cursor advancing past
@@ -544,6 +580,19 @@ impl<S> core::fmt::Debug for Ring<S> {
 #[derive(Debug)]
 pub struct Producer<'a, S> {
   ring: &'a Ring<S>,
+  /// The next sequence this end will claim — the producer cursor's private
+  /// mirror. Advanced by [`claim`](Self::claim), published to the shared
+  /// cursor by `Reservation::drop`, and equal to that cursor's value whenever
+  /// no reservation is live. Being a plain field is what makes the fast path
+  /// load-free: the end is `&mut`-exclusive, so nothing else reads or writes
+  /// it.
+  cached_tail: Seq,
+  /// This end's latest observation of the consumer cursor, taken at
+  /// [`GATING`]. Monotone and conservative: it is only ever set to a value the
+  /// consumer's cursor actually held, so it can lag that cursor but never run
+  /// ahead of it, and a claim granted on it can never overwrite a record the
+  /// consumer has not taken.
+  cached_head: Seq,
   /// `Cell` is `Send` and not `Sync`, so this marker makes the end movable to a
   /// thread and unshareable between two. Without it the end would inherit
   /// `Sync` from `&Ring`, and two threads holding `&Producer` could each claim
@@ -620,6 +669,12 @@ impl<S> Producer<'_, S> {
 
   /// Whether the next claim would fail.
   ///
+  /// The check reads the real cursors, not this end's cached observation. The
+  /// two can disagree while the cache is stale; `claim` resolves that by
+  /// refreshing before it refuses, so both answers of this check hold — a
+  /// full report means the next claim fails, and a not-full report means it
+  /// succeeds, possibly after the refresh.
+  ///
   /// ```
   /// use ring_slot::TypedSlot;
   /// use ring_spsc::Ring;
@@ -657,6 +712,14 @@ impl<S> Producer<'_, S> {
   /// abandoned". Making the publish the drop makes the case unreachable,
   /// including on unwind.
   ///
+  /// The capacity decision runs on this end's cached cursors, and the fast
+  /// path performs no atomic load: the cached tail is this end's own
+  /// bookkeeping, and a cached head that lags the consumer can only make the
+  /// cache report less room than there is. When the cache reports full, one
+  /// [`GATING`] load of the consumer cursor refreshes it — the single read of
+  /// the consumer's line on this path — and the refreshed observation decides
+  /// honestly. A refused claim moves nothing, cached or shared.
+  ///
   /// # Errors
   ///
   /// [`RingError::Full`] when the consumer has not committed far enough for a
@@ -676,11 +739,23 @@ impl<S> Producer<'_, S> {
   /// assert_eq!( consumer.drain().get( 0 ).map( BytesSlot::read ), Some( &b"hi"[ .. ] ) );
   /// ```
   pub fn claim(&mut self) -> Result<Reservation<'_, S>, RingError> {
-    if self.is_full() {
-      return Err(RingError::Full);
+    let capacity = self.ring.capacity().get() as u64;
+
+    if self.cached_head.distance_to(self.cached_tail) >= capacity {
+      // The cache says full. The cache can only lag the consumer, so the ring
+      // may still have room: refresh the observation once, at the one
+      // `Acquire` load the fast path exists to avoid. This load is also the
+      // edge that orders the consumer's take of the lapped record before this
+      // end's overwrite of its slot.
+      self.cached_head = self.ring.cursors.consumer().load(GATING);
+
+      if self.cached_head.distance_to(self.cached_tail) >= capacity {
+        return Err(RingError::Full);
+      }
     }
 
-    let seq = self.ring.cursors.producer().load(OWN);
+    let seq = self.cached_tail;
+    self.cached_tail = seq.next();
 
     Ok(Reservation { ring: self.ring, seq })
   }
@@ -762,6 +837,14 @@ impl<T: Send> Producer<'_, TypedSlot<T>> {
 /// moving it through a temporary. The publish is the drop, which makes an
 /// abandoned claim unrepresentable. An early return, a `?`, or an unwind all
 /// publish instead of stalling the ring.
+///
+/// The one way to keep a claim unpublished is `mem::forget`. That is a caller
+/// precondition violation either way, and the failure shape differs between
+/// this crate's cached and uncached bookkeeping: the shared cursor stays
+/// behind the producer's cached tail, so the next publish jumps over the
+/// leaked sequence instead of re-granting it, and the consumer receives an
+/// empty or stale record at that position rather than the ring stalling. No
+/// slot ends up with two live owners in either case.
 #[must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot"]
 #[derive(Debug)]
 pub struct Reservation<'a, S> {

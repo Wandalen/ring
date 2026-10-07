@@ -18,6 +18,7 @@ measured benchmark.*
 [![CI](https://github.com/Wandalen/ring/actions/workflows/ci.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/ci.yml)
 [![Gates](https://github.com/Wandalen/ring/actions/workflows/gates.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/gates.yml)
 [![Loom](https://github.com/Wandalen/ring/actions/workflows/loom.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/loom.yml)
+[![Benchmarks](https://github.com/Wandalen/ring/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/Wandalen/ring/actions/workflows/benchmarks.yml)
 
 The family is the `ring_*` mechanism crates plus `bench_harness`, its
 family-neutral stage-gate and workload oracle. Together they form this

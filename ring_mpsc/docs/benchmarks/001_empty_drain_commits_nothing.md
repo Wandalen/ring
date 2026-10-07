@@ -32,7 +32,7 @@ only in `ring_mpsc/src/lib.rs`. Both use 64-byte `ring_align::CACHE_LINE` paddin
 
 ## Results
 
-### Two threads at 1024 slots (M records/s, median and range of 8 runs)
+### One consumer thread plus one thread per producer, at 1024 slots (M records/s, median and range of 8 runs)
 
 | Cell | Before | After | Ratio |
 |---|---|---|---|

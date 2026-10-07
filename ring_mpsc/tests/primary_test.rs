@@ -221,4 +221,96 @@ mod exhaustive {
       );
     });
   }
+
+  /// Two live primary handles never double-grant either: minted from two
+  /// copies of one `Producer`, both guess the shared claim cursor from
+  /// their caches, and the compare-exchange arbitrates between them — the
+  /// handle that claims second holds a stale guess, its exchange fails
+  /// once, adopts the actual cursor, and grants the next sequence.
+  ///
+  /// Red under the mutation that replaces the guessed compare-exchange with
+  /// a plain store: both handles grant sequence zero from identical caches,
+  /// one publish overwrites the other's increment, the watermark stops at
+  /// zero, and the reader drains one record against two grants.
+  ///
+  /// What this model cannot check: the `Acquire` on either handle's cached
+  /// head refresh. Loom linearises each step, so a relaxed refresh that
+  /// returns the committed value orders identically to an acquired one —
+  /// the same blind spot the payload-proxy pattern narrows only this far.
+  #[test]
+  fn two_primary_producers_never_double_grant() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+
+      let ends = leaked_ends();
+      let ring = ends.ring();
+      let (mut producer, mut consumer) = ends.split();
+      let mut copy = producer;
+      let mut first = producer.primary();
+      let mut second = copy.primary();
+
+      let first_writer = loom::thread::spawn(move || {
+        // The cached tail is the mint-time cursor: exact until the other
+        // handle claims, a stale guess afterwards — the exchange arbitrates
+        // either way. The store sits between the claim and the publish, so
+        // the drain's `Acquire` on the cursor sees it.
+        let reserved = first.claim().expect("a two-slot ring admits one");
+        let seq = reserved.sequence();
+        payloads[(seq.0 & 1) as usize].store(11, Ordering::Relaxed);
+        drop(reserved);
+      });
+
+      let second_writer = loom::thread::spawn(move || {
+        let reserved = second.claim().expect("the ring has one slot left");
+        let seq = reserved.sequence();
+        payloads[(seq.0 & 1) as usize].store(22, Ordering::Relaxed);
+        drop(reserved);
+      });
+
+      let reader = loom::thread::spawn(move || {
+        let first = consumer.drain();
+        for offset in 0..first.len() {
+          let seq = first.start().advanced_by(offset as u64);
+          assert_ne!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            0,
+            "drained record {seq:?} carried no write at all",
+          );
+        }
+        drop(first);
+
+        let second = consumer.drain();
+        for offset in 0..second.len() {
+          let seq = second.start().advanced_by(offset as u64);
+          assert_ne!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            0,
+            "drained record {seq:?} carried no write at all",
+          );
+        }
+        second.len()
+      });
+
+      first_writer.join().expect("no panic");
+      second_writer.join().expect("no panic");
+      reader.join().expect("no panic");
+
+      // The handles' caches agree at mint and never again once one of them
+      // claims: sequence zero was published by whichever handle won it,
+      // sequence one by the other, whose stale guess failed into it. Under
+      // a plain store in place of the guessed compare-exchange both grants
+      // collide on sequence zero, sequence one is never published, and its
+      // stamp stays `UNSTAMPED`.
+      assert_eq!(
+        ring.stamps()[0].load(Ordering::Relaxed),
+        Seq(0),
+        "sequence zero was published by whichever handle won it",
+      );
+      assert_eq!(
+        ring.stamps()[1].load(Ordering::Relaxed),
+        Seq(1),
+        "sequence one was never published — the two handles' grants collided",
+      );
+    });
+  }
 }

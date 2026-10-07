@@ -198,10 +198,10 @@ fn results(criterion: &Path) -> readme::Data {
   find(criterion, &mut files);
   let mut data = readme::Data::new();
   for file in files {
-    let Some(dir) = file.parent().and_then(Path::parent) else {
+    let Some(new_dir) = file.parent() else {
       continue;
     };
-    let (Some(benchmark), Some(median)) = (json(&file), median(&dir.join("new"))) else {
+    let (Some(benchmark), Some(median)) = (json(&file), median(new_dir)) else {
       continue;
     };
     let text = |field: &str| benchmark[field].as_str().map(str::to_string);

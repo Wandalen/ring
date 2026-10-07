@@ -177,6 +177,32 @@ fn latency_rows_render_as_tables() {
   assert!(tables.contains("| 1 | 0.20 M/s | rtrb |"), "{tables}");
 }
 
+/// A row saved before `p95_ns` existed — the shape every pre-`p95` `latency.json` renders once the
+/// ladder grows a quantile. The missing cell must read as no data, not as a real measurement.
+#[test]
+fn a_saved_row_without_a_quantile_renders_no_data_not_a_number() {
+  let row = serde_json::json!({
+    "test": "steady",
+    "producers": 1,
+    "rate": 200_000.0,
+    "candidate": "spsc",
+    "achieved": 199_000.0,
+    "saturated": false,
+    "p50_ns": 120,
+    "p90_ns": 180,
+    "p99_ns": 240,
+    "p999_ns": 300,
+    "p9999_ns": 350,
+    "max_ns": 400
+  });
+  let tables = latency::markdown(&[row]);
+  assert!(
+    tables
+      .contains("| 1 | 0.20 M/s | spsc | 0.20 M/s | 120.0 ns | 180.0 ns | — | **240.0 ns** | 300.0 ns | 350.0 ns | 400.0 ns |"),
+    "{tables}"
+  );
+}
+
 #[test]
 #[should_panic(expected = "faulty: records lost, duplicated, reordered or torn — received 39960 of 40000")]
 fn a_candidate_that_drops_every_thousandth_record_is_rejected() {

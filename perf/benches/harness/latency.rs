@@ -426,7 +426,11 @@ pub fn markdown(rows: &[Value]) -> String {
           ["p50_ns", "p90_ns", "p95_ns", "p99_ns", "p999_ns", "p9999_ns", "max_ns"]
             .iter()
             .map(|field| {
-              let ns = row[*field].as_u64().unwrap_or(0);
+              // A saved row from before a quantile existed carries no such field; a missing
+              // measurement must not render as a real near-zero one.
+              let Some(ns) = row[*field].as_u64() else {
+                return "—".to_string();
+              };
               let cell = duration(ns as f64);
               if *field == "p99_ns" && Some(ns) == best {
                 format!("**{cell}**")

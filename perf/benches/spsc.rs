@@ -4,7 +4,7 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, function};
-use harness::candidates::{Candidate, CrossbeamQueue, MutexDeque, Rtrb, Spsc, SyncChannel, Wide};
+use harness::candidates::{Candidate, CrossbeamQueue, MpscPrimary, MutexDeque, Rtrb, Spsc, SyncChannel, Wide};
 use harness::driver::{Mode, Shape};
 use harness::topology;
 
@@ -21,6 +21,7 @@ fn capacity(c: &mut Criterion) {
     every_mode::<MutexDeque>(&mut group, capacity);
     every_mode::<SyncChannel>(&mut group, capacity);
     every_mode::<CrossbeamQueue>(&mut group, capacity);
+    every_mode::<MpscPrimary>(&mut group, capacity);
   }
   group.finish();
 }

@@ -47,7 +47,7 @@ const GROUPS: [(&str, &str); 11] = [
 ];
 
 /// Row order: the in-house rings first, then the references, the baseline last.
-const CANDIDATES: [&str; 6] = ["spsc", "mpsc", "rtrb", "sync_channel", "arrayqueue", "mutex"];
+const CANDIDATES: [&str; 7] = ["spsc", "mpsc", "mpsc-primary", "rtrb", "sync_channel", "arrayqueue", "mutex"];
 
 struct Args {
   baseline: Option<String>,

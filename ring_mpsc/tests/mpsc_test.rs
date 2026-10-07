@@ -1397,6 +1397,85 @@ mod threaded {
     assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(2));
   }
 
+  /// The primary handle mints from the shared claim cursor, coexists with
+  /// ordinary `Copy` producers, and its grants are disjoint from theirs —
+  /// the compare-exchange arbitrates, exactly as it does between copies.
+  #[test]
+  fn a_primary_producer_and_a_copy_producer_grant_disjoint_sequences() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    producer.push(1).expect("room"); // sequence 0, the ordinary path
+
+    let mut primary = producer.primary();
+    primary.try_push(2).expect("room"); // sequence 1, the cached fast path
+
+    producer.push(3).expect("room"); // sequence 2, the ordinary path again
+
+    assert_eq!(primary.claimed(), Seq(3));
+    assert_eq!(producer.claimed(), Seq(3), "one cursor, three grants");
+
+    let mut batch = consumer.drain();
+    assert_eq!(batch.len(), 3);
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(1));
+    assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(2));
+    assert_eq!(batch.get_mut(2).and_then(TypedSlot::take), Some(3));
+  }
+
+  /// The cached head can only lag the consumer, so after the cache reports
+  /// full the next claim refreshes it against the consumer's commit and
+  /// succeeds — the conservative refusal never wedges the handle.
+  #[test]
+  fn the_primary_cache_is_refreshed_before_the_claim_refuses() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(2));
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+    let mut primary = producer.primary();
+
+    primary.try_push(1).expect("room");
+    primary.try_push(2).expect("room");
+    assert_eq!(
+      primary.claim().err(),
+      Some(RingError::Full),
+      "the cache says full, and the ring is"
+    );
+
+    drop(consumer.drain());
+
+    primary.try_push(3).expect("the refresh finds the room the drain made");
+    primary.try_push(4).expect("room");
+
+    let mut batch = consumer.drain();
+    assert_eq!(batch.len(), 2);
+    assert_eq!(batch.get_mut(0).and_then(TypedSlot::take), Some(3));
+    assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(4));
+  }
+
+  /// A primary reservation leaked with `mem::forget` keeps its sequence
+  /// unpublished: the claim's exchange moved the shared cursor past it, and
+  /// without the drop there is no stamp, so the consumer stalls at the hole
+  /// and every later record is unreachable behind it. This is the ring's
+  /// documented lost-claim pitfall, pinned for the cached handle: the loss
+  /// lives in the missing publish, not in the cursor arithmetic, and the
+  /// cache changes nothing about it.
+  #[test]
+  fn a_leaked_primary_reservation_stalls_the_drain_at_its_hole() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+    let mut primary = producer.primary();
+
+    primary.try_push(1).expect("room"); // sequence 0, published
+
+    std::mem::forget(primary.claim().expect("room")); // sequence 1: cursor moved, no stamp
+
+    primary.try_push(2).expect("room"); // sequence 2, published past the hole
+
+    assert_eq!(consumer.drain().len(), 1, "only the record before the hole drains",);
+    assert_eq!(consumer.drain().len(), 0, "the hole never fills");
+  }
+
   #[test]
   fn a_reserved_guard_reports_the_sequence_it_will_publish() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));

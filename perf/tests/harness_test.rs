@@ -8,7 +8,21 @@ use std::hint::spin_loop;
 use std::marker::PhantomData;
 use std::time::Duration;
 
-use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Record, Rtrb, Run, Rx, Spsc, SyncChannel, Tx, Wide};
+use harness::candidates::{
+  Candidate,
+  CrossbeamQueue,
+  Mpsc,
+  MpscPrimary,
+  MutexDeque,
+  Record,
+  Rtrb,
+  Run,
+  Rx,
+  Spsc,
+  SyncChannel,
+  Tx,
+  Wide,
+};
 use harness::driver::{self, Mode, Shape};
 use harness::latency::{self, Load, Stamped};
 use harness::topology;
@@ -40,6 +54,11 @@ fn rtrb_passes_validation_in_every_mode() {
 fn mpsc_passes_validation_in_every_mode_and_producer_count() {
   every_mode::<Mpsc>(1);
   every_mode::<Mpsc>(3);
+}
+
+#[test]
+fn mpsc_primary_passes_validation_in_its_single_producer_mode() {
+  every_mode::<MpscPrimary>(1);
 }
 
 #[test]
@@ -105,6 +124,7 @@ fn ping_pong_echoes_through_every_candidate() {
   assert!(latency::ping_pong::<Spsc>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Rtrb>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Mpsc>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<MpscPrimary>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<SyncChannel>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<CrossbeamQueue>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<MutexDeque>(4, 1_000) > 0.0);

@@ -7,8 +7,9 @@ Status: Accepted
 The workspace sets `unsafe-code = "deny"` and `undocumented_unsafe_blocks = "deny"`. In `ring_mpsc::Ring`, any number
 of producers write slots while the one consumer reads others, all through shared references to one allocation.
 `ring_mpsc::Producer` is `Copy` and `Sync` on purpose, since giving each thread its own copy is what multi-producer
-means. Which producer may write which slot is a runtime fact about cursor values, settled by a compare-exchange in
-`ring_claim::Claimer::claim`. The borrow checker reasons about scopes and cannot see it.
+means. Which producer may write which slot is a runtime fact about cursor values, settled by a compare-exchange on
+the claim cursor: `ring_claim::Claimer::claim` for the ordinary producers, the primary's guessed exchange for
+`PrimaryProducer`. The borrow checker reasons about scopes and cannot see it.
 
 The invariant is stated in the claim cursor, the per-slot stamps and the consumer cursor. `ring_store` and `ring_slot`
 hold none of those, so the unsafe code has to live in a crate that holds both the storage and the cursors.
@@ -26,8 +27,10 @@ the opt-out.
 
 These rules bound it:
 
-- No unsafe API is public, and callers carry no obligation. A `Reserved` comes only from `Producer::claim`, after the
-  claim passed the `GatingSet` headroom check. A `Batch` comes only from `Consumer::drain` or `Consumer::drain_up_to`,
+- No unsafe API is public, and callers carry no obligation. A `Reserved` comes from `Producer::claim`, which grants
+  after the `GatingSet` headroom check, or from `PrimaryProducer::claim`, which grants on an exchange won against
+  the live cursor and a cached head that only ever lags the consumer's commit (the cache is refreshed at `GATING`).
+  A `Batch` comes only from `Consumer::drain` or `Consumer::drain_up_to`,
   which stop at the first slot whose stamp, read at `OBSERVE`, does not equal its sequence. So `slot_mut` is reached
   only for a claimed, unpublished sequence or a published, uncommitted one.
 - There is one consumer. `Ring::ends` takes `&mut self`, `Ends::split` takes `&mut self`, and `Consumer` is neither

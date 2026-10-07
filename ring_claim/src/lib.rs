@@ -565,6 +565,51 @@ impl<'a> Claimer<'a> {
     Err(RingError::Full)
   }
 
+  /// Claim one sequence with the caller's guessed expected value.
+  ///
+  /// The exchange skips the headroom check entirely: the caller gates the
+  /// claim from its own observation of the consumer cursor, and this method
+  /// only arbitrates the cursor advance. A wrong guess — another producer
+  /// claimed since the caller last looked — fails safely and hands back the
+  /// cursor's actual value, so the caller can correct its guess and retry.
+  ///
+  /// This is the shape the primary producer's cached gate needs: the
+  /// headroom decision is amortised in the caller's cache, and the exchange
+  /// stays here, where the claim protocol's orderings live.
+  ///
+  /// # Errors
+  ///
+  /// [`Seq`] — the cursor's actual value when the guess was behind: adopt it
+  /// and retry, or report full if the caller's own gate still refuses. The
+  /// weak exchange folds a spurious failure into the caller's retry too.
+  ///
+  /// ```
+  /// use core::sync::atomic::Ordering;
+  /// use ring_claim::Claimer;
+  /// use ring_cursor::SeqCell;
+  /// use ring_gating::GatingSet;
+  /// use ring_types::{ Capacity, Seq };
+  ///
+  /// let consumers = GatingSet::new( Capacity::new( 4 ).unwrap(), 1 );
+  /// let claimer = Claimer::new( &consumers );
+  ///
+  /// // An exact guess grants sequence zero without a cursor load.
+  /// let claim = claimer.claim_guessed( Seq::ZERO ).unwrap();
+  /// assert_eq!( claim.start(), Seq::ZERO );
+  ///
+  /// // A guess behind the real cursor fails and carries the actual value.
+  /// assert_eq!( claimer.claim_guessed( Seq::ZERO ).unwrap_err(), Seq( 1 ) );
+  /// ```
+  pub fn claim_guessed(&self, expected: Seq) -> Result<Claim, Seq> {
+    match self
+      .cursor
+      .compare_exchange_weak(expected, expected.next(), CLAIM_SUCCESS, GATING)
+    {
+      Ok(_) => Ok(Claim::new(expected, 1)),
+      Err(actual) => Err(actual),
+    }
+  }
+
   /// Claim as many of `max` sequences as are available, down to one.
   ///
   /// For a batching producer that would rather write four items now than wait

@@ -218,6 +218,41 @@ impl<R: Record> Rx<R> for MpscRx<'_, R> {
   }
 }
 
+/// `ring_mpsc` through the exclusive primary handle: the spike's cached-cursor claim fast path
+/// (`ring_mpsc/docs/decisions/003`), one producer by construction. The receiving end is the
+/// ordinary `MpscRx` — the primary changes the producer's claim path only.
+#[derive(Debug)]
+pub struct MpscPrimary<R = u64>(ring_mpsc::Ring<TypedSlot<R>>);
+
+impl<R: Record> Candidate for MpscPrimary<R> {
+  type Record = R;
+
+  const NAME: &'static str = "mpsc-primary";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(slots: usize) -> Self {
+    Self(ring_mpsc::Ring::new(capacity(slots)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    assert_eq!(producers, 1, "the primary handle takes one producer");
+    let mut ends = self.0.ends();
+    let (mut tx, rx) = ends.split();
+    let primary = tx.primary();
+
+    run.run(vec![MpscPrimaryTx(primary)], MpscRx(rx))
+  }
+}
+
+struct MpscPrimaryTx<'a, R>(ring_mpsc::PrimaryProducer<'a, TypedSlot<R>>);
+
+impl<R: Record> Tx<R> for MpscPrimaryTx<'_, R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_push(record).is_ok()
+  }
+}
+
 /// `std::sync::Mutex< VecDeque< R > >` bounded at the capacity: one lock per push, per pop, or per
 /// batch.
 #[derive(Debug)]

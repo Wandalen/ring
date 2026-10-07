@@ -26,7 +26,7 @@ prints the command(s) the verb would run without running them.
 | `fmt` | Apply this repo's adopted rustfmt style workspace-wide (`+nightly`, `rustfmt.toml`). `check::1` verifies without writing |
 | `doc` | Rebuild rustdoc from a clean slate (`rm -rf target/doc` first, because incremental `cargo doc` hides errors in unchanged crates) |
 | `gate` | Dispatch to `bench_harness/gate/run_all.sh`, the family's gate suite. `family::<name>` (default `ring`), `gate::<name>` (repeatable), `stage::<name>` |
-| `bench` | Run the benchmarks — `suite::comparison` (default, `ring_bench`'s example, release), `micro` / `spsc` / `mpsc` / `batch` (`perf`, criterion), `latency`, `report` (markdown comparison of the last results) or `all`. `quick::1` validates every `perf` case without numbers; `filter::<text>`, `save::<name>`, `baseline::<name>`, `out::<file>` |
+| `bench` | Run the benchmarks — `suite::comparison` (default, `ring_bench`'s example, release), `micro` / `spsc` / `mpsc` / `batch` (`perf`, criterion), `latency`, `report` (markdown comparison of the last results), `readme` (the suites behind the root readme's measured-results table, then that table regenerated in place) or `all`. `quick::1` validates every `perf` case without numbers; `filter::<text>`, `save::<name>`, `baseline::<name>`, `out::<file>` |
 | `publish_check` | Dry-run `cargo publish` for every publishable crate, building each from its package. `crate::<name>` narrows |
 | `clean` | Remove `target/` and gate scratch logs |
 | `verify` | Full pre-push gate, an alias for `test level::5` |

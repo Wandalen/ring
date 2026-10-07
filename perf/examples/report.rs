@@ -16,8 +16,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::{env, fs, thread};
+use std::{env, fs};
 
 use harness::{latency, output};
 use serde_json::Value;
@@ -113,7 +112,7 @@ fn main() {
   let criterion = output::criterion_dir();
   let perf = output::perf_dir();
 
-  let mut report = format!("# Benchmark comparison\n\n{}\n\n", machine());
+  let mut report = format!("# Benchmark comparison\n\n{}\n\n", output::machine());
   if let Some(name) = &args.baseline {
     let _ = writeln!(
       report,
@@ -271,7 +270,7 @@ fn table(report: &mut String, name: &str, about: &str, entries: &[Entry], extras
         let mut text = if per_operation {
           output::duration(metric)
         } else {
-          rate(metric)
+          output::rate(metric)
         };
         if Some(metric) == *best && rows.len() > 1 {
           text = format!("**{text}**");
@@ -327,14 +326,6 @@ fn spins(report: &mut String, mut measured: Vec<(String, &Value)>) {
   report.push_str("\n</details>\n\n");
 }
 
-fn rate(per_second: f64) -> String {
-  match per_second {
-    r if r >= 1e9 => format!("{:.2} G/s", r / 1e9),
-    r if r >= 1e6 => format!("{:.1} M/s", r / 1e6),
-    r => format!("{:.1} K/s", r / 1e3),
-  }
-}
-
 fn rank(function: &str) -> usize {
   let candidate = function.split('/').next().unwrap_or(function);
   CANDIDATES
@@ -351,39 +342,4 @@ fn by_number(a: Option<&str>, b: Option<&str>) -> Ordering {
     (None, Some(_)) => Ordering::Greater,
     (None, None) => Ordering::Equal,
   }
-}
-
-/// The machine line every report starts with: numbers without it are not comparable.
-fn machine() -> String {
-  let read = |path: &str| fs::read_to_string(path).ok().map(|text| text.trim().to_string());
-  let run = |program: &str, args: &[&str]| {
-    let out = Command::new(program).args(args).output().ok()?;
-    out
-      .status
-      .success()
-      .then(|| String::from_utf8_lossy(&out.stdout).trim().to_string())
-  };
-  let cpu = read("/proc/cpuinfo")
-    .and_then(|info| {
-      info
-        .lines()
-        .find(|line| line.starts_with("model name"))?
-        .split(':')
-        .nth(1)
-        .map(|name| name.trim().to_string())
-    })
-    .unwrap_or_else(|| env::consts::ARCH.to_string());
-  let threads = thread::available_parallelism().map_or(0, usize::from);
-  let governor = read("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor").unwrap_or_else(|| "unknown".into());
-  let kernel = read("/proc/sys/kernel/osrelease").unwrap_or_else(|| env::consts::OS.into());
-  let clock = read("/sys/devices/system/clocksource/clocksource0/current_clocksource").unwrap_or_else(|| "unknown".into());
-  let rustc = run("rustc", &["-V"]).unwrap_or_else(|| "rustc unknown".into());
-  let commit = run("git", &["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "unknown".into());
-  let dirty = run("git", &["status", "--porcelain"]).is_some_and(|status| !status.is_empty());
-
-  format!(
-    "{cpu}, {threads} logical CPUs, governor {governor}, kernel {kernel}, clocksource {clock}, {rustc}; report made at \
-     commit {commit}{}.",
-    if dirty { " with uncommitted changes" } else { "" }
-  )
 }

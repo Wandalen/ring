@@ -107,7 +107,10 @@ chasing at large capacity.
 - Correctness gate: 30 integration tests (28 + 2 new), 26 doctests,
   5 compile_fail, loom 4/4 with the new cached-head model, clippy
   `-D warnings`, fmt, workspace green (`ring_handle`'s trybuild stderr
-  re-blessed for the shifted line numbers).
+  re-blessed — additive, nothing shifted: with `rust-src` installed, as
+  this branch's CI now does, rustc quotes the sysroot sources behind its
+  `$RUST/...` spans, so the fixture gained the `PhantomData` and
+  `Scope::spawn` snippets and no diagnostic text moved).
 
 ## Verdict
 

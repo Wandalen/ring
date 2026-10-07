@@ -1,8 +1,9 @@
 # docs
 
 Repository-level documentation that isn't scoped to a single crate. Each
-`ring_*` crate keeps its architectural decisions in its own `docs/decisions/`,
-and `bench_harness/docs/` documents `bench_harness` itself.
+`ring_*` crate keeps its architectural decisions in its own `docs/decisions/`
+and any benchmark records in its own `docs/benchmarks/`, and
+`bench_harness/docs/` documents `bench_harness` itself.
 
 | Path | Responsibility |
 |------|-----------------|
@@ -30,6 +31,11 @@ instead of restating it.
 - A section that spans several items goes in the module documentation (`//!`) instead.
 - A decision with rejected alternatives and a revisit trigger goes in the crate's
   `docs/decisions/` as an ADR.
+- Before/after measurements of one change go in the crate's `docs/benchmarks/`, numbered like
+  the ADRs. A record names the commits on both sides and the machine, and stays as measured: the
+  code moving later does not make it wrong, because it says what was measured, not what holds.
+  If the measurements lead to adopting a mechanism over alternatives, that decision is an ADR in
+  `docs/decisions/`, which links the record.
 
 These sections name items as intra-doc links, such as ``[`Guarded::try_push_batch`]``, so a
 rename fails CI's `cargo doc` run, which denies warnings. Tests, and items in crates the crate

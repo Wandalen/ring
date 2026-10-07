@@ -5,6 +5,15 @@
 # instead of sampling them. Kept out of `ci.yml` because it is an order of
 # magnitude slower than the sampled run and would block every quick push.
 #
+# Each model runs as its own `cargo test -p <crate> --test <file>`, one per
+# crate that carries one, exactly as the readmes and `ring_atomic`'s module
+# documentation run them locally. Never `--workspace`: under `--cfg loom` the
+# instrumented atomics panic the moment they are touched outside a
+# `loom::model` closure, so any ordinary test binary that constructs a ring
+# (notably `perf`'s `harness_test`) fails the whole run before a single model
+# executes. Scoping the workflow to the four model binaries is what lets them
+# run at all.
+#
 # Schedule: `master` pushes + nightly + manual dispatch. Never on every PR.
 
 name: Loom
@@ -29,4 +38,8 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.98.0
       - uses: Swatinem/rust-cache@v2
       - name: loom models (see ring_spsc / ring_mpsc / ring_publish readmes)
-        run: RUSTFLAGS="--cfg loom" cargo test --workspace --all-features --tests
+        run: |
+          RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test
+          RUSTFLAGS="--cfg loom" cargo test -p ring_mpsc --test mpsc_test
+          RUSTFLAGS="--cfg loom" cargo test -p ring_publish --test handshake_test
+          RUSTFLAGS="--cfg loom" cargo test -p ring_testkit --test exhaustive_test

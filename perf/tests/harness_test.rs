@@ -1,6 +1,13 @@
 //! `perf`'s drivers: every candidate passes its own validation in every shape the benchmarks use,
 //! and a candidate that loses, reorders or tears records is rejected by name rather than timed.
 
+// Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
+// `ring_atomic`'s atomics for loom's instrumented ones across the whole
+// graph, and those panic the moment they are touched outside a
+// `loom::model` closure. Without this gate a family-wide loom run dies
+// here before it can run a single model.
+#![cfg(not(loom))]
+
 #[path = "../benches/harness/mod.rs"]
 mod harness;
 

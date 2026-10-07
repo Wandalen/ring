@@ -21,6 +21,28 @@ and no report anyone else can see.
 - A regression gate — fail the build if p99 latency regresses past a
   documented threshold, not just "fail if it crashes"
 
+## Where this stands
+
+The CI job exists: `.github/workflows/benchmarks.yml` runs
+`verb/bench suite::all` on three hosted architectures — x86_64 linux,
+aarch64 linux, apple silicon — nightly, on `master` pushes that touch
+the benchmarked code, and on manual dispatch. Each run publishes its
+markdown report into the run summary and a per-architecture artifact
+carrying the raw `target/perf/` results beside it.
+
+The other two deliverables are deferred, on the record:
+
+- The durable `criterion` HTML report. A shared hosted runner's
+  `target/criterion` is hundreds of megabytes of HTML nobody reads
+  there; until a publisher (GitHub Pages, or a longer artifact
+  retention) is chosen deliberately, the markdown report and the raw
+  JSON in the artifact are the durable form.
+- The regression gate. The benchmarking guide's § Fair measurements
+  says unpinned threads on shared hardware swing tens of percent in
+  both directions; a p99 threshold fed by such numbers fails on noise,
+  not regressions. It waits for numbers from one dedicated machine with
+  an established noise floor.
+
 ## Why this one matters more than it looks
 
 This project's whole design philosophy is "measured, not argued" — adoption

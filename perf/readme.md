@@ -56,6 +56,9 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 | `wait`    | `wait_exhausted`      | one thread: the full spins budget against a never-ready predicate — pause cost times spins                                    | `spin` / `yield` / `park` / `none`   |
 | `wait`    | `wait_space`          | one thread: `for_space` on an empty ring (`ready`), then on a full one                                                        | `ready` / `full` × strategy          |
 | `wait`    | `wait_data`           | one thread: `for_data` with three records pending (`ready`), then on an empty ring                                            | `ready` / `empty` × strategy         |
+| `stages`  | `claim`               | claim plus the publish store on drop, no write: spsc fast / refused, mpsc shared / batch-32 / primary                        | —                                    |
+| `stages`  | `write`               | the slot write alone on a held guard, no synchronisation                                                                       | —                                    |
+| `stages`  | `fused`               | claim, write and publish per record (per 32 for the batch form) — the shape production code calls                              | —                                    |
 | `overflow`| `fail_retry`          | one thread: refused push on a full ring under `Fail` — what a retry loop pays per attempt                                     | `spsc` / `mpsc`                      |
 | `overflow`| `drop_newest`         | one thread: discarded push on a full ring under `DropNewest` — success reported, record dropped                              | `spsc` / `mpsc`                      |
 | `mpsc`    | `mpsc_producers`      | 2²⁰ records split over that many producer threads, 1024 slots                                                                 | 1, 2, 4, 8, cores − 1                |

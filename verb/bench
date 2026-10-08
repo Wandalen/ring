@@ -39,9 +39,9 @@ for _arg in "$@"; do
   esac
 done
 
-_names='comparison, micro, spsc, mpsc, batch, wait, overflow, latency, regression, report, all'
+_names='comparison, micro, spsc, mpsc, batch, wait, stages, overflow, latency, regression, report, all'
 case "$_suite" in
-  comparison|micro|spsc|mpsc|batch|wait|overflow|latency|regression|report) _suites=( "$_suite" ) ;;
+  comparison|micro|spsc|mpsc|batch|wait|stages|overflow|latency|regression|report) _suites=( "$_suite" ) ;;
   # `regression` stays out of `all` on purpose: it is a pass/fail gate, not a
   # measurement, so it must never flow through criterion's save/baseline
   # machinery (a suite the base branch lacks aborts the head comparison —
@@ -52,7 +52,7 @@ case "$_suite" in
   # the base commit has no `overflow` baseline to compare against. Add it
   # back to `all` once that baseline exists; until then it runs standalone
   # as `suite::overflow`.
-  all) _suites=( comparison micro spsc mpsc batch wait latency report ) ;;
+  all) _suites=( comparison micro spsc mpsc batch wait stages latency report ) ;;
   *)
     echo "verb/bench: suite::$_suite is not one of $_names" >&2
     exit 2

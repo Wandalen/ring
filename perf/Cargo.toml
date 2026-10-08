@@ -48,6 +48,10 @@ name = "wait"
 harness = false
 
 [[bench]]
+name = "stages"
+harness = false
+
+[[bench]]
 name = "overflow"
 harness = false
 

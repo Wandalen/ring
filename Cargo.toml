@@ -79,7 +79,7 @@ ring_mpsc = { path = "ring_mpsc", version = "0.2.1" }
 ring_overflow = { path = "ring_overflow", version = "0.2.1" }
 ring_poll = { path = "ring_poll", version = "0.2.1" }
 ring_publish = { path = "ring_publish", version = "0.2.1" }
-ring_registry = { path = "ring_registry", version = "0.1.0" }
+ring_registry = { path = "ring_registry", version = "0.2.1" }
 ring_seqno = { path = "ring_seqno", version = "0.2.1" }
 ring_shutdown = { path = "ring_shutdown", version = "0.1.0" }
 ring_slot = { path = "ring_slot", version = "0.2.1" }

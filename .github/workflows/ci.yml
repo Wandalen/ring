@@ -77,3 +77,29 @@ jobs:
           components: rustfmt
       - name: fmt check (verb/fmt check::1)
         run: cargo +nightly-2026-09-29 fmt --all -- --check
+
+  bench-guard:
+    name: bench guard (shellcheck + bash 3.2 empty-array)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck verbs
+        run: |
+          command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
+          shellcheck -S warning verb/bench verb/gate
+      - name: no unguarded empty-array expansion (bash 3.2 set -u)
+        # Regression guard for the macOS bash-3.2 failure: an empty
+        # `"${arr[@]}"` under `set -u` aborts there. Every `--` + options
+        # append must go through the `_maybe_add_opts` / `_cmd` guard, never
+        # as a direct `_run ... -- "${array[@]}"` expansion.
+        run: |
+          if grep -nE '_run .*-- "\$\{' verb/bench; then
+            echo "verb/bench: unguarded array expansion — route -- plus options through _maybe_add_opts" >&2
+            exit 1
+          fi
+      - name: guarded branches run with empty arrays (dry::1)
+        run: |
+          bash verb/bench suite::latency dry::1
+          bash verb/bench suite::report dry::1
+          bash verb/bench suite::micro dry::1

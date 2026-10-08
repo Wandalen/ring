@@ -14,7 +14,7 @@
 //! across ring laps either way, which is why the overwrite cases below are
 //! explicit.
 
-use ring_slot::{BytesSlot, Slot, TypedSlot};
+use ring_slot::{BytesSlot, CopySlot, Slot, TypedSlot};
 use ring_types::RingError;
 
 // ---- TypedSlot ----
@@ -424,6 +424,52 @@ fn a_slot_is_default_for_a_payload_that_is_not() {
 
   let slot: TypedSlot<NotDefault> = TypedSlot::default();
   assert!(slot.is_empty());
+}
+
+// ---- CopySlot ----
+
+/// The point of the shape: the slot is the record, with no tag beside it.
+#[test]
+fn a_copy_slot_is_the_size_of_its_record() {
+  assert_eq!(size_of::<CopySlot<u64>>(), size_of::<u64>());
+  assert_eq!(size_of::<CopySlot<[u64; 8]>>(), 64);
+  assert!(
+    size_of::<CopySlot<u64>>() < size_of::<TypedSlot<u64>>(),
+    "`TypedSlot<u64>` spends a word on its tag"
+  );
+}
+
+/// A fresh copy slot holds the default, and each write replaces the value
+/// whole.
+#[test]
+fn a_copy_slot_reads_back_its_last_write() {
+  let mut slot = CopySlot::<u32>::default();
+  assert_eq!(slot.get(), 0);
+  slot.set(7);
+  assert_eq!(slot.get(), 7);
+  slot.set(9);
+  assert_eq!(slot.get(), 9);
+}
+
+/// Clearing writes the default back, so the old record does not survive in the
+/// slot.
+#[test]
+fn clearing_a_copy_slot_writes_the_default_back() {
+  let mut slot = CopySlot::default();
+  slot.set(42u64);
+  slot.clear();
+  assert_eq!(slot.get(), 0);
+}
+
+/// A copy slot always holds a value, so it never reports empty, not even fresh
+/// or cleared. Which slots hold a record is the ring's to say, from its
+/// cursors.
+#[test]
+fn a_copy_slot_never_reports_empty() {
+  let mut slot = CopySlot::<u8>::default();
+  assert!(!slot.is_empty());
+  slot.clear();
+  assert!(!slot.is_empty());
 }
 
 // ---- The shared trait ----

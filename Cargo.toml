@@ -87,7 +87,7 @@ ring_spsc = { path = "ring_spsc", version = "0.1.0" }
 ring_stats = { path = "ring_stats", version = "0.1.0" }
 ring_store = { path = "ring_store", version = "0.1.0" }
 ring_tls = { path = "ring_tls", version = "0.1.0" }
-ring_types = { path = "ring_types", version = "0.1.0" }
+ring_types = { path = "ring_types", version = "0.2.1" }
 ring_wait = { path = "ring_wait", version = "0.1.0" }
 
 core_affinity = "0.8"

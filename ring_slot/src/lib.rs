@@ -1,4 +1,4 @@
-//! Slot payload views: typed and raw bytes.
+//! Slot payload views: typed, bare `Copy`, and raw bytes.
 //!
 //! Part of the ring family's concurrency write path.
 //!
@@ -18,9 +18,16 @@
 //! downstream is written against the trait and cannot branch on which shape it
 //! has.
 //!
+//! A third shape, [`CopySlot`], is [`TypedSlot`] without its tag, for `Copy`
+//! records. The rings derive occupancy from their cursors, so the tag is a
+//! store they never read, and dropping it was measured to matter. What the
+//! tag did catch, a slot published without a write, is the pitfall
+//! [`CopySlot`] documents.
+//!
 //! No `unsafe`. A [`BytesSlot`] is a fixed-length buffer plus a length, so a
 //! partially-filled slot reads back exactly what was written and nothing else,
-//! without `MaybeUninit`.
+//! without `MaybeUninit`. A [`CopySlot`] starts at `T::default()` for the same
+//! reason.
 
 #![deny(missing_docs)]
 
@@ -171,6 +178,71 @@ impl<T> Slot for TypedSlot<T> {
 
   fn clear(&mut self) {
     self.0 = None;
+  }
+}
+
+/// A slot holding one `Copy` value bare: no tag, so the slot is the size of the
+/// record.
+///
+/// [`TypedSlot`] stores an `Option<T>`, and for a record with no spare bit
+/// pattern, such as `u64`, the tag takes a word of its own, so every write
+/// stores twice what it carries. The rings never read that tag: which slots
+/// hold a record follows from their cursors. A `CopySlot` drops it. The cost is
+/// what the tag was for, below, and a `T: Copy + Default` bound in place of
+/// `TypedSlot`'s any `T`. The measurement is
+/// `docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md`, and the
+/// decision `docs/decisions/002_copy_slot_stores_the_record_bare.md`.
+///
+/// ```
+/// use ring_slot::CopySlot;
+///
+/// let mut slot = CopySlot::< u64 >::default();
+/// assert_eq!( slot.get(), 0, "a fresh slot holds the default" );
+/// slot.set( 42 );
+/// assert_eq!( slot.get(), 42 );
+/// assert_eq!( size_of::< CopySlot< u64 > >(), 8 );
+/// ```
+///
+/// # Pitfall: an unwritten publish hands back the previous lap's record
+///
+/// **Trap.** Claiming a slot and dropping the claim without writing, the way a
+/// `TypedSlot` producer may.
+///
+/// **Failure.** The rings publish on drop whether or not the slot was
+/// written. A `TypedSlot` reader then sees `None`. A `CopySlot` reader sees
+/// whatever the slot last held: the record from the previous lap, delivered a
+/// second time, or the default on the first lap.
+///
+/// **Mitigation.** Write every claimed slot.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CopySlot<T>(T);
+
+impl<T: Copy> CopySlot<T> {
+  /// Overwrite the slot with `value`.
+  pub const fn set(&mut self, value: T) {
+    self.0 = value;
+  }
+
+  /// The value the slot holds: the last one written, or the default before the
+  /// first write.
+  #[must_use]
+  pub const fn get(&self) -> T {
+    self.0
+  }
+}
+
+impl<T: Copy + Default> Slot for CopySlot<T> {
+  /// Never: a `CopySlot` always holds a value, the default until the first
+  /// write. Which slots hold a record is the ring's to say, from its cursors,
+  /// so this is the one shape whose occupancy the trait cannot report.
+  fn is_empty(&self) -> bool {
+    false
+  }
+
+  /// Write the default back, the closest this shape has to empty. The old
+  /// record does not survive in the slot.
+  fn clear(&mut self) {
+    self.0 = T::default();
   }
 }
 

@@ -8,6 +8,12 @@
 #@ tags: verb, bench
 set -euo pipefail
 
+# Self-descriptive failure: with `set -e` GitHub only shows "exit code 1".
+# Print what failed and where, with the bash version that matters for the
+# known empty-array pitfall (bash 3.2 on macos-14 expands empty "${arr[@]}"
+# as unbound variable, newer bash does not).
+trap 'echo "verb/bench: FAILED at ${BASH_SOURCE[0]}:${LINENO}: \`$BASH_COMMAND\` (suite=${_s:-?}, suite_arg=${_suite:-?}, bash=$BASH_VERSION)" >&2' ERR
+
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
 _dry_run=0
@@ -65,7 +71,12 @@ _run() {
   if (( _dry_run )); then
     printf '%s\n' "$*"
   else
-    "$@"
+    echo "verb/bench: + $*" >&2
+    "$@" || {
+      local rc=$?
+      echo "verb/bench: command failed with $rc: $* (suite=${_s:-?}, quick=${_quick:-?})" >&2
+      return $rc
+    }
   fi
 }
 
@@ -89,6 +100,7 @@ _maybe_add_opts() {
   fi
 }
 for _s in "${_suites[@]}"; do
+  echo "verb/bench: === suite $_s ===" >&2
   case "$_s" in
     comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
     latency)

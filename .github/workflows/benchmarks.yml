@@ -113,16 +113,26 @@ jobs:
       - name: benchmarks (verb/bench)
         # shell: bash so the verb runs identically on every runner in the matrix, macOS
         # included. Inputs go through env instead of inline ${{ }} so quoting stays boring.
+        # The verb itself traps ERR and echoes "+ <cmd>" / "FAILED at …", but the
+        # workflow also echoes the suite and bash version so the GitHub log is
+        # self-descriptive even when the verb dies before its trap fires.
         shell: bash
         env:
           BENCH_SUITE: ${{ inputs.suite || 'all' }}
           BENCH_QUICK: ${{ inputs.quick == true }}
         run: |
+          echo "benchmarks: suite=$BENCH_SUITE quick=$BENCH_QUICK bash=$BASH_VERSION on $RUNNER_OS ($RUNNER_ARCH)" >&2
           args=( "suite::$BENCH_SUITE" )
           if [ "$BENCH_QUICK" = "true" ]; then
             args+=( quick::1 )
           fi
-          bash verb/bench "${args[@]}"
+          echo "benchmarks: running verb/bench ${args[*]}" >&2
+          bash verb/bench "${args[@]}" || {
+            rc=$?
+            echo "benchmarks: verb/bench failed with $rc (suite=$BENCH_SUITE, arch=$RUNNER_ARCH, bash=$BASH_VERSION)" >&2
+            echo "benchmarks: hint — empty array under set -u fails on bash 3.2 (macos-14); verb/bench must use _maybe_add_opts, not \"\${arr[@]}\" directly" >&2
+            exit $rc
+          }
       - name: report to a file (perf/examples/report.rs)
         # quick::1 saves nothing, so a quick run's report carries the machine line and a
         # "no criterion results" note instead of tables. The step stays unconditional so

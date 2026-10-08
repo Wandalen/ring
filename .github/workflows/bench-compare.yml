@@ -1,0 +1,165 @@
+# Post a benchmark comparison table as a PR comment.
+#
+# Runs the full `verb/bench suite::all` on the PR base and head on the *same*
+# runner (intra-run, same hardware), then `perf --example report --baseline`.
+# The table is intra-run and therefore comparable; cross-run numbers from
+# `benchmarks.yml` are not.
+#
+# Triggers:
+#   * `pull_request` on benchmarked paths — posts automatically, slow (~40 min on x86_64).
+#   * `workflow_dispatch` with `pr` — manual rerun for a PR that already exists.
+# To keep PR CI fast, this does not block merges (no required status).
+
+name: Bench Compare
+
+on:
+  pull_request:
+    paths:
+      - perf/**
+      - ring_bench/**
+      - verb/bench
+      - ring_types/**
+      - ring_seqno/**
+      - ring_index/**
+      - ring_align/**
+      - ring_atomic/**
+      - ring_config/**
+      - ring_slot/**
+      - ring_cursor/**
+      - ring_store/**
+      - ring_gating/**
+      - ring_claim/**
+      - ring_overflow/**
+      - ring_batch/**
+      - ring_spsc/**
+      - ring_mpsc/**
+      - ring_core/**
+      - ring_handle/**
+      - ring_tls/**
+      - ring_flush/**
+      - ring_stats/**
+      - ring_registry/**
+      - ring_factory/**
+      - Cargo.toml
+      - .github/workflows/bench-compare.yml
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: PR number to compare (head vs. its base)
+        required: true
+        type: number
+      suite:
+        description: verb/bench suite
+        required: false
+        default: all
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: bench-compare-${{ github.event.pull_request.number || inputs.pr }}
+  cancel-in-progress: false
+
+jobs:
+  compare:
+    name: bench compare (x86_64-linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Resolve PR number
+        id: pr
+        shell: bash
+        run: |
+          if [ -n "${{ github.event.pull_request.number }}" ]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${{ github.event.pull_request.head.sha }}" >> "$GITHUB_OUTPUT"
+            echo "base_sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ inputs.pr }}" >> "$GITHUB_OUTPUT"
+            # fetch via API to get head/base shas for the dispatch case
+            pr_json=$(gh api repos/${{ github.repository }}/pulls/${{ inputs.pr }})
+            echo "head_sha=$(jq -r .head.sha <<<\"$pr_json\")" >> "$GITHUB_OUTPUT"
+            echo "base_sha=$(jq -r .base.sha <<<\"$pr_json\")" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.base_sha }}
+          fetch-depth: 0
+
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - uses: Swatinem/rust-cache@v2
+        with:
+          # keep criterion baseline between the two checkouts on same runner
+          save-if: false
+
+      - name: Benchmark base (save baseline)
+        shell: bash
+        env:
+          BENCH_SUITE: ${{ inputs.suite || 'all' }}
+        run: |
+          echo "bench-compare: base $BENCH_SUITE on $(cat /proc/cpuinfo | grep 'model name' | head -1) rustc $(rustc --version)" >&2
+          bash verb/bench suite::$BENCH_SUITE save::pr-compare-base
+
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0
+          clean: false
+
+      - name: Benchmark head (compare to base)
+        shell: bash
+        env:
+          BENCH_SUITE: ${{ inputs.suite || 'all' }}
+        run: |
+          echo "bench-compare: head $BENCH_SUITE baseline pr-compare-base" >&2
+          bash verb/bench suite::$BENCH_SUITE baseline::pr-compare-base
+
+      - name: Render comparison report
+        shell: bash
+        run: |
+          cargo run -q -p perf --example report -- --baseline pr-compare-base --out bench-compare.md
+          echo "--- bench-compare.md ---"
+          cat bench-compare.md
+          echo "------------------------"
+
+      - name: Post comparison table as PR comment
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          body=$(cat <<'EOF'
+          <!-- bench-compare: pr-compare-base -->
+          ## Benchmark comparison — `pr-compare-base` (base → head)
+
+          Intra-run on the same `x86_64-linux` runner, so numbers are comparable. Full `target/criterion` is not uploaded — see the artifact for raw data.
+
+          EOF
+          )
+          # collapse report into code fence for comment
+          report=$(cat bench-compare.md)
+          # keep comment under GitHub limit; truncate if needed
+          comment="$body
+          <details><summary>bench-compare.md</summary>
+
+          \`\`\`markdown
+          $report
+          \`\`\`
+          </details>
+
+          *Generated by \`bench-compare.yml\` @ $GITHUB_SHA — suite \`${{ inputs.suite || 'all' }}\` — [run #$GITHUB_RUN_NUMBER]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)*"
+          # create-or-update: find previous bench-compare comment and update it
+          existing=$(gh api repos/${{ github.repository }}/issues/$PR_NUMBER/comments --paginate | jq -r '.[] | select(.body | contains("<!-- bench-compare:")) | .id' | head -1)
+          if [ -n "$existing" ]; then
+            gh api repos/${{ github.repository }}/issues/comments/$existing -X PATCH -f body="$comment" 1>/dev/null
+            echo "Updated comment $existing on PR #$PR_NUMBER"
+          else
+            gh pr comment "$PR_NUMBER" --body "$comment"
+            echo "Created comment on PR #$PR_NUMBER"
+          fi

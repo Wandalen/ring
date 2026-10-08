@@ -9,9 +9,11 @@ own: `Option<u64>` is 16 bytes, so every push stores twice what it carries. Neit
 `ring_spsc` states it on `Ring`: "A slot's state is never stored either. Free, published and drained follow from
 comparing a sequence with the two cursors". `ring_mpsc` gates reads on its stamps.
 
-A bench-only slot without the tag, measured in `docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md`,
-moved two-thread `ring_spsc` at 1024 slots from 268 to 965 M records/s and at 16384 slots from 35.5 to 548. A tag
-written and never checked had measured as slow as `TypedSlot` earlier, so the cost is the store, not the check.
+Measured in `docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md`, `ring_spsc` over an untagged slot
+drops 0.84 ns per single-threaded push and pop, moves 26% more records in a single-threaded fill and drain at 64 and
+1024 slots, and at 16384 slots moves 1004 M records/s against 53 single-threaded and 326 against 26 with two threads.
+A tag written and never checked had measured as slow as `TypedSlot` earlier, so the cost is the store, not the
+check.
 
 The tag does carry one thing the cursors do not. Both rings publish a claimed slot when its guard drops, written or
 not, and the tag is what lets a reader tell "published with a record" from "published with nothing".
@@ -48,9 +50,10 @@ on the first lap. That is documented as `CopySlot`'s pitfall, not prevented. `ri
   `ring_store::Buffer::all_empty` over `CopySlot`s is false from construction on. The rings never ask.
 - A reader of a `CopySlot` ring cannot detect a stale duplicate. A producer that claims and drops unwritten delivers
   the previous lap's record a second time. Rust's type system does not prevent it; the pitfall and `try_push` do.
-- Records of 64 and 256 bytes measured 30% and 44% slower untagged, and one-at-a-time hand-off at 1024 slots 23%
-  slower. The untagged strides are powers of two there, and 4K aliasing is a candidate cause, untested. A caller
-  with wide records should measure before choosing `CopySlot`.
+- Records of 64 and 256 bytes measured 30–46% slower untagged. The untagged strides are powers of two there, and 4K
+  aliasing is a candidate cause, untested. A caller with wide records should measure before choosing `CopySlot`.
+- Two-thread hand-off at 64 and 1024 slots follows where each ring's cursors land, not the slot, on a harness that
+  builds rings on the stack. The record shows those cells both ways and does not use them for this decision.
 - Revisit when the wide-record regression is explained, when a non-`Copy` record needs the untagged path, or when a
   caller needs to tell an empty publication from a written one on a `CopySlot` ring.
 

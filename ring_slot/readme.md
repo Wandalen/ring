@@ -37,5 +37,6 @@ cargo test --doc -p ring_slot --all-features
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/decisions/` | Architecture decision records |
+| `docs/benchmarks/` | Before/after measurements, each naming the machine it ran on. [001](docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md): `TypedSlot`'s tag against `CopySlot` |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `slot_test.rs` and the manual plan under `manual/` |

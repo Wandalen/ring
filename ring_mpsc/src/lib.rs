@@ -1621,7 +1621,7 @@ impl<S> Drop for Batch<'_, S> {
   /// still take the cursor's line exclusive, away from every producer whose
   /// headroom check reads it, on each empty poll of a consumer that keeps up.
   fn drop(&mut self) {
-    if self.len == 0 {
+    if self.is_empty() {
       return;
     }
 

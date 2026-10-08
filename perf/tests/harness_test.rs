@@ -19,6 +19,7 @@ use harness::candidates::{
   Candidate,
   CrossbeamQueue,
   Mpsc,
+  MpscPlain,
   MpscPrimary,
   MutexDeque,
   Record,
@@ -26,6 +27,7 @@ use harness::candidates::{
   Run,
   Rx,
   Spsc,
+  SpscPlain,
   SyncChannel,
   Tx,
   Wide,
@@ -63,6 +65,20 @@ fn mpsc_passes_validation_in_every_mode_and_producer_count() {
   every_mode::<Mpsc>(3);
 }
 
+// The untagged slot holds no occupancy of its own, so the two runs below are what show the cursors
+// alone hand over every record once, in order and whole.
+
+#[test]
+fn spsc_plain_passes_validation_in_every_mode() {
+  every_mode::<SpscPlain>(1);
+}
+
+#[test]
+fn mpsc_plain_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<MpscPlain>(1);
+  every_mode::<MpscPlain>(3);
+}
+
 #[test]
 fn mpsc_primary_passes_validation_in_its_single_producer_mode() {
   every_mode::<MpscPrimary>(1);
@@ -90,8 +106,13 @@ fn mutex_passes_validation_in_every_mode_and_producer_count() {
 fn wide_records_arrive_whole_through_every_candidate() {
   let shape = Shape::new(64, 1, RECORDS, Mode::PUSH1_POPN);
   driver::run::<Spsc<Wide<8>>>(&shape);
+  driver::run::<SpscPlain<Wide<8>>>(&shape);
   driver::run::<Rtrb<Wide<32>>>(&shape);
   driver::run::<Mpsc<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<MpscPlain<Wide<8>>>(&Shape {
     producers: 2,
     ..shape.clone()
   });

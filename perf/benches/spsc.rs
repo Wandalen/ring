@@ -4,7 +4,7 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, function};
-use harness::candidates::{Candidate, CrossbeamQueue, MpscPrimary, MutexDeque, Rtrb, Spsc, SyncChannel, Wide};
+use harness::candidates::{Candidate, CrossbeamQueue, MpscPrimary, MutexDeque, Rtrb, Spsc, SpscPlain, SyncChannel, Wide};
 use harness::driver::{Mode, Shape};
 use harness::topology;
 
@@ -17,6 +17,7 @@ fn capacity(c: &mut Criterion) {
   let mut group = ThreadedGroup::new(c, "spsc");
   for capacity in [64, 1024, 16384] {
     every_mode::<Spsc>(&mut group, capacity);
+    every_mode::<SpscPlain>(&mut group, capacity);
     every_mode::<Rtrb>(&mut group, capacity);
     every_mode::<MutexDeque>(&mut group, capacity);
     every_mode::<SyncChannel>(&mut group, capacity);
@@ -38,6 +39,9 @@ fn payload(c: &mut Criterion) {
   sized::<Spsc<u64>>(&mut group);
   sized::<Spsc<Wide<8>>>(&mut group);
   sized::<Spsc<Wide<32>>>(&mut group);
+  sized::<SpscPlain<u64>>(&mut group);
+  sized::<SpscPlain<Wide<8>>>(&mut group);
+  sized::<SpscPlain<Wide<32>>>(&mut group);
   sized::<Rtrb<u64>>(&mut group);
   sized::<Rtrb<Wide<8>>>(&mut group);
   sized::<Rtrb<Wide<32>>>(&mut group);

@@ -1,0 +1,88 @@
+# Fuzz operation sequences, run as two jobs with different budgets.
+#
+# `loom` owns the interleavings; these targets own the input space: each feeds
+# a byte stream of push/claim/drain/batch operations into `ring_spsc` /
+# `ring_mpsc` and checks every step against a FIFO oracle (`VecDeque`), so a
+# wrong `Full`, a lost record, or a reordered drain fails the run. New
+# crashes land as regression seeds under `fuzz/seeds/`, which is checked in;
+# libfuzzer's own `corpus/` and `artifacts/` stay gitignored.
+#
+# `fuzz` is cargo-fuzz's own workspace (see the `exclude` in the root
+# manifest): libfuzzer builds with its own flags and must not join this one.
+# The short PR job keeps every push honest; the nightly job soaks longer.
+# Crashes fail the job either way — a fuzzer that cannot go red is decoration.
+
+name: Fuzz
+
+on:
+  pull_request:
+    paths:
+      - fuzz/**
+      - ring_spsc/**
+      - ring_mpsc/**
+      - ring_slot/**
+      - ring_types/**
+      - ring_cursor/**
+      - ring_claim/**
+      - ring_publish/**
+      - ring_consume/**
+      - .github/workflows/fuzz.yml
+  schedule:
+    # An hour after the benchmarks ("0 4 * * *"), clear of gates/loom ("0 3 * * *").
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: seconds per target
+        required: false
+        default: "600"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  short:
+    name: fuzz 120s per target
+    # The nightly run covers every push to master; PRs only pay when they touch
+    # the fuzzed crates or the harness itself.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: seed the corpus
+        run: |
+          for target in spsc_ops mpsc_ops; do
+            mkdir -p fuzz/corpus/"$target"
+            cp fuzz/seeds/"$target"/* fuzz/corpus/"$target"/
+          done
+      - name: fuzz spsc_ops
+        run: cd fuzz && cargo +nightly fuzz run spsc_ops -- -max_total_time=120
+      - name: fuzz mpsc_ops
+        run: cd fuzz && cargo +nightly fuzz run mpsc_ops -- -max_total_time=120
+
+  soak:
+    name: fuzz 600s per target
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: seed the corpus
+        run: |
+          for target in spsc_ops mpsc_ops; do
+            mkdir -p fuzz/corpus/"$target"
+            cp fuzz/seeds/"$target"/* fuzz/corpus/"$target"/
+          done
+      - name: fuzz spsc_ops
+        run: cd fuzz && cargo +nightly fuzz run spsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}
+      - name: fuzz mpsc_ops
+        run: cd fuzz && cargo +nightly fuzz run mpsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}

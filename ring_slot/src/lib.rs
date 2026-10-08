@@ -213,7 +213,8 @@ impl<T> Slot for TypedSlot<T> {
 /// whatever the slot last held: the record from the previous lap, delivered a
 /// second time, or the default on the first lap.
 ///
-/// **Mitigation.** Write every claimed slot.
+/// **Mitigation.** Write every claimed slot. `ring_spsc`'s `try_push` over a
+/// `CopySlot` always does; the trap is reachable only through a bare `claim`.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CopySlot<T>(T);
 

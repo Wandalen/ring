@@ -224,7 +224,7 @@ use core::sync::atomic::Ordering;
 
 use ring_config::RingConfig;
 use ring_cursor::{CursorPair, GATING, SeqCell};
-use ring_slot::{Slot, TypedSlot};
+use ring_slot::{CopySlot, Slot, TypedSlot};
 use ring_store::Buffer;
 use ring_types::{Capacity, RingError, Seq};
 
@@ -846,6 +846,42 @@ impl<T: Send> Producer<'_, TypedSlot<T>> {
     // The slot's previous occupant, if any, was committed by the consumer a lap
     // ago; dropping it here is what makes the ring's storage bounded.
     drop(reservation.set(record));
+
+    Ok(())
+  }
+}
+
+impl<T: Copy + Send> Producer<'_, CopySlot<T>> {
+  /// Put one record into the ring, stored bare: no tag beside it.
+  ///
+  /// The same fused shape as the [`TypedSlot`] `try_push`, over [`claim`].
+  /// It always writes the slot it claims, which is what keeps
+  /// [`CopySlot`]'s pitfall out of reach: an unwritten publish happens only
+  /// through a bare `claim` dropped without a write.
+  ///
+  /// [`claim`]: Producer::claim
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::Full`], with `record` returned to the caller.
+  ///
+  /// ```
+  /// use ring_slot::CopySlot;
+  /// use ring_spsc::Ring;
+  /// use ring_types::Capacity;
+  ///
+  /// let mut ring : Ring< CopySlot< u64 > > = Ring::new( Capacity::new( 1 ).unwrap() );
+  /// let ( mut producer, mut consumer ) = ring.split();
+  ///
+  /// assert_eq!( producer.try_push( 7 ), Ok( () ) );
+  /// assert_eq!( producer.try_push( 8 ), Err( 8 ), "full, and the record comes back" );
+  /// assert_eq!( consumer.drain().iter().map( CopySlot::get ).collect::< Vec< _ > >(), [ 7 ] );
+  /// ```
+  pub fn try_push(&mut self, record: T) -> Result<(), T> {
+    let Ok(mut reservation) = self.claim() else {
+      return Err(record);
+    };
+    reservation.set(record);
 
     Ok(())
   }

@@ -87,6 +87,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
   # No RUSTFLAGS "-D warnings", unlike ci.yml: a warning cannot change what a benchmark
   # measures, and denying it would kill the run over prose.
 

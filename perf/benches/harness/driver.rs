@@ -364,16 +364,32 @@ impl Check {
       .all(|(&next, id)| next == (id << SEQ_BITS) + self.per_producer);
     let expected_sum = self.expected_sum();
     let clean = self.received == self.expected && self.misordered == 0 && self.torn == 0 && left == 0;
-    assert!(
-      complete && clean && self.sum == expected_sum,
-      "{name}: records lost, duplicated, reordered or torn — received {} of {}, {} out of order, {} torn, \
-       {} left in the queue, checksum {:#x}, expected {expected_sum:#x}",
-      self.received,
-      self.expected,
-      self.misordered,
-      self.torn,
-      left,
-      self.sum,
-    );
+    if !(complete && clean && self.sum == expected_sum) {
+      // GitHub annotation — surfaces as a highlighted error, not just `exit 101`.
+      eprintln!(
+        "::error title=benchmark::{name} failed::benchmark::{name} torn/ordering failure — received {}/{}, {} out of order, {} torn, {} left, checksum {:#x} expected {expected_sum:#x} (per_producer={}, producers={}, expected={})",
+        self.received,
+        self.expected,
+        self.misordered,
+        self.torn,
+        left,
+        self.sum,
+        self.per_producer,
+        self.next.len(),
+        self.expected,
+      );
+      panic!(
+        "{name}: records lost, duplicated, reordered or torn — received {} of {}, {} out of order, {} torn, \
+         {} left in the queue, checksum {:#x}, expected {expected_sum:#x} (per_producer={}, producers={})",
+        self.received,
+        self.expected,
+        self.misordered,
+        self.torn,
+        left,
+        self.sum,
+        self.per_producer,
+        self.next.len(),
+      );
+    }
   }
 }

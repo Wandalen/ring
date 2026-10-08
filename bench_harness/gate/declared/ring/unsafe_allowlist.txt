@@ -2,15 +2,14 @@
 # workspace-wide `unsafe-code = "deny"` lint.
 #
 # Ruled by this family's own review of where the shared-slot unsafe is sited,
-# which replaced an earlier four-name list with these three. Each crate here
+# which replaced an earlier four-name list with these two. Each crate here
 # must also justify the opt-out in its own docs/workaround/readme.md. G6
 # checks both halves, so listing a crate here is necessary but not sufficient.
 #
 # ring_spsc: one producer and one consumer hold two ends of one slot array
 # ring_mpsc: the same, with many producers and per-slot sequence stamps
-# ring_core: the shared assembly both configurations are built from
 #
-# All three assemble a *complete* ring: slot storage plus the cursors that
+# Both assemble a *complete* ring: slot storage plus the cursors that
 # bound it. That pairing is the whole reason the unsafe is sited here. The
 # invariant making a shared slot write sound is stated entirely in terms of
 # cursors. The producer writes only what it has claimed and not published, and
@@ -25,8 +24,11 @@
 # longer than the set of crates actually using unsafe is a gate that cannot
 # fail.
 #
-# Three crates, and the list is meant to stay three. A fourth needs a decision.
+# ring_core was listed third, as the shared assembly, but it carries no
+# `unsafe` and never has in this tree: it composes the two crates above (and
+# the crossbeam interim backend) behind a safe API, so there is nothing here
+# to exempt. G6's stale-entry check caught it. Two crates, and the list is
+# meant to stay two. A third needs a decision.
 
 ring_spsc
 ring_mpsc
-ring_core

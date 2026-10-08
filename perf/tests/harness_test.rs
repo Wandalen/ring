@@ -16,6 +16,7 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use harness::candidates::{
+  self,
   Candidate,
   CrossbeamQueue,
   Mpsc,
@@ -125,6 +126,23 @@ fn wide_records_arrive_whole_through_every_candidate() {
     ..shape.clone()
   });
   driver::run::<MutexDeque<Wide<32>>>(&shape);
+}
+
+/// Every candidate is built at the start of a 128-byte block, so its layout against the cache lines
+/// is the same in every process. Why that matters is on `candidates::build`.
+#[test]
+fn every_candidate_is_built_at_the_start_of_a_128_byte_block() {
+  fn offset<C: Candidate>() -> usize {
+    std::ptr::from_ref::<C>(&candidates::build::<C>(64)).addr() % 128
+  }
+
+  assert_eq!(offset::<Spsc>(), 0, "spsc");
+  assert_eq!(offset::<Rtrb>(), 0, "rtrb");
+  assert_eq!(offset::<Mpsc>(), 0, "mpsc");
+  assert_eq!(offset::<MpscPrimary>(), 0, "mpsc-primary");
+  assert_eq!(offset::<SyncChannel>(), 0, "sync_channel");
+  assert_eq!(offset::<CrossbeamQueue>(), 0, "arrayqueue");
+  assert_eq!(offset::<MutexDeque>(), 0, "mutex");
 }
 
 #[test]

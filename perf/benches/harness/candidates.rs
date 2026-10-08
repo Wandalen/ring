@@ -3,6 +3,7 @@
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -103,6 +104,35 @@ pub trait Candidate {
 
   /// Split into `producers` sending ends and the receiving end, and hand them to `run`.
   fn split<V: Run<Self::Record>>(&mut self, producers: usize, run: V) -> V::Output;
+}
+
+/// A candidate of `capacity` slots, on the heap at the start of a 128-byte block.
+///
+/// A ring holds its cursors inline, so built on the stack its layout against the cache lines moved
+/// with the bench thread's stack: the same commit measured 25 or 72 M/s from one process to the
+/// next. Placed here, every process sees the same layout. 128 is the largest line among the hosts
+/// measured (Apple Silicon); `rtrb` and `ArrayQueue` already pad their own indices to it.
+pub fn build<C: Candidate>(capacity: usize) -> Box<LineAligned<C>> {
+  Box::new(LineAligned(C::new(capacity)))
+}
+
+/// What [`build`] returns: the candidate, aligned to the start of a 128-byte block.
+#[derive(Debug)]
+#[repr(align(128))]
+pub struct LineAligned<C>(C);
+
+impl<C> Deref for LineAligned<C> {
+  type Target = C;
+
+  fn deref(&self) -> &C {
+    &self.0
+  }
+}
+
+impl<C> DerefMut for LineAligned<C> {
+  fn deref_mut(&mut self) -> &mut C {
+    &mut self.0
+  }
 }
 
 /// What is done with a split queue. A trait rather than a closure because the ends borrow the

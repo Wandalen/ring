@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use super::candidates::{Candidate, Record, Run, Rx, SEQ_BITS, Tx};
+use super::candidates::{self, Candidate, Record, Run, Rx, SEQ_BITS, Tx};
 use super::topology;
 
 /// Records per batch push in the standard modes.
@@ -140,7 +140,7 @@ pub fn run<C: Candidate>(shape: &Shape) -> Outcome {
   );
   assert!(shape.producers < 1 << (64 - SEQ_BITS) && shape.per_producer < 1 << SEQ_BITS);
 
-  C::new(shape.capacity).split(shape.producers, Drive { shape, name: C::NAME })
+  candidates::build::<C>(shape.capacity).split(shape.producers, Drive { shape, name: C::NAME })
 }
 
 struct Drive<'s> {

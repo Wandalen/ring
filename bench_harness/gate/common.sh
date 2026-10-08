@@ -24,7 +24,22 @@
 #     added after this family's own gate set first closed, and applying them
 #     retroactively would report NOT REACHED for a bar its plan never set.
 
-REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../.." && pwd )"
+# The checkout root, resolved without depending on the checkout directory's
+# name. Three levels up from `bench_harness/gate/` is the checkout's *parent*,
+# which only reads as the repo root when that directory is literally named
+# `ring` (then `$REPO/ring` is the checkout itself — true on CI's
+# `/home/runner/work/ring/ring`, false for any other clone path, where every
+# gate aborted with "33/33 declared crate(s) absent from the tree"). Prefer
+# the git toplevel, accept an explicit `GATE_REPO` override (the checkout
+# root), and keep the relative computation as a last resort for non-git
+# exports.
+if [ -n "${GATE_REPO:-}" ]; then
+  REPO="$GATE_REPO"
+elif _git_top="$( git rev-parse --show-toplevel 2>/dev/null )"; then
+  REPO="$_git_top"
+else
+  REPO="$( cd "$( dirname "${BASH_SOURCE[0]}" )/../../.." && pwd )"
+fi
 GATE_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 DECL_ROOT="$GATE_DIR/declared"
 
@@ -49,7 +64,12 @@ export CARGO_TERM_COLOR=never
 # it staying absolute so that `family_bin_sources` can drop them from G1's join.
 # Where a declared name may be *found* is a separate question with a separate
 # answer; see RESOLVE_ROOTS.
-CRATE_ROOTS=( "$REPO/module" "$REPO/ring" "$REPO/substrate" )
+# `$REPO` itself is listed first: in a standalone checkout the family's
+# crates sit directly under it (`<checkout>/ring_spsc`, not
+# `<checkout>/ring/ring_spsc`), so without this entry nothing resolves unless
+# the checkout directory happens to be named `ring`. The sibling-root entries
+# stay for the multi-family layout this tooling was originally built for.
+CRATE_ROOTS=( "$REPO" "$REPO/module" "$REPO/ring" "$REPO/substrate" )
 
 # Where a declared crate name may be found, as opposed to what the census
 # counts. Conflating the two is what made `assert_declared_crates_exist` report
@@ -97,10 +117,10 @@ NESTED_ROOTS=( "$REPO/substrate" )
 # became an ordinary package would otherwise be handed to `cargo metadata` as a
 # root, where it answers for whichever workspace encloses it instead.
 #
-# `$REPO` and the crate roots take the same guard. In a standalone ring
-# checkout, `$REPO` is the checkout's parent and has no manifest, and the
-# workspace is `$REPO/ring`. Printing `$REPO` unguarded made `cargo metadata`
-# fail there, and G1 with it.
+# `$REPO` and the crate roots take the same guard. `$REPO` is the checkout
+# itself, whose manifest is the root workspace; a sibling root without one is
+# skipped rather than handed to `cargo metadata`, where it would fail the
+# whole query, and G1 with it.
 workspace_roots() {
   local r
   for r in "$REPO" "${CRATE_ROOTS[@]}"; do

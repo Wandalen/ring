@@ -67,7 +67,7 @@ ring_batch = { path = "ring_batch", version = "0.2.1" }
 ring_claim = { path = "ring_claim", version = "0.2.1" }
 ring_config = { path = "ring_config", version = "0.2.1" }
 ring_consume = { path = "ring_consume", version = "0.1.0" }
-ring_core = { path = "ring_core", version = "0.1.0" }
+ring_core = { path = "ring_core", version = "0.2.1" }
 ring_cursor = { path = "ring_cursor", version = "0.2.1" }
 ring_event = { path = "ring_event", version = "0.2.1" }
 ring_factory = { path = "ring_factory", version = "0.1.0" }

@@ -70,7 +70,7 @@ ring_consume = { path = "ring_consume", version = "0.1.0" }
 ring_core = { path = "ring_core", version = "0.2.1" }
 ring_cursor = { path = "ring_cursor", version = "0.2.1" }
 ring_event = { path = "ring_event", version = "0.2.1" }
-ring_factory = { path = "ring_factory", version = "0.1.0" }
+ring_factory = { path = "ring_factory", version = "0.2.1" }
 ring_flush = { path = "ring_flush", version = "0.1.0" }
 ring_gating = { path = "ring_gating", version = "0.2.1" }
 ring_handle = { path = "ring_handle", version = "0.2.1" }

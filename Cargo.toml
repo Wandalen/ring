@@ -61,7 +61,7 @@ repository = "https://github.com/Wandalen/ring"
 # crates are left out so a published crate cannot depend on them.
 [workspace.dependencies]
 ring_align = { path = "ring_align", version = "0.2.1" }
-ring_atomic = { path = "ring_atomic", version = "0.1.0" }
+ring_atomic = { path = "ring_atomic", version = "0.2.1" }
 ring_barrier = { path = "ring_barrier", version = "0.1.0" }
 ring_batch = { path = "ring_batch", version = "0.1.0" }
 ring_claim = { path = "ring_claim", version = "0.1.0" }

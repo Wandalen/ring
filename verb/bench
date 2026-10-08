@@ -76,25 +76,37 @@ _run() {
 # first and `--` plus the options are appended only when there are any, the
 # same guard `verb/gate` uses. `_cmd` itself is never empty, so running it is
 # safe on every bash.
+#
+# The guard lives here, once, instead of inline at each call site: every
+# branch passes its option array *by name* so an empty array is never expanded.
+# `eval` (not `local -n`) keeps this working on bash 3.2, which has no namerefs.
+_maybe_add_opts() {
+  local _arr_name="$1"
+  local _n
+  eval "_n=\${#${_arr_name}[@]}"
+  if (( _n > 0 )); then
+    eval "_cmd+=( -- \"\${${_arr_name}[@]}\" )"
+  fi
+}
 for _s in "${_suites[@]}"; do
   case "$_s" in
     comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
     latency)
       _cmd=( cargo bench -p perf --bench latency )
-      (( ${#_latency[@]} > 0 )) && _cmd+=( -- "${_latency[@]}" )
+      _maybe_add_opts _latency
       _run "${_cmd[@]}"
       ;;
     # A quick run saves nothing, so there would be nothing new to report.
     report)
       if ! (( _quick )); then
         _cmd=( cargo run -q -p perf --example report )
-        (( ${#_report[@]} > 0 )) && _cmd+=( -- "${_report[@]}" )
+        _maybe_add_opts _report
         _run "${_cmd[@]}"
       fi
       ;;
     *)
       _cmd=( cargo bench -p perf --bench "$_s" )
-      (( ${#_criterion[@]} > 0 )) && _cmd+=( -- "${_criterion[@]}" )
+      _maybe_add_opts _criterion
       _run "${_cmd[@]}"
       ;;
   esac

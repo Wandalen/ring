@@ -14,7 +14,7 @@ many-producer/single-consumer, hard-latency-budget workloads.
   section covering what was measured and why
 
 This is a real codebase, not a toy: unsafe is `deny`-by-default with a
-3-crate allowlist (`ring_spsc`, `ring_mpsc`, `ring_core` —
+2-crate allowlist (`ring_spsc`, `ring_mpsc` —
 [`unsafe_allowlist.txt`](../../bench_harness/gate/declared/ring/unsafe_allowlist.txt)),
 it already runs `loom` model-checking on part of the concurrency-critical
 tier, and it has its own home-grown stage-gate verification suite

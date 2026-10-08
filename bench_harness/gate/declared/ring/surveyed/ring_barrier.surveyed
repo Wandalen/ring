@@ -2,5 +2,5 @@
 # Regenerate by re-surveying the crate; G13 reads `digest` and fails
 # once it stops matching the crate on disk.
 crate: ring_barrier
-swept: 2026-10-02
-digest: 5fe25e91d031037cd0d0e6bad0251e8723792bce29e486ce77b0bf4239caa419
+swept: 2026-10-07
+digest: 89fe977872f738001a17e2016e2304b78191d4149fecccc03f8dccb4c29fca1d

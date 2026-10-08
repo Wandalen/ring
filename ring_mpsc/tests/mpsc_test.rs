@@ -821,6 +821,7 @@ mod threaded {
 
     let batch = producer.claim_batch(8).expect("three slots free");
     assert_eq!(batch.len(), 3, "granted the headroom, not the ask");
+    assert!(!batch.is_empty(), "a grant is never empty");
     assert_eq!(batch.sequence(0), Some(Seq(1)));
     assert_eq!(batch.sequence(2), Some(Seq(3)));
     assert_eq!(batch.sequence(3), None);

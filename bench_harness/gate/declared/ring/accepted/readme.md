@@ -10,7 +10,7 @@ than gaps. The survey subtracts these and reports what is left, so a sweep says
 | `ring_store.accepted` | An `is_empty` that is already `false` for every buffer that can exist |
 | `ring_config.accepted` | A boundary comparison whose two branches return the same value on the boundary |
 | `ring_cursor.accepted` | The alignment canary, true by the layout of one struct |
-| `ring_mpsc.accepted` | The alignment canary, true across two separate allocations |
+| `ring_mpsc.accepted` | The alignment canary, true across two separate allocations, and a `ReservedBatch::is_empty` that is already `false` for every grant |
 | `ring_poll.accepted` | Eleven mutations of a retry loop that a single-threaded test cannot observe |
 | `ring_spsc.accepted` | The alignment canary, delegated rather than recomputed |
 | `ring_wait.accepted` | Two mutations of a spin hint's iteration count |

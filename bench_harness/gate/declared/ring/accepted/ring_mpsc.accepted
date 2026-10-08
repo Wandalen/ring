@@ -20,3 +20,18 @@
 # both now held by `mutant/S4` and `mutant/S11`.
 
 ring_mpsc/src/lib.rs:996:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
+
+# `ReservedBatch::is_empty` returning `false` unconditionally, which it already
+# does.
+#
+# `Producer::claim_batch` is the only way to get a `ReservedBatch`, and it wraps
+# whatever `ring_claim::Claimer::claim_up_to` grants. That grant is at least one
+# sequence: a headroom or a `max` of zero exits to `Full` instead of granting
+# nothing. So every `ReservedBatch` that can exist is non-empty, and a mutant
+# returning `false` returns the same answer. An equivalent mutant, the same kind
+# as `ring_store`'s `Buffer::is_empty`.
+#
+# The other polarity, returning `true`, is a real defect and is killed by
+# `a_batch_claim_grants_what_headroom_allows_rather_than_the_full_ask`.
+
+ring_mpsc/src/lib.rs:1241:5: replace ReservedBatch<'_, S>::is_empty -> bool with false

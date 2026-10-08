@@ -56,5 +56,6 @@ RUSTFLAGS="--cfg loom" cargo nextest run -p ring_mpsc exhaustive::
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/workaround/` | Why the crate opts out of the workspace `unsafe` deny. See [docs/workaround/readme.md](docs/workaround/readme.md) |
 | `docs/decisions/` | Architecture decision records |
+| `docs/benchmarks/` | Before/after measurements of performance changes, each naming the machine it ran on |
 | `src/lib.rs` | The ring, its two handles, and the two RAII guards that publish and commit |
 | `tests/` | Integration tests and the loom models. [tests/manual/readme.md](tests/manual/readme.md) records what was checked by hand |

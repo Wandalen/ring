@@ -98,3 +98,9 @@ Implement `Candidate` in `benches/harness/candidates.rs`: `new`, and `split` han
 ends to a `Run`. Use the crate's fastest idiomatic API and name it in the doc comment; set
 `PUSH_BATCH` only for a real batch push. Add it to the bench functions and to
 `tests/harness_test.rs`.
+
+## Records
+
+Before/after measurements of changes to the harness itself are in `docs/benchmarks/`, numbered like ADRs:
+
+- [Candidates built at a 128-byte boundary](docs/benchmarks/001_candidates_built_at_a_128_byte_boundary.md)

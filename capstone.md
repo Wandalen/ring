@@ -13,7 +13,7 @@ many-producer/single-consumer, hard-latency-budget workloads.
   dependency graph, and the build-vs-buy rationale
 
 This is a real codebase, not a toy: unsafe is `deny`-by-default with a
-3-crate allowlist (`ring_spsc`, `ring_mpsc`, `ring_core` —
+2-crate allowlist (`ring_spsc`, `ring_mpsc` —
 `bench_harness/gate/declared/ring/unsafe_allowlist.txt`), it already runs
 `loom` model-checking on part of the concurrency-critical tier, and it has
 its own home-grown stage-gate verification suite (`bench_harness/gate/`,
@@ -63,8 +63,7 @@ about the input space — capacity edge cases, claim/publish/commit sequences
 that wrap the ring, overflow behavior.
 
 **Deliverables:** a `cargo-fuzz` (or AFL) harness targeting the public API
-of the three unsafe-allowlisted crates (`ring_spsc`, `ring_mpsc`,
-`ring_core`), a documented corpus of interesting seed inputs, and a CI job
+of the two unsafe-allowlisted crates (`ring_spsc`, `ring_mpsc`), a documented corpus of interesting seed inputs, and a CI job
 that runs a short fuzz pass on every PR (long-running fuzzing as a separate
 scheduled job, not blocking every push). This is the topic most likely to
 turn up a real bug in code everyone currently trusts.

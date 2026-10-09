@@ -14,7 +14,7 @@
 //!
 //! The feature's constraint is that "both use the same claim, gating, and drain"
 //! and that "the difference is confined to what a slot contains." [`Slot`]
-//! enforces that here. It is one trait both shapes implement, so everything
+//! enforces that here. It is one trait every shape implements, so everything
 //! downstream is written against the trait and cannot branch on which shape it
 //! has.
 //!
@@ -54,8 +54,10 @@ pub trait Slot {
   /// (`TypedSlot`), the old value's destructor runs, so nothing survives the
   /// call. For a shape that stores by copying into fixed storage
   /// (`BytesSlot`), the bytes are not zeroed. Only the length moves, and the
-  /// length is what marks them unreachable through this trait's own API. Both
-  /// are "empty" by [`Slot::is_empty`]; only one is empty in memory.
+  /// length is what marks them unreachable through this trait's own API. Those
+  /// two are "empty" by [`Slot::is_empty`]; only one is empty in memory. A
+  /// shape that always holds a value (`CopySlot`) gets `T::default()` written
+  /// back, so nothing survives, yet [`Slot::is_empty`] still reports false.
   ///
   /// **How long the residue lasts.** For `BytesSlot`, until a write of at
   /// least that length lands on the same slot, or the ring holding it is

@@ -7,7 +7,7 @@ Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 The crate gives a ring three slot shapes. `TypedSlot<T>` holds traffic whose
 type is known at compile time, `CopySlot<T>` holds a `Copy` record bare, without
 `TypedSlot`'s tag, and `BytesSlot<N>` holds up to `N` opaque bytes for traffic
-decoded later. Both implement `Slot`, which carries only `is_empty` and
+decoded later. All three implement `Slot`, which carries only `is_empty` and
 `clear`, so code downstream is written against the trait and cannot branch on
 which shape it holds. `ring_event` publishes and drains through these shapes.
 

@@ -16,6 +16,8 @@ core_affinity = { workspace = true }
 criterion = { workspace = true }
 crossbeam-queue = { workspace = true }
 hdrhistogram = { workspace = true }
+ring_config = { workspace = true }
+ring_core = { workspace = true }
 ring_mpsc = { workspace = true }
 ring_slot = { workspace = true }
 ring_spsc = { workspace = true }
@@ -37,6 +39,10 @@ harness = false
 
 [[bench]]
 name = "batch"
+harness = false
+
+[[bench]]
+name = "overflow"
 harness = false
 
 # Its own `main`, not criterion's: it reports percentiles per record.

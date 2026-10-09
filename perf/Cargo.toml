@@ -44,5 +44,9 @@ harness = false
 name = "latency"
 harness = false
 
+[[bench]]
+name = "regression"
+harness = false
+
 [lints]
 workspace = true

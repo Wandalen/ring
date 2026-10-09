@@ -57,6 +57,7 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 | `latency` | `steady`              | percentiles of receive time minus scheduled send time under an offered load                                                   | 1 / 4 / 8 producers × 1 / 5 / 10 M/s |
 | `latency` | `oversubscribed`      | the same from twice as many producers as logical CPUs                                                                         | 1 / 5 M/s                            |
 | `latency` | `bursts`              | 64 records per producer, every producer at once, every 200 µs                                                                 | 1 / 4 / 8 producers                  |
+| `regression` | `regression`       | spsc and mpsc p99 hand-off each asserted to beat the mutex p99 measured back-to-back on the same runner                        | —                                    |
 
 Threaded runs build a fresh queue per run and time from a spinning start line to the consumer's
 last record; building, spawning and validation stay outside the clock. Producers spin on a full

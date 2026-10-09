@@ -50,6 +50,9 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 | `spsc`    | `spsc_payload`        | the same at 1024 slots with wider records: protocol cost against copy cost                                                    | record size 8 / 64 / 256 B           |
 | `spsc`    | `spsc_pinned`         | the same at 1024 slots, both threads on SMT siblings of one core, then on two cores                                           | `siblings` / `cores`                 |
 | `batch`   | `batch`               | one producer pushing that many records per operation, 1024 slots                                                              | 1 / 8 / 32 / 128                     |
+| `stages`  | `claim`               | claim plus the publish store on drop, no write: spsc fast / refused, mpsc shared / batch-32 / primary                        | —                                    |
+| `stages`  | `write`               | the slot write alone on a held guard, no synchronisation                                                                       | —                                    |
+| `stages`  | `fused`               | claim, write and publish per record (per 32 for the batch form) — the shape production code calls                              | —                                    |
 | `mpsc`    | `mpsc_producers`      | 2²⁰ records split over that many producer threads, 1024 slots                                                                 | 1, 2, 4, 8, cores − 1                |
 | `mpsc`    | `mpsc_capacity`       | four producers against 64 slots, always full, and 16384, never full                                                           | capacity                             |
 | `mpsc`    | `mpsc_oversubscribed` | twice as many producers as logical CPUs, so producers are preempted mid-operation; adds the longest wait between two receives | producers                            |

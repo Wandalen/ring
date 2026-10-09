@@ -1,0 +1,51 @@
+# Latency regression gate, run as its own fast job.
+#
+# `benchmarks.yml` measures everything and blocks nothing: absolute
+# nanoseconds on shared runners are noise, so no threshold there could ever
+# fail honestly. This gate instead compares two candidates back-to-back on
+# the same runner — the ring's p99 hand-off against the mutex baseline's —
+# and fails when the ring stops beating it. The margin is the whole method:
+# the comparison harness documents the ring beating the mutex several times
+# over, so a closed gap is a real regression, not a noisy neighbour.
+#
+# Fast on purpose (minutes, not the hours of the full benchmark matrix), so
+# it can run on every pull request that touches the hot path instead of only
+# on the nightly schedule.
+
+name: Regression
+
+on:
+  pull_request:
+    paths:
+      - perf/**
+      - ring_spsc/**
+      - ring_mpsc/**
+      - ring_slot/**
+      - ring_types/**
+      - ring_cursor/**
+      - ring_atomic/**
+      - ring_claim/**
+      - .github/workflows/regression.yml
+  push:
+    branches: [master]
+
+concurrency:
+  group: regression-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  # No RUSTFLAGS "-D warnings", like benchmarks.yml: a warning cannot change
+  # what a hand-off costs, and denying it would fail the gate over prose.
+
+jobs:
+  regression:
+    name: verb/bench suite::regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - name: latency gate (perf/benches/regression.rs)
+        run: bash verb/bench suite::regression

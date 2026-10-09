@@ -52,8 +52,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+      # cargo-fuzz ships no prebuilt binary through this project's
+      # taiki-e/install-action pattern, so its binary is cached directly:
+      # Swatinem/rust-cache covers registry + target, not ~/.cargo/bin.
+      # The version is pinned so the key stays correct across bumps.
+      - name: cache cargo-fuzz binary
+        id: cache-fuzz
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-0.13.2-${{ runner.os }}
       - name: install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        if: steps.cache-fuzz.outputs.cache-hit != 'true'
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: seed the corpus
         run: |
           for target in spsc_ops mpsc_ops; do
@@ -74,8 +85,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@nightly
       - uses: Swatinem/rust-cache@v2
+      # cargo-fuzz ships no prebuilt binary through this project's
+      # taiki-e/install-action pattern, so its binary is cached directly:
+      # Swatinem/rust-cache covers registry + target, not ~/.cargo/bin.
+      # The version is pinned so the key stays correct across bumps.
+      - name: cache cargo-fuzz binary
+        id: cache-fuzz
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-0.13.2-${{ runner.os }}
       - name: install cargo-fuzz
-        run: cargo install cargo-fuzz --locked
+        if: steps.cache-fuzz.outputs.cache-hit != 'true'
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: seed the corpus
         run: |
           for target in spsc_ops mpsc_ops; do

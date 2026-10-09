@@ -69,7 +69,13 @@ fn exhausted(c: &mut Criterion) {
   let mut group = c.benchmark_group("wait_exhausted");
   for (kind, name) in KINDS {
     let spins = exhausted_spins(kind);
-    group.throughput(Throughput::Elements(spins as u64));
+    // `None` evaluates once no matter the budget, so its row reports the
+    // one look it performs rather than the unused budget value.
+    let looks = match kind {
+      WaitKind::None => 1,
+      WaitKind::Spin | WaitKind::Yield | WaitKind::Park => spins,
+    };
+    group.throughput(Throughput::Elements(looks as u64));
     group.bench_with_input(BenchmarkId::from_parameter(name), &kind, |b, &kind| {
       b.iter(|| black_box(wait_until(kind, spins, || black_box(false))));
     });

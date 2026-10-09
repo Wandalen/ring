@@ -33,10 +33,10 @@ for _arg in "$@"; do
   esac
 done
 
-_names='comparison, micro, spsc, mpsc, batch, wait, stages, latency, report, all'
+_names='comparison, micro, spsc, mpsc, batch, stages, latency, report, all'
 case "$_suite" in
-  comparison|micro|spsc|mpsc|batch|wait|stages|latency|report) _suites=( "$_suite" ) ;;
-  all) _suites=( comparison micro spsc mpsc batch wait stages latency report ) ;;
+  comparison|micro|spsc|mpsc|batch|stages|latency|report) _suites=( "$_suite" ) ;;
+  all) _suites=( comparison micro spsc mpsc batch stages latency report ) ;;
   *)
     echo "verb/bench: suite::$_suite is not one of $_names" >&2
     exit 2

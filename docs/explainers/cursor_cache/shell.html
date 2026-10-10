@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why one store made a ring 4x slower — cache lines, cursors, and a benchmark lottery</title>
+<style>
+  :root {
+    --bg: #0f1115; --surface: #161a22; --surface-2: #1d2330; --text: #e8ebf1; --muted: #9aa3b2; --line: #2a3140;
+    --accent: #7aa2f7;
+    --c-producer: #f7a85b; --c-consumer: #6ad1a3;
+    --c-tagged: #c792ea; --c-untagged: #82aaff; --c-rtrb: #8a93a6;
+    --c-master: #8a93a6; --c-pr41: #6ad1a3; --c-pr38: #82aaff;
+    --c-bad: #ef6b73; --c-good: #6ad1a3; --c-warn: #f7c35b;
+    --font-ui: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --radius: 10px; --measure: 72ch;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f7f8fa; --surface: #ffffff; --surface-2: #eef1f6; --text: #1b1f27; --muted: #5b6474; --line: #d6dbe5;
+      --accent: #2f5fd0;
+      --c-producer: #c66a12; --c-consumer: #1f8f63;
+      --c-tagged: #7a3fb3; --c-untagged: #2f5fd0; --c-rtrb: #5b6474;
+      --c-master: #5b6474; --c-pr41: #1f8f63; --c-pr38: #2f5fd0;
+      --c-bad: #c0323c; --c-good: #1f8f63; --c-warn: #a8780a;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var(--font-ui); -webkit-font-smoothing: antialiased; }
+  code, pre, kbd, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+  pre { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; overflow-x: auto; line-height: 1.45; }
+  code:not(pre code) { background: var(--surface-2); padding: 0.1em 0.35em; border-radius: 5px; }
+  a { color: var(--accent); }
+  h1, h2, h3, h4 { line-height: 1.2; margin: 0 0 0.5em; letter-spacing: -0.01em; }
+  h1 { font-size: 2.1rem; font-weight: 700; }
+  h2 { font-size: 1.55rem; font-weight: 650; margin-top: 0; }
+  h3 { font-size: 1.15rem; font-weight: 600; margin-top: 1.6em; }
+  p, li { max-width: var(--measure); }
+  table { border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--line); text-align: right; }
+  th:first-child, td:first-child { text-align: left; }
+  thead th { color: var(--muted); font-weight: 600; font-size: 0.85rem; letter-spacing: 0.02em; }
+  .muted { color: var(--muted); }
+  .hyp { border-left: 3px solid var(--c-warn); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); }
+  .hyp::before { content: "Hypothesis · "; color: var(--c-warn); font-weight: 600; }
+  .measured { border-left: 3px solid var(--c-good); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); }
+  .measured::before { content: "Measured · "; color: var(--c-good); font-weight: 600; }
+  .layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 0; min-height: 100vh; }
+  nav.toc { position: sticky; top: 0; height: 100vh; overflow: auto; padding: 28px 18px; border-right: 1px solid var(--line); background: var(--surface); }
+  nav.toc .brand { font-weight: 700; font-size: 0.95rem; margin-bottom: 18px; line-height: 1.3; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; padding: 6px 8px; border-radius: 6px; font-size: 0.92rem; }
+  nav.toc a:hover, nav.toc a.active { color: var(--text); background: var(--surface-2); }
+  main { padding: 40px 48px 120px; }
+  header.hero { max-width: 80ch; margin-bottom: 48px; }
+  header.hero p.lede { font-size: 1.12rem; color: var(--muted); }
+  .section { padding: 36px 0 28px; border-top: 1px solid var(--line); }
+  .section > h2 .num { color: var(--muted); font-weight: 500; margin-right: 10px; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: center; margin: 12px 0; }
+  .controls label { display: inline-flex; gap: 8px; align-items: center; color: var(--muted); font-size: 0.92rem; }
+  input[type="range"] { accent-color: var(--accent); width: 220px; }
+  button { font: inherit; color: var(--text); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button[aria-pressed="true"] { background: var(--accent); color: #0f1115; border-color: var(--accent); }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px 18px; font-size: 0.88rem; color: var(--muted); }
+  .legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; }
+  svg text { font-family: var(--font-ui); fill: var(--text); }
+  svg .axis text { fill: var(--muted); font-size: 11px; }
+  svg .axis line, svg .axis path { stroke: var(--line); }
+  svg .grid line { stroke: var(--line); stroke-dasharray: 2 4; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } nav.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); } main { padding: 24px 18px 80px; } }
+  footer { color: var(--muted); font-size: 0.88rem; border-top: 1px solid var(--line); padding-top: 18px; margin-top: 40px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <nav class="toc" aria-label="Sections">
+    <div class="brand">Why one store made a ring 4x slower</div>
+    <!-- NAV -->
+  </nav>
+  <main>
+    <header class="hero">
+      <h1>Why one store made a ring 4x slower, and how we found out</h1>
+      <p class="lede">A lock-free single-producer, single-consumer ring got a cheaper slot type and, in one benchmark,
+        ran four times slower. The slot was innocent. This is the chain of mechanisms behind that number: cache lines,
+        two cursors, a layout decided by the length of an environment variable, a chase between two cores, and the one
+        load that turned a faster producer into a slower queue. Every number here was measured on one Apple M4 Pro; every
+        inference is labelled as one.</p>
+      <p class="muted">Pull requests: <a href="https://github.com/Wandalen/ring/pull/41">#41</a> the consumer caches the
+        producer cursor · <a href="https://github.com/Wandalen/ring/pull/38">#38</a> <code>CopySlot</code>, stacked on #41.</p>
+    </header>
+    <!-- SECTIONS -->
+    <footer>Measured 2026-10-09/10 on an Apple M4 Pro (10 P + 4 E cores, 128-byte lines, 128 KB L1D per P-core), macOS,
+      rustc 1.98.0, fat-LTO bench profile, threads not pinned. No hardware performance counters were available; every
+      mechanism is inferred from timing and intervention and is marked as such.</footer>
+  </main>
+</div>
+<script>
+  // Active-section highlighting for the nav.
+  (() => {
+    const links = [...document.querySelectorAll('nav.toc a[data-target]')];
+    const byId = new Map(links.map(a => [a.dataset.target, a]));
+    const io = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) { links.forEach(a => a.classList.remove('active')); byId.get(e.target.id)?.classList.add('active'); }
+    }, { rootMargin: '-40% 0px -55% 0px' });
+    document.querySelectorAll('section.section').forEach(s => io.observe(s));
+  })();
+</script>
+</body>
+</html>

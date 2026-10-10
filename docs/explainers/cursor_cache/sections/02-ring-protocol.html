@@ -1,0 +1,783 @@
+<!-- summary: teaches the SPSC ring (slot array + two single-writer cursors, occupancy derived from them), the exact atomics of one push and one pop (OWN/GATING/HANDOFF, LDAPR/STLR/STLUR, no DMB), Release/Acquire on one record, the producer cache (#20) and consumer cache (#41) with the `distance < max` reload rule and why `==` was wrong, and loom's reach. -->
+<!-- summary: controls: 8-slot ring with Push / Push x4 / Pop / Pop x4 / Drain all / Reset and a "consumer cache off/on" toggle that lights the cursor lines each op touches and counts producer-line loads per drain call; publish/load ordering toggles on a worked Release/Acquire example with the measured misorder counts; a step-through of the two `start == cached` counterexamples vs the shipped rule. -->
+<!-- summary: numbers used: relaxed_corrupts (506,559 / 796,494 of 1M), 37.8 ns one-way, push1_pop1 64 slots two lines master 29/30 vs pr41 122/123. -->
+<section id="sec-ring-protocol" class="section" data-title="The ring and its cursors">
+<style>
+  #sec-ring-protocol .rp-fig { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 14px; margin: 18px 0 22px; }
+  #sec-ring-protocol .rp-fig svg { display: block; width: 100%; height: auto; }
+  #sec-ring-protocol .rp-fig figcaption { color: var(--muted); font-size: 0.88rem; margin-top: 10px; max-width: var(--measure); }
+  #sec-ring-protocol figure { margin-left: 0; margin-right: 0; }
+  #sec-ring-protocol .rp-controls { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin: 4px 0 12px; }
+  #sec-ring-protocol .rp-controls .rp-sep { width: 1px; align-self: stretch; background: var(--line); margin: 0 6px; }
+  #sec-ring-protocol .rp-controls .rp-glabel { color: var(--muted); font-size: 0.9rem; margin-right: 2px; }
+  #sec-ring-protocol button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #sec-ring-protocol .rp-seg { display: inline-flex; }
+  #sec-ring-protocol .rp-seg button { border-radius: 0; }
+  #sec-ring-protocol .rp-seg button:first-child { border-radius: 8px 0 0 8px; }
+  #sec-ring-protocol .rp-seg button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+  #sec-ring-protocol .rp-below { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; margin-top: 10px; }
+  #sec-ring-protocol .rp-counts { font-size: 0.92rem; line-height: 1.5; }
+  #sec-ring-protocol .rp-counts b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  #sec-ring-protocol .rp-counts .rp-ratio { font-size: 1.35rem; font-weight: 650; font-variant-numeric: tabular-nums; display: block; margin: 2px 0 4px; }
+  #sec-ring-protocol .rp-log { list-style: none; margin: 0; padding: 0; font-size: 0.86rem; line-height: 1.45; }
+  #sec-ring-protocol .rp-log li { padding: 3px 0 3px 10px; border-left: 3px solid var(--line); margin-bottom: 3px; max-width: none; }
+  #sec-ring-protocol .rp-log li.p { border-left-color: var(--c-producer); }
+  #sec-ring-protocol .rp-log li.c { border-left-color: var(--c-consumer); }
+  #sec-ring-protocol .rp-log li.bad { border-left-color: var(--c-bad); }
+  #sec-ring-protocol .rp-log .rp-op { color: var(--muted); font-size: 0.82rem; border-left: 0; padding-left: 0; }
+  #sec-ring-protocol .rp-key { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); margin-top: 8px; }
+  #sec-ring-protocol .rp-key svg { width: 34px; height: 12px; display: inline-block; vertical-align: -1px; margin-right: 6px; }
+  /* ring svg */
+  #sec-ring-protocol .rp-box { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; }
+  #sec-ring-protocol .rp-box.p { stroke: var(--c-producer); stroke-width: 2; }
+  #sec-ring-protocol .rp-box.c { stroke: var(--c-consumer); stroke-width: 2; }
+  #sec-ring-protocol .rp-box.load { stroke-dasharray: 6 4; }
+  #sec-ring-protocol .rp-slot { fill: var(--surface-2); stroke: var(--surface); stroke-width: 2; transition: fill-opacity .2s; }
+  #sec-ring-protocol .rp-slot.full { fill: var(--c-producer); fill-opacity: 0.22; }
+  #sec-ring-protocol .rp-slot.wrote { stroke: var(--c-producer); stroke-width: 2.5; }
+  #sec-ring-protocol .rp-slot.read { stroke: var(--c-consumer); stroke-width: 2.5; }
+  #sec-ring-protocol .rp-link { fill: none; stroke: var(--line); stroke-width: 1.5; transition: stroke .15s, stroke-width .15s; }
+  #sec-ring-protocol .rp-link.load { stroke-dasharray: 6 5; }
+  #sec-ring-protocol .rp-link.on.p { stroke: var(--c-producer); stroke-width: 3; }
+  #sec-ring-protocol .rp-link.on.c { stroke: var(--c-consumer); stroke-width: 3; }
+  #sec-ring-protocol .rp-ins { font-family: var(--font-mono); font-size: 11px; fill: var(--muted); }
+  #sec-ring-protocol .rp-ins.on { fill: var(--text); font-weight: 700; }
+  #sec-ring-protocol .rp-t { font-size: 13px; }
+  #sec-ring-protocol .rp-tm { font-size: 11px; fill: var(--muted); }
+  #sec-ring-protocol .rp-mono { font-family: var(--font-mono); font-size: 12px; }
+  #sec-ring-protocol .rp-big { font-family: var(--font-mono); font-size: 20px; font-weight: 600; }
+  #sec-ring-protocol .rp-rec { font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
+  #sec-ring-protocol .rp-rec.stale { fill: var(--muted); font-weight: 400; }
+  #sec-ring-protocol .rp-ptr { transition: transform .25s ease; }
+  #sec-ring-protocol .rp-ptr text { font-size: 11px; font-weight: 700; fill: #0f1115; }
+  #sec-ring-protocol .rp-dim { opacity: 0.45; }
+  /* code */
+  #sec-ring-protocol pre { font-size: 0.84rem; margin: 8px 0 6px; }
+  #sec-ring-protocol pre .hp, #sec-ring-protocol pre .hc { display: inline-block; width: calc(100% + 28px); margin-left: -14px; padding-left: 11px; border-left: 3px solid; }
+  #sec-ring-protocol pre .hp { border-left-color: var(--c-producer); }
+  #sec-ring-protocol pre .hc { border-left-color: var(--c-consumer); }
+  #sec-ring-protocol .rp-src { color: var(--muted); font-size: 0.82rem; margin: 0 0 14px; }
+  #sec-ring-protocol .rp-table { margin: 10px 0 16px; font-size: 0.9rem; }
+  #sec-ring-protocol .rp-table td, #sec-ring-protocol .rp-table th { text-align: left; }
+  #sec-ring-protocol .rp-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  #sec-ring-protocol .rp-ops { margin: 10px 0 14px; padding-left: 0; list-style: none; }
+  #sec-ring-protocol .rp-ops li { padding: 6px 0 6px 12px; border-left: 3px solid var(--line); margin-bottom: 6px; }
+  #sec-ring-protocol .rp-ops li.p { border-left-color: var(--c-producer); }
+  #sec-ring-protocol .rp-ops li.c { border-left-color: var(--c-consumer); }
+  /* release/acquire */
+  #sec-ring-protocol .ra-node { fill: var(--surface-2); stroke: var(--line); }
+  #sec-ring-protocol .ra-node.p { stroke: var(--c-producer); }
+  #sec-ring-protocol .ra-node.c { stroke: var(--c-consumer); }
+  #sec-ring-protocol .ra-edge { fill: none; stroke: var(--muted); stroke-width: 2; }
+  #sec-ring-protocol .ra-edge.broken { stroke: var(--c-bad); stroke-dasharray: 5 5; }
+  #sec-ring-protocol .ra-elabel { font-size: 11.5px; fill: var(--muted); }
+  #sec-ring-protocol .ra-elabel.broken { fill: var(--c-bad); font-weight: 600; }
+  #sec-ring-protocol .ra-outcome { margin-top: 10px; padding: 10px 12px; border-left: 3px solid var(--c-good); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); }
+  #sec-ring-protocol .ra-outcome.bad { border-left-color: var(--c-bad); }
+  #sec-ring-protocol .ra-bar-track { fill: var(--surface-2); }
+  #sec-ring-protocol .ra-bar { fill: var(--muted); fill-opacity: 0.35; transition: fill .15s, fill-opacity .15s; }
+  #sec-ring-protocol .ra-bar.on { fill: var(--c-bad); fill-opacity: 1; }
+  #sec-ring-protocol .ra-axis { stroke: var(--line); stroke-width: 1; }
+  /* stepper */
+  #sec-ring-protocol .st-table { width: 100%; font-size: 0.88rem; margin-top: 8px; }
+  #sec-ring-protocol .st-table td, #sec-ring-protocol .st-table th { text-align: left; }
+  #sec-ring-protocol .st-table td.num { text-align: right; font-family: var(--font-mono); font-size: 0.85rem; }
+  #sec-ring-protocol .st-table tr.pending td { color: transparent; }
+  #sec-ring-protocol .st-table tr.pending td.opcell { color: var(--muted); opacity: 0.55; }
+  #sec-ring-protocol .st-table tr.now td { background: var(--surface-2); }
+  #sec-ring-protocol .st-table td:last-child { white-space: nowrap; }
+  #sec-ring-protocol button code { background: transparent; color: inherit; padding: 0; }
+  #sec-ring-protocol .st-table td.bad { color: var(--c-bad); font-weight: 600; }
+  #sec-ring-protocol .st-verdict { margin-top: 10px; min-height: 1.6em; max-width: var(--measure); }
+  #sec-ring-protocol .st-verdict.bad { color: var(--c-bad); }
+  #sec-ring-protocol .st-verdict.good { color: var(--c-good); }
+  @media (max-width: 1100px) { #sec-ring-protocol .rp-below { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { #sec-ring-protocol .rp-ptr, #sec-ring-protocol .rp-link, #sec-ring-protocol .rp-slot { transition: none; } }
+</style>
+
+<h2>The ring and its cursors</h2>
+
+<p>The ring under test is <code>ring_spsc</code>: one producer thread, one consumer thread, a fixed array of slots,
+  and two counters. Every mechanism later in this explainer is a consequence of which of those two counters each
+  operation reads and writes, so this section counts exactly that.</p>
+
+<h3>Two cursors and an array</h3>
+
+<p>The producer owns the <em>producer cursor</em>, <code>produced</code>: the sequence number of the next record it
+  will write. The consumer owns the <em>consumer cursor</em>, <code>consumed</code>: the next record it will read.
+  Both only grow. Record <code>s</code> lives in slot <code>s mod capacity</code>.</p>
+<p>Nothing else is shared. How many records wait is <code>produced − consumed</code>. The producer may write when
+  that is below the capacity. No slot carries a full/empty flag, and no operation does a read-modify-write: each
+  cursor has exactly one writer, so a plain store is enough to move it.</p>
+<p>Each end is a value one thread holds by <code>&amp;mut</code> (exclusive access). An end may also keep private
+  fields that no other thread can see. Those fields are where both caches below live.</p>
+
+<figure class="rp-fig" aria-labelledby="rp-cap">
+  <div class="rp-controls" role="group" aria-label="Ring operations">
+    <button type="button" data-act="push" aria-label="Push one record">Push</button>
+    <button type="button" data-act="push4" aria-label="Push four records">Push ×4</button>
+    <button type="button" data-act="pop" aria-label="Pop: drain_up_to(1) then commit">Pop</button>
+    <button type="button" data-act="pop4" aria-label="Pop four times">Pop ×4</button>
+    <button type="button" data-act="drain" aria-label="Drain all: drain() then commit">Drain all</button>
+    <span class="rp-sep" aria-hidden="true"></span>
+    <span class="rp-glabel" id="rp-cache-lbl">Consumer cache (#41)</span>
+    <span class="rp-seg" role="group" aria-labelledby="rp-cache-lbl">
+      <button type="button" data-cache="off" aria-pressed="true">Off</button>
+      <button type="button" data-cache="on" aria-pressed="false">On</button>
+    </span>
+    <span class="rp-sep" aria-hidden="true"></span>
+    <button type="button" data-act="reset" aria-label="Reset the ring and the counters">Reset</button>
+  </div>
+  <svg class="rp-ring" viewBox="0 28 920 382" role="img" aria-label="An eight-slot ring between a producer thread on the left and a consumer thread on the right. Below it, the producer cursor's line and the consumer cursor's line, with connectors showing which thread touched which line in the last operation."></svg>
+  <div class="rp-key" aria-hidden="true">
+    <span><svg viewBox="0 0 34 12"><line x1="2" y1="6" x2="32" y2="6" stroke="var(--muted)" stroke-width="2.5"/></svg>store to the thread's own cursor</span>
+    <span><svg viewBox="0 0 34 12"><line x1="2" y1="6" x2="32" y2="6" stroke="var(--muted)" stroke-width="2.5" stroke-dasharray="6 5"/></svg>load of the other thread's cursor (crosses cores)</span>
+    <span><svg viewBox="0 0 34 12"><circle cx="9" cy="6" r="5" fill="var(--c-producer)"/></svg>P outside the ring: producer's next slot</span>
+    <span><svg viewBox="0 0 34 12"><circle cx="9" cy="6" r="5" fill="var(--c-consumer)"/></svg>C inside the ring: consumer's next slot</span>
+  </div>
+  <div class="rp-below">
+    <div class="rp-counts" aria-live="polite">
+      <span class="rp-ratio" data-out="ratio">0 of 0</span>
+      <span data-out="ratio-say">drain calls loaded the producer's line.</span><br>
+      Records taken: <b data-out="taken">0</b>. Producer loads of the consumer's line: <b data-out="pl">0</b>.
+      <br><span class="muted" data-out="mode-note"></span>
+    </div>
+    <ol class="rp-log" aria-live="polite" aria-label="What the last operation did"></ol>
+  </div>
+  <figcaption id="rp-cap">Pop is <code>drain_up_to(1)</code> followed by the batch's commit; Drain all is
+    <code>drain()</code>. A highlighted connector is an atomic access the last operation made, in the colour of the
+    thread that made it. The cursors are drawn on two separate lines; the layout section shows the placements where
+    they share one. Try Push ×4 then Pop ×4 with the cache off, then reset and repeat with it on.</figcaption>
+</figure>
+
+<h3>What one push and one pop do</h3>
+
+<p>The crate names three orderings, one per role. An end reading back its own cursor needs no ordering, because
+  this thread made the store it reads. An end reading the other's cursor needs Acquire. Publishing a record and
+  committing a batch need Release.</p>
+
+<table class="rp-table">
+  <thead><tr><th>constant</th><th>ordering</th><th>used for</th><th>instruction on the M4 Pro</th></tr></thead>
+  <tbody>
+    <tr><td><code>OWN</code></td><td data-out="o-own"></td><td>an end reads its own cursor</td><td><code>ldr</code> (plain load)</td></tr>
+    <tr><td><code>GATING</code></td><td data-out="o-gating"></td><td>an end reads the other end's cursor</td><td><code>ldapr</code></td></tr>
+    <tr><td><code>HANDOFF</code></td><td data-out="o-handoff"></td><td>publish (producer), commit (consumer)</td><td><code>stlr</code> / <code>stlur</code></td></tr>
+  </tbody>
+</table>
+
+<p><strong>One push.</strong> <code>claim</code> decides from two private fields: <code>cached_tail</code>, the
+  producer's own next sequence, and <code>cached_head</code>, its last observation of the consumer cursor (PR #20,
+  ring_spsc ADR 001). Comments elided:</p>
+<pre><code>if self.cached_head.distance_to(self.cached_tail) &gt;= capacity {
+<span class="hp">  self.cached_head = self.ring.cursors.consumer().load(GATING);</span>
+  if self.cached_head.distance_to(self.cached_tail) &gt;= capacity {
+    return Err(RingError::Full);
+  }
+}
+let seq = self.cached_tail;
+self.cached_tail = seq.next();</code></pre>
+<p>The caller then writes the payload into the slot with ordinary stores. Dropping the <code>Reservation</code>
+  publishes it:</p>
+<pre><code>impl&lt;S&gt; Drop for Reservation&lt;'_, S&gt; {
+  fn drop(&amp;mut self) {
+<span class="hp">    self.ring.cursors.producer().store(self.seq.next(), HANDOFF);</span>
+  }
+}</code></pre>
+<p>The observation in <code>cached_head</code> can only lag the real cursor, because the cursor only grows and the
+  field is only ever set from a load. A stale value can refuse a ring that has room. It can never let the producer
+  overwrite a record the consumer has not taken.</p>
+
+<p><strong>One pop.</strong> <code>drain_up_to</code> reads its own cursor, learns how far the producer has
+  published, and returns a <code>Batch</code> that borrows the slots:</p>
+<pre><code>pub fn drain_up_to(&amp;mut self, max: usize) -&gt; Batch&lt;'_, S&gt; {
+  let start = self.ring.cursors.consumer().load(OWN);
+<span class="hc">  let produced = self.observe_produced(start, max);</span>
+  Batch { ring: self.ring, start, len: max.min(start.distance_to(produced) as usize) }
+}</code></pre>
+<p>Before #41, the highlighted line was an unconditional <code>self.ring.cursors.producer().load(GATING)</code>.
+  Dropping the batch commits the whole batch with one store, even when it is empty:</p>
+<pre><code>impl&lt;S&gt; Drop for Batch&lt;'_, S&gt; {
+  fn drop(&amp;mut self) {
+<span class="hc">    self.ring.cursors.consumer().store(self.start.advanced_by(self.len as u64), HANDOFF);</span>
+  }
+}</code></pre>
+<p class="rp-src">Quoted from <code>ring_spsc/src/lib.rs</code> on <code>feat/ring-slot-copy-slot</code>; whitespace
+  compacted.</p>
+
+<p>So the atomic traffic per operation is:</p>
+<ul class="rp-ops">
+  <li class="p"><strong>Push:</strong> <span data-out="per-push"></span>.</li>
+  <li class="c"><strong>Pop before #41:</strong> <span data-out="per-pop-before"></span>.</li>
+  <li class="c"><strong>Pop after #41:</strong> <span data-out="per-pop-after"></span>.</li>
+</ul>
+
+<p>The disassembly of the fat-LTO bench binary agrees. Acquire compiles to <code>ldapr</code>, Release to
+  <code>stlr</code> or <code>stlur</code>, and there is no <code>dmb</code> barrier anywhere between two pops.
+  <code>LDAPR</code> is the RCpc form of load-acquire. Unlike <code>LDAR</code>, it may complete before an earlier
+  <code>STLR</code> to a different address, so the consumer's commit store does not stall its next cursor load. The
+  orderings cost almost nothing as instructions. What costs is the line the <code>ldapr</code> reads: the producer
+  wrote it a moment ago, so its only up-to-date copy sits in the producer core's cache, and the load has to fetch it
+  across cores (measured at <span data-out="oneway"></span> ns one way, section 1).</p>
+<p class="hyp">The per-pop cost is that coherence miss, not the Acquire ordering. Evidence: with the load weakened to
+  Relaxed (a plain <code>ldr</code>), the slow cells stayed slow. Confidence high (orderings review, F1). No hardware
+  performance counters were available to observe the miss directly.</p>
+
+<h3>Release and Acquire, one record end to end</h3>
+
+<p>The producer writes the payload 42 into slot 3, then publishes <code>produced = 4</code>. The consumer loads
+  <code>produced</code>, sees 4, and reads slot 3. Release means every write before the store is visible to any thread
+  that observes the stored value. Acquire means no read after the load can return data older than what the load
+  observed. Together they form one edge: if the load sees 4, the read sees 42. Weaken either side and the edge is
+  gone.</p>
+
+<figure class="rp-fig" aria-labelledby="ra-cap">
+  <div class="rp-controls">
+    <span class="rp-glabel" id="ra-pub-lbl">Publish store</span>
+    <span class="rp-seg" role="group" aria-labelledby="ra-pub-lbl">
+      <button type="button" data-pub="Release" aria-pressed="true">Release</button>
+      <button type="button" data-pub="Relaxed" aria-pressed="false">Relaxed</button>
+    </span>
+    <span class="rp-sep" aria-hidden="true"></span>
+    <span class="rp-glabel" id="ra-gate-lbl">Cursor load</span>
+    <span class="rp-seg" role="group" aria-labelledby="ra-gate-lbl">
+      <button type="button" data-gate="Acquire" aria-pressed="true">Acquire</button>
+      <button type="button" data-gate="Relaxed" aria-pressed="false">Relaxed</button>
+    </span>
+  </div>
+  <svg class="ra-svg" viewBox="0 0 890 230" role="img" aria-label="Producer lane: write slot 3, then store produced. Consumer lane: load produced, then read slot 3. Edges show which steps stay ordered."></svg>
+  <div class="ra-outcome" aria-live="polite"></div>
+  <svg class="ra-bars" viewBox="0 0 700 120" role="img" aria-label="Most records misordered in one run, per weakened ordering"></svg>
+  <figcaption id="ra-cap">Bars: the most records one run handed out misordered (value at the bar's end), with one ordering weakened, measured
+    on the M4 Pro (measurement-only builds, never merged). Track length is one run's 2<sup>20</sup> records. The
+    weakened variant you selected is highlighted.</figcaption>
+</figure>
+
+<p>Weakening is not a speed-up either: neither Relaxed variant removed the slow cells. On this machine both orderings
+  are needed in practice, not only on paper.</p>
+
+<h3>The consumer's cache (#41), and why <code>==</code> was wrong</h3>
+
+<p>#41 gives the consumer what #20 gave the producer: one private field, <code>cached_produced</code>, holding its
+  last <code>GATING</code> observation of the producer cursor. A drain reloads it only when the records it already
+  knows of are fewer than the drain asks for:</p>
+<pre><code>fn observe_produced(&amp;mut self, start: Seq, wanted: usize) -&gt; Seq {
+<span class="hc">  if (start.distance_to(self.cached_produced) as usize) &lt; wanted {</span>
+<span class="hc">    let produced = self.ring.cursors.producer().load(GATING);</span>
+    if produced != self.cached_produced {
+      self.cached_produced = produced;
+    }
+  }
+  self.cached_produced
+}</code></pre>
+<p><code>drain()</code> asks for <code>usize::MAX</code>, so it always reloads. <code>drain_up_to(1)</code> reloads
+  only when it knows of nothing. When the producer is ahead, one load now serves many pops: in the ring above, with
+  the cache on, Push ×4 then Pop ×4 loads the producer's line once instead of four times. The field is written only
+  when the observation moved, so a consumer polling an empty ring does not store the same value every poll.</p>
+<p>The cache is sound for the same reason as the producer's: it can only lag. Every record it offers was published
+  before a Release store that some <code>GATING</code> load by this end observed, on this drain or an earlier one,
+  and program order carries that edge forward to the slot read.</p>
+<p class="measured">With the consumer cache, <code>push1_pop1</code> at 64 slots with the cursors on two lines went
+  from <span data-out="m-before"></span> M records/s on master to <span data-out="m-after"></span> (two rounds each).
+  The results section has every cell.</p>
+
+<p>An earlier draft reloaded on <code>start == cached</code>, that is, only when the consumer had used up everything
+  it knew of. The test suite of the time did not notice, and it breaks two cases. Step through them:</p>
+
+<figure class="rp-fig" aria-labelledby="st-cap">
+  <div class="rp-controls">
+    <span class="rp-glabel" id="st-sc-lbl">Case</span>
+    <span class="rp-seg" role="group" aria-labelledby="st-sc-lbl">
+      <button type="button" data-sc="a" aria-pressed="true">Bounded drain, then drain()</button>
+      <button type="button" data-sc="b" aria-pressed="false">Re-split, cache starts at 0</button>
+    </span>
+    <span class="rp-sep" aria-hidden="true"></span>
+    <span class="rp-glabel" id="st-rule-lbl">Reload when</span>
+    <span class="rp-seg" role="group" aria-labelledby="st-rule-lbl">
+      <button type="button" data-rule="eq" aria-pressed="true"><code>start == cached</code></button>
+      <button type="button" data-rule="lt" aria-pressed="false"><code>distance &lt; max</code></button>
+    </span>
+    <span class="rp-sep" aria-hidden="true"></span>
+    <button type="button" data-st="step">Step</button>
+    <button type="button" data-st="all">Run all</button>
+    <button type="button" data-st="reset">Reset</button>
+  </div>
+  <table class="st-table">
+    <thead><tr><th>#</th><th>operation</th><th>produced</th><th>consumed</th><th>cached_produced</th><th>reloaded?</th><th>result</th></tr></thead>
+    <tbody></tbody>
+  </table>
+  <p class="st-verdict" aria-live="polite"></p>
+  <figcaption id="st-cap">Single-threaded, so every value is exact. <code>available()</code> reads both real cursors,
+    never the cache. <code>distance_to</code> saturates at zero. The shipped <code>split</code> starts the cache at the
+    consumer cursor, not at 0; the second case is the mutation that tested the rule against a cold cache.</figcaption>
+</figure>
+
+<p>Both cases are pinned by std tests now
+  (<code>drain_takes_everything_published_after_a_bounded_drain</code>,
+  <code>a_re_split_consumer_sees_what_the_first_generation_left_published</code>). Changing <code>&lt;</code> to
+  <code>&lt;=</code> survives every test; it reloads one call early and is otherwise identical, an equivalent mutant
+  accepted with that reason.</p>
+
+<h3>What loom checks here, and what it cannot</h3>
+
+<p>Loom runs a small concurrent program under every interleaving it can generate and every outcome its memory model
+  allows. The model <code>a_bounded_drain_hands_out_only_records_whose_writes_it_can_see</code> has a producer write a
+  payload and push, twice, into a two-slot ring, while the consumer calls <code>drain_up_to(1)</code> twice and asserts
+  each record's payload write is visible. It fails under a Relaxed reload and under a cache that extrapolates past its
+  observation; before it, no loom model called <code>drain_up_to</code> at all. What loom cannot see is a cache that
+  never reloads: that consumer hands out nothing wrong, it just stops, and a bounded model has no notion of "never".
+  That mutant was caught by std tests, and the 100k-record threaded test hangs on it.</p>
+
+<script>
+(() => {
+  const root = document.getElementById('sec-ring-protocol');
+  if (!root) return;
+
+  // Copied from tmp/explainer/data.json.
+  const DATA = {
+    protocol: {
+      per_push_atomics: "one Release store of the producer cursor (STLR); the producer loads the consumer cursor only when its cache says full",
+      per_pop_atomics_before_41: "one Acquire load of the producer cursor (LDAPR) on every drain_up_to, one Release store of the consumer cursor (STLUR) per batch",
+      per_pop_atomics_after_41: "the Acquire load only when the consumer knows of fewer records than the drain asks for",
+      orderings: { OWN: "Relaxed", GATING: "Acquire", HANDOFF: "Release" },
+      relaxed_corrupts: { relaxed_gate_max_misordered_of_1M: 506559, relaxed_publish_max_misordered_of_1M: 796494 }
+    },
+    core_to_core_one_way_ns_median: 37.8,
+    push1_pop1_64_two_lines: { master: [29, 30], pr41: [122, 123] }
+  };
+  const RUN_RECORDS = 1048576; // 2^20 records per run (orderings review method)
+
+  const $ = (sel) => root.querySelector(sel);
+  const $$ = (sel) => [...root.querySelectorAll(sel)];
+  const out = (key, text) => { const n = root.querySelector(`[data-out="${key}"]`); if (n) n.textContent = text; };
+  const fmt = (n) => n.toLocaleString('en-US');
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const txt = (parent, x, y, s, cls, anchor) => {
+    const t = mk('text', { x, y, class: cls || '', 'text-anchor': anchor || 'start' }, parent);
+    t.textContent = s;
+    return t;
+  };
+
+  out('o-own', DATA.protocol.orderings.OWN);
+  out('o-gating', DATA.protocol.orderings.GATING);
+  out('o-handoff', DATA.protocol.orderings.HANDOFF);
+  out('per-push', DATA.protocol.per_push_atomics);
+  out('per-pop-before', DATA.protocol.per_pop_atomics_before_41);
+  out('per-pop-after', DATA.protocol.per_pop_atomics_after_41);
+  out('oneway', String(DATA.core_to_core_one_way_ns_median));
+  out('m-before', DATA.push1_pop1_64_two_lines.master.join(' / '));
+  out('m-after', DATA.push1_pop1_64_two_lines.pr41.join(' / '));
+
+  /* ------------------------------------------------------------------ ring */
+  const CAP = 8;
+  const svg = $('.rp-ring');
+  const CX = 460, CY = 162, R = 118, r = 70;
+  const pt = (deg, rad) => [CX + rad * Math.cos(deg * Math.PI / 180), CY + rad * Math.sin(deg * Math.PI / 180)];
+  const mid = (i) => -90 + i * 45 + 22.5;
+
+  // Threads.
+  const pCore = mk('g', {}, svg);
+  mk('rect', { x: 20, y: 46, width: 230, height: 140, rx: 10, class: 'rp-box' }, pCore);
+  mk('rect', { x: 20, y: 46, width: 6, height: 140, rx: 3, fill: 'var(--c-producer)' }, pCore);
+  txt(pCore, 40, 72, 'Producer thread', 'rp-t');
+  txt(pCore, 40, 90, 'private fields, no other core sees them', 'rp-tm');
+  txt(pCore, 40, 120, 'cached_tail', 'rp-mono');
+  txt(pCore, 40, 150, 'cached_head', 'rp-mono');
+  const vTail = txt(pCore, 232, 121, '0', 'rp-big', 'end');
+  const vHead = txt(pCore, 232, 151, '0', 'rp-big', 'end');
+  txt(pCore, 40, 174, 'own next seq / view of consumed', 'rp-tm');
+
+  const cCore = mk('g', {}, svg);
+  mk('rect', { x: 670, y: 46, width: 230, height: 140, rx: 10, class: 'rp-box' }, cCore);
+  mk('rect', { x: 670, y: 46, width: 6, height: 140, rx: 3, fill: 'var(--c-consumer)' }, cCore);
+  txt(cCore, 690, 72, 'Consumer thread', 'rp-t');
+  txt(cCore, 690, 90, 'private fields, no other core sees them', 'rp-tm');
+  const cField = mk('g', {}, cCore);
+  txt(cField, 690, 135, 'cached_produced', 'rp-mono');
+  const vCP = txt(cField, 882, 136, '0', 'rp-big', 'end');
+  const cNote = txt(cCore, 690, 168, '', 'rp-tm');
+
+  // Cursor lines.
+  const mkLine = (x, label) => {
+    const g = mk('g', {}, svg);
+    const box = mk('rect', { x, y: 346, width: 200, height: 54, rx: 8, class: 'rp-box' }, g);
+    txt(g, x + 12, 368, label, 'rp-tm');
+    txt(g, x + 12, 388, 'line written by one thread', 'rp-tm');
+    const v = txt(g, x + 188, 386, '0', 'rp-big', 'end');
+    return { box, v };
+  };
+  const lineP = mkLine(250, 'producer cursor');
+  const lineC = mkLine(470, 'consumer cursor');
+
+  // Connectors: [id, actor, kind, p0, c1, c2, p3, instruction, label dx, label t]
+  const LINKS = [
+    ['Pown', 'p', 'store', [135, 186], [135, 290], [330, 280], [330, 346], 'STLR', -6, 0.5, 'end'],
+    ['Ppeer', 'p', 'load', [215, 186], [215, 330], [540, 296], [540, 346], 'LDAPR', -6, 0.9, 'end'],
+    ['Cown', 'c', 'store', [785, 186], [785, 290], [590, 280], [590, 346], 'STLUR', 6, 0.5, 'start'],
+    ['Cpeer', 'c', 'load', [705, 186], [705, 330], [380, 296], [380, 346], 'LDAPR', 6, 0.9, 'start'],
+  ];
+  const bez = (a, b, c, d, t) => {
+    const u = 1 - t;
+    return [0, 1].map(k => u * u * u * a[k] + 3 * u * u * t * b[k] + 3 * u * t * t * c[k] + t * t * t * d[k]);
+  };
+  const links = {};
+  for (const [id, actor, kind, a, b, c, d, ins, dx, t, anchor] of LINKS) {
+    const path = mk('path', { d: `M${a} C${b} ${c} ${d}`, class: `rp-link ${actor} ${kind === 'load' ? 'load' : ''}` }, svg);
+    const [lx, ly] = bez(a, b, c, d, t);
+    const label = txt(svg, lx + dx, ly - 7, ins, 'rp-ins', anchor);
+    links[id] = { path, label };
+  }
+
+  // Ring slots.
+  const slots = [];
+  for (let i = 0; i < CAP; i++) {
+    const a0 = -90 + i * 45 + 0.8, a1 = -90 + (i + 1) * 45 - 0.8;
+    const [ox0, oy0] = pt(a0, R), [ox1, oy1] = pt(a1, R), [ix1, iy1] = pt(a1, r), [ix0, iy0] = pt(a0, r);
+    const path = mk('path', { d: `M${ox0},${oy0} A${R},${R} 0 0 1 ${ox1},${oy1} L${ix1},${iy1} A${r},${r} 0 0 0 ${ix0},${iy0} Z`, class: 'rp-slot' }, svg);
+    const [tx, ty] = pt(mid(i), (R + r) / 2);
+    const rec = txt(svg, tx, ty + 2, '', 'rp-rec', 'middle');
+    txt(svg, tx, ty + 17, `slot ${i}`, 'rp-tm', 'middle');
+    slots.push({ path, rec });
+  }
+  const occ = txt(svg, CX, CY - 2, '0 of 8', 'rp-big', 'middle');
+  txt(svg, CX, CY + 18, 'produced − consumed', 'rp-tm', 'middle');
+
+  const mkPtr = (letter, fill) => {
+    const g = mk('g', { class: 'rp-ptr' }, svg);
+    mk('circle', { cx: 0, cy: 0, r: 10, fill, stroke: 'var(--surface)', 'stroke-width': 2 }, g);
+    txt(g, 0, 4, letter, '', 'middle');
+    return g;
+  };
+  const ptrP = mkPtr('P', 'var(--c-producer)');
+  const ptrC = mkPtr('C', 'var(--c-consumer)');
+
+  // Model.
+  const S = {};
+  const reset = (keepCache) => {
+    const cacheOn = keepCache ? S.cacheOn : false;
+    Object.assign(S, { produced: 0, consumed: 0, cachedHead: 0, cachedProduced: 0, cacheOn,
+      drains: 0, cLoads: 0, pLoads: 0, taken: 0, last: null });
+  };
+  const resetCounters = () => Object.assign(S, { drains: 0, cLoads: 0, pLoads: 0, taken: 0 });
+  reset(false);
+
+  const push = () => {
+    const steps = [], touches = new Set();
+    const tail = S.produced; // cached_tail is the producer's own copy of its cursor
+    if (tail - S.cachedHead >= CAP) {
+      const was = S.cachedHead;
+      S.cachedHead = S.consumed; S.pLoads++; touches.add('Ppeer');
+      steps.push(['p', `claim: cached_head ${was} says full, so one LDAPR of the consumer cursor (GATING): ${S.consumed}.`]);
+      if (tail - S.cachedHead >= CAP) {
+        steps.push(['bad', 'Still full: Err(Full). No slot written, nothing stored.']);
+        return { title: 'Push', steps, touches, wrote: null, read: [] };
+      }
+    } else {
+      steps.push(['p', `claim: cached_tail ${tail} − cached_head ${S.cachedHead} < ${CAP}, so there is room. No atomic load.`]);
+    }
+    const slot = tail % CAP;
+    steps.push(['p', `Write record #${tail} into slot ${slot} with plain stores.`]);
+    S.produced = tail + 1; touches.add('Pown');
+    steps.push(['p', `Reservation::drop: STLR producer cursor ← ${S.produced} (HANDOFF).`]);
+    return { title: 'Push', steps, touches, wrote: slot, read: [] };
+  };
+
+  const pop = (max) => {
+    const steps = [], touches = new Set();
+    const maxLabel = max === Infinity ? 'usize::MAX' : String(max);
+    const call = max === Infinity ? 'drain()' : `drain_up_to(${max})`;
+    const start = S.consumed;
+    let view;
+    if (!S.cacheOn) {
+      view = S.produced; S.cLoads++; touches.add('Cpeer');
+      steps.push(['c', `${call}: LDAPR of the producer cursor (GATING): ${view}. Every call does this before #41.`]);
+    } else {
+      const known = Math.max(0, S.cachedProduced - start);
+      if (known < max) {
+        const obs = S.produced; S.cLoads++; touches.add('Cpeer');
+        const moved = obs !== S.cachedProduced;
+        steps.push(['c', `${call}: knows of ${known} < ${maxLabel}, so one LDAPR of the producer cursor: ${obs}. ` +
+          (moved ? `cached_produced ← ${obs}.` : 'Unchanged, so the field is not written.')]);
+        if (moved) S.cachedProduced = obs;
+      } else {
+        steps.push(['c', `${call}: knows of ${known} ≥ ${maxLabel} from cached_produced ${S.cachedProduced}. No load.`]);
+      }
+      view = S.cachedProduced;
+    }
+    const len = Math.min(max, Math.max(0, view - start));
+    const read = [];
+    for (let s = start; s < start + len; s++) read.push(s % CAP);
+    steps.push(['c', len ? `Read ${len === 1 ? `record #${start} from slot ${start % CAP}` : `records #${start}–#${start + len - 1}`} in place.` : 'Nothing to read: an empty batch.']);
+    S.consumed = start + len; touches.add('Cown');
+    steps.push(['c', `Batch::drop: STLUR consumer cursor ← ${S.consumed} (HANDOFF)${len ? '' : ', the same value; an empty batch still commits'}.`]);
+    S.drains++; S.taken += len;
+    return { title: max === Infinity ? 'Drain all' : 'Pop', steps, touches, wrote: null, read };
+  };
+
+  const render = () => {
+    const L = S.last;
+    const touches = L ? L.touches : new Set();
+    for (let i = 0; i < CAP; i++) {
+      const s = slots[i];
+      // the newest record in slot i, if any was ever written
+      let seq = null;
+      for (let q = S.produced - 1; q >= 0 && q >= S.produced - CAP; q--) if (q % CAP === i) { seq = q; break; }
+      const full = seq !== null && seq >= S.consumed;
+      s.path.classList.toggle('full', full);
+      s.path.classList.toggle('wrote', !!L && L.wrote === i);
+      s.path.classList.toggle('read', !!L && L.read.includes(i));
+      s.rec.textContent = seq === null ? '' : `#${seq}`;
+      s.rec.classList.toggle('stale', !full);
+    }
+    occ.textContent = `${S.produced - S.consumed} of ${CAP}`;
+    const [px, py] = pt(mid(S.produced % CAP), R + 17);
+    const [qx, qy] = pt(mid(S.consumed % CAP), r - 16);
+    ptrP.style.transform = `translate(${px}px, ${py}px)`;
+    ptrC.style.transform = `translate(${qx}px, ${qy}px)`;
+    vTail.textContent = S.produced;
+    vHead.textContent = S.cachedHead;
+    vCP.textContent = S.cachedProduced;
+    cField.classList.toggle('rp-dim', !S.cacheOn);
+    if (!S.cacheOn) vCP.textContent = '—';
+    cNote.textContent = S.cacheOn ? 'last view of produced (#41)' : 'no cache: not in the code before #41';
+    lineP.v.textContent = S.produced;
+    lineC.v.textContent = S.consumed;
+    for (const id in links) {
+      const on = touches.has(id);
+      links[id].path.classList.toggle('on', on);
+      links[id].label.classList.toggle('on', on);
+    }
+    const lineState = (box, ownId, peerId, ownActor, peerActor) => {
+      box.classList.remove('p', 'c', 'load');
+      if (touches.has(ownId)) box.classList.add(ownActor);
+      else if (touches.has(peerId)) box.classList.add(peerActor, 'load');
+    };
+    lineState(lineP.box, 'Pown', 'Cpeer', 'p', 'c');
+    lineState(lineC.box, 'Cown', 'Ppeer', 'c', 'p');
+
+    out('ratio', `${S.cLoads} of ${S.drains}`);
+    out('ratio-say', S.drains === 1 ? "drain call loaded the producer's line." : "drain calls loaded the producer's line.");
+    out('taken', String(S.taken));
+    out('pl', String(S.pLoads));
+    out('mode-note', S.cacheOn ? 'Cache on: a drain loads only when it knows of fewer records than it asks for.' : 'Cache off: the ring as it was before #41.');
+
+    const log = $('.rp-log');
+    log.textContent = '';
+    if (!L) {
+      const li = document.createElement('li'); li.className = 'rp-op';
+      li.textContent = 'Press Push or Pop. Each step of the operation appears here.';
+      log.appendChild(li);
+      return;
+    }
+    const head = document.createElement('li'); head.className = 'rp-op';
+    head.textContent = L.count > 1 ? `Last of ${L.count}: ${L.title}` : `Last operation: ${L.title}`;
+    log.appendChild(head);
+    for (const [cls, s] of L.steps) {
+      const li = document.createElement('li'); li.className = cls; li.textContent = s; log.appendChild(li);
+    }
+  };
+
+  const run = (fn, n) => { let res; for (let k = 0; k < n; k++) res = fn(); res.count = n; S.last = res; render(); };
+  root.querySelectorAll('[data-act]').forEach(b => b.addEventListener('click', () => {
+    const a = b.dataset.act;
+    if (a === 'push') run(push, 1);
+    else if (a === 'push4') run(push, 4);
+    else if (a === 'pop') run(() => pop(1), 1);
+    else if (a === 'pop4') run(() => pop(1), 4);
+    else if (a === 'drain') run(() => pop(Infinity), 1);
+    else if (a === 'reset') { reset(true); S.cachedProduced = S.consumed; render(); }
+  }));
+  const cacheBtns = $$('[data-cache]');
+  cacheBtns.forEach(b => b.addEventListener('click', () => {
+    S.cacheOn = b.dataset.cache === 'on';
+    cacheBtns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+    // Like a fresh split: the consumer's view starts at its own position. Counters restart for a clean comparison.
+    S.cachedProduced = S.consumed;
+    resetCounters(); S.last = null;
+    render();
+  }));
+  render();
+
+  /* ------------------------------------------------- release / acquire */
+  const ra = { pub: 'Release', gate: 'Acquire' };
+  const rsvg = $('.ra-svg');
+  const defs = mk('defs', {}, rsvg);
+  const marker = (id, color) => {
+    const m = mk('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse' }, defs);
+    mk('path', { d: 'M0,0 L10,5 L0,10 z', fill: color }, m);
+  };
+  marker('ra-arr', 'var(--muted)');
+  marker('ra-arr-bad', 'var(--c-bad)');
+  txt(rsvg, 14, 64, 'Producer', 'rp-t');
+  txt(rsvg, 14, 174, 'Consumer', 'rp-t');
+  mk('line', { x1: 100, y1: 70, x2: 880, y2: 70, class: 'ra-axis' }, rsvg);
+  mk('line', { x1: 100, y1: 180, x2: 880, y2: 180, class: 'ra-axis' }, rsvg);
+  const node = (x, y, w, actor, l1, l2) => {
+    mk('rect', { x, y: y - 26, width: w, height: 52, rx: 8, class: `ra-node ${actor}` }, rsvg);
+    txt(rsvg, x + 12, y - 5, l1, 'rp-mono');
+    return txt(rsvg, x + 12, y + 15, l2, 'rp-tm');
+  };
+  node(110, 70, 190, 'p', 'slot[3] = 42', 'plain store');
+  const insPub = node(350, 70, 230, 'p', 'produced.store(4, ·)', '');
+  const insGate = node(420, 180, 230, 'c', 'produced.load(·) → 4', '');
+  const readOut = node(700, 180, 180, '', 'v = slot[3]', '');
+  const edge = (d) => mk('path', { d, class: 'ra-edge', 'marker-end': 'url(#ra-arr)' }, rsvg);
+  const e1 = edge('M300,70 L346,70');
+  const e2 = edge('M500,96 C500,125 540,125 540,150');
+  const e3 = edge('M650,180 L696,180');
+  const l1 = txt(rsvg, 323, 116, '', 'ra-elabel', 'middle');
+  const l2 = txt(rsvg, 560, 128, 'sees 4', 'ra-elabel', 'start');
+  const l3 = txt(rsvg, 673, 222, '', 'ra-elabel', 'middle');
+
+  const bsvg = $('.ra-bars');
+  const BX = 170, BW = 360;
+  const bars = [
+    ['gate', 'Relaxed cursor load', DATA.protocol.relaxed_corrupts.relaxed_gate_max_misordered_of_1M, 22],
+    ['pub', 'Relaxed publish store', DATA.protocol.relaxed_corrupts.relaxed_publish_max_misordered_of_1M, 62],
+  ].map(([key, label, v, y]) => {
+    txt(bsvg, 0, y + 14, label, 'rp-tm');
+    mk('rect', { x: BX, y, width: BW, height: 20, class: 'ra-bar-track' }, bsvg);
+    const w = BW * v / RUN_RECORDS;
+    const bar = mk('path', { d: `M${BX},${y} H${BX + w - 4} a4,4 0 0 1 4,4 V${y + 16} a4,4 0 0 1 -4,4 H${BX} Z`, class: 'ra-bar' }, bsvg);
+    const hit = mk('title', {}, bar); hit.textContent = `${label}: up to ${fmt(v)} of ${fmt(RUN_RECORDS)} records misordered in one run`;
+    txt(bsvg, BX + BW + 10, y + 15, fmt(v), 'rp-t');
+    return { key, bar };
+  });
+  mk('line', { x1: BX, y1: 14, x2: BX, y2: 92, class: 'ra-axis' }, bsvg);
+  txt(bsvg, BX, 110, '0', 'rp-tm', 'middle');
+  txt(bsvg, BX + BW, 110, '2²⁰ records', 'rp-tm', 'middle');
+
+  const renderRA = () => {
+    const pubOk = ra.pub === 'Release', gateOk = ra.gate === 'Acquire';
+    insPub.textContent = pubOk ? 'Release: STLR' : 'Relaxed: plain STR';
+    insGate.textContent = gateOk ? 'Acquire: LDAPR' : 'Relaxed: plain LDR';
+    const setEdge = (e, l, ok, okText, badText) => {
+      e.classList.toggle('broken', !ok);
+      e.setAttribute('marker-end', ok ? 'url(#ra-arr)' : 'url(#ra-arr-bad)');
+      l.textContent = ok ? okText : badText;
+      l.classList.toggle('broken', !ok);
+    };
+    setEdge(e1, l1, pubOk, 'stays before the store', 'may become visible after it');
+    setEdge(e3, l3, gateOk, 'stays after the load', 'may be satisfied before it');
+    e2.classList.remove('broken');
+    readOut.textContent = pubOk && gateOk ? 'v is 42' : 'v may be the old value';
+    const o = $('.ra-outcome');
+    const bits = [];
+    if (!pubOk) bits.push(`The producer's slot write and its cursor store are no longer ordered for other cores: the consumer can see 4 before it can see 42. Measured: up to ${fmt(DATA.protocol.relaxed_corrupts.relaxed_publish_max_misordered_of_1M)} records misordered in one run.`);
+    if (!gateOk) bits.push(`The consumer's slot read is no longer held behind its cursor load: it can return slot 3's old contents even though the load returned 4. Measured: up to ${fmt(DATA.protocol.relaxed_corrupts.relaxed_gate_max_misordered_of_1M)} records misordered in one run.`);
+    if (!pubOk && !gateOk) bits.push('Both weakened at once was not measured; each number above is its own build.');
+    o.classList.toggle('bad', bits.length > 0);
+    o.textContent = bits.length ? bits.join(' ') : 'The load saw 4, which a Release store wrote after the slot write, so the read after the Acquire load sees 42. Guaranteed, and the only synchronisation either thread performs.';
+    for (const b of bars) b.bar.classList.toggle('on', (b.key === 'pub' && !pubOk) || (b.key === 'gate' && !gateOk));
+  };
+  const seg = (attr, key) => {
+    const btns = $$(`[data-${attr}]`);
+    btns.forEach(b => b.addEventListener('click', () => {
+      ra[key] = b.dataset[attr];
+      btns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      renderRA();
+    }));
+  };
+  seg('pub', 'pub');
+  seg('gate', 'gate');
+  renderRA();
+
+  /* ----------------------------------------------------- reload stepper */
+  const SCEN = {
+    a: ['push', 'push', 'drain_up_to(1)', 'push', 'available()', 'drain()'],
+    b: ['push', 'push', 'drain_up_to(1)', 're-split', 'push', 'drain_up_to(1)', 'drain_up_to(1)', 'available()'],
+  };
+  const st = { sc: 'a', rule: 'eq', at: 0 };
+  const simulate = (ops, rule) => {
+    const m = { produced: 0, consumed: 0, cached: 0 };
+    const rows = [], results = {};
+    for (const op of ops) {
+      let reloaded = '', result = '', bad = false;
+      if (op === 'push') { m.produced++; result = `published #${m.produced - 1}`; }
+      else if (op === 're-split') { m.cached = 0; result = 'new ends; cache starts at 0'; }
+      else if (op === 'available()') { const a = m.produced - m.consumed; result = `${a} waiting`; results.available = a; }
+      else {
+        const max = op === 'drain()' ? Infinity : 1;
+        const start = m.consumed;
+        const dist = Math.max(0, m.cached - start);
+        const reload = rule === 'eq' ? start === m.cached : dist < max;
+        if (reload) { m.cached = m.produced; reloaded = 'yes'; } else reloaded = 'no';
+        const len = Math.min(max, Math.max(0, m.cached - start));
+        m.consumed = start + len;
+        const waiting = m.produced - start;
+        result = `took ${len}`;
+        bad = len < Math.min(max, waiting);
+        (results.drains = results.drains || []).push({ op, len, waiting: Math.min(max, waiting) });
+      }
+      rows.push({ op, produced: m.produced, consumed: m.consumed, cached: m.cached, reloaded, result, bad });
+    }
+    return { rows, results };
+  };
+  const tbody = $('.st-table tbody');
+  const verdict = $('.st-verdict');
+  const renderST = () => {
+    const ops = SCEN[st.sc];
+    const { rows, results } = simulate(ops, st.rule);
+    tbody.textContent = '';
+    rows.forEach((row, i) => {
+      const tr = document.createElement('tr');
+      if (i >= st.at) tr.className = 'pending';
+      if (i === st.at - 1) tr.className = 'now';
+      const cells = [String(i + 1), row.op, row.produced, row.consumed, row.cached, row.reloaded || '—', row.result];
+      cells.forEach((c, k) => {
+        const td = document.createElement('td');
+        if (i >= st.at && k !== 1) c = '';
+        if (k === 1) { const code = document.createElement('code'); code.textContent = c; td.appendChild(code); td.className = 'opcell'; }
+        else td.textContent = String(c);
+        if (k >= 2 && k <= 4) td.classList.add('num');
+        if (k === 6 && row.bad) td.classList.add('bad');
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    verdict.className = 'st-verdict';
+    if (st.at < ops.length) { verdict.textContent = `Step ${st.at} of ${ops.length}.`; return; }
+    const drains = results.drains;
+    if (st.sc === 'a') {
+      const last = drains[drains.length - 1];
+      const broken = last.len < results.available;
+      verdict.classList.add(broken ? 'bad' : 'good');
+      verdict.textContent = broken
+        ? `drain() returned ${last.len} while available() said ${results.available}. It knew of one record from the bounded drain, so start ≠ cached and it never looked.`
+        : `drain() returned ${last.len}, matching available() = ${results.available}. drain() asks for usize::MAX, so it always reloads.`;
+    } else {
+      const after = drains.slice(1);
+      const broken = after.every(d => d.len === 0);
+      verdict.classList.add(broken ? 'bad' : 'good');
+      verdict.textContent = broken
+        ? `Every drain after the re-split returns 0 while available() says ${results.available}. start is 1 and the cache is 0, so they are never equal and it never reloads: empty forever.`
+        : `The cold cache costs one reload: knowing of 0 < 1 triggers it, and both records come out. A lagging start value is harmless under this rule.`;
+    }
+  };
+  const segST = (attr, key) => {
+    const btns = $$(`[data-${attr}]`);
+    btns.forEach(b => b.addEventListener('click', () => {
+      st[key] = b.dataset[attr];
+      btns.forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      if (key === 'sc') st.at = 0;
+      renderST();
+    }));
+  };
+  segST('sc', 'sc');
+  segST('rule', 'rule');
+  root.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => {
+    const n = SCEN[st.sc].length;
+    if (b.dataset.st === 'step') st.at = Math.min(n, st.at + 1);
+    else if (b.dataset.st === 'all') st.at = n;
+    else st.at = 0;
+    renderST();
+  }));
+  renderST();
+})();
+</script>
+</section>

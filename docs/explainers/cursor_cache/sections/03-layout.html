@@ -1,0 +1,780 @@
+<!-- summary: Teaches where the Ring struct lands in memory and why that decided the benchmark: the 256-byte byte map,
+CACHE_LINE = 64 on a 128-byte machine, the env-var PAD flip, criterion's sample-0 stack shift, the four fixed offsets, slot strides and the Wide::whole bug.
+Controls: ring-address slider; PAD slider + 64/1024 toggle with hover chart; stack-offset slider + 10/100 sample toggle; offsets bar chart toggle; record-size/slot-type/frontier stride explorer; old/fixed check toggle. -->
+<section id="sec-layout" class="section" data-title="Where the ring lands">
+<style>
+  #sec-layout .lay-fig { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 14px; margin: 18px 0 22px; max-width: 920px; }
+  #sec-layout .lay-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  #sec-layout .lay-cap { color: var(--muted); font-size: 0.88rem; margin: 8px 0 0; max-width: var(--measure); }
+  #sec-layout .lay-read { font-variant-numeric: tabular-nums; margin: 10px 0 0; min-height: 3em; max-width: var(--measure); }
+  #sec-layout .lay-read strong { font-weight: 650; }
+  #sec-layout .lay-ratio { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 2px; }
+  #sec-layout .lay-ratio .big { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  #sec-layout .lay-ratio .sub { color: var(--muted); font-size: 0.92rem; }
+  #sec-layout .lay-group { display: inline-flex; gap: 0; }
+  #sec-layout .lay-group button { border-radius: 0; margin-left: -1px; }
+  #sec-layout .lay-group button:first-child { border-radius: 8px 0 0 8px; margin-left: 0; }
+  #sec-layout .lay-group button:last-child { border-radius: 0 8px 8px 0; }
+  #sec-layout .lay-val { font-family: var(--font-mono); color: var(--text); min-width: 4ch; display: inline-block; }
+  #sec-layout :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #sec-layout svg:focus-visible { outline-offset: 4px; border-radius: 4px; }
+  #sec-layout details { margin-top: 10px; font-size: 0.9rem; }
+  #sec-layout details summary { cursor: pointer; color: var(--muted); }
+  #sec-layout details table { margin-top: 8px; }
+  #sec-layout table.lay-small td, #sec-layout table.lay-small th { padding: 4px 10px; }
+  #sec-layout .lay-two { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  #sec-layout .lay-tip { position: fixed; z-index: 50; pointer-events: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 300px; }
+  #sec-layout .lay-tip .t { color: var(--muted); margin-bottom: 4px; }
+  #sec-layout .lay-tip .r { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+  #sec-layout .lay-tip .r strong { min-width: 4.5ch; text-align: right; }
+  #sec-layout .lay-tip .r .k { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--muted); }
+  #sec-layout .lay-tip .r .k.typed { border-top-color: var(--c-tagged); }
+  #sec-layout .lay-tip .r .k.copy { border-top: 2px dashed var(--c-untagged); }
+  #sec-layout .lay-tip .r .lbl { color: var(--muted); }
+  #sec-layout .legend .ln { display: inline-block; width: 18px; height: 0; border-top: 2px solid var(--c-tagged); margin-right: 6px; vertical-align: 4px; }
+  #sec-layout .legend .ln.copy { border-top: 2px dashed var(--c-untagged); }
+  #sec-layout .legend .sw.typed { background: var(--c-tagged); }
+  #sec-layout .legend .sw.copy { background: repeating-linear-gradient(45deg, var(--c-untagged) 0 2px, transparent 2px 5px); border: 1px solid var(--c-untagged); }
+  #sec-layout .legend .sw.one { background: var(--accent); }
+  #sec-layout .legend .sw.two { background: repeating-linear-gradient(45deg, var(--muted) 0 2px, transparent 2px 5px); border: 1px solid var(--muted); }
+  #sec-layout .legend .sw.never { background: repeating-linear-gradient(45deg, var(--c-bad) 0 2px, transparent 2px 5px); border: 1px solid var(--c-bad); }
+  #sec-layout .legend .sw.prod { background: var(--c-producer); }
+  #sec-layout .legend .sw.cons { background: var(--c-consumer); }
+  #sec-layout .legend .sw.front { background: transparent; border: 2px solid var(--c-warn); }
+
+  /* SVG vocabulary: one memory ruler, used by every figure in this section */
+  #sec-layout .band-a { fill: var(--surface-2); stroke: var(--line); }
+  #sec-layout .band-b { fill: var(--surface); stroke: var(--line); }
+  #sec-layout .band-hot { fill: var(--c-consumer); fill-opacity: .12; stroke: var(--c-consumer); stroke-opacity: .6; }
+  #sec-layout .band-front { fill: none; stroke: var(--c-warn); stroke-width: 2.5; }
+  #sec-layout .tick { stroke: var(--muted); stroke-width: 1; }
+  #sec-layout .addr { fill: var(--muted); font-family: var(--font-mono); font-size: 10.5px; }
+  #sec-layout .lname { fill: var(--muted); font-size: 11px; }
+  #sec-layout .lbl { font-size: 12px; fill: var(--text); }
+  #sec-layout .lbl-s { font-size: 11px; fill: var(--muted); }
+  #sec-layout .mono { font-family: var(--font-mono); }
+  #sec-layout .status { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; fill: var(--text); }
+  #sec-layout .f-prod { fill: var(--c-producer); }
+  #sec-layout .f-cons { fill: var(--c-consumer); }
+  #sec-layout .f-cap { fill: var(--muted); fill-opacity: .45; }
+  #sec-layout .f-ptr { fill: var(--muted); fill-opacity: .25; }
+  #sec-layout .f-warn { stroke: var(--c-warn); stroke-width: 2.5; }
+  #sec-layout .on-fill { fill: #0f1115; font-size: 12px; font-weight: 600; }
+  #sec-layout .ring-box { fill: none; stroke: var(--text); stroke-dasharray: 4 3; stroke-width: 1.2; }
+  #sec-layout .ring-g { transition: transform .35s ease; }
+  @media (prefers-reduced-motion: reduce) { #sec-layout .ring-g { transition: none; } }
+  #sec-layout .brk { fill: none; stroke: var(--text); stroke-width: 1.2; }
+  #sec-layout .gridl { stroke: var(--line); stroke-dasharray: 2 4; }
+  #sec-layout .axisl { stroke: var(--line); }
+  #sec-layout .ax { fill: var(--muted); font-size: 11px; }
+  #sec-layout .s-typed { fill: none; stroke: var(--c-tagged); stroke-width: 2; }
+  #sec-layout .s-copy { fill: none; stroke: var(--c-untagged); stroke-width: 2; stroke-dasharray: 6 4; }
+  #sec-layout .m-typed { fill: var(--c-tagged); stroke: var(--surface); stroke-width: 2; }
+  #sec-layout .m-copy { fill: var(--c-untagged); stroke: var(--surface); stroke-width: 2; }
+  #sec-layout .xhair { stroke: var(--muted); stroke-width: 1; }
+  #sec-layout .hit { fill: transparent; cursor: crosshair; }
+  #sec-layout .b-typed { fill: var(--c-tagged); }
+  #sec-layout .b-copy-bg { fill: var(--c-untagged); fill-opacity: .22; }
+  #sec-layout .b-copy-ln { stroke: var(--c-untagged); stroke-width: 2.5; }
+  #sec-layout .b-copy-edge { fill: none; stroke: var(--c-untagged); stroke-width: 1.5; }
+  #sec-layout .b-art { fill: none; stroke: var(--c-warn); stroke-width: 2; stroke-dasharray: 4 3; }
+  #sec-layout .bar:hover, #sec-layout .bar:focus { opacity: .8; }
+  #sec-layout .c-one { fill: var(--accent); }
+  #sec-layout .c-two-bg { fill: var(--muted); fill-opacity: .18; }
+  #sec-layout .c-two-ln { stroke: var(--muted); stroke-width: 2; }
+  #sec-layout .c-warm { fill: none; stroke: var(--muted); stroke-dasharray: 3 3; }
+  #sec-layout .c-sel { fill: none; stroke: var(--text); stroke-width: 2; }
+  #sec-layout .stk { fill: var(--surface-2); stroke: var(--line); }
+  #sec-layout .stk-env { fill: var(--accent); fill-opacity: .18; stroke: var(--accent); }
+  #sec-layout .stk-ring { fill: var(--c-producer); fill-opacity: .18; stroke: var(--c-producer); stroke-dasharray: 4 3; }
+  #sec-layout .sl-typed { fill: var(--c-tagged); fill-opacity: .3; }
+  #sec-layout .sl-copy { fill: var(--c-untagged); fill-opacity: .3; }
+  #sec-layout .sl-tag { fill: var(--c-tagged); }
+  #sec-layout .w-read { fill: var(--c-consumer); }
+  #sec-layout .w-skip { fill: var(--muted); fill-opacity: .28; }
+  #sec-layout .w-tag { fill: var(--c-tagged); fill-opacity: .55; }
+  #sec-layout .w-tag-read { fill: var(--c-tagged); }
+  #sec-layout .never-bg { fill: var(--c-bad); fill-opacity: .06; }
+  #sec-layout .never-ln { stroke: var(--c-bad); stroke-opacity: .55; stroke-width: 1.5; }
+  @media (min-width: 1300px) { #sec-layout .lay-two { grid-template-columns: 1fr 1fr; } }
+</style>
+
+<h2>Where the ring lands</h2>
+<p>The two cursors from the previous section live in one struct, <code>Ring</code>. Where that struct sits in memory
+  moved the benchmark more than any change to the code did. This section follows the bytes: the struct, the stack that
+  placed it, the benchmark framework that moved it between samples, and the slot array laid over the same lines.</p>
+
+<h3>A 256-byte struct padded for 64-byte lines</h3>
+<p><code>ring_align</code> fixes the line size the whole ring family pads to (<code>ring_align/src/lib.rs</code>):</p>
+<pre><code>pub const CACHE_LINE: usize = 64;
+
+#[repr(align(64))]
+pub struct CacheAligned&lt;T&gt;(T);</code></pre>
+<p>Each cursor is padded to 64 bytes, and <code>Ring</code> is aligned to 64. Its four fields start 64 bytes apart:
+  producer cursor at +0, consumer cursor at +64, capacity at +128, slot-array pointer at +192. That is 256 bytes in
+  total. On x86-64 each cursor gets a line of its own. The M4 Pro's lines are 128 bytes, so two 64-byte fields share
+  one line, and which two depends on the struct's address modulo 128. Alignment 64 leaves two possible answers.</p>
+
+<div class="lay-fig" id="lay-f1">
+  <div class="controls">
+    <label for="lay-addr">Ring start address <input id="lay-addr" type="range" min="0" max="256" step="64" value="0"
+      aria-label="Ring start address in bytes, steps of 64"> <span class="lay-val" id="lay-addr-v">0</span> bytes</label>
+  </div>
+  <svg id="lay-addr-svg" viewBox="0 0 720 200" role="img" aria-label="The Ring struct's four 64-byte fields laid over 128-byte cache lines"></svg>
+  <p class="lay-read" id="lay-addr-read" aria-live="polite"></p>
+  <p class="lay-cap">Field blocks run from each field's offset to the next one, padding included. Lines are drawn at
+    128 bytes, the M4 Pro's size.</p>
+</div>
+
+<p>At 0 mod 128 both cursors share a line. Every store by either side takes the one line holding both, and the other
+  core's copy is invalidated. At 64 mod 128 they sit on separate lines, which is what the padding was written to
+  achieve. It measured slower: the closed PR #23, which padded the cursors to 128 bytes, was 3&ndash;7x slower on pop1
+  without #41. <a href="#sec-regimes">Section 4</a> explains why.</p>
+<p class="measured">In the two-line layout <code>capacity</code> (+128) lands on the consumer cursor's line, and the
+  producer loads it on every push. Hoisting it into the producer removed the load from the assembly and left two-line
+  pop1 as slow as before. It breaks the rule that no hot field shares a cursor's line. It is not the regression.</p>
+
+<h3>The harness never chose the address</h3>
+<p>The benchmark built the ring as a temporary on the main thread's stack. On macOS the stack pointer at
+  <code>main</code> sits just below the argv and environment strings, so anything that lengthens them pushes the stack
+  down. The ring is aligned to 64, so a 16-byte move shifts it by 0 or 64 bytes. When it shifts, 0 mod 128 becomes
+  64 mod 128 and one line becomes two.</p>
+<p>The test that settles it: run the unmodified PR #38 binary with one unused environment variable, <code>PAD</code>,
+  of 1 to 113 characters. Push one, pop one, criterion medians.</p>
+
+<div class="lay-fig" id="lay-f2">
+  <div class="controls">
+    <label for="lay-pad">PAD length <input id="lay-pad" type="range" min="0" max="7" step="1" value="0"
+      aria-label="PAD environment variable length"> <span class="lay-val" id="lay-pad-v">1</span> characters</label>
+    <span class="lay-group" role="group" aria-label="Ring capacity">
+      <button type="button" data-cap="64" aria-pressed="true">64 slots</button>
+      <button type="button" data-cap="1024" aria-pressed="false">1024 slots</button>
+    </span>
+  </div>
+  <svg id="lay-stack-svg" viewBox="0 0 720 92" role="img" aria-label="Schematic of the main thread's stack: environment strings grow, everything below moves down"></svg>
+  <div class="lay-ratio" aria-live="polite"><span class="big" id="lay-ratio-big"></span><span class="sub" id="lay-ratio-sub"></span></div>
+  <div class="legend" aria-hidden="true"><span><span class="ln"></span>TypedSlot (spsc)</span><span><span class="ln copy"></span>CopySlot (spsc-plain)</span></div>
+  <svg id="lay-pad-svg" viewBox="0 0 720 290" role="img" aria-label="Throughput against PAD length for TypedSlot and CopySlot"></svg>
+  <details><summary>Table view</summary>
+    <table class="lay-small" id="lay-pad-table"><thead><tr><th>PAD</th><th>spsc 64</th><th>plain 64</th><th>spsc 1024</th><th>plain 1024</th></tr></thead><tbody></tbody></table>
+  </details>
+  <p class="lay-cap">Unmodified PR #38 binary, stock stack-placed harness. M records/s. The stack strip is a schematic:
+    block widths are not to scale.</p>
+</div>
+
+<p>PR #38 published CopySlot at 0.26x of TypedSlot at 64 slots. ADR 002 sums up what PAD does to that figure: the
+  same binary reads 0.26x or 3.2x faster, by environment length alone. In this table the spread runs from 0.27x at
+  PAD&nbsp;49 to 3.33x at PAD&nbsp;17. A real per-slot cost would keep its sign under any padding. This one flips. The
+  two candidates flip at different lengths because their monomorphised frames differ in size.</p>
+
+<h3>Criterion moved it again, between samples</h3>
+<p>Criterion 0.8.2 wraps sample <em>i</em> in <code>alloca(i % page_size)</code>, a de-biasing step meant for 100
+  samples. The harness ran 10. The shim is a variable-length array, so sizes 1&ndash;9 round up to 16 bytes: sample 0
+  runs at shift 0, samples 1&ndash;9 at shift 16. When the stack sits where 16 bytes crosses a 64-byte boundary,
+  sample 0 gets one layout and the other nine get the other. Warm-up has no alloca and a different call depth, so it is
+  a third placement. That explains the bimodal cells and the "low severe outlier" criterion kept reporting.</p>
+
+<div class="lay-fig" id="lay-f3">
+  <div class="controls">
+    <label for="lay-base">Stack pointer, bytes past a 128-byte boundary <input id="lay-base" type="range" min="0" max="112" step="16" value="0"
+      aria-label="Where the stack pointer sits, bytes past a 128-byte boundary"> <span class="lay-val" id="lay-base-v">0</span></label>
+    <span class="lay-group" role="group" aria-label="Samples per benchmark">
+      <button type="button" data-n="10" aria-pressed="true">10 samples</button>
+      <button type="button" data-n="100" aria-pressed="false">100 samples</button>
+    </span>
+  </div>
+  <div class="legend" aria-hidden="true"><span><span class="sw one"></span>one line (ring at 0 mod 128)</span><span><span class="sw two"></span>two lines (ring at 64 mod 128)</span></div>
+  <svg id="lay-samp-svg" viewBox="0 0 720 118" tabindex="0" role="img" aria-label="Samples coloured by layout; use left and right arrow keys to inspect a sample"></svg>
+  <p class="lay-read" id="lay-samp-read" aria-live="polite"></p>
+  <p class="lay-cap">A model of the mechanism, not a measurement: ring address = (stack position &minus; alloca shift),
+    rounded down to 64. The slider stands in for what the environment and argv set; real frame offsets differ per
+    candidate. Arrow keys step through samples when the strip has focus.</p>
+</div>
+
+<h3>Placing the ring by hand</h3>
+<p>The cure for the measurement is to take placement away from the stack: put the ring at a fixed offset inside a heap
+  block and report each layout as its own cell. Below is PR #38's code, without the consumer cache, with the ring at
+  byte 0, 64, 128 or 192 of a 256-byte block. Per-run means.</p>
+
+<div class="lay-fig" id="lay-f4">
+  <div class="controls">
+    <span class="lay-group" role="group" aria-label="Ring capacity">
+      <button type="button" data-cap="64" aria-pressed="true">64 slots</button>
+      <button type="button" data-cap="1024" aria-pressed="false">1024 slots</button>
+    </span>
+    <div class="legend" aria-hidden="true"><span><span class="sw typed"></span>TypedSlot (spsc)</span><span><span class="sw copy"></span>CopySlot (spsc-plain)</span></div>
+  </div>
+  <svg id="lay-off-svg" viewBox="0 0 720 286" role="img" aria-label="Throughput at the four ring offsets for TypedSlot and CopySlot"></svg>
+  <details><summary>Table view</summary>
+    <table class="lay-small" id="lay-off-table"><thead><tr><th>Offset</th><th>Cursors</th><th>spsc 64</th><th>plain 64</th><th>spsc 1024</th><th>plain 1024</th></tr></thead><tbody></tbody></table>
+  </details>
+</div>
+
+<p>Offsets 0 and 128 give the same layout, and so do 64 and 192. The bars agree in those pairs, which a layout effect
+  predicts and a slot effect does not.</p>
+<p class="measured">With <code>#[inline(always)]</code> on both adapters, every slot shape measured 24&ndash;37 M/s on
+  two lines and 100&ndash;112 on one line.</p>
+<p class="hyp">The two fast TypedSlot cells at 1024 slots on two lines (196 and 232) are a compile artefact: LLVM
+  inlined the tagged adapter's <code>pop_batch</code> and outlined the plain one. The inlining difference was read from
+  the binaries' symbol tables, not from counters. The <code>inline(always)</code> rerun above is what makes the
+  artefact reading the likely one.</p>
+
+<h3>Slot strides decide what shares a line</h3>
+<p>The slot array is the other thing laid over these lines. <code>TypedSlot&lt;T&gt;</code> wraps an
+  <code>Option&lt;T&gt;</code>, whose tag costs 8 bytes per slot at these sizes. <code>CopySlot&lt;T&gt;</code> has no
+  tag. The stride is the distance from one slot's start to the next.</p>
+<table class="lay-small">
+  <thead><tr><th>Record</th><th>TypedSlot stride</th><th>CopySlot stride</th><th>Slots per 128-byte line</th></tr></thead>
+  <tbody>
+    <tr><td><code>u64</code> (8 B)</td><td>16 B</td><td>8 B</td><td>8 vs 16</td></tr>
+    <tr><td><code>[u64; 8]</code> (64 B)</td><td>72 B</td><td>64 B</td><td>1.78 vs 2</td></tr>
+    <tr><td><code>[u64; 32]</code> (256 B)</td><td>264 B</td><td>256 B</td><td>0.48 vs 0.5</td></tr>
+  </tbody>
+</table>
+<p class="muted">At 16384 slots of <code>u64</code> the array is 262144 bytes as TypedSlot and 131072 as CopySlot.</p>
+
+<div class="lay-fig" id="lay-f5">
+  <div class="controls">
+    <span class="lay-group" role="group" aria-label="Record size">
+      <button type="button" data-rec="8" aria-pressed="true">u64</button>
+      <button type="button" data-rec="64" aria-pressed="false">64-byte record</button>
+      <button type="button" data-rec="256" aria-pressed="false">256-byte record</button>
+    </span>
+    <span class="lay-group" role="group" aria-label="Slot type">
+      <button type="button" data-slot="typed" aria-pressed="true">TypedSlot</button>
+      <button type="button" data-slot="copy" aria-pressed="false">CopySlot</button>
+    </span>
+    <label for="lay-front">Consumer reads slot <input id="lay-front" type="range" min="0" max="10" step="1" value="0"
+      aria-label="Slot index the consumer is reading; the producer writes the next one"> <span class="lay-val" id="lay-front-v">0</span></label>
+  </div>
+  <div class="legend" aria-hidden="true"><span><span class="sw cons"></span>consumer reads slot i</span><span><span class="sw prod"></span>producer writes slot i+1</span><span><span class="sw front"></span>line both touch</span></div>
+  <svg id="lay-stride-svg" viewBox="0 0 720 176" role="img" aria-label="Slots laid over 128-byte lines with the producer and consumer frontier"></svg>
+  <p class="lay-read" id="lay-stride-read" aria-live="polite"></p>
+  <p class="lay-cap">The slot array starts on a line boundary. For TypedSlot the tag is drawn at the slot's start;
+    rustc chooses the order.</p>
+</div>
+
+<p class="measured">64-byte records, two rounds each, M/s: CopySlot at stride 64 ran 38 / 53; the same CopySlot padded to
+  72 ran 81 / 96. TypedSlot at 72 ran 70 / 85; TypedSlot with the tag removed (stride 64) ran 52 / 73. The stride
+  decides, not the slot type. With the consumer held 64 records behind the producer the stride stops mattering: 180
+  vs 177 at 64 vs 72, 110 vs 113 at 256 vs 264. Single-threaded fill-then-drain shows the opposite: stride 64 ran 707
+  against 483 at 72. Stride 128 runs within ~10% of 136.</p>
+<p class="hyp">The 64-byte-stride penalty lives at the frontier, where the producer writes slot i+1 next to the
+  slot i the consumer reads; it vanishes when the two are 64 records apart. Why a power-of-two stride is slow there is
+  not known. This machine exposed no PMU counters. Ruled out: 4K aliasing (a same-core effect that would not vanish
+  with lag), more line sharing (72 shares more boundaries yet is faster), and codegen (both store inline, no memcpy).</p>
+
+<h3>The check that never read the middle line</h3>
+<p>The 256-byte row put TypedSlot at a 264-byte stride against CopySlot at 256. The consumer checks each record with
+  <code>Wide::whole</code> (<code>perf/benches/harness/candidates.rs</code>), and the check compared two words:</p>
+<pre><code>-    self.0[0] == self.0[N - 1]
++    self.0.iter().all(|word| *word == self.0[0])</code></pre>
+
+<div class="lay-fig" id="lay-f6">
+  <div class="controls">
+    <span class="lay-group" role="group" aria-label="Which check the consumer runs">
+      <button type="button" data-chk="old" aria-pressed="true">Old check: first and last word</button>
+      <button type="button" data-chk="new" aria-pressed="false">Fixed check: every word</button>
+    </span>
+  </div>
+  <div class="legend" aria-hidden="true"><span><span class="sw cons"></span>word the check reads</span><span><span class="sw" style="background:var(--c-tagged)"></span>tag</span><span><span class="sw never"></span>line no read touches</span></div>
+  <svg id="lay-wide-svg" viewBox="0 0 720 250" role="img" aria-label="Three 256-byte records at strides 264 and 256 over 128-byte lines, with the words each check reads"></svg>
+  <p class="lay-read" id="lay-wide-read" aria-live="polite"></p>
+</div>
+
+<p>At a 264-byte stride each record spans three lines. The first word shares a line with the previous record's tail,
+  the last word shares one with the next record's tag, and the middle line is never touched, so it never crosses
+  cores. At 256 the first and last words sit on two different lines that no other record touches. The benchmark
+  measured the checker's footprint, not the queue's.</p>
+<p>The fix reads every word. Push one, pop many, 1024 slots, two rounds, M/s: TypedSlot fell from 46.9 / 52.0 to
+  31.8 / 30.2. CopySlot went from 26.6 / 26.9 to 29.4 / 29.1, and rtrb reads 31.0 / 29.6. The 256-byte gap was the
+  check. The 64-byte gap survives the fix: TypedSlot 99.3 / 93.7 against CopySlot 62.6 / 44.6. That one is the stride
+  effect above.</p>
+
+<div class="lay-tip" hidden></div>
+
+<script>
+(() => {
+  const root = document.getElementById('sec-layout');
+  if (!root) return;
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // Copied from tmp/explainer/data.json.
+  const D = {
+    offsets: { producer: 0, consumer: 64, capacity: 128, slots: 192 },
+    ringBytes: 256,
+    slotBytes: { typed: { 8: 16, 64: 72, 256: 264 }, copy: { 8: 8, 64: 64, 256: 256 } },
+    env: [
+      { pad: 1, spsc_64: 27.1, plain_64: 85.7, spsc_1024: 243, plain_1024: 180 },
+      { pad: 17, spsc_64: 26.7, plain_64: 89.0, spsc_1024: 244, plain_1024: 206 },
+      { pad: 33, spsc_64: 77.8, plain_64: 102.8, spsc_1024: 191, plain_1024: 205 },
+      { pad: 49, spsc_64: 96.7, plain_64: 26.0, spsc_1024: 267, plain_1024: 29.3 },
+      { pad: 65, spsc_64: 84.1, plain_64: 24.3, spsc_1024: 184, plain_1024: 56.0 },
+      { pad: 81, spsc_64: 83.8, plain_64: 23.5, spsc_1024: 267, plain_1024: 26.7 },
+      { pad: 97, spsc_64: 32.7, plain_64: 23.9, spsc_1024: 248, plain_1024: 28.4 },
+      { pad: 113, spsc_64: 32.7, plain_64: 23.2, spsc_1024: 86.5, plain_1024: 29.1 }
+    ],
+    four: [
+      { offset: 0, cursors: 'one line', spsc_64: 98, plain_64: 95, spsc_1024: 248, plain_1024: 192 },
+      { offset: 128, cursors: 'one line', spsc_64: 87, plain_64: 92, spsc_1024: 236, plain_1024: 252 },
+      { offset: 64, cursors: 'two lines', spsc_64: 23, plain_64: 22, spsc_1024: 196, plain_1024: 24 },
+      { offset: 192, cursors: 'two lines', spsc_64: 24, plain_64: 27, spsc_1024: 232, plain_1024: 36 }
+    ],
+    linesOld: { 264: 1.06, 256: 2.0 }
+  };
+
+  const $ = sel => root.querySelector(sel);
+  function el(tag, attrs, parent, text) {
+    const n = document.createElementNS(NS, tag);
+    for (const k in attrs) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function clear(n) { while (n.firstChild) n.removeChild(n.firstChild); }
+  function hatch(svg, id, bgCls, lnCls) {
+    const defs = el('defs', {}, svg);
+    const p = el('pattern', { id, width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' }, defs);
+    el('rect', { width: 6, height: 6, class: bgCls }, p);
+    el('line', { x1: 0, y1: 0, x2: 0, y2: 6, class: lnCls }, p);
+  }
+  function pressGroup(group, btn) {
+    group.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'));
+  }
+
+  // Tooltip: values lead, labels follow; built with textContent only.
+  const tip = $('.lay-tip');
+  function tipShow(x, y, title, rows) {
+    clear(tip);
+    const t = document.createElement('div'); t.className = 't'; t.textContent = title; tip.appendChild(t);
+    for (const r of rows) {
+      const d = document.createElement('div'); d.className = 'r';
+      const k = document.createElement('span'); k.className = 'k ' + (r.key || ''); d.appendChild(k);
+      const s = document.createElement('strong'); s.textContent = r.value; d.appendChild(s);
+      const l = document.createElement('span'); l.className = 'lbl'; l.textContent = r.label; d.appendChild(l);
+      tip.appendChild(d);
+    }
+    tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(x + 14, window.innerWidth - w - 8)) + 'px';
+    tip.style.top = Math.max(8, Math.min(y + 14, window.innerHeight - h - 8)) + 'px';
+  }
+  function tipHide() { tip.hidden = true; }
+  function tipAt(node, title, rows) {
+    const r = node.getBoundingClientRect();
+    tipShow(r.left + r.width / 2, r.top, title, rows);
+  }
+
+  // The memory ruler: 128-byte lines as alternating bands with byte addresses under them.
+  function ruler(g, o) {
+    const s = o.w / (o.b1 - o.b0);
+    const X = b => o.x0 + (b - o.b0) * s;
+    for (let L = Math.floor(o.b0 / 128); L * 128 < o.b1; L++) {
+      const a = Math.max(L * 128, o.b0), b = Math.min(L * 128 + 128, o.b1);
+      el('rect', { x: X(a), y: o.y, width: X(b) - X(a), height: o.h, class: L % 2 ? 'band-b' : 'band-a' }, g);
+      if (o.names) el('text', { x: (X(a) + X(b)) / 2, y: o.y - 6, 'text-anchor': 'middle', class: 'lname' }, g, 'line ' + L);
+    }
+    for (let b = Math.ceil(o.b0 / 128) * 128; b <= o.b1; b += 128) {
+      el('line', { x1: X(b), x2: X(b), y1: o.y + o.h, y2: o.y + o.h + 5, class: 'tick' }, g);
+      el('text', { x: X(b), y: o.y + o.h + 17, 'text-anchor': 'middle', class: 'addr' }, g, String(b));
+    }
+    return { X, s };
+  }
+
+  /* ---------- Figure 1: ring address over 128-byte lines ---------- */
+  (() => {
+    const svg = $('#lay-addr-svg'), input = $('#lay-addr'), out = $('#lay-addr-read'), val = $('#lay-addr-v');
+    const R = { x0: 20, w: 680, b0: 0, b1: 512, y: 62, h: 80, names: true };
+    const base = el('g', {}, svg);
+    const { X, s } = ruler(base, R);
+    const statusT = el('text', { x: 700, y: 30, 'text-anchor': 'end', class: 'status' }, svg);
+    const addrT = el('text', { x: 20, y: 30, class: 'lbl' }, svg);
+    const ring = el('g', { class: 'ring-g' }, svg);
+    const fy = R.y + 12, fh = R.h - 24;
+    el('rect', { x: X(0), y: R.y + 6, width: 256 * s, height: R.h - 12, class: 'ring-box', rx: 4 }, ring);
+    const fields = [
+      { key: 'producer', name: 'producer', cls: 'f-prod', dark: true },
+      { key: 'consumer', name: 'consumer', cls: 'f-cons', dark: true },
+      { key: 'capacity', name: 'capacity', cls: 'f-cap' },
+      { key: 'slots', name: 'slots ptr', cls: 'f-ptr' }
+    ];
+    const capRect = {};
+    for (const f of fields) {
+      const off = D.offsets[f.key];
+      const r = el('rect', { x: X(off) + 2, y: fy, width: 64 * s - 4, height: fh, rx: 4, class: f.cls }, ring);
+      if (f.key === 'capacity') capRect.node = r;
+      el('text', { x: X(off) + 32 * s, y: fy + fh / 2 - 2, 'text-anchor': 'middle', class: f.dark ? 'on-fill' : 'lbl' }, ring, f.name);
+      el('text', { x: X(off) + 32 * s, y: fy + fh / 2 + 13, 'text-anchor': 'middle', class: f.dark ? 'on-fill mono' : 'lbl-s mono', style: 'font-weight:400;font-size:10.5px' }, ring, '+' + off);
+    }
+    const brk = el('g', {}, svg);
+    function bracket(L, label, row) {
+      const a = X(L * 128) + 4, b = X(L * 128 + 128) - 4, y = R.y + R.h + 30 + row * 30;
+      el('path', { d: `M${a},${y - 6} V${y} H${b} V${y - 6}`, class: 'brk' }, brk);
+      el('text', { x: (a + b) / 2, y: y + 15, 'text-anchor': 'middle', class: 'lbl' }, brk, label);
+    }
+    function draw() {
+      const A = +input.value;
+      val.textContent = A;
+      ring.style.transform = `translate(${A * s}px, 0px)`;
+      const line = b => Math.floor(b / 128);
+      const lp = line(A + D.offsets.producer), lc = line(A + D.offsets.consumer), lcap = line(A + D.offsets.capacity);
+      const one = lp === lc;
+      statusT.textContent = one ? 'one line' : 'two lines';
+      addrT.textContent = `Ring at byte ${A}: ${A} mod 128 = ${A % 128}`;
+      clear(brk);
+      const capShared = lcap === lc;
+      capRect.node.classList.toggle('f-warn', capShared);
+      if (one) {
+        bracket(lp, `line ${lp}: both cursors`, 0);
+      } else {
+        bracket(lp, `line ${lp}: producer cursor`, 0);
+        bracket(lc, `line ${lc}: consumer cursor + capacity`, 0);
+      }
+      out.textContent = one
+        ? `Producer cursor (byte ${A}) and consumer cursor (byte ${A + 64}) are both on line ${lp}: one line. Capacity and the slot-array pointer share line ${lcap}, which neither side writes.`
+        : `Producer cursor (byte ${A}) is on line ${lp}; consumer cursor (byte ${A + 64}) is on line ${lc}: two lines. Capacity (byte ${A + 128}) lands on line ${lcap}, the consumer cursor's line, and the producer reads it on every push.`;
+    }
+    input.addEventListener('input', draw);
+    draw();
+  })();
+
+  /* ---------- Figure 2: PAD flips the result ---------- */
+  (() => {
+    const svg = $('#lay-pad-svg'), stack = $('#lay-stack-svg'), input = $('#lay-pad'), val = $('#lay-pad-v');
+    const big = $('#lay-ratio-big'), sub = $('#lay-ratio-sub');
+    const group = $('#lay-f2 .lay-group');
+    let cap = '64';
+    const tb = $('#lay-pad-table tbody');
+    for (const r of D.env) {
+      const tr = document.createElement('tr');
+      for (const v of [r.pad, r.spsc_64, r.plain_64, r.spsc_1024, r.plain_1024]) {
+        const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+    const W = 720, H = 290, m = { l: 52, r: 150, t: 14, b: 44 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    const xs = i => m.l + (i + 0.5) * (pw / D.env.length);
+    const ratio = r => r['plain_' + cap] / r['spsc_' + cap];
+
+    function drawStack(i) {
+      clear(stack);
+      const envW = 130 + i * 12;
+      const blocks = [
+        { w: envW, label: `env strings, PAD = ${D.env[i].pad}`, cls: 'stk-env' },
+        { w: 80, label: 'argv strings', cls: 'stk' },
+        { w: 90, label: 'pointers', cls: 'stk' },
+        { w: 120, label: "main's frame", cls: 'stk' }
+      ];
+      let x = 700;
+      const y = 14, h = 40;
+      let frameX = 0;
+      for (const b of blocks) {
+        x -= b.w;
+        el('rect', { x, y, width: b.w - 2, height: h, rx: 4, class: b.cls }, stack);
+        el('text', { x: x + (b.w - 2) / 2, y: y + 24, 'text-anchor': 'middle', class: 'lbl-s' }, stack, b.label);
+        frameX = x;
+      }
+      el('rect', { x: frameX - 92, y: y + 4, width: 88, height: h - 8, rx: 4, class: 'stk-ring' }, stack);
+      el('text', { x: frameX - 48, y: y + 24, 'text-anchor': 'middle', class: 'lbl-s' }, stack, 'Ring (align 64)');
+      el('text', { x: 700, y: 78, 'text-anchor': 'end', class: 'lbl-s' }, stack, 'higher addresses');
+      el('text', { x: frameX - 92, y: 78, class: 'lbl-s' }, stack, 'lower addresses: the stack grows this way');
+    }
+
+    function draw() {
+      const i = +input.value, r = D.env[i];
+      val.textContent = r.pad;
+      drawStack(i);
+      const k = ratio(r);
+      big.textContent = k.toFixed(2) + 'x';
+      sub.textContent = `CopySlot ÷ TypedSlot at PAD ${r.pad}, ${cap} slots: ${r['plain_' + cap]} vs ${r['spsc_' + cap]} M/s. ` +
+        (k >= 1 ? 'CopySlot looks faster.' : 'CopySlot looks slower.');
+      clear(svg);
+      const ymax = cap === '64' ? 120 : 300, step = cap === '64' ? 20 : 50;
+      const ys = v => m.t + ph - (v / ymax) * ph;
+      for (let v = 0; v <= ymax; v += step) {
+        el('line', { x1: m.l, x2: m.l + pw, y1: ys(v), y2: ys(v), class: v === 0 ? 'axisl' : 'gridl' }, svg);
+        el('text', { x: m.l - 8, y: ys(v) + 4, 'text-anchor': 'end', class: 'ax' }, svg, String(v));
+      }
+      el('text', { x: 12, y: m.t + ph / 2, 'text-anchor': 'middle', class: 'ax', transform: `rotate(-90 12 ${m.t + ph / 2})` }, svg, 'M records/s');
+      D.env.forEach((row, j) => el('text', { x: xs(j), y: m.t + ph + 17, 'text-anchor': 'middle', class: 'ax' }, svg, String(row.pad)));
+      el('text', { x: m.l + pw / 2, y: H - 6, 'text-anchor': 'middle', class: 'ax' }, svg, 'PAD length (characters)');
+      el('line', { x1: xs(i), x2: xs(i), y1: m.t, y2: m.t + ph, class: 'xhair' }, svg);
+      const series = [{ key: 'spsc_' + cap, cls: 'typed', name: 'TypedSlot' }, { key: 'plain_' + cap, cls: 'copy', name: 'CopySlot' }];
+      for (const sr of series) {
+        el('path', { d: D.env.map((row, j) => (j ? 'L' : 'M') + xs(j) + ',' + ys(row[sr.key])).join(' '), class: 's-' + sr.cls }, svg);
+        D.env.forEach((row, j) => {
+          const x = xs(j), y = ys(row[sr.key]), rr = j === i ? 6 : 4.5;
+          if (sr.cls === 'typed') el('circle', { cx: x, cy: y, r: rr, class: 'm-typed' }, svg);
+          else el('rect', { x: x - rr, y: y - rr, width: 2 * rr, height: 2 * rr, class: 'm-copy' }, svg);
+        });
+      }
+      // Direct labels at the right end, nudged apart if they collide.
+      const last = D.env[D.env.length - 1];
+      let ya = ys(last['spsc_' + cap]), yb = ys(last['plain_' + cap]);
+      if (Math.abs(ya - yb) < 16) { const mid = (ya + yb) / 2; if (ya <= yb) { ya = mid - 8; yb = mid + 8; } else { ya = mid + 8; yb = mid - 8; } }
+      el('text', { x: m.l + pw + 10, y: ya + 4, class: 'lbl' }, svg, 'TypedSlot (spsc)');
+      el('text', { x: m.l + pw + 10, y: yb + 4, class: 'lbl' }, svg, 'CopySlot (plain)');
+      // Hit columns: the crosshair finds the PAD; the tooltip lists both series.
+      D.env.forEach((row, j) => {
+        const hr = el('rect', { x: m.l + j * pw / D.env.length, y: m.t, width: pw / D.env.length, height: ph, class: 'hit' }, svg);
+        hr.addEventListener('pointerenter', () => { if (+input.value !== j) { input.value = j; draw(); } });
+        hr.addEventListener('pointermove', e => tipShow(e.clientX, e.clientY, `PAD ${row.pad}, ${cap} slots`, [
+          { key: 'typed', value: String(row['spsc_' + cap]), label: 'TypedSlot M/s' },
+          { key: 'copy', value: String(row['plain_' + cap]), label: 'CopySlot M/s' },
+          { value: ratio(row).toFixed(2) + 'x', label: 'CopySlot ÷ TypedSlot' }
+        ]));
+        hr.addEventListener('pointerleave', tipHide);
+      });
+    }
+    input.addEventListener('input', draw);
+    group.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      cap = b.dataset.cap; pressGroup(group, b); draw();
+    });
+    draw();
+  })();
+
+  /* ---------- Figure 3: criterion's per-sample stack shift (model) ---------- */
+  (() => {
+    const svg = $('#lay-samp-svg'), input = $('#lay-base'), val = $('#lay-base-v'), out = $('#lay-samp-read');
+    const group = $('#lay-f3 .lay-group');
+    let n = 10, sel = 0;
+    const shiftOf = i => Math.ceil(i / 16) * 16;          // alloca(i % page) as a VLA rounds up to 16
+    const ringPos = (base, shift) => { const p = base - shift; return ((Math.floor(p / 64) * 64) % 128 + 128) % 128; };
+    const layout = (base, i) => ringPos(base, shiftOf(i)) === 0 ? 'one line' : 'two lines';
+    let cells = [];
+    function info(i) {
+      const base = +input.value, sh = shiftOf(i);
+      return { title: `sample ${i}`, rows: [
+        { value: `alloca(${i})`, label: `rounds to ${sh} bytes` },
+        { value: String(ringPos(base, sh)), label: 'ring address mod 128' },
+        { value: layout(base, i), label: 'layout' }
+      ] };
+    }
+    function draw() {
+      const base = +input.value;
+      val.textContent = base;
+      clear(svg);
+      hatch(svg, 'lay-pat-two', 'c-two-bg', 'c-two-ln');
+      const y = 30, h = 40;
+      el('rect', { x: 20, y, width: 64, height: h, rx: 4, class: 'c-warm' }, svg);
+      el('text', { x: 52, y: y + h + 16, 'text-anchor': 'middle', class: 'lbl-s' }, svg, 'warm-up');
+      el('text', { x: 52, y: y + 25, 'text-anchor': 'middle', class: 'lbl-s' }, svg, 'own depth');
+      const x0 = 100, span = 600, cw = span / n, gap = n > 20 ? 1 : 3;
+      cells = [];
+      for (let i = 0; i < n; i++) {
+        const one = layout(base, i) === 'one line';
+        const r = el('rect', { x: x0 + i * cw, y, width: cw - gap, height: h, rx: n > 20 ? 1 : 4, class: one ? 'c-one' : 'c-two' }, svg);
+        if (!one) r.setAttribute('style', 'fill:url(#lay-pat-two)');
+        cells.push(r);
+        r.addEventListener('pointermove', e => { const t = info(i); tipShow(e.clientX, e.clientY, t.title, t.rows); });
+        r.addEventListener('pointerleave', tipHide);
+        if (n <= 20 || i % 10 === 0) el('text', { x: x0 + i * cw + (cw - gap) / 2, y: y + h + 16, 'text-anchor': 'middle', class: 'lbl-s' }, svg, String(i));
+      }
+      if (n <= 20) {
+        el('text', { x: x0 + (cw - gap) / 2, y: y - 8, 'text-anchor': 'middle', class: 'addr' }, svg, 'shift 0 B');
+        el('path', { d: `M${x0 + cw + 2},${y - 6} V${y - 11} H${x0 + n * cw - gap - 2} V${y - 6}`, class: 'brk', style: 'stroke:var(--muted)' }, svg);
+        el('text', { x: x0 + cw + (n - 1) * cw / 2, y: y - 15, 'text-anchor': 'middle', class: 'addr' }, svg, 'shift 16 B');
+      }
+      if (n > 20) for (let s = 0; s <= 112; s += 16) {
+        const i = s === 0 ? 0 : s - 15;
+        el('text', { x: x0 + i * cw, y: y - 8, class: 'addr' }, svg, s + ' B');
+      }
+      el('text', { x: 700, y: y + h + 34, 'text-anchor': 'end', class: 'lbl-s' }, svg, 'sample index');
+      if (sel >= n) sel = 0;
+      const sr = cells[sel];
+      el('rect', { x: +sr.getAttribute('x') - 2, y: y - 2, width: +sr.getAttribute('width') + 4, height: h + 4, rx: 5, class: 'c-sel' }, svg);
+      // Readout: group runs of equal layout.
+      const runs = [];
+      for (let i = 0; i < n; i++) {
+        const L = layout(base, i);
+        if (runs.length && runs[runs.length - 1].L === L) runs[runs.length - 1].to = i; else runs.push({ L, from: i, to: i });
+      }
+      const ones = [...Array(n).keys()].filter(i => layout(base, i) === 'one line').length;
+      if (n === 10) {
+        out.textContent = runs.map(r => (r.from === r.to ? `sample ${r.from}` : `samples ${r.from}–${r.to}`) + `: ${r.L}`).join('; ') + '. ' +
+          (runs.length > 1 ? 'The 16-byte shift crosses a 64-byte boundary here, so sample 0 sits alone.' : 'The 16-byte shift crosses no 64-byte boundary at this position, so all ten samples share a layout.');
+      } else {
+        out.textContent = `${ones} of 100 samples one line, ${100 - ones} two lines. Shifts walk 0 to 112 bytes, so the cell becomes a mix and its median depends on the split.`;
+      }
+    }
+    svg.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      sel = (sel + (e.key === 'ArrowRight' ? 1 : n - 1)) % n;
+      draw();
+      const t = info(sel); tipAt(cells[sel], t.title, t.rows);
+    });
+    svg.addEventListener('blur', tipHide);
+    input.addEventListener('input', draw);
+    group.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      n = +b.dataset.n; pressGroup(group, b); draw();
+    });
+    draw();
+  })();
+
+  /* ---------- Figure 4: the four fixed offsets ---------- */
+  (() => {
+    const svg = $('#lay-off-svg'), group = $('#lay-f4 .lay-group');
+    let cap = '64';
+    const tb = $('#lay-off-table tbody');
+    for (const r of D.four) {
+      const tr = document.createElement('tr');
+      for (const v of [r.offset, r.cursors, r.spsc_64, r.plain_64, r.spsc_1024, r.plain_1024]) {
+        const td = document.createElement('td'); td.textContent = String(v); tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+    const W = 720, H = 286, m = { l: 52, r: 16, t: 30, b: 62 };
+    const pw = W - m.l - m.r, ph = H - m.t - m.b;
+    function draw() {
+      clear(svg);
+      hatch(svg, 'lay-pat-copy', 'b-copy-bg', 'b-copy-ln');
+      const ymax = cap === '64' ? 120 : 300, step = cap === '64' ? 20 : 50;
+      const ys = v => m.t + ph - (v / ymax) * ph;
+      for (let v = 0; v <= ymax; v += step) {
+        el('line', { x1: m.l, x2: m.l + pw, y1: ys(v), y2: ys(v), class: v === 0 ? 'axisl' : 'gridl' }, svg);
+        el('text', { x: m.l - 8, y: ys(v) + 4, 'text-anchor': 'end', class: 'ax' }, svg, String(v));
+      }
+      el('text', { x: 12, y: m.t + ph / 2, 'text-anchor': 'middle', class: 'ax', transform: `rotate(-90 12 ${m.t + ph / 2})` }, svg, 'M records/s');
+      const gw = pw / 4, bw = 44, gap = 4;
+      D.four.forEach((r, gi) => {
+        const cx = m.l + gw * gi + gw / 2 + (gi >= 2 ? 10 : -10);
+        const bars = [{ k: 'spsc_' + cap, cls: 'typed', name: 'TypedSlot' }, { k: 'plain_' + cap, cls: 'copy', name: 'CopySlot' }];
+        bars.forEach((b, bi) => {
+          const v = r[b.k], x = cx - bw - gap / 2 + bi * (bw + gap), y = ys(v), hh = ys(0) - y;
+          // 4px rounded data end, square at the baseline.
+          const d = `M${x},${ys(0)} V${y + 4} Q${x},${y} ${x + 4},${y} H${x + bw - 4} Q${x + bw},${y} ${x + bw},${y + 4} V${ys(0)} Z`;
+          const p = el('path', { d, class: 'bar ' + (b.cls === 'typed' ? 'b-typed' : ''), tabindex: 0, role: 'img',
+            'aria-label': `${b.name} at offset ${r.offset}, ${r.cursors}, ${cap} slots: ${v} M/s` }, svg);
+          if (b.cls === 'copy') { p.setAttribute('style', 'fill:url(#lay-pat-copy)'); el('path', { d, class: 'b-copy-edge', 'pointer-events': 'none' }, svg); }
+          const art = cap === '1024' && r.cursors === 'two lines' && b.cls === 'typed';
+          if (art) el('rect', { x: x - 3, y: y - 3, width: bw + 6, height: hh + 3, rx: 5, class: 'b-art', 'pointer-events': 'none' }, svg);
+          el('text', { x: x + bw / 2, y: y - 6, 'text-anchor': 'middle', class: 'lbl' }, svg, String(v));
+          if (art) el('text', { x: x + bw / 2, y: y - 22, 'text-anchor': 'middle', class: 'lbl-s' }, svg, 'artefact');
+          const rows = () => [{ key: b.cls, value: String(v), label: `${b.name} M/s` }].concat(art ? [{ value: 'inlining', label: 'compile artefact, see note' }] : []);
+          p.addEventListener('pointermove', e => tipShow(e.clientX, e.clientY, `offset ${r.offset}, ${r.cursors}, ${cap} slots`, rows()));
+          p.addEventListener('pointerleave', tipHide);
+          p.addEventListener('focus', () => tipAt(p, `offset ${r.offset}, ${r.cursors}, ${cap} slots`, rows()));
+          p.addEventListener('blur', tipHide);
+        });
+        el('text', { x: cx, y: ys(0) + 17, 'text-anchor': 'middle', class: 'ax' }, svg, 'offset ' + r.offset);
+      });
+      // Layout brackets under each pair.
+      [[0, 1, 'one line'], [2, 3, 'two lines']].forEach(([a, b, label]) => {
+        const xa = m.l + gw * a + 18 + (a >= 2 ? 10 : -10), xb = m.l + gw * b + gw - 18 + (b >= 2 ? 10 : -10), y = ys(0) + 30;
+        el('path', { d: `M${xa},${y - 5} V${y} H${xb} V${y - 5}`, class: 'brk' }, svg);
+        el('text', { x: (xa + xb) / 2, y: y + 16, 'text-anchor': 'middle', class: 'lbl' }, svg, label);
+      });
+    }
+    group.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      cap = b.dataset.cap; pressGroup(group, b); draw();
+    });
+    draw();
+  })();
+
+  /* ---------- Figure 5: slot strides and the frontier ---------- */
+  (() => {
+    const svg = $('#lay-stride-svg'), input = $('#lay-front'), val = $('#lay-front-v'), out = $('#lay-stride-read');
+    const groups = root.querySelectorAll('#lay-f5 .lay-group');
+    let rec = 8, slot = 'typed';
+    function draw() {
+      const stride = D.slotBytes[slot][rec];
+      const win = rec === 8 ? 512 : 1024;
+      const maxI = Math.floor(win / stride) - 2;
+      input.max = String(maxI);
+      if (+input.value > maxI) input.value = String(maxI);
+      const i = +input.value;
+      val.textContent = i;
+      clear(svg);
+      const R = { x0: 20, w: 680, b0: 0, b1: win, y: 46, h: 82, names: true };
+      const g = el('g', {}, svg);
+      const { X } = ruler(g, R);
+      const lineSet = k => { const a = k * stride, b = a + stride - 1; const s = []; for (let L = Math.floor(a / 128); L <= Math.floor(b / 128); L++) s.push(L); return s; };
+      const lc = lineSet(i), lp = lineSet(i + 1);
+      const shared = lc.filter(L => lp.includes(L));
+      const nSlots = Math.ceil(win / stride);
+      const gap = stride <= 16 ? 1 : 2;
+      for (let k = 0; k < nSlots; k++) {
+        const a = k * stride, b = Math.min(a + stride, win);
+        const cls = k === i ? 'f-cons' : k === i + 1 ? 'f-prod' : (slot === 'typed' ? 'sl-typed' : 'sl-copy');
+        el('rect', { x: X(a) + gap / 2, y: R.y + 14, width: Math.max(1, X(b) - X(a) - gap), height: R.h - 28, rx: stride <= 16 ? 1 : 3, class: cls }, g);
+        if (slot === 'typed' && b - a >= 8) el('rect', { x: X(a) + gap / 2, y: R.y + 14, width: Math.max(1, X(a + 8) - X(a) - gap / 2), height: 8, class: 'sl-tag' }, g);
+      }
+      for (const L of shared) el('rect', { x: X(L * 128) + 1.5, y: R.y + 1.5, width: X(128) - X(0) - 3, height: R.h - 3, class: 'band-front' }, g);
+      // Labels for the two frontier slots.
+      const lab = (k, text) => { const a = k * stride; el('text', { x: X(a + stride / 2), y: R.y + R.h + 34, 'text-anchor': 'middle', class: 'lbl' }, g, text); };
+      if (stride >= 64) { lab(i, 'consumer, slot ' + i); lab(i + 1, 'producer, slot ' + (i + 1)); }
+      else { const tx = X(i * stride); el('text', { x: tx, y: R.y + R.h + 34, 'text-anchor': tx > 480 ? 'end' : 'start', class: 'lbl' }, g, `consumer slot ${i}, producer slot ${i + 1}`); }
+      el('text', { x: 20, y: 18, class: 'lbl' }, svg, `${slot === 'typed' ? 'TypedSlot' : 'CopySlot'}, ${rec}-byte record: stride ${stride} B, ${(128 / stride).toFixed(2).replace(/\.00$/, '')} slots per line`);
+      const span = s => s.length === 1 ? `line ${s[0]}` : `lines ${s[0]}–${s[s.length - 1]}`;
+      out.textContent = `Slot ${i} covers bytes ${i * stride}–${i * stride + stride - 1} (${span(lc)}); slot ${i + 1} covers ${(i + 1) * stride}–${(i + 1) * stride + stride - 1} (${span(lp)}). ` +
+        (shared.length ? `Both touch line ${shared.join(', ')}: the producer writes into a line the consumer is reading.` : 'No line in common: the producer writes into the next line.');
+    }
+    groups.forEach(gp => gp.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      if (b.dataset.rec) rec = +b.dataset.rec;
+      if (b.dataset.slot) slot = b.dataset.slot;
+      pressGroup(gp, b); draw();
+    }));
+    input.addEventListener('input', draw);
+    draw();
+  })();
+
+  /* ---------- Figure 6: Wide::whole at strides 264 and 256 ---------- */
+  (() => {
+    const svg = $('#lay-wide-svg'), out = $('#lay-wide-read'), group = $('#lay-f6 .lay-group');
+    let chk = 'old';
+    function row(y, stride, tagged, title) {
+      const g = el('g', {}, svg);
+      el('text', { x: 20, y: y - 22, class: 'lbl' }, g, title);
+      const R = { x0: 20, w: 680, b0: 0, b1: 1024, y, h: 56 };
+      const { X } = ruler(g, R);
+      const touched = new Set();
+      const nRec = Math.floor(1024 / stride);
+      const words = [];
+      for (let k = 0; k < nRec; k++) {
+        const s = k * stride;
+        const first = tagged ? s + 8 : s;
+        if (tagged) { words.push({ a: s, tag: true, read: true }); touched.add(Math.floor(s / 128)); }
+        for (let j = 0; j < 32; j++) {
+          const a = first + j * 8;
+          const read = chk === 'new' || j === 0 || j === 31;
+          words.push({ a, read });
+          if (read) touched.add(Math.floor(a / 128));
+        }
+      }
+      const covered = Math.ceil((nRec * stride) / 128);
+      for (let L = 0; L < covered; L++) if (!touched.has(L)) {
+        el('rect', { x: X(L * 128) + 1, y: y + 1, width: X(128) - X(0) - 2, height: R.h - 2, style: 'fill:url(#lay-pat-never)' }, g);
+        el('text', { x: X(L * 128 + 64), y: y - 6, 'text-anchor': 'middle', class: 'lbl-s' }, g, 'never read');
+      } else {
+        el('text', { x: X(L * 128 + 64), y: y - 6, 'text-anchor': 'middle', class: 'lname' }, g, 'line ' + L);
+      }
+      for (const w of words) {
+        el('rect', { x: X(w.a) + 0.5, y: y + 10, width: X(8) - X(0) - 1, height: R.h - 20, rx: 1,
+          class: w.tag ? 'w-tag-read' : (w.read ? 'w-read' : 'w-skip') }, g);
+      }
+      for (let k = 0; k <= nRec; k++) el('line', { x1: X(k * stride), x2: X(k * stride), y1: y + 4, y2: y + R.h - 4, class: 'tick', style: 'stroke:var(--text);stroke-width:1.5' }, g);
+    }
+    function draw() {
+      clear(svg);
+      hatch(svg, 'lay-pat-never', 'never-bg', 'never-ln');
+      row(40, D.slotBytes.typed[256], true, 'TypedSlot<[u64; 32]>, stride 264: three records');
+      row(160, D.slotBytes.copy[256], false, 'CopySlot<[u64; 32]>, stride 256: four records');
+      out.textContent = chk === 'old'
+        ? `Old check: at stride 264 the consumer pulled ${D.linesOld[264].toFixed(2)} lines per record; at 256 it pulled ${D.linesOld[256].toFixed(2)}. The middle line of every 264-byte record never left the producer's core.`
+        : 'Fixed check: every word is read, so every line a record covers crosses to the consumer at both strides. The two slot types now pay for the same lines.';
+    }
+    group.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return;
+      chk = b.dataset.chk; pressGroup(group, b); draw();
+    });
+    draw();
+  })();
+})();
+</script>
+</section>

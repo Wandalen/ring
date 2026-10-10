@@ -1,0 +1,456 @@
+<!-- summary: Teaches what a cache line is (64 vs 128 bytes), how one line moves between two cores (owned / shared / invalid,
+     measured 37.8 ns one-way), false vs true sharing, and why one line vs two lines for the two cursors depends on the access pattern.
+     Controls: byte ruler with a 64/128 toggle and selectable words; two step/play coherence simulators (sharing + placement toggles; cursor pattern + placement toggles; latency choice). -->
+<section id="sec-cache-lines" class="section" data-title="Cache lines">
+<style>
+  #sec-cache-lines .cl-fig { margin: 18px 0 8px; }
+  #sec-cache-lines .cl-fig svg { display: block; width: 100%; height: auto; }
+  #sec-cache-lines .cl-group { display: inline-flex; gap: 6px; align-items: center; }
+  #sec-cache-lines .cl-group > span { color: var(--muted); font-size: 0.92rem; margin-right: 2px; }
+  #sec-cache-lines .cl-readout { min-height: 3.2em; margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+  #sec-cache-lines .cl-readout b { font-weight: 600; }
+  #sec-cache-lines .ruler-cell { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; cursor: pointer; }
+  #sec-cache-lines .ruler-cell.odd-line { fill: var(--surface); }
+  #sec-cache-lines .ruler-cell.in-sel { fill: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+  #sec-cache-lines .ruler-cell.sel { fill: var(--accent); }
+  #sec-cache-lines .ruler-cell:focus { outline: none; stroke: var(--accent); stroke-width: 2.5; }
+  #sec-cache-lines .ruler-bound { stroke: var(--text); stroke-width: 2; }
+  #sec-cache-lines .ruler-tick { stroke: var(--line); }
+  #sec-cache-lines .ruler-sel-box { fill: none; stroke: var(--accent); stroke-width: 2; }
+  #sec-cache-lines svg .lbl { fill: var(--muted); font-size: 12px; }
+  #sec-cache-lines svg .lbl-strong { fill: var(--text); font-size: 13px; font-weight: 600; }
+  #sec-cache-lines svg .mono { font-family: var(--font-mono); }
+  #sec-cache-lines .sim { margin: 18px 0 10px; }
+  #sec-cache-lines .sim-body { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; align-items: start; }
+  @media (max-width: 1180px) { #sec-cache-lines .sim-body { grid-template-columns: 1fr; } }
+  #sec-cache-lines .stats { display: grid; grid-template-columns: auto auto; gap: 4px 14px; margin: 0; font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+  #sec-cache-lines .stats dt { color: var(--muted); }
+  #sec-cache-lines .stats dd { margin: 0; text-align: right; font-weight: 600; }
+  #sec-cache-lines .stats .big { font-size: 1.35rem; }
+  #sec-cache-lines .stats .sep { grid-column: 1 / -1; border-top: 1px solid var(--line); margin: 4px 0; }
+  #sec-cache-lines .log { list-style: none; padding: 0; margin: 10px 0 0; font-size: 0.86rem; color: var(--muted); max-width: none; }
+  #sec-cache-lines .log li { padding: 3px 0; border-bottom: 1px dashed var(--line); max-width: none; }
+  #sec-cache-lines .log li:first-child { color: var(--text); }
+  #sec-cache-lines .log .tA { color: var(--c-producer); font-weight: 600; }
+  #sec-cache-lines .log .tB { color: var(--c-consumer); font-weight: 600; }
+  #sec-cache-lines .cell { stroke: var(--bg); stroke-width: 1.5; }
+  #sec-cache-lines .cell.word-off { opacity: 0.35; }
+  #sec-cache-lines .copy-frame { fill: none; stroke-width: 1.5; }
+  #sec-cache-lines .copy-frame.st-I, #sec-cache-lines .copy-frame.st-none { stroke: var(--line); stroke-dasharray: 4 4; }
+  #sec-cache-lines .unused { opacity: 0.3; }
+  #sec-cache-lines .packet { pointer-events: none; }
+  #sec-cache-lines .note { font-size: 0.88rem; color: var(--muted); max-width: var(--measure); }
+  #sec-cache-lines .carry li { margin: 4px 0; }
+  #sec-cache-lines button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<h2>Cache lines</h2>
+
+<p>A core never fetches one byte from memory. It fetches a <dfn>cache line</dfn>: a fixed, aligned block of bytes that
+the caches store, copy and track as one unit. Touch one byte and the whole line comes along. The line is 64 bytes on x86
+and most ARM cores. It is 128 bytes on Apple silicon, including the Apple M4 Pro where every number in this explainer
+was measured.</p>
+
+<h3>The unit the memory system moves</h3>
+<p>The ruler below is 256 bytes of memory, split into 8-byte words (one <code>u64</code> each). Switch the line size and
+pick a word: the highlighted span is everything that moves with it.</p>
+
+<div class="card cl-fig" id="cl-ruler-card">
+  <div class="controls" role="group" aria-label="Cache line size">
+    <span class="cl-group"><span>Line size</span>
+      <button type="button" data-ls="64" aria-pressed="false">64 bytes (x86, most ARM)</button>
+      <button type="button" data-ls="128" aria-pressed="true">128 bytes (Apple M4 Pro)</button>
+    </span>
+  </div>
+  <svg id="cl-ruler" viewBox="0 0 960 118" role="group" aria-label="A 256-byte span of memory split into 8-byte words, with cache line boundaries"></svg>
+  <p class="cl-readout" id="cl-ruler-out" aria-live="polite"></p>
+</div>
+
+<h3>One line, two cores</h3>
+<p>Each core keeps its own copy of a line in its L1 cache. A coherence protocol keeps the copies consistent with two
+rules. To <em>write</em>, a core must hold the only valid copy; every other copy is invalidated first. To <em>read</em>,
+a core needs a valid copy; several cores may hold the same line read-only, <em>shared</em>. When the up-to-date copy
+lives in the other core, the line has to cross over. On this machine one crossing between two performance cores in the
+same cluster took a median <b>37.8 ns</b> (p25 37.3, p75 38.2). Across clusters it took 58 to 105 ns.</p>
+
+<p>The simulator runs core A and core B in turns. A writes word <code>a</code> each turn. B reads one word each turn.
+Choose which word B reads and where the two words sit, then step or play.</p>
+
+<div class="card sim" id="cl-sim1">
+  <div class="controls">
+    <span class="cl-group" role="group" aria-label="What core B reads"><span>B reads</span>
+      <button type="button" data-k="share" data-v="false" aria-pressed="true">its own unrelated word b</button>
+      <button type="button" data-k="share" data-v="true" aria-pressed="false">what A wrote (word a)</button>
+    </span>
+    <span class="cl-group" role="group" aria-label="Where the two words sit"><span>Words a and b in</span>
+      <button type="button" data-k="place" data-v="one" aria-pressed="true">the same line</button>
+      <button type="button" data-k="place" data-v="two" aria-pressed="false">different lines</button>
+    </span>
+  </div>
+  <div class="sim-body">
+    <div>
+      <svg class="sim-svg" viewBox="0 0 760 236" role="img" aria-label="Core A's and core B's copies of two 128-byte cache lines with their coherence states"></svg>
+      <div class="controls">
+        <button type="button" data-act="step">Step one turn</button>
+        <button type="button" data-act="play" aria-pressed="false">Play</button>
+        <button type="button" data-act="reset">Reset</button>
+        <span class="cl-group" role="group" aria-label="Cost of one move"><span>One move costs</span>
+          <button type="button" data-lat="37.8" aria-pressed="true">37.8 ns (same cluster)</button>
+          <button type="button" data-lat="58" aria-pressed="false">58 ns</button>
+          <button type="button" data-lat="105" aria-pressed="false">105 ns (cross cluster)</button>
+        </span>
+      </div>
+    </div>
+    <div>
+      <dl class="stats" aria-live="polite"></dl>
+      <ol class="log" aria-label="What happened, newest first"></ol>
+    </div>
+  </div>
+  <p class="note">Model, not a measurement. Each turn a core fetches each line it touches once: owned if it writes any
+    word in it, shared if it only reads. A <em>move</em> is either a transfer (the line's bytes cross to the other core)
+    or an invalidation (the writer tells the other core to drop its copy). Every move is charged the chosen one-way
+    latency. The first load of each line comes from memory and is not counted. A real core can hide part of a write's
+    invalidation behind other work; a read of a line the other core just wrote cannot be hidden, the core waits.</p>
+</div>
+
+<h3>False sharing and true sharing</h3>
+<p><dfn>False sharing</dfn> is unrelated data that happens to sit in one line: core B never needs <code>a</code>, yet
+A's writes still drag the line away from B and B's reads drag it back. Set B to read its own word and move the words to
+different lines: the moves stop. After each line's first load from memory, every access is a hit. Padding (putting unused bytes between the two words) fixes false
+sharing. <dfn>True sharing</dfn> is data both cores must touch because the protocol says so: B reads what A wrote. Now
+placement changes nothing; every round still costs a move each way, because the value itself has to travel. Padding
+cannot remove a transfer the protocol requires.</p>
+<p>The ring in this explainer has two such values, its two <dfn>cursors</dfn>. The producer writes its cursor to
+publish records, and the consumer must read it to find them. The consumer writes its cursor to free slots, and the
+producer must read it to find room. That is true sharing in both directions. Layout cannot make those moves go away. It
+decides only whether the two cursors travel together in one line or separately in two.</p>
+
+<h3>One line or two: it depends on the access pattern</h3>
+<p>Same simulator, now with the two cursors. The producer (A) writes cursor <code>P</code> every turn. The consumer (B)
+writes cursor <code>C</code> every turn. Each side also reads the other's cursor, either every turn or every fourth
+turn. The fourth-turn pattern stands for a side that keeps a private copy of the other cursor and re-reads the shared
+one only now and then. In one line, <code>P</code> sits at byte 0 and <code>C</code> at byte 64; in two lines,
+<code>C</code> moves to byte 128.</p>
+
+<div class="card sim" id="cl-sim2">
+  <div class="controls">
+    <span class="cl-group" role="group" aria-label="How often each side reads the other cursor"><span>Each side reads the other cursor</span>
+      <button type="button" data-k="pattern" data-v="lock" aria-pressed="true">every turn (strict ping-pong)</button>
+      <button type="button" data-k="pattern" data-v="loose" aria-pressed="false">every fourth turn (independent)</button>
+    </span>
+    <span class="cl-group" role="group" aria-label="Where the two cursors sit"><span>Cursors in</span>
+      <button type="button" data-k="place" data-v="one" aria-pressed="true">one line</button>
+      <button type="button" data-k="place" data-v="two" aria-pressed="false">two lines</button>
+    </span>
+  </div>
+  <div class="sim-body">
+    <div>
+      <svg class="sim-svg" viewBox="0 0 760 236" role="img" aria-label="Producer's and consumer's copies of the cursor lines with their coherence states"></svg>
+      <div class="controls">
+        <button type="button" data-act="step">Step one turn</button>
+        <button type="button" data-act="play" aria-pressed="false">Play</button>
+        <button type="button" data-act="reset">Reset</button>
+        <span class="cl-group" role="group" aria-label="Cost of one move"><span>One move costs</span>
+          <button type="button" data-lat="37.8" aria-pressed="true">37.8 ns (same cluster)</button>
+          <button type="button" data-lat="58" aria-pressed="false">58 ns</button>
+          <button type="button" data-lat="105" aria-pressed="false">105 ns (cross cluster)</button>
+        </span>
+      </div>
+    </div>
+    <div>
+      <dl class="stats" aria-live="polite"></dl>
+      <ol class="log" aria-label="What happened, newest first"></ol>
+    </div>
+  </div>
+</div>
+
+<p>Play both patterns in both placements and compare moves per round. With strict ping-pong, one line costs 2 moves a
+round and two lines cost 4: in one line, the single transfer that brings A the consumer's new <code>C</code> carries the
+line A is about to write <code>P</code> into, so one move does two jobs. With independent access, one line still costs 2
+a round, because each side's own write steals the line from the other even when nobody needs the new value. Two lines
+cost 1 on average: each side writes its own line undisturbed, and moves happen only on the occasional read. So &ldquo;put the
+cursors on separate lines&rdquo; is the right default only when the two sides do not read each other every turn.</p>
+
+<p class="measured">Before the consumer cached the producer's cursor (pull request #41), the consumer read it on every
+pop. With 64 slots and one record per pop, the ring ran 87 to 98 M records/s with both cursors in one line and 22 to
+27 M records/s with them in two lines.</p>
+
+<p class="hyp">Stated confidence about 60%. &ldquo;Natural batching&rdquo; is the proposed reason one line won. When the
+consumer stores its own cursor it takes ownership of the whole shared line. The producer's next publishes wait in its
+store buffer (a queue of stores not yet visible to other cores) until the line comes back, then land together. The
+consumer then finds several new records per fetch and pops them as local hits. The measurements confirm the trigger:
+placement decides the speed, and caching the producer cursor in the consumer removes that dependence. They do not prove
+this mechanism. This machine had no hardware performance counters, so nobody counted the moves.</p>
+
+<h3>What to carry into the next sections</h3>
+<ul class="carry">
+  <li>A line is <b>128 bytes</b> on this machine. Anything within the same 128-byte block moves as one.</li>
+  <li>One cross-core move costs about <b>37.8 ns</b> (median, same cluster; 58 to 105 ns across clusters). At that
+    price one line can cross at most about 26 million times a second.</li>
+  <li>A queue that pays one unhidden move per record is capped near <b>20 to 25 M records/s</b>. Section 4 fits 40 to
+    48 ns per cursor re-read, and the slow layouts above sit at 22 to 27 M records/s.</li>
+  <li>The cursors are true sharing. Padding only chooses whether they travel together or apart; which is better depends
+    on how often each side reads the other.</li>
+</ul>
+
+<script>
+(() => {
+  const root = document.getElementById('sec-cache-lines');
+  // From data.json, machine block.
+  const MACHINE = { cache_line_bytes: 128, one_way_ns: { same_cluster_median: 37.8, same_cluster_p25: 37.3, same_cluster_p75: 38.2, cross_cluster_range: [58, 105] } };
+  const NS = 'http://www.w3.org/2000/svg';
+  const reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const el = (tag, attrs = {}, parent) => {
+    const n = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    if (parent) parent.appendChild(n);
+    return n;
+  };
+  const pressGroup = (btns, active) => btns.forEach(b => b.setAttribute('aria-pressed', String(b === active)));
+
+  /* ---------------- Byte ruler ---------------- */
+  (() => {
+    const card = root.querySelector('#cl-ruler-card');
+    const svg = root.querySelector('#cl-ruler');
+    const out = root.querySelector('#cl-ruler-out');
+    const lsBtns = [...card.querySelectorAll('button[data-ls]')];
+    const X0 = 32, W = 28, Y = 34, H = 40, WORDS = 32;
+    let ls = MACHINE.cache_line_bytes, sel = 9;
+    const cells = [];
+    for (let i = 0; i < WORDS; i++) {
+      const r = el('rect', { x: X0 + i * W, y: Y, width: W, height: H, class: 'ruler-cell', tabindex: '0', role: 'button' }, svg);
+      r.addEventListener('click', () => { sel = i; draw(); });
+      r.addEventListener('focus', () => { sel = i; draw(); });
+      r.addEventListener('keydown', e => {
+        if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+          e.preventDefault();
+          const j = Math.max(0, Math.min(WORDS - 1, i + (e.key === 'ArrowRight' ? 1 : -1)));
+          cells[j].focus();
+        }
+      });
+      cells.push(r);
+    }
+    const overlay = el('g', {}, svg);
+    function draw() {
+      overlay.textContent = '';
+      const wordsPerLine = ls / 8, nLines = 256 / ls, selLine = Math.floor(sel / wordsPerLine);
+      cells.forEach((c, i) => {
+        const line = Math.floor(i / wordsPerLine);
+        c.setAttribute('class', 'ruler-cell' + (line % 2 ? ' odd-line' : '') + (line === selLine ? ' in-sel' : '') + (i === sel ? ' sel' : ''));
+        c.setAttribute('aria-label', `bytes ${i * 8} to ${i * 8 + 7}, line ${line}`);
+      });
+      for (let b = 0; b <= 256; b += 16) {
+        const x = X0 + (b / 8) * W;
+        const isBound = b % ls === 0;
+        el('line', { x1: x, x2: x, y1: isBound ? Y - 10 : Y + H, y2: isBound ? Y + H + 10 : Y + H + 5, class: isBound ? 'ruler-bound' : 'ruler-tick' }, overlay);
+        if (b % 32 === 0) {
+          const t = el('text', { x, y: Y + H + 26, 'text-anchor': 'middle', class: 'lbl mono' }, overlay);
+          t.textContent = b;
+        }
+      }
+      for (let l = 0; l < nLines; l++) {
+        const t = el('text', { x: X0 + (l * wordsPerLine + wordsPerLine / 2) * W, y: Y - 14, 'text-anchor': 'middle', class: l === selLine ? 'lbl-strong' : 'lbl' }, overlay);
+        t.textContent = `line ${l}`;
+      }
+      el('rect', { x: X0 + selLine * wordsPerLine * W, y: Y - 3, width: wordsPerLine * W, height: H + 6, rx: 4, class: 'ruler-sel-box' }, overlay);
+      const lo = selLine * ls, hi = lo + ls - 1;
+      out.innerHTML = `Bytes <b>${sel * 8}&ndash;${sel * 8 + 7}</b> sit in <b>line ${selLine}</b> (bytes ${lo}&ndash;${hi}). ` +
+        `A core that reads or writes these 8 bytes moves all <b>${ls}</b>. This 256-byte span holds ${nLines} lines.` +
+        (ls === 128 ? ' Two words 64 bytes apart can share one of these lines.' : '');
+    }
+    lsBtns.forEach(b => b.addEventListener('click', () => { ls = +b.dataset.ls; pressGroup(lsBtns, b); draw(); }));
+    draw();
+  })();
+
+  /* ---------------- Coherence simulator ---------------- */
+  // Copy states per core per line: '-' not loaded, 'I' invalid, 'S' shared, 'M' owned (modified).
+  const STATE_TXT = { '-': 'not loaded', I: 'invalid (I)', S: 'shared (S)', M: 'owned, modified (M)' };
+  const COLOR = { A: 'var(--c-producer)', B: 'var(--c-consumer)' };
+
+  function makeSim(card, cfg) {
+    const svg = card.querySelector('.sim-svg');
+    const stats = card.querySelector('.stats');
+    const log = card.querySelector('.log');
+    const opt = Object.assign({}, cfg.defaults);
+    let lat = MACHINE.one_way_ns.same_cluster_median;
+    let s, timer = null;
+    const playBtn = card.querySelector('[data-act="play"]');
+
+    function reset() {
+      s = { turn: 0, copies: [{ A: '-', B: '-' }, { A: '-', B: '-' }], transfers: 0, invals: 0, perRound: [], roundMoves: 0, lastWrite: null, events: [] };
+      log.textContent = '';
+      render([]);
+    }
+    function lineStatus(c) {
+      if (c.A === 'M') return 'owned by A';
+      if (c.B === 'M') return 'owned by B';
+      if (c.A === 'S' || c.B === 'S') return 'shared';
+      if (c.A === 'I' || c.B === 'I') return 'invalid';
+      return 'not cached';
+    }
+    // One core needs one line, owned (excl) or shared.
+    function need(core, li, excl) {
+      const o = core === 'A' ? 'B' : 'A', c = s.copies[li];
+      const mine = c[core], theirs = c[o];
+      const held = theirs === 'S' || theirs === 'M';
+      if (excl) {
+        if (mine === 'M') return { kind: 'hit' };
+        if (!held) { c[core] = 'M'; return { kind: mine === 'S' ? 'hit' : 'cold' }; }
+        c[o] = 'I'; c[core] = 'M';
+        return mine === 'S' ? { kind: 'inval', from: core, to: o } : { kind: 'transfer', from: o, to: core };
+      }
+      if (mine === 'M' || mine === 'S') return { kind: 'hit' };
+      if (!held) { c[core] = 'S'; return { kind: 'cold' }; }
+      c[o] = 'S'; c[core] = 'S';
+      return { kind: 'transfer', from: o, to: core };
+    }
+    function step() {
+      const core = s.turn % 2 === 0 ? 'A' : 'B';
+      const round = Math.floor(s.turn / 2);
+      const ops = cfg.ops(core, round, opt);
+      const words = cfg.words(opt);
+      const byLine = new Map();
+      ops.forEach(op => {
+        const li = words[op.w].line;
+        if (!byLine.has(li)) byLine.set(li, { excl: false, ops: [] });
+        const g = byLine.get(li); g.excl = g.excl || op.write; g.ops.push(op);
+      });
+      const anims = [];
+      const parts = [];
+      let moves = 0;
+      for (const [li, g] of byLine) {
+        const r = need(core, li, g.excl);
+        const what = g.ops.map(op => `${op.write ? 'writes' : 'reads'} ${op.w}`).join(', ');
+        let tail;
+        if (r.kind === 'transfer') { s.transfers++; moves++; anims.push({ li, ...r, kind: 'transfer' }); tail = `line ${li} transfers from ${r.from} (1 move)`; }
+        else if (r.kind === 'inval') { s.invals++; moves++; anims.push({ li, ...r, kind: 'inval' }); tail = `${core} invalidates ${r.to}'s copy of line ${li} (1 move)`; }
+        else if (r.kind === 'cold') tail = `line ${li} loads from memory (first touch, not counted)`;
+        else tail = `line ${li} is already here (hit)`;
+        parts.push(`${what}: ${tail}`);
+        g.ops.forEach(op => { if (op.write) s.lastWrite = op.w; });
+      }
+      s.roundMoves += moves;
+      if (core === 'B') { s.perRound.push(s.roundMoves); s.roundMoves = 0; }
+      const li = document.createElement('li');
+      li.innerHTML = `Turn ${s.turn + 1}, <span class="t${core}">${cfg.coreName[core]}</span> ${parts.join('; ')}.`;
+      log.prepend(li);
+      while (log.children.length > 6) log.lastChild.remove();
+      s.turn++;
+      render(anims, core);
+    }
+    function fmtNs(ns) { return ns >= 10000 ? (ns / 1000).toFixed(1) + ' µs' : ns.toFixed(1) + ' ns'; }
+    function render(anims, actor) {
+      svg.textContent = '';
+      const words = cfg.words(opt);
+      const used = new Set(Object.values(words).filter(w => w.used).map(w => w.line));
+      const CW = 18, X = [150, 462], ROW = { A: 40, B: 162 }, RH = 34;
+      ['A', 'B'].forEach(core => {
+        const t = el('text', { x: 0, y: ROW[core] + 15, class: 'lbl-strong' }, svg); t.textContent = cfg.rowName[core][0];
+        const t2 = el('text', { x: 0, y: ROW[core] + 31, class: 'lbl' }, svg); t2.textContent = cfg.rowName[core][1];
+        el('rect', { x: 132, y: ROW[core] - 2, width: 4, height: RH + 4, fill: COLOR[core], rx: 2 }, svg);
+      });
+      [0, 1].forEach(li => {
+        const g = el('g', { class: used.has(li) ? '' : 'unused' }, svg);
+        const c = s.copies[li];
+        const h = el('text', { x: X[li], y: 22, class: 'lbl-strong' }, g);
+        h.textContent = `line ${li}, bytes ${li * 128}–${li * 128 + 127}`;
+        const h2 = el('text', { x: X[li] + 16 * CW, y: 22, 'text-anchor': 'end', class: 'lbl' }, g);
+        h2.textContent = used.has(li) ? lineStatus(c) : 'not used here';
+        ['A', 'B'].forEach(core => {
+          const st = c[core];
+          for (let k = 0; k < 16; k++) {
+            const word = Object.entries(words).find(([, w]) => w.line === li && w.idx === k);
+            let fill = 'var(--surface-2)', op = 1;
+            if (st === 'M') { fill = COLOR[core]; op = word ? 0.95 : 0.55; }
+            else if (st === 'S') { fill = COLOR[core]; op = word ? 0.45 : 0.2; }
+            const r = el('rect', { x: X[li] + k * CW, y: ROW[core], width: CW, height: RH, fill, 'fill-opacity': op, class: 'cell' + (word && !word[1].used ? ' word-off' : '') }, g);
+            if (word) {
+              const tx = el('text', { x: X[li] + k * CW + CW / 2, y: ROW[core] + RH / 2 + 5, 'text-anchor': 'middle', class: 'mono', 'font-size': 13, 'font-weight': 700 }, g);
+              tx.textContent = word[0];
+              if (!word[1].used) tx.setAttribute('opacity', 0.4);
+              if (actor === core && s.lastWrite === word[0] && st === 'M' && !reduceMotion) r.animate([{ fillOpacity: 0.2 }, { fillOpacity: 0.95 }], { duration: 500 });
+            }
+          }
+          el('rect', { x: X[li] - 1, y: ROW[core] - 1, width: 16 * CW + 2, height: RH + 2, rx: 3, class: 'copy-frame st-' + (st === '-' ? 'none' : st), stroke: st === 'M' || st === 'S' ? COLOR[core] : '' }, g);
+          const lab = el('text', { x: X[li], y: ROW[core] + RH + 16, class: 'lbl' }, g);
+          lab.textContent = `${core}'s copy: ${STATE_TXT[st]}`;
+        });
+      });
+      // Moves between the rows.
+      anims.forEach(a => {
+        const x = X[a.li], yFrom = a.from === 'A' ? ROW.A + RH + 22 : ROW.B - 26, yTo = a.from === 'A' ? ROW.B - 26 : ROW.A + RH + 22;
+        const g = el('g', { class: 'packet' }, svg);
+        if (a.kind === 'transfer') {
+          el('rect', { x, y: yTo, width: 16 * CW, height: 8, rx: 4, fill: COLOR[a.to], 'fill-opacity': 0.9 }, g);
+          const t = el('text', { x: x + 8 * CW, y: (ROW.A + RH + ROW.B) / 2 + 6, 'text-anchor': 'middle', class: 'lbl-strong' }, svg);
+          t.textContent = `transfer ${a.from} → ${a.to}`;
+        } else {
+          el('rect', { x: x + 8 * CW - 20, y: yTo, width: 40, height: 8, rx: 4, fill: 'var(--c-bad)' }, g);
+          const t = el('text', { x: x + 8 * CW, y: (ROW.A + RH + ROW.B) / 2 + 6, 'text-anchor': 'middle', class: 'lbl-strong' }, svg);
+          t.textContent = `invalidate ${a.to}'s copy`;
+        }
+        if (!reduceMotion) g.animate([{ transform: `translate(0px, ${yFrom - yTo}px)`, opacity: 0.3 }, { transform: 'translate(0px, 0px)', opacity: 1 }], { duration: 450, easing: 'ease-out' });
+      });
+      // Stats.
+      const moves = s.transfers + s.invals;
+      const recent = s.perRound.slice(-4);
+      const avg = recent.length ? recent.reduce((p, q) => p + q, 0) / recent.length : null;
+      const perRoundNs = avg === null ? null : avg * lat;
+      stats.innerHTML =
+        `<dt>Turns</dt><dd>${s.turn}</dd>` +
+        `<dt>Transfers</dt><dd>${s.transfers}</dd>` +
+        `<dt>Invalidations</dt><dd>${s.invals}</dd>` +
+        `<dt>Time moving lines</dt><dd class="big">${fmtNs(moves * lat)}</dd>` +
+        `<div class="sep"></div>` +
+        `<dt>Moves per round, last 4</dt><dd>${avg === null ? '–' : avg.toFixed(1)}</dd>` +
+        `<dt>Line time per round</dt><dd>${perRoundNs === null ? '–' : fmtNs(perRoundNs)}</dd>`;
+    }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } playBtn.setAttribute('aria-pressed', 'false'); playBtn.textContent = 'Play'; }
+    card.querySelector('[data-act="step"]').addEventListener('click', () => { stop(); step(); });
+    card.querySelector('[data-act="reset"]').addEventListener('click', () => { stop(); reset(); });
+    playBtn.addEventListener('click', () => {
+      if (timer) return stop();
+      step(); timer = setInterval(step, 750);
+      playBtn.setAttribute('aria-pressed', 'true'); playBtn.textContent = 'Pause';
+    });
+    const latBtns = [...card.querySelectorAll('button[data-lat]')];
+    latBtns.forEach(b => b.addEventListener('click', () => { lat = +b.dataset.lat; pressGroup(latBtns, b); render([]); }));
+    const keys = new Set([...card.querySelectorAll('button[data-k]')].map(b => b.dataset.k));
+    keys.forEach(k => {
+      const btns = [...card.querySelectorAll(`button[data-k="${k}"]`)];
+      btns.forEach(b => b.addEventListener('click', () => { opt[k] = b.dataset.v; pressGroup(btns, b); stop(); reset(); }));
+    });
+    reset();
+  }
+
+  // Simulator 1: A writes a; B reads b (false sharing) or a (true sharing).
+  makeSim(root.querySelector('#cl-sim1'), {
+    defaults: { share: 'false', place: 'one' },
+    coreName: { A: 'A', B: 'B' },
+    rowName: { A: ['Core A', 'writes a'], B: ['Core B', 'reads a word'] },
+    words: o => ({
+      a: { line: 0, idx: 2, used: true },
+      b: o.place === 'one' ? { line: 0, idx: 10, used: o.share === 'false' } : { line: 1, idx: 2, used: o.share === 'false' },
+    }),
+    ops: (core, round, o) => core === 'A' ? [{ w: 'a', write: true }] : [{ w: o.share === 'true' ? 'a' : 'b', write: false }],
+  });
+
+  // Simulator 2: the two cursors.
+  makeSim(root.querySelector('#cl-sim2'), {
+    defaults: { pattern: 'lock', place: 'one' },
+    coreName: { A: 'producer', B: 'consumer' },
+    rowName: { A: ['Producer', 'writes P'], B: ['Consumer', 'writes C'] },
+    words: o => ({
+      P: { line: 0, idx: 0, used: true },
+      C: o.place === 'one' ? { line: 0, idx: 8, used: true } : { line: 1, idx: 0, used: true },
+    }),
+    ops: (core, round, o) => {
+      const reads = o.pattern === 'lock' || round % 4 === 3;
+      return core === 'A'
+        ? [{ w: 'P', write: true }, ...(reads ? [{ w: 'C', write: false }] : [])]
+        : [...(reads ? [{ w: 'P', write: false }] : []), { w: 'C', write: true }];
+    },
+  });
+})();
+</script>
+</section>

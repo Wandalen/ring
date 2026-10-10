@@ -1,0 +1,827 @@
+<!-- summary: Teaches the chase between producer and consumer: who is faster decides where the ring sits, the full-ring lockstep (one refresh buys one push), the fitted cost model, why CopySlot tipped the plain ring into lockstep, anomaly A as a knife-edge plus inlining artefact, and what the consumer cache (#41) does and does not change.
+     Controls: lockstep stepper (step / play / reset); fit chart with keyboard crosshair; chase simulator (p, c, r, m, capacity sliders, consumer-cache toggle, three "apply measured intervention" buttons) driving a room trace and a throughput chart with measured intervention markers; anomaly A build toggle (PR-era binary vs inlining forced equal).
+     All numbers inlined from data.json (regime_model, four_offsets_push1_pop1, stages_push1_pop1, stages_push1_popN, machine, cache_line_64_vs_128). -->
+<section id="sec-regimes" class="section" data-title="Who chases whom">
+<style>
+  #sec-regimes .rg-lede { font-size: 1.05rem; }
+  #sec-regimes .rg-fig { position: relative; margin: 18px 0 8px; max-width: 860px; }
+  #sec-regimes .rg-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  #sec-regimes .rg-fig svg:focus-visible, #sec-regimes .rg-fig g:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #sec-regimes .rg-cap { color: var(--muted); font-size: 0.88rem; margin: 6px 0 0; max-width: var(--measure); }
+  #sec-regimes .rg-tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.84rem; line-height: 1.35; min-width: 160px; box-shadow: 0 6px 18px rgba(0,0,0,0.25); opacity: 0; transition: opacity 0.08s; z-index: 2; }
+  #sec-regimes .rg-tip.on { opacity: 1; }
+  #sec-regimes .rg-tip .h { color: var(--muted); margin-bottom: 4px; }
+  #sec-regimes .rg-tip .row { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  #sec-regimes .rg-tip .row b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  #sec-regimes .rg-tip .row span.k { color: var(--muted); }
+  #sec-regimes .rg-tip .key { display: inline-block; width: 14px; height: 0; border-top: 2px solid var(--muted); }
+  #sec-regimes svg .t-muted { fill: var(--muted); font-size: 11px; }
+  #sec-regimes svg .t-ann { fill: var(--muted); font-size: 11.5px; }
+  #sec-regimes svg .t-lab { fill: var(--text); font-size: 12px; }
+  #sec-regimes svg .t-big { fill: var(--text); font-size: 13px; font-weight: 600; }
+  #sec-regimes svg .gridl { stroke: var(--line); stroke-width: 1; }
+  #sec-regimes svg .xh { stroke: var(--muted); stroke-width: 1; }
+  #sec-regimes svg .band-fast { fill: var(--c-good); opacity: 0.13; }
+  #sec-regimes svg .band-slow { fill: var(--c-bad); opacity: 0.11; }
+  #sec-regimes svg .ln { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  #sec-regimes svg .ln-1024 { stroke: var(--accent); }
+  #sec-regimes svg .ln-64 { stroke: var(--muted); stroke-dasharray: 6 4; }
+  #sec-regimes svg .ln-ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 3; fill: none; }
+  #sec-regimes svg .ln-off { stroke: var(--c-master); stroke-dasharray: 6 4; }
+  #sec-regimes svg .ln-on { stroke: var(--c-pr41); }
+  #sec-regimes svg .ln.dim { opacity: 0.4; stroke-width: 1.5; }
+  #sec-regimes svg .dot { stroke: var(--surface); stroke-width: 2; }
+  #sec-regimes .k-off { border-top: 2px dashed var(--c-master) !important; }
+  #sec-regimes .k-on { border-top-color: var(--c-pr41) !important; }
+  #sec-regimes .k-1024 { border-top-color: var(--accent) !important; }
+  #sec-regimes .k-64 { border-top: 2px dashed var(--muted) !important; }
+  #sec-regimes .k-tagged { border-top-color: var(--c-tagged) !important; }
+  #sec-regimes .k-untagged { border-top-color: var(--c-untagged) !important; }
+  #sec-regimes .k-before { border-top-color: var(--muted) !important; }
+  #sec-regimes .k-any { border-top-color: var(--text) !important; }
+  #sec-regimes .legend .ln-key { display: inline-block; width: 18px; height: 0; border-top: 2px solid; margin-right: 6px; vertical-align: 3px; }
+
+  /* stepper */
+  #sec-regimes .rg-step { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  #sec-regimes .rg-step-text { min-height: 3.2em; margin: 0; max-width: 68ch; }
+  #sec-regimes .rg-step-text .who-p { color: var(--c-producer); font-weight: 600; }
+  #sec-regimes .rg-step-text .who-c { color: var(--c-consumer); font-weight: 600; }
+  #sec-regimes .rg-count { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 0.92rem; }
+  #sec-regimes .rg-count b { color: var(--text); }
+  #sec-regimes svg .slot { fill: var(--surface-2); stroke: var(--line); stroke-width: 1; transition: fill 0.25s; }
+  #sec-regimes svg .slot.full { fill: var(--c-producer); fill-opacity: 0.55; }
+  #sec-regimes svg .slot.taken { fill: var(--c-consumer); fill-opacity: 0.35; }
+  #sec-regimes svg .lane { fill: var(--surface-2); stroke: var(--line); }
+  #sec-regimes svg .lane-p { stroke: var(--c-producer); }
+  #sec-regimes svg .lane-c { stroke: var(--c-consumer); }
+  #sec-regimes svg .mk-p { fill: var(--c-producer); }
+  #sec-regimes svg .mk-c { fill: var(--c-consumer); }
+  #sec-regimes svg .xfer { fill: none; stroke-width: 2.5; opacity: 0; transition: opacity 0.2s; }
+  #sec-regimes svg .xfer.on { opacity: 1; }
+  #sec-regimes svg .xfer-p2c { stroke: var(--c-producer); }
+  #sec-regimes svg .xfer-c2p { stroke: var(--c-consumer); }
+  #sec-regimes svg .xfer-lab { opacity: 0; transition: opacity 0.2s; }
+  #sec-regimes svg .xfer-lab.on { opacity: 1; }
+
+  /* simulator */
+  #sec-regimes .rg-sim { margin-top: 14px; max-width: 900px; }
+  #sec-regimes .rg-sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px 26px; margin: 4px 0 14px; }
+  #sec-regimes .rg-sliders label { display: grid; grid-template-columns: 1fr auto; gap: 2px 10px; align-items: baseline; color: var(--muted); font-size: 0.9rem; }
+  #sec-regimes .rg-sliders label output { color: var(--text); font-variant-numeric: tabular-nums; font-family: var(--font-mono); font-size: 0.86rem; }
+  #sec-regimes .rg-sliders label input { grid-column: 1 / -1; width: 100%; }
+  #sec-regimes .rg-sliders .who-p { color: var(--c-producer); }
+  #sec-regimes .rg-sliders .who-c { color: var(--c-consumer); }
+  #sec-regimes .rg-state { display: grid; grid-template-columns: auto 1fr; gap: 4px 16px; align-items: baseline; padding: 14px 16px; border-radius: var(--radius); background: var(--surface-2); border-left: 4px solid var(--line); margin: 6px 0 4px; }
+  #sec-regimes .rg-state[data-s="lock"] { border-left-color: var(--c-bad); }
+  #sec-regimes .rg-state[data-s="room"] { border-left-color: var(--c-warn); }
+  #sec-regimes .rg-state[data-s="free"] { border-left-color: var(--c-good); }
+  #sec-regimes .rg-state .big { font-size: 2.1rem; font-weight: 650; letter-spacing: -0.02em; line-height: 1.05; }
+  #sec-regimes .rg-state .big small { font-size: 0.95rem; color: var(--muted); font-weight: 500; margin-left: 4px; }
+  #sec-regimes .rg-state .lab { font-weight: 600; }
+  #sec-regimes .rg-state .lab .ic { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0; background: var(--line); }
+  #sec-regimes .rg-state[data-s="lock"] .ic { background: var(--c-bad); }
+  #sec-regimes .rg-state[data-s="room"] .ic { background: var(--c-warn); }
+  #sec-regimes .rg-state[data-s="free"] .ic { background: var(--c-good); }
+  #sec-regimes .rg-state .nums { grid-column: 2; color: var(--muted); font-variant-numeric: tabular-nums; font-size: 0.92rem; }
+  #sec-regimes .rg-state .nums b { color: var(--text); font-weight: 600; }
+  #sec-regimes .rg-model { font-size: 0.93rem; }
+  #sec-regimes .rg-model p, #sec-regimes .rg-model li { max-width: 74ch; }
+  #sec-regimes .rg-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0 2px; }
+  #sec-regimes .rg-pair { font-variant-numeric: tabular-nums; }
+  #sec-regimes table.rg-t { margin: 10px 0; font-size: 0.92rem; }
+  #sec-regimes table.rg-t td.bad { color: var(--c-bad); }
+  #sec-regimes details { margin: 6px 0 12px; max-width: 860px; }
+  #sec-regimes details summary { cursor: pointer; color: var(--muted); font-size: 0.9rem; }
+  #sec-regimes .rg-sign { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; max-width: 860px; margin: 12px 0; }
+  #sec-regimes .rg-sign .card h4 { margin: 0 0 6px; font-size: 1rem; }
+  #sec-regimes .rg-sign .card p { margin: 0; font-size: 0.93rem; }
+  #sec-regimes .rg-sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    #sec-regimes svg .slot, #sec-regimes svg .xfer, #sec-regimes svg .xfer-lab, #sec-regimes .rg-tip { transition: none; }
+  }
+</style>
+
+<h2>Who chases whom</h2>
+<p class="rg-lede">Section 3 showed the same code running at about 24 M/s or about 200 M/s depending on where the two
+  cursors landed. This section explains the slow number. No single load got slower. The two threads settled into a
+  state where every record costs one cross-core round trip.</p>
+
+<h3>The chase</h3>
+<p>Two threads on two cores. The <span style="color:var(--c-producer)">producer</span> spends <var>p</var> ns of its
+  own work per record; the <span style="color:var(--c-consumer)">consumer</span> spends <var>c</var> ns. Neither
+  waits for the other until the ring forces it to.</p>
+<ul>
+  <li>If the producer is faster (<var>p</var> &lt; <var>c</var>), it gains a little on every record and the ring
+    fills. Now the producer is the one that keeps hitting a wall: its cached copy of the consumer cursor says
+    <em>full</em>, and it has to read the consumer's cursor line to find out whether a slot was freed.</li>
+  <li>If the consumer is faster (<var>c</var> &lt; <var>p</var>), the ring runs nearly empty. The producer's cache
+    says <em>room</em> for almost a whole lap, so it reads the consumer cursor about once per lap. The consumer is the
+    one waiting, on the producer cursor.</li>
+</ul>
+<p>So where the ring sits decides which cross-core reads happen and how often. Here is the producer's side, from
+  <code>claim</code> in <code>ring_spsc/src/lib.rs</code> (the producer cache from #20):</p>
+<pre><code>if self.cached_head.distance_to(self.cached_tail) &gt;= capacity {
+  // The cache says full. [...] refresh the observation once
+  self.cached_head = self.ring.cursors.consumer().load(GATING);</code></pre>
+<p>Call that load a <strong>refresh</strong>. It is the only time the producer reads the consumer's cursor line.
+  When the refresh finds <var>R</var> free slots, the producer pushes <var>R</var> records before it needs the
+  next one.</p>
+
+<h3>The full-ring lockstep</h3>
+<p>Take the case that went wrong: the consumer is a little slower, the ring is full, and the benchmark pops one record
+  per call (<code>push1_pop1</code>). Step through it.</p>
+<div class="card rg-step" id="rg-stepper">
+  <div class="rg-fig" style="margin:0">
+    <svg viewBox="0 0 720 230" role="img" aria-label="An eight-slot ring between the producer core and the consumer core, showing which cache line moves at each step"></svg>
+  </div>
+  <p class="rg-step-text" aria-live="polite"></p>
+  <div class="controls" style="margin:0">
+    <button type="button" data-act="step">Step</button>
+    <button type="button" data-act="play" aria-pressed="false">Play</button>
+    <button type="button" data-act="reset">Reset</button>
+    <span class="rg-count" aria-live="off"></span>
+  </div>
+</div>
+<p>The consumer frees one slot and commits. The producer's cache says full, so it refreshes: one cross-core round
+  trip. It finds exactly one free slot, pushes once, and is full again. <strong>Each refresh buys one push.</strong>
+  The ring is never short of records; the consumer is slow because each slot it frees is fought over at once.</p>
+<div class="measured">Slow <code>push1_pop1</code> runs refresh 0.5 to 1.0 times per record, and the refreshes find
+  room for exactly one slot. Fast runs refresh at most 0.04 times per record. The review counted the refreshes with a
+  counter added to <code>Producer</code>; no hardware counters were available on this machine.</div>
+
+<p>Plot time per record against refreshes per record and the runs fall on a line. The slope is the price of one
+  refresh.</p>
+<div class="rg-fig" id="rg-fit">
+  <div class="legend" aria-hidden="true">
+    <span><span class="ln-key k-1024"></span>1024 slots, 144 runs</span>
+    <span><span class="ln-key k-64"></span>64 slots, 144 runs</span>
+    <span><span class="sw" style="background:var(--c-good);opacity:.45"></span>where fast runs sit</span>
+    <span><span class="sw" style="background:var(--c-bad);opacity:.4"></span>where slow runs sit</span>
+  </div>
+  <svg viewBox="0 0 720 300" tabindex="0" role="img" aria-label="Fitted time per record against refreshes per record. 1024 slots: 4.3 ns plus 48 ns per refresh, R squared 0.91. 64 slots: 10.2 ns plus 40 ns per refresh, R squared 0.95. Use left and right arrow keys to inspect."></svg>
+  <div class="rg-tip" role="status"></div>
+</div>
+<p class="rg-cap">Fitted lines from 288 <code>push1_pop1</code> runs (all four ring offsets, both slot types).
+  Hover or focus the chart and use the arrow keys to read both fits at any refresh rate.</p>
+<details>
+  <summary>Fit parameters as a table</summary>
+  <table class="rg-t">
+    <thead><tr><th>Capacity</th><th>Runs</th><th>Time per record</th><th>R²</th></tr></thead>
+    <tbody><tr><td>1024 slots</td><td>144</td><td>4.3 ns + 48 ns × refreshes/record</td><td>0.91</td></tr>
+      <tr><td>64 slots</td><td>144</td><td>10.2 ns + 40 ns × refreshes/record</td><td>0.95</td></tr></tbody>
+  </table>
+</details>
+<p>At one refresh per record the 1024-slot fit gives 52.3 ns per record, about 19 M/s: the slow cells. The 40 to 48 ns
+  slope is one cross-core round trip. For scale, the measured one-way core-to-core latency on this machine is 37.8 ns
+  (median, same cluster). The intercept, 4.3 ns, is what a record costs when nobody refreshes.</p>
+
+<h3>Play the chase</h3>
+<p>The simulator below follows the ring one refresh at a time. Move <var>p</var> and <var>c</var> across each
+  other and watch the ring fall into lockstep or climb out of it. <var>p</var> and <var>c</var> were never measured
+  in isolation; the defaults sit just on the fast side of the edge.</p>
+<div class="card rg-sim" id="rg-sim">
+  <div class="rg-sliders">
+    <label><span class="who-p">p: producer work per record</span><output data-o="p"></output>
+      <input type="range" data-k="p" min="1" max="20" step="0.1" value="5" aria-label="producer nanoseconds per record"></label>
+    <label><span class="who-c">c: consumer work per record</span><output data-o="c"></output>
+      <input type="range" data-k="c" min="1" max="20" step="0.1" value="3.5" aria-label="consumer nanoseconds per record"></label>
+    <label><span>m: cost of one refresh (round trip)</span><output data-o="m"></output>
+      <input type="range" data-k="m" min="10" max="100" step="1" value="45" aria-label="refresh cost in nanoseconds"></label>
+    <label><span>r: consumer's per-pop read of the producer line (cache off)</span><output data-o="r"></output>
+      <input type="range" data-k="r" min="0" max="10" step="0.5" value="1" aria-label="consumer per-pop read cost in nanoseconds"></label>
+    <label><span>Capacity</span><output data-o="N"></output>
+      <input type="range" data-k="N" min="0" max="8" step="1" value="4" aria-label="ring capacity in slots"></label>
+    <div class="controls" style="margin:0;align-self:end">
+      <button type="button" data-act="cache" aria-pressed="false">Consumer cache (#41): off</button>
+    </div>
+  </div>
+
+  <div class="rg-state" data-s="free" aria-live="polite">
+    <div class="big" data-o="mps"></div>
+    <div class="lab"><span class="ic" aria-hidden="true"></span><span data-o="state"></span></div>
+    <div class="nums" data-o="nums"></div>
+  </div>
+
+  <div class="rg-fig" id="rg-trace">
+    <div class="legend" aria-hidden="true">
+      <span><span class="ln-key k-off"></span>consumer cache off</span>
+      <span><span class="ln-key k-on"></span>consumer cache on</span>
+    </div>
+    <svg viewBox="0 0 720 210" tabindex="0" role="img" aria-label="Room found by each refresh, one point per refresh, starting from half the ring free. Arrow keys inspect."></svg>
+    <div class="rg-tip" role="status"></div>
+  </div>
+  <p class="rg-cap">Room found by each refresh, starting with half the ring free. Log scale. A line that sinks to 1 is
+    the lockstep; a line that rises to the capacity is a ring the consumer keeps empty. The active setting is drawn
+    bold.</p>
+
+  <div class="rg-fig" id="rg-sweep">
+    <svg viewBox="0 0 720 330" tabindex="0" role="img" aria-label="Model throughput against consumer minus producer cost for both cache settings, beside the three measured interventions. Arrow keys inspect the model curve; tab to each measured column."></svg>
+    <div class="rg-tip" role="status"></div>
+  </div>
+  <p class="rg-cap">Left: the model's throughput as <var>c</var> moves while <var>p</var> stays where you set it.
+    The dot is your current setting. Right, on the same scale: the three measured interventions, before
+    <span class="rg-sw" style="background:var(--muted)"></span>and after (<span class="rg-sw" style="background:var(--c-tagged)"></span>TypedSlot, circles;
+    <span class="rg-sw" style="background:var(--c-untagged)"></span>CopySlot, squares). Apply one to the model:</p>
+  <div class="rg-btns">
+    <button type="button" data-apply="0">Slow the producer by 6 ns</button>
+    <button type="button" data-apply="1">Slow the consumer by 1 ns</button>
+    <button type="button" data-apply="2">Slow the consumer by 5 ns</button>
+    <button type="button" data-act="defaults">Back to defaults</button>
+  </div>
+  <p class="rg-cap">The deltas sit inside each measured range (3–9 ns, about 1 ns, 4.5–6 ns).</p>
+  <details>
+    <summary>Measured interventions as a table</summary>
+    <table class="rg-t" id="rg-int-table">
+      <thead><tr><th>Intervention</th><th>Before, M/s</th><th>After, M/s</th></tr></thead><tbody></tbody>
+    </table>
+  </details>
+
+  <div class="rg-model">
+    <h4 style="margin:14px 0 6px">The model</h4>
+    <p>A refresh finds room <var>R</var>. The producer spends <var>R</var>·<var>p</var> pushing, then <var>m</var> on
+      the next refresh. In that time the consumer frees one slot every <var>c</var><sub>eff</sub> ns, so the next
+      refresh finds <var>R′</var> = (<var>R</var>·<var>p</var> + <var>m</var>) / <var>c</var><sub>eff</sub>.</p>
+    <ul>
+      <li><strong>Cache on:</strong> <var>c</var><sub>eff</sub> = <var>c</var>. If <var>c</var> &gt; <var>p</var>,
+        <var>R</var> settles at <var>R*</var> ≈ <var>m</var> / (<var>c</var> − <var>p</var>). The ring parks near
+        full, but each refresh still buys <var>R*</var> pushes.</li>
+      <li><strong>Cache off:</strong> <var>c</var><sub>eff</sub> = <var>c</var> + <var>r</var> + <var>m</var>/<var>R</var>.
+        The <var>r</var> is the consumer reading the producer's cursor line on every pop. The <var>m</var>/<var>R</var>
+        is the feedback: each refresh takes the consumer's cursor line away, and the consumer pays to take it back.
+        Substitute and <var>R′</var> − <var>R</var> has the sign of <var>p</var> − (<var>c</var> + <var>r</var>). There
+        is no stable middle: a consumer slower by any amount drives <var>R</var> to 1.</li>
+    </ul>
+    <p>With the cache off, time per record is <var>c</var> + <var>r</var> + <var>m</var> × refreshes/record, the same
+      shape as the fit above: the intercept is the consumer's own work, the slope is one refresh.</p>
+  </div>
+</div>
+<div class="hyp" style="margin-top:12px">The feedback term, a refresh costing the consumer a line re-acquisition when
+  the cursors sit on separate lines, was inferred from how added delays moved the result. Nobody observed it: there are
+  no PMU counters on this machine. Review "regimes" rates the direction high confidence and the thresholds medium. The
+  model keeps three costs and nothing else. It gets the direction of all three measured interventions right and
+  over-predicts the gain from slowing the producer.</div>
+
+<h3>Why CopySlot tipped it</h3>
+<p><code>CopySlot</code> (#38) dropped the tag store from the producer's push. The consumer's pop did not get
+  cheaper. That shrank <var>p</var> and left <var>c</var> alone, and on the two-line layout it was enough to flip the
+  sign of <var>c</var> − <var>p</var>: the producer became the faster side, the ring filled, and
+  <code>push1_pop1</code> fell into lockstep.</p>
+<table class="rg-t" id="rg-tip-table" aria-label="push1_pop1 at 1024 slots, cursors on two lines, without the consumer cache">
+  <thead><tr><th><code>push1_pop1</code>, 1024 slots, two lines, no consumer cache</th><th>Round 1, M/s</th><th>Round 2, M/s</th></tr></thead>
+  <tbody></tbody>
+</table>
+<div class="rg-sign">
+  <div class="card"><h4><span class="rg-sw" style="background:var(--c-untagged)"></span>CopySlot: producer ahead</h4>
+    <p>Measured in <code>push1_popN</code> at 1024 slots: the ring fills, and the consumer almost never finds it
+      empty. The producer is the faster side.</p></div>
+  <div class="card"><h4><span class="rg-sw" style="background:var(--c-tagged)"></span>TypedSlot: consumer ahead</h4>
+    <p>Same cell: the ring never fills, and the consumer sometimes finds it empty. The consumer is the faster
+      side.</p></div>
+</div>
+<div class="measured">Slowing the producer by 3–9 ns per push on two lines took the ring from 22–28 M/s to 54–68
+  (TypedSlot) and 34–53 (CopySlot): a slower producer made the ring 2 to 2.5 times faster. The refresh rate fell with
+  it.</div>
+
+<h3>Anomaly A, and the binary that hid the edge</h3>
+<p>One cell refused the story: TypedSlot at 1024 slots stayed fast with its cursors on two lines (196 and 232 M/s)
+  while CopySlot crawled (24 and 36). The cause was not the slot. LLVM inlined the TypedSlot adapter's
+  <code>pop_batch</code> into the benchmark's consumer loop and left the CopySlot one as a call. That shaved the
+  consumer just enough to keep <var>c</var> below <var>p</var>.</p>
+<div class="controls" role="group" aria-label="Which build">
+  <button type="button" data-build="pr" aria-pressed="true">PR-era binary</button>
+  <button type="button" data-build="inl" aria-pressed="false">#[inline(always)] on both</button>
+</div>
+<div class="rg-fig" id="rg-anom">
+  <svg viewBox="0 0 720 220" role="img" aria-label="push1_pop1 at 1024 slots by slot type and layout, for two builds"></svg>
+  <div class="rg-tip" role="status"></div>
+</div>
+<p class="rg-cap" id="rg-anom-cap"></p>
+<div class="measured">With TypedSlot fast on two lines (267 M/s), slowing the consumer by about 1 ns per record dropped
+  it to 19.9–23.6 M/s, back into lockstep. On one line the flip took a consumer slowed by 4.5–6 ns (76–110 M/s down
+  to 19–33).</div>
+<p><strong>This is a knife-edge.</strong> On two lines the cell sits where <var>c</var> ≈ <var>p</var>, and which side
+  of the edge it lands on depends on a nanosecond of code generation in the consumer loop. Any two-line
+  <code>push1_pop1</code> number from before the consumer cache measures the compiler's inlining choice as much as the
+  ring.</p>
+<div class="hyp">Inlining as the cause of anomaly A: review "uarch" rates it about 95%. The exact trigger, inlining or
+  loop unswitching, was not isolated.</div>
+
+<h3>What the consumer cache changes, and what it does not</h3>
+<p>The consumer cache (#41) makes the consumer read the producer cursor only when it has run out of records it already
+  knows about. On a full ring that is once per batch of known records, not once per pop. That removes <var>r</var>
+  and the per-pop line traffic the feedback rides on, so the two layouts agree and the edge moves far out: in the
+  model, lockstep now needs <var>c</var> − <var>p</var> ≥ <var>m</var>.</p>
+<table class="rg-t" id="rg-cc-table" aria-label="push1_pop1 by stage, two rounds each">
+  <thead><tr><th><code>push1_pop1</code>, M/s, two rounds</th><th>TypedSlot, master</th><th>TypedSlot, #41</th><th>CopySlot, no cache</th><th>CopySlot on #41</th></tr></thead>
+  <tbody></tbody>
+</table>
+<p>It does not remove the state. With an artificial delay making the consumer slower, the cached ring still parks at
+  full and the refresh rate climbs again (measured by review "regimes"). A ring whose consumer is slower than its
+  producer will sit full; the cache only makes sitting full cheaper. What removes the state is draining more than one
+  record per pop: <code>push1_popN</code> drains a whole lap per call, and one refresh then buys a lap.</p>
+
+<h3>The opposite race: <code>popN</code></h3>
+<p>In <code>push1_popN</code> a full ring is the good state: the consumer takes a whole lap per call and the producer
+  refreshes once per lap. The 1024-slot cell is bimodal on every stage (for example 416 and 272 M/s for #41 on one line)
+  because the initial race picks, per run, whether the producer gets ahead or the consumer catches it and drains tiny
+  batches, and either state sustains itself.</p>
+
+<script>
+(() => {
+  const S = document.getElementById('sec-regimes');
+  const NS = 'http://www.w3.org/2000/svg';
+  const q = (sel, root = S) => root.querySelector(sel);
+  const qa = (sel, root = S) => [...root.querySelectorAll(sel)];
+  const el = (tag, attrs = {}, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+  const txt = (parent, x, y, s, attrs = {}) => { const t = el('text', Object.assign({ x, y }, attrs), parent); t.textContent = s; return t; };
+  const f1 = v => (Math.round(v * 10) / 10).toFixed(1);
+  const f2 = v => (Math.round(v * 100) / 100).toFixed(2);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const fR = R => R >= 100 ? String(Math.round(R)) : f1(R);
+  const reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // ---- numbers copied from data.json ---------------------------------------
+  const DATA = {
+    fits: [ // regime_model.fit_1024_slots, fit_64_slots
+      { key: '1024', label: '1024 slots', a: 4.3, b: 48, r2: 0.91, runs: 144 },
+      { key: '64', label: '64 slots', a: 10.2, b: 40, r2: 0.95, runs: 144 },
+    ],
+    slowRefr: [0.5, 1.0],           // regime_model.slow_runs_refreshes_per_record
+    fastRefrMax: 0.04,              // regime_model.fast_runs_refreshes_per_record_max
+    oneWayNs: 37.8,                 // machine.core_to_core_one_way_ns.same_cluster_median
+    interventions: [                // regime_model.interventions
+      { name: ['Producer', '+3–9 ns'], what: 'Slow the producer 3–9 ns per push, two lines', before: [22, 28],
+        after: [{ who: 'tagged', v: [54, 68] }, { who: 'untagged', v: [34, 53] }], apply: { p: 6 } },
+      { name: ['Consumer', '+~1 ns'], what: 'Slow the consumer ~1 ns per record, TypedSlot, 1024, two lines (anomaly A)', before: [267, 267],
+        beforeWho: 'tagged', after: [{ who: 'tagged', v: [19.9, 23.6] }], apply: { c: 1 } },
+      { name: ['Consumer', '+4.5–6 ns'], what: 'Slow the consumer 4.5–6 ns per record, one line', before: [76, 110],
+        after: [{ who: 'any', v: [19, 33] }], apply: { c: 5 } },
+    ],
+    // four_offsets_push1_pop1, 1024 slots: [offset 0, offset 128] one line; [offset 64, offset 192] two lines
+    offsets1024: { tagged: { one: [248, 236], two: [196, 232] }, untagged: { one: [192, 252], two: [24, 36] } },
+    inlineForced: { two: [24, 37], one: [100, 112] }, // four_offsets_push1_pop1.inlining_note
+    stagesPop1: [ // stages_push1_pop1 rows (64 and 1024)
+      { slots: 64, layout: 'one line', master: [102, 101], pr41: [136, 128], pr38_no_cache: [102, 100], pr38_on_41: [136, 142] },
+      { slots: 64, layout: 'two lines', master: [29, 30], pr41: [122, 123], pr38_no_cache: [24, 24], pr38_on_41: [122, 124] },
+      { slots: 1024, layout: 'one line', master: [261, 252], pr41: [333, 337], pr38_no_cache: [187, 199], pr38_on_41: [444, 360] },
+      { slots: 1024, layout: 'two lines', master: [216, 188], pr41: [332, 337], pr38_no_cache: [24, 24], pr38_on_41: [443, 439] },
+    ],
+  };
+
+  // ---- shared tooltip helpers ----------------------------------------------
+  function tipShow(tip, fig, svg, vbX, vbY, head, rows) {
+    tip.textContent = '';
+    const h = document.createElement('div'); h.className = 'h'; h.textContent = head; tip.appendChild(h);
+    for (const r of rows) {
+      const row = document.createElement('div'); row.className = 'row';
+      if (r.key) { const k = document.createElement('span'); k.className = 'key ' + r.key; row.appendChild(k); }
+      const b = document.createElement('b'); b.textContent = r.value; row.appendChild(b);
+      const l = document.createElement('span'); l.className = 'k'; l.textContent = r.label; row.appendChild(l);
+      tip.appendChild(row);
+    }
+    const vb = svg.viewBox.baseVal, rect = svg.getBoundingClientRect(), fr = fig.getBoundingClientRect();
+    const sx = rect.width / vb.width, sy = rect.height / vb.height;
+    let left = rect.left - fr.left + vbX * sx + 14, top = rect.top - fr.top + vbY * sy - 10;
+    tip.classList.add('on');
+    const tw = tip.offsetWidth;
+    if (left + tw > fr.width) left = rect.left - fr.left + vbX * sx - tw - 14;
+    tip.style.left = Math.max(0, left) + 'px';
+    tip.style.top = Math.max(0, top) + 'px';
+  }
+  const tipHide = tip => tip.classList.remove('on');
+
+  // A crosshair over a continuous x domain. Pointer and arrow keys.
+  function crosshair(o) {
+    const { svg, fig, tip, x0, x1, y0, y1, toVal, toPx, step, rows, head, lo, hi } = o;
+    const g = el('g', {}, svg);
+    const line = el('line', { class: 'xh', y1: y0, y2: y1, visibility: 'hidden' }, g);
+    const hit = el('rect', { x: x0, y: y0, width: x1 - x0, height: y1 - y0, fill: 'transparent' }, g);
+    let cur = null;
+    const show = v => {
+      cur = clamp(v, lo, hi);
+      const px = toPx(cur);
+      line.setAttribute('x1', px); line.setAttribute('x2', px); line.setAttribute('visibility', 'visible');
+      tipShow(tip, fig, svg, px, y0 + 10, head(cur), rows(cur));
+    };
+    const hide = () => { line.setAttribute('visibility', 'hidden'); tipHide(tip); };
+    hit.addEventListener('pointermove', e => {
+      const r = svg.getBoundingClientRect(), vb = svg.viewBox.baseVal;
+      show(toVal((e.clientX - r.left) * vb.width / r.width));
+    });
+    hit.addEventListener('pointerleave', hide);
+    svg.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      show((cur === null ? (lo + hi) / 2 : cur) + (e.key === 'ArrowRight' ? step : -step));
+    });
+    svg.addEventListener('blur', hide);
+    return { refresh: () => { if (cur !== null && tip.classList.contains('on')) show(cur); } };
+  }
+
+  function axes(svg, o) {
+    const { x0, x1, y0, y1, xt, yt, xp, yp, xfmt, yfmt, xlabel, ylabel } = o;
+    const g = el('g', { class: 'axis' }, svg);
+    for (const v of yt) {
+      const y = yp(v);
+      el('line', { class: 'gridl', x1: x0, x2: x1, y1: y, y2: y }, g);
+      txt(g, x0 - 8, y + 4, yfmt(v), { 'text-anchor': 'end', class: 't-muted' });
+    }
+    for (const v of xt) txt(g, xp(v), y1 + 16, xfmt(v), { 'text-anchor': 'middle', class: 't-muted' });
+    if (xlabel) txt(g, (x0 + x1) / 2, y1 + 34, xlabel, { 'text-anchor': 'middle', class: 't-muted' });
+    if (ylabel) txt(g, x0 - 40, y0 - 8, ylabel, { class: 't-muted' });
+    return g;
+  }
+
+  // ---- 1. lockstep stepper -------------------------------------------------
+  (function stepper() {
+    const root = q('#rg-stepper'), svg = q('svg', root), out = q('.rg-step-text', root), cnt = q('.rg-count', root);
+    const N = 8, sx = 150, sw = 46, gap = 8, sy = 94, sh = 40;
+    // lanes
+    el('rect', { class: 'lane lane-p', x: 8, y: 10, width: 704, height: 50, rx: 8 }, svg);
+    el('rect', { class: 'lane lane-c', x: 8, y: 168, width: 704, height: 50, rx: 8 }, svg);
+    txt(svg, 22, 40, 'Producer core', { class: 't-big' });
+    txt(svg, 22, 198, 'Consumer core', { class: 't-big' });
+    const pChip = txt(svg, 150, 40, '', { class: 't-lab' });
+    const cChip = txt(svg, 150, 198, '', { class: 't-lab' });
+    txt(svg, 22, sy + 25, 'Ring, 8 slots', { class: 't-muted' });
+    const slots = [];
+    for (let i = 0; i < N; i++) slots.push(el('rect', { class: 'slot', x: sx + i * (sw + gap), y: sy, width: sw, height: sh, rx: 4 }, svg));
+    const tailMk = el('path', { class: 'mk-p' }, svg);
+    const headMk = el('path', { class: 'mk-c' }, svg);
+    // transfers on the right
+    const ax = 690;
+    const p2c = el('path', { class: 'xfer xfer-p2c', d: `M${ax - 14} 62 L${ax - 14} 160 M${ax - 20} 152 L${ax - 14} 162 L${ax - 8} 152` }, svg);
+    const c2p = el('path', { class: 'xfer xfer-c2p', d: `M${ax + 14} 166 L${ax + 14} 68 M${ax + 8} 76 L${ax + 14} 66 L${ax + 20} 76` }, svg);
+    const p2cLab = txt(svg, ax - 22, 118, 'producer line', { class: 't-muted xfer-lab', 'text-anchor': 'end' });
+    const c2pLab = txt(svg, ax - 22, 118, 'consumer line', { class: 't-muted xfer-lab', 'text-anchor': 'end' });
+
+    let head, tail, taken, refreshes, pushes, phase, cacheRoom, timer = null;
+    const PH = [
+      { who: 'c', t: 'Consumer pops one record. Without the consumer cache it Acquire-loads the producer cursor first: a line the producer wrote since the last pop, so it comes over from the producer core.' },
+      { who: 'c', t: 'Consumer commits: one Release store of its cursor. One slot is free, and nobody on the producer side knows yet.' },
+      { who: 'p', t: 'Producer tries to push. Its cache says full, so it refreshes: it loads the consumer cursor and the line crosses to the producer core. One round trip, about 48 ns in the fit.' },
+      { who: 'p', t: 'The refresh found room for exactly one slot. The producer writes the record and Release-stores its cursor.' },
+      { who: 'p', t: 'Next push: the cache says full again. One refresh bought one push. Back to the consumer.' },
+    ];
+    function reset() {
+      head = 0; tail = N; taken = -1; refreshes = 0; pushes = 0; phase = -1; cacheRoom = 0;
+      stop(); draw();
+      out.innerHTML = '';
+      out.textContent = 'The ring is full: 8 records wait. The producer’s cached copy of the consumer cursor agrees: no room. Press Step.';
+    }
+    function draw() {
+      for (let i = 0; i < N; i++) {
+        const occupied = ((i - (head % N) + N) % N) < tail - head;
+        slots[i].setAttribute('class', 'slot' + (taken === i ? ' taken' : occupied ? ' full' : ''));
+      }
+      const tx = sx + (tail % N) * (sw + gap) + sw / 2;
+      tailMk.setAttribute('d', `M${tx - 7} ${sy - 16} L${tx + 7} ${sy - 16} L${tx} ${sy - 5} Z`);
+      const hx = sx + (head % N) * (sw + gap) + sw / 2;
+      headMk.setAttribute('d', `M${hx - 7} ${sy + sh + 16} L${hx + 7} ${sy + sh + 16} L${hx} ${sy + sh + 5} Z`);
+      pChip.textContent = `cached view: ${cacheRoom === 0 ? 'full' : cacheRoom + ' free'}    ▼ = producer cursor (next write)`;
+      cChip.textContent = `records known: ${tail - head}    ▲ = consumer cursor (next read)`;
+      cnt.textContent = '';
+      const parts = [['records pushed', pushes], ['refreshes', refreshes], ['refreshes per record', pushes ? f2(refreshes / pushes) : '–']];
+      parts.forEach(([k, v], i) => { if (i) cnt.append('   '); cnt.append(k + ': '); const b = document.createElement('b'); b.textContent = v; cnt.appendChild(b); });
+    }
+    function xfer(which) {
+      p2c.classList.toggle('on', which === 'p2c'); p2cLab.classList.toggle('on', which === 'p2c');
+      c2p.classList.toggle('on', which === 'c2p'); c2pLab.classList.toggle('on', which === 'c2p');
+    }
+    function step() {
+      phase = (phase + 1) % PH.length;
+      xfer(null);
+      if (phase === 0) { taken = head % N; xfer('p2c'); }
+      else if (phase === 1) { taken = -1; head++; }
+      else if (phase === 2) { refreshes++; cacheRoom = N - (tail - head); xfer('c2p'); }
+      else if (phase === 3) { tail++; pushes++; cacheRoom--; }
+      draw();
+      const ph = PH[phase];
+      out.textContent = '';
+      const w = document.createElement('span'); w.className = ph.who === 'p' ? 'who-p' : 'who-c';
+      w.textContent = ph.who === 'p' ? 'Producer. ' : 'Consumer. ';
+      out.append(w, ph.t);
+    }
+    function stop() {
+      if (timer) clearInterval(timer); timer = null;
+      const b = q('[data-act="play"]', root); b.setAttribute('aria-pressed', 'false'); b.textContent = 'Play';
+    }
+    q('[data-act="step"]', root).addEventListener('click', () => { stop(); step(); });
+    q('[data-act="reset"]', root).addEventListener('click', reset);
+    q('[data-act="play"]', root).addEventListener('click', e => {
+      if (timer) { stop(); return; }
+      e.currentTarget.setAttribute('aria-pressed', 'true'); e.currentTarget.textContent = 'Pause';
+      step(); timer = setInterval(step, reduced ? 1800 : 1300);
+    });
+    reset();
+  })();
+
+  // ---- 2. fit chart --------------------------------------------------------
+  (function fit() {
+    const fig = q('#rg-fit'), svg = q('svg', fig), tip = q('.rg-tip', fig);
+    const W = 720, H = 300, m = { l: 52, r: 168, t: 18, b: 46 };
+    const X1 = 1.2, Y1 = 70;
+    const xp = v => m.l + v / X1 * (W - m.l - m.r), yp = v => H - m.b - v / Y1 * (H - m.t - m.b);
+    const x0 = m.l, x1 = W - m.r, y0 = m.t, y1 = H - m.b;
+    // bands first, under the grid labels
+    el('rect', { class: 'band-fast', x: xp(0), y: y0, width: xp(DATA.fastRefrMax) - xp(0), height: y1 - y0 }, svg);
+    el('rect', { class: 'band-slow', x: xp(DATA.slowRefr[0]), y: y0, width: xp(DATA.slowRefr[1]) - xp(DATA.slowRefr[0]), height: y1 - y0 }, svg);
+    axes(svg, { x0, x1, y0, y1, xt: [0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2], yt: [0, 10, 20, 30, 40, 50, 60, 70], xp, yp,
+      xfmt: v => v.toFixed(1), yfmt: v => String(v), xlabel: 'refreshes per record', ylabel: 'ns per record' });
+    txt(svg, xp(DATA.fastRefrMax) + 4, y0 + 12, 'fast runs: ≤ 0.04', { class: 't-ann' });
+    txt(svg, xp(0.75), y0 + 12, 'slow runs: 0.5–1.0', { class: 't-ann', 'text-anchor': 'middle' });
+    // one-way latency reference
+    el('line', { class: 'ln-ref', x1: x0, x2: x1, y1: yp(DATA.oneWayNs), y2: yp(DATA.oneWayNs) }, svg);
+    txt(svg, x1 + 6, yp(DATA.oneWayNs) + 4, 'one-way latency: 37.8 ns', { class: 't-ann' });
+    for (const f of DATA.fits) {
+      el('path', { class: 'ln ln-' + f.key, d: `M${xp(0)} ${yp(f.a)} L${xp(X1)} ${yp(f.a + f.b * X1)}` }, svg);
+    }
+    const [fa, fb] = DATA.fits;
+    txt(svg, x1 + 6, yp(fa.a + fa.b * X1) - 4, '1024: 4.3 + 48 × r', { class: 't-lab' });
+    txt(svg, x1 + 6, yp(fb.a + fb.b * X1) + 12, '64: 10.2 + 40 × r', { class: 't-lab' });
+    // lockstep annotation on the 1024 line at r = 1
+    const lx = xp(1), ly = yp(fa.a + fa.b);
+    el('circle', { class: 'dot', cx: lx, cy: ly, r: 4.5, fill: 'var(--accent)' }, svg);
+    txt(svg, lx - 8, ly - 10, 'lockstep: 52.3 ns, about 19 M/s', { class: 't-ann', 'text-anchor': 'end' });
+    crosshair({ svg, fig, tip, x0, x1, y0, y1, lo: 0, hi: X1, step: 0.02,
+      toVal: px => (px - m.l) / (W - m.l - m.r) * X1, toPx: xp,
+      head: v => `${f2(v)} refreshes per record`,
+      rows: v => DATA.fits.map(f => { const t = f.a + f.b * v; return { key: 'k-' + f.key, value: `${f1(t)} ns`, label: `${f.label}, ${f1(1000 / t)} M/s` }; }) });
+  })();
+
+  // ---- 3. simulator --------------------------------------------------------
+  (function sim() {
+    const root = q('#rg-sim');
+    const CAPS = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384];
+    const DEF = { p: 5, c: 3.5, m: 45, r: 1, N: 4 };
+    const inputs = Object.fromEntries(qa('input[data-k]', root).map(i => [i.dataset.k, i]));
+    const cacheBtn = q('[data-act="cache"]', root);
+    let cache = false, highlight = -1;
+    const st = () => ({ p: +inputs.p.value, c: +inputs.c.value, m: +inputs.m.value, r: +inputs.r.value, N: CAPS[+inputs.N.value] });
+
+    const cEff = (R, s, on) => on ? s.c : s.c + s.r + s.m / R;
+    function steady(s, on) {
+      let R;
+      if (on) R = s.c > s.p ? clamp(s.m / (s.c - s.p), 1, s.N) : s.N;
+      else { const d = s.c + s.r - s.p; R = d > 1e-9 ? 1 : d < -1e-9 ? s.N : s.N / 2; }
+      const t = Math.max(s.p + s.m / R, cEff(R, s, on));
+      return { R, t, mps: 1000 / t, refr: 1 / R };
+    }
+    function trace(s, on, E) {
+      let R = s.N / 2; const out = [R];
+      for (let i = 0; i < E; i++) { R = clamp((R * s.p + s.m) / cEff(R, s, on), 1, s.N); out.push(R); }
+      return out;
+    }
+
+    // trace chart
+    const tFig = q('#rg-trace'), tSvg = q('svg', tFig), tTip = q('.rg-tip', tFig);
+    const TW = 720, TH = 210, tm = { l: 52, r: 20, t: 14, b: 42 }, E = 120;
+    const tx = i => tm.l + i / E * (TW - tm.l - tm.r);
+    // sweep chart
+    const wFig = q('#rg-sweep'), wSvg = q('svg', wFig), wTip = q('.rg-tip', wFig);
+    const WW = 720, WH = 330, wm = { l: 52, t: 22, b: 46 }, PX1 = 470, SX0 = 512, SX1 = 712;
+    const DX0 = -10, DX1 = 20;
+    const wx = d => wm.l + (d - DX0) / (DX1 - DX0) * (PX1 - wm.l);
+
+    let tLayer = el('g', {}, tSvg), wLayer = el('g', {}, wSvg), tCross = null, wCross = null, tCtx = null, wCtx = null;
+
+    function render() {
+      const s = st();
+      for (const k of ['p', 'c', 'm', 'r']) q(`[data-o="${k}"]`, root).textContent = f1(+inputs[k].value) + ' ns';
+      q('[data-o="N"]', root).textContent = s.N + ' slots';
+      cacheBtn.setAttribute('aria-pressed', String(cache));
+      cacheBtn.textContent = 'Consumer cache (#41): ' + (cache ? 'on' : 'off');
+
+      const ss = steady(s, cache);
+      const box = q('.rg-state', root);
+      let kind, label;
+      if (ss.R <= 1.0001) { kind = 'lock'; label = 'Lockstep: full ring, one push per refresh'; }
+      else if (ss.R >= s.N - 1e-6) { kind = 'free'; label = 'Consumer keeps up: the producer refreshes about once a lap'; }
+      else { kind = 'room'; label = `Parked near full, but each refresh buys ${fR(ss.R)} pushes`; }
+      box.dataset.s = kind;
+      const big = q('[data-o="mps"]', root); big.textContent = f1(ss.mps); const sm = document.createElement('small'); sm.textContent = 'M/s in the model'; big.appendChild(sm);
+      q('[data-o="state"]', root).textContent = label;
+      const nums = q('[data-o="nums"]', root); nums.textContent = '';
+      const sign = cache ? s.c - s.p : s.c + s.r - s.p;
+      [[cache ? 'c − p' : 'c + r − p', (sign >= 0 ? '+' : '') + f1(sign) + ' ns'], ['room per refresh', fR(ss.R)],
+       ['refreshes per record', ss.refr < 0.01 ? ss.refr.toFixed(4) : f2(ss.refr)], ['time per record', f1(ss.t) + ' ns']]
+        .forEach(([k, v], i) => { if (i) nums.append('    '); nums.append(k + ' '); const b = document.createElement('b'); b.textContent = v; nums.appendChild(b); });
+
+      // ---- trace
+      tLayer.remove(); tLayer = el('g', {}, tSvg);
+      const L = Math.log2(s.N);
+      const ty = R => TH - tm.b - Math.log2(R) / L * (TH - tm.t - tm.b);
+      const yt = []; const stepPow = L > 8 ? 2 : 1;
+      for (let k = 0; k <= L; k += stepPow) yt.push(2 ** k);
+      if (yt[yt.length - 1] !== s.N) yt.push(s.N);
+      axes(tLayer, { x0: tm.l, x1: TW - tm.r, y0: tm.t, y1: TH - tm.b, xt: [0, 20, 40, 60, 80, 100, 120], yt, xp: tx, yp: ty,
+        xfmt: v => String(v), yfmt: v => String(v), xlabel: 'refresh number', ylabel: 'room found (slots)' });
+      const trs = { off: trace(s, false, E), on: trace(s, true, E) };
+      for (const k of ['off', 'on']) {
+        const d = trs[k].map((R, i) => (i ? 'L' : 'M') + tx(i).toFixed(1) + ' ' + ty(R).toFixed(1)).join(' ');
+        el('path', { class: `ln ln-${k}` + ((k === 'on') === cache ? '' : ' dim'), d }, tLayer);
+      }
+      tCtx = { s, trs, ty };
+      if (!tCross) tCross = crosshair({ svg: tSvg, fig: tFig, tip: tTip, x0: tm.l, x1: TW - tm.r, y0: tm.t, y1: TH - tm.b, lo: 0, hi: E, step: 1,
+        toVal: px => Math.round((px - tm.l) / (TW - tm.l - tm.r) * E), toPx: v => tx(Math.round(v)),
+        head: v => `refresh ${Math.round(v)}`,
+        rows: v => ['off', 'on'].map(k => ({ key: 'k-' + k, value: fR(tCtx.trs[k][Math.round(v)]) + ' slots', label: 'cache ' + k })) });
+
+      // ---- sweep
+      wLayer.remove(); wLayer = el('g', {}, wSvg);
+      const ds = []; for (let d = DX0; d <= DX1 + 1e-9; d += 0.1) ds.push(+d.toFixed(2));
+      const curve = on => ds.map(d => { const c = s.p + d; return c < 0.2 ? null : { d, ...steady({ ...s, c }, on) }; });
+      const cv = { off: curve(false), on: curve(true) };
+      let ymax = 300;
+      for (const k of ['off', 'on']) for (const pt of cv[k]) if (pt) ymax = Math.max(ymax, pt.mps);
+      ymax = Math.ceil(ymax / 100) * 100;
+      const wy = v => WH - wm.b - v / ymax * (WH - wm.t - wm.b);
+      const ytk = []; const yst = ymax <= 400 ? 50 : ymax <= 1000 ? 100 : 200;
+      for (let v = 0; v <= ymax; v += yst) ytk.push(v);
+      axes(wLayer, { x0: wm.l, x1: PX1, y0: wm.t, y1: WH - wm.b, xt: [-10, -5, 0, 5, 10, 15, 20], yt: ytk, xp: wx, yp: wy,
+        xfmt: v => (v > 0 ? '+' : '') + v, yfmt: v => String(v), xlabel: 'c − p, ns (consumer slower →)', ylabel: 'M/s' });
+      // grid extends under the strip
+      for (const v of ytk) el('line', { class: 'gridl', x1: SX0, x2: SX1, y1: wy(v), y2: wy(v) }, wLayer);
+      // the edge for the active mode
+      const edge = cache ? 0 : -s.r;
+      if (edge >= DX0 && edge <= DX1) {
+        el('line', { class: 'ln-ref', x1: wx(edge), x2: wx(edge), y1: wm.t, y2: WH - wm.b }, wLayer);
+        txt(wLayer, wx(edge) + 5, wm.t + 10, cache ? 'ring parks full beyond here' : 'edge: c + r = p', { class: 't-ann' });
+      }
+      for (const k of ['off', 'on']) {
+        let d = '', pen = false;
+        for (const pt of cv[k]) { if (!pt) { pen = false; continue; } d += (pen ? 'L' : 'M') + wx(pt.d).toFixed(1) + ' ' + wy(pt.mps).toFixed(1) + ' '; pen = true; }
+        el('path', { class: `ln ln-${k}` + ((k === 'on') === cache ? '' : ' dim'), d }, wLayer);
+      }
+      // direct labels at the right end of the curves
+      const endOff = cv.off[cv.off.length - 1], endOn = cv.on[cv.on.length - 1];
+      if (endOff && endOn) {
+        const yo = wy(endOff.mps), yn = wy(endOn.mps);
+        txt(wLayer, PX1 - 2, yo + (yo > yn ? 14 : -6), 'cache off', { class: 't-ann', 'text-anchor': 'end' });
+        txt(wLayer, PX1 - 2, yn + (yo > yn ? -6 : 14), 'cache on', { class: 't-ann', 'text-anchor': 'end' });
+      }
+      // current point
+      const dNow = s.c - s.p;
+      if (dNow >= DX0 && dNow <= DX1) el('circle', { class: 'dot', cx: wx(dNow), cy: wy(ss.mps), r: 6, fill: cache ? 'var(--c-pr41)' : 'var(--c-master)' }, wLayer);
+      // measured strip
+      el('line', { class: 'gridl', x1: SX0 - 14, x2: SX0 - 14, y1: wm.t - 6, y2: WH - wm.b + 30 }, wLayer);
+      txt(wLayer, (SX0 + SX1) / 2, wm.t - 8, 'Measured, M/s', { class: 't-lab', 'text-anchor': 'middle' });
+      const colW = (SX1 - SX0) / 3;
+      DATA.interventions.forEach((iv, j) => {
+        const cx = SX0 + colW * (j + 0.5);
+        const g = el('g', { tabindex: 0, role: 'img', 'aria-label': `${iv.what}: before ${iv.before[0] === iv.before[1] ? iv.before[0] : iv.before.join('–')}, after ${iv.after.map(a => a.v.join('–')).join(' and ')} M/s` }, wLayer);
+        if (highlight === j) el('rect', { x: cx - colW / 2 + 3, y: wm.t, width: colW - 6, height: WH - wm.t - wm.b, rx: 6, fill: 'var(--accent)', opacity: 0.1 }, g);
+        el('rect', { x: cx - colW / 2, y: wm.t, width: colW, height: WH - wm.t - wm.b + 32, fill: 'transparent' }, g);
+        const bx = cx - 14;
+        const range = (x, v, cls, shape) => {
+          if (v[0] === v[1]) {
+            if (shape === 'sq') el('rect', { class: 'dot', x: x - 5, y: wy(v[0]) - 5, width: 10, height: 10, rx: 2, fill: cls }, g);
+            else el('circle', { class: 'dot', cx: x, cy: wy(v[0]), r: 5, fill: cls }, g);
+          } else {
+            el('rect', { x: x - 4, y: wy(v[1]) - 4, width: 8, height: Math.max(8, wy(v[0]) - wy(v[1]) + 8), rx: shape === 'sq' ? 2 : 4, fill: cls }, g);
+          }
+        };
+        const beforeMid = (iv.before[0] + iv.before[1]) / 2;
+        range(bx, iv.before, 'var(--muted)', 'c');
+        const n = iv.after.length;
+        iv.after.forEach((a, k) => {
+          const ax = cx + 10 + k * 16 - (n - 1) * 4;
+          const mid = (a.v[0] + a.v[1]) / 2;
+          el('path', { d: `M${bx + 6} ${wy(beforeMid)} L${ax - 6} ${wy(mid)}`, stroke: 'var(--muted)', 'stroke-width': 1, fill: 'none', 'stroke-dasharray': '3 3' }, g);
+          const col = a.who === 'tagged' ? 'var(--c-tagged)' : a.who === 'untagged' ? 'var(--c-untagged)' : 'var(--text)';
+          range(ax, a.v, col, a.who === 'untagged' ? 'sq' : 'c');
+        });
+        txt(g, cx, WH - wm.b + 16, iv.name[0], { class: 't-muted', 'text-anchor': 'middle' });
+        txt(g, cx, WH - wm.b + 29, iv.name[1], { class: 't-muted', 'text-anchor': 'middle' });
+        const rows = [{ key: 'k-before', value: (iv.before[0] === iv.before[1] ? String(iv.before[0]) : iv.before.join('–')) + ' M/s', label: 'before' }]
+          .concat(iv.after.map(a => ({ key: 'k-' + a.who, value: a.v.join('–') + ' M/s', label: 'after' + (a.who === 'tagged' ? ', TypedSlot' : a.who === 'untagged' ? ', CopySlot' : '') })));
+        const show = () => tipShow(wTip, wFig, wSvg, cx - colW / 2, wy(Math.max(iv.before[1], ...iv.after.map(a => a.v[1]))), iv.what, rows);
+        g.addEventListener('pointerenter', show); g.addEventListener('focus', show);
+        g.addEventListener('pointerleave', () => tipHide(wTip)); g.addEventListener('blur', () => tipHide(wTip));
+      });
+      wCtx = { s, cv, ds };
+      if (!wCross) wCross = crosshair({ svg: wSvg, fig: wFig, tip: wTip, x0: wm.l, x1: PX1, y0: wm.t, y1: WH - wm.b, lo: DX0, hi: DX1, step: 0.5,
+        toVal: px => Math.round(((px - wm.l) / (PX1 - wm.l) * (DX1 - DX0) + DX0) * 10) / 10, toPx: wx,
+        head: v => `c − p = ${(v > 0 ? '+' : '') + f1(v)} ns (c = ${f1(wCtx.s.p + v)} ns)`,
+        rows: v => ['off', 'on'].map(k => { const pt = wCtx.cv[k][Math.round((v - DX0) * 10)]; return { key: 'k-' + k, value: pt ? f1(pt.mps) + ' M/s' : '–', label: `cache ${k}, ${pt ? f2(pt.refr) : '–'} refreshes/record` }; }) });
+      // keep crosshair layers above the redrawn content
+      for (const [svg, layer] of [[tSvg, tLayer], [wSvg, wLayer]]) svg.insertBefore(layer, svg.firstChild);
+      if (tCross) tCross.refresh(); if (wCross) wCross.refresh();
+    }
+
+    for (const k in inputs) inputs[k].addEventListener('input', () => { highlight = -1; render(); });
+    cacheBtn.addEventListener('click', () => { cache = !cache; render(); });
+    qa('[data-apply]', root).forEach(b => b.addEventListener('click', () => {
+      const j = +b.dataset.apply, a = DATA.interventions[j].apply;
+      for (const k in a) inputs[k].value = clamp(+inputs[k].value + a[k], +inputs[k].min, +inputs[k].max);
+      highlight = j; render();
+    }));
+    q('[data-act="defaults"]', root).addEventListener('click', () => { for (const k in DEF) inputs[k].value = DEF[k]; cache = false; highlight = -1; render(); });
+
+    const tb = q('#rg-int-table tbody');
+    for (const iv of DATA.interventions) {
+      const tr = document.createElement('tr');
+      const cells = [iv.what, iv.before[0] === iv.before[1] ? String(iv.before[0]) : iv.before.join('–'),
+        iv.after.map(a => a.v.join('–') + (a.who === 'tagged' ? ' TypedSlot' : a.who === 'untagged' ? ' CopySlot' : '')).join(', ')];
+      for (const c of cells) { const td = document.createElement('td'); td.textContent = c; tr.appendChild(td); }
+      tb.appendChild(tr);
+    }
+    render();
+  })();
+
+  // ---- 4. CopySlot table ---------------------------------------------------
+  (function tipTable() {
+    const tb = q('#rg-tip-table tbody');
+    const row = DATA.stagesPop1.find(r => r.slots === 1024 && r.layout === 'two lines');
+    for (const [name, v, bad] of [['TypedSlot (master)', row.master, false], ['CopySlot (#38 without the consumer cache)', row.pr38_no_cache, true]]) {
+      const tr = document.createElement('tr');
+      const a = document.createElement('td'); a.textContent = name; tr.appendChild(a);
+      for (const x of v) { const td = document.createElement('td'); td.textContent = String(x); if (bad) td.className = 'bad'; tr.appendChild(td); }
+      tb.appendChild(tr);
+    }
+  })();
+
+  // ---- 5. anomaly A chart --------------------------------------------------
+  (function anomaly() {
+    const fig = q('#rg-anom'), svg = q('svg', fig), tip = q('.rg-tip', fig), cap = q('#rg-anom-cap');
+    const W = 720, H = 220, m = { l: 176, r: 24, t: 12, b: 40 };
+    const X1 = 300;
+    const xp = v => m.l + v / X1 * (W - m.l - m.r);
+    const rows = [
+      { who: 'tagged', lay: 'two', label: 'TypedSlot, two lines' },
+      { who: 'untagged', lay: 'two', label: 'CopySlot, two lines' },
+      { who: 'tagged', lay: 'one', label: 'TypedSlot, one line' },
+      { who: 'untagged', lay: 'one', label: 'CopySlot, one line' },
+    ];
+    const rh = (H - m.t - m.b) / rows.length;
+    const ry = i => m.t + rh * (i + 0.5);
+    let build = 'pr', layer = null;
+    axes(svg, { x0: m.l, x1: W - m.r, y0: m.t, y1: H - m.b, xt: [0, 50, 100, 150, 200, 250, 300], yt: [], xp, yp: v => v,
+      xfmt: v => String(v), yfmt: () => '', xlabel: 'push1_pop1, 1024 slots, M/s' });
+    for (const v of [0, 50, 100, 150, 200, 250, 300]) el('line', { class: 'gridl', x1: xp(v), x2: xp(v), y1: m.t, y2: H - m.b }, svg);
+    rows.forEach((r, i) => txt(svg, m.l - 12, ry(i) + 4, r.label, { class: 't-lab', 'text-anchor': 'end' }));
+    function draw() {
+      if (layer) layer.remove();
+      layer = el('g', {}, svg);
+      rows.forEach((r, i) => {
+        const col = r.who === 'tagged' ? 'var(--c-tagged)' : 'var(--c-untagged)';
+        const y = ry(i);
+        const g = el('g', { tabindex: 0 }, layer);
+        el('rect', { x: m.l, y: y - rh / 2, width: W - m.l - m.r, height: rh, fill: 'transparent' }, g);
+        let head, vals;
+        if (build === 'pr') {
+          const v = DATA.offsets1024[r.who][r.lay];
+          const offs = r.lay === 'one' ? [0, 128] : [64, 192];
+          v.forEach((x, k) => {
+            if (r.who === 'untagged') el('rect', { class: 'dot', x: xp(x) - 6, y: y - 6, width: 12, height: 12, rx: 2, fill: col }, g);
+            else el('circle', { class: 'dot', cx: xp(x), cy: y, r: 6.5, fill: col }, g);
+          });
+          head = `${r.label}, PR-era binary`;
+          vals = v.map((x, k) => ({ key: 'k-' + r.who, value: x + ' M/s', label: `ring offset ${offs[k]}` }));
+          g.setAttribute('aria-label', `${r.label}: ${v[0]} and ${v[1]} M/s at ring offsets ${offs.join(' and ')}`);
+        } else {
+          const v = DATA.inlineForced[r.lay];
+          el('rect', { x: xp(v[0]), y: y - 5, width: Math.max(8, xp(v[1]) - xp(v[0])), height: 10, rx: 5, fill: col }, g);
+          head = `${r.label}, inlining forced equal`;
+          vals = [{ key: 'k-' + r.who, value: `${v[0]}–${v[1]} M/s`, label: 'range over every slot shape' }];
+          g.setAttribute('aria-label', `${r.label}: ${v[0]} to ${v[1]} M/s, range over every slot shape`);
+        }
+        g.setAttribute('role', 'img');
+        const show = () => tipShow(tip, fig, svg, xp(build === 'pr' ? Math.max(...DATA.offsets1024[r.who][r.lay]) : DATA.inlineForced[r.lay][1]), y - 12, head, vals);
+        g.addEventListener('pointerenter', show); g.addEventListener('focus', show);
+        g.addEventListener('pointerleave', () => tipHide(tip)); g.addEventListener('blur', () => tipHide(tip));
+      });
+      cap.textContent = build === 'pr'
+        ? 'PR #38 code without the consumer cache, ring heap-placed at offsets 0 and 128 (one line) or 64 and 192 (two lines). TypedSlot circles, CopySlot squares. TypedSlot on two lines looks fast; CopySlot does not.'
+        : 'Same cells with #[inline(always)] on both adapters’ pop_batch: every slot shape measured 24–37 M/s on two lines and 100–112 on one line. The dataset keeps the range, not per-shape values. The two-line gap between slot types is gone.';
+    }
+    qa('[data-build]').forEach(b => b.addEventListener('click', () => {
+      build = b.dataset.build;
+      qa('[data-build]').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+      tipHide(tip); draw();
+    }));
+    draw();
+  })();
+
+  // ---- 6. consumer cache table --------------------------------------------
+  (function ccTable() {
+    const tb = q('#rg-cc-table tbody');
+    for (const r of DATA.stagesPop1) {
+      const tr = document.createElement('tr');
+      const a = document.createElement('td'); a.textContent = `${r.slots} slots, ${r.layout}`; tr.appendChild(a);
+      for (const k of ['master', 'pr41', 'pr38_no_cache', 'pr38_on_41']) {
+        const td = document.createElement('td'); td.className = 'rg-pair'; td.textContent = r[k].join(', ');
+        if (Math.max(...r[k]) < 40) td.classList.add('bad');
+        tr.appendChild(td);
+      }
+      tb.appendChild(tr);
+    }
+  })();
+})();
+</script>
+</section>

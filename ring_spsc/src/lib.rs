@@ -1102,7 +1102,12 @@ impl<S> Consumer<'_, S> {
   /// nothing would make an unbounded drain report less than `available`.
   fn observe_produced(&mut self, start: Seq, wanted: usize) -> Seq {
     if (start.distance_to(self.cached_produced) as usize) < wanted {
-      self.cached_produced = self.ring.cursors.producer().load(GATING);
+      let produced = self.ring.cursors.producer().load(GATING);
+      // Written only when it moved: a consumer polling an empty ring would
+      // otherwise store the same value every poll and read it back the next.
+      if produced != self.cached_produced {
+        self.cached_produced = produced;
+      }
     }
     self.cached_produced
   }

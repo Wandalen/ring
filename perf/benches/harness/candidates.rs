@@ -36,7 +36,11 @@ impl Record for u64 {
   }
 }
 
-/// `N` words with the key in the first and the last: a payload the queue has to copy whole.
+/// `N` words, every one the key: a payload the queue has to copy whole, and whose check reads every word.
+///
+/// The check used to compare the first and last word only. At a 264-byte stride that never touched the middle
+/// 128-byte line of a 256-byte record, so the consumer pulled one line fewer per record than at a 256-byte stride,
+/// and the payload bench measured the checker's footprint instead of the queue's.
 #[derive(Clone, Copy, Debug)]
 pub struct Wide<const N: usize>(pub [u64; N]);
 
@@ -58,7 +62,7 @@ impl<const N: usize> Record for Wide<N> {
   }
 
   fn whole(&self) -> bool {
-    self.0[0] == self.0[N - 1]
+    self.0.iter().all(|word| *word == self.0[0])
   }
 }
 

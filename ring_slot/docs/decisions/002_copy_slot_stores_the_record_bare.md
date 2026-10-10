@@ -50,11 +50,15 @@ on the first lap. That is documented as `CopySlot`'s pitfall, not prevented. `ri
   `ring_store::Buffer::all_empty` over `CopySlot`s is false from construction on. The rings never ask.
 - A reader of a `CopySlot` ring cannot detect a stale duplicate. A producer that claims and drops unwritten delivers
   the previous lap's record a second time. Rust's type system does not prevent it; the pitfall and `try_push` do.
-- Records of 64 and 256 bytes measured 30–46% slower untagged. The untagged strides are powers of two there, and 4K
-  aliasing is a candidate cause, untested. A caller with wide records should measure before choosing `CopySlot`.
-- Two-thread hand-off at 64 and 1024 slots follows where each ring's cursors land, not the slot, on a harness that
-  builds rings on the stack. The record shows those cells both ways and does not use them for this decision.
-- Revisit when the wide-record regression is explained, when a non-`Copy` record needs the untagged path, or when a
+- 64-byte records at a 64-byte stride measure 30–45% slower untagged. The benchmark record's addendum places it on
+  the stride, not the slot: padding to 72 bytes recovers it, stride 128 is fine, and it vanishes when the consumer lags
+  the producer by a lap of lines. 4K aliasing is ruled out; the mechanism is open. A caller with 64-byte records should
+  measure, and may pad. The 256-byte row that first looked the same was the harness's whole-record check reading two
+  words of thirty-two; read whole, the two slots and `rtrb` tie.
+- Two-thread one-record hand-off followed where each ring's cursors landed because `ring_spsc`'s consumer read the
+  producer cursor on every drain; `CopySlot`'s faster producer tipped that pattern into a full-ring lockstep sooner.
+  `ring_spsc` ADR 002 caches that read. On it, `CopySlot` leads `TypedSlot` on every one-record cell, in both layouts.
+- Revisit when the 64-byte-stride effect is explained, when a non-`Copy` record needs the untagged path, or when a
   caller needs to tell an empty publication from a written one on a `CopySlot` ring.
 
 See [`src/lib.rs`](../../src/lib.rs).

@@ -94,18 +94,71 @@ untagged, the size of a performance core's L1D.
   51 M/s untagged against 77 and 158 tagged. An earlier run of the same comparison, with every ring built at one fixed
   128-byte offset, measured those untagged cells at 99 and 196, within 7% and 23% of the tagged ones. The slot code is
   the same; what changed is where each candidate's cursors land. `push1_popN` at 1024 slots spans 115–200 tagged and
-  185–496 untagged across four processes, the same shape. These cells cannot be read on master's harness.
+  185–496 untagged across four processes, the same shape. These cells cannot be read on master's harness. The
+  addendum below has the cause and the remeasurement.
 - **Records of 64 and 256 bytes are slower untagged,** by 46% and 36% here and 30% and 44% in the fixed-offset run.
   The untagged strides are powers of two (64, 256 bytes) against 72 and 264 tagged, and `rtrb`, whose strides are
-  powers of two as well, measures close to the untagged slot. 4K aliasing between the producer's stores and the
-  consumer's loads would produce this shape. Untested.
+  powers of two as well, measures close to the untagged slot. The addendum separates the two rows: the 256-byte one
+  was the harness, the 64-byte one is the stride.
 - **`ring_mpsc` barely moves through the rings.** Its per-record cost is the claim, not the slot. Single-threaded,
   `push_pop` and `push_full` gain about 0.4 and 0.26 ns.
 
-Verdict: `CopySlot` pays for small `Copy` records in `ring_spsc` wherever placement does not decide the cell: single
-thread at every capacity, and two threads at large capacities. The small-capacity two-thread cells need a harness that
-fixes placement before they say anything about the slot, and wide records need the stride question answered before a
-caller with them chooses `CopySlot`.
+Verdict, as written on `c28bedb`: `CopySlot` pays for small `Copy` records in `ring_spsc` wherever placement does not
+decide the cell: single thread at every capacity, and two threads at large capacities. The small-capacity two-thread
+cells need a harness that fixes placement before they say anything about the slot, and wide records need the stride
+question answered before a caller with them chooses `CopySlot`. The addendum revises the two-thread and 256-byte parts.
+
+## Addendum, 2026-10-10: the two-thread cells explained, the 256-byte row corrected
+
+Five independent adversarial reviews of the run above, on the same machine, traced the two-thread `push1_pop1` cells
+to one read: `ring_spsc`'s consumer loaded the producer cursor on every drain. With `ring_align::CACHE_LINE` at 64 on a
+128-byte-line host, whether the two cursors share one line or two depends on the ring's address mod 128, which the
+stack-built harness takes from the environment size and argv; one unused environment variable of 1–113 characters
+flips the same binary from `spsc-plain` at 0.26x of `spsc` to 3.2x faster. The slow state is the ring full with the
+producer one slot behind the consumer, refreshing its cache before nearly every push at one cross-core round trip each
+(time per record 4.3 ns + 48 ns × refreshes, R² 0.91 over 288 runs). `CopySlot` makes the producer faster, which tips a
+one-record-per-pop consumer into that state sooner. The orderings are necessary: a `Relaxed` load or publish, measured
+only, kept the collapse and corrupted up to 796k of 1M records. `ring_spsc` ADR 002 (#41) gives the consumer the cache
+the producer already had.
+
+**Two threads, this branch rebased on #41, with and without the consumer cache.** Harness patched, for the measurement
+only, to place each ring at byte 0 or 64 of a 256-byte block: at 0 both cursors share one 128-byte line, at 64 they sit
+on two. Two rounds, M records/s.
+
+| `push1_pop1` | one line, no cache | one line, cache | two lines, no cache | two lines, cache |
+|---|---|---|---|---|
+| `TypedSlot`, 64 slots | 101, 86 | 129, 131 | 31, 30 | 120, 121 |
+| `CopySlot`, 64 slots | 102, 100 | **136, 142** | 24, 24 | **122, 124** |
+| `TypedSlot`, 1024 slots | 191, 258 | 264, 267 | 227, 236 | 337, 284 |
+| `CopySlot`, 1024 slots | 187, 199 | **444, 360** | 24, 24 | **443, 439** |
+| `TypedSlot`, 16384 slots | 39, 47 | 32, 30 | 47, 47 | 33, 37 |
+| `CopySlot`, 16384 slots | 260, 264 | **475, 445** | 29, 29 | **469, 393** |
+
+`push1_popN` does not move with the cache on either slot; it reads the cursor once per lap already.
+
+**Wide records: the check, not the slot, made the 256-byte row.** `Wide::whole` compared the first and last word only.
+At the tagged 264-byte stride the middle 128-byte line of a 256-byte record was never read and never crossed cores,
+so the tagged consumer pulled one line fewer per record than the untagged one. `fix(perf): the wide record's
+whole-record check reads every word` makes the check read every word. Stock harness, 1024 slots, `push1_popN`, two
+rounds, M records/s:
+
+| record | `TypedSlot`, old check | `TypedSlot`, every word | `CopySlot`, old check | `CopySlot`, every word | `rtrb`, every word |
+|---|---|---|---|---|---|
+| 8 bytes | 271, 369 | 361, 281 | 570, 910 | 881, 728 | 144, 136 |
+| 64 bytes | 80.7, 91.0 | 99.3, 93.7 | 42.0, 42.6 | **62.6, 44.6** | 65.9, 52.7 |
+| 256 bytes | 46.9, 52.0 | **31.8, 30.2** | 26.6, 26.9 | **29.4, 29.1** | 31.0, 29.6 |
+
+- **256 bytes: a tie at about 30 M/s** for `TypedSlot`, `CopySlot` and `rtrb` once every word is read. The 36–44%
+  "regression" was the checker's footprint. The tagged side lost 40% because it now pays for the line it skipped.
+- **64 bytes: the gap stays**, 94–99 tagged against 45–63 untagged. The reviews placed it on the 64-byte stride, not
+  the slot: `CopySlot` padded to a 72-byte stride measured 81–96 M/s, a tagless `TypedSlot` at stride 64 was slow too,
+  stride 128 against 136 was within 10%, and a consumer held 64 records behind the producer removed the dependence.
+  4K aliasing is ruled out: a same-core effect that does not vanish with lag. The mechanism is open without hardware
+  counters. A caller with 64-byte records should measure, and may pad.
+
+Revised verdict: `CopySlot` pays for `Copy` records in `ring_spsc` at every capacity and in both threading shapes once
+the consumer caches the producer cursor, and the 256-byte row was never about the slot. The one open row is 64-byte
+records at a 64-byte stride.
 
 ## Reproduce
 

@@ -51,7 +51,7 @@ on:
       suite:
         description: verb/bench suite
         required: false
-        default: all
+        default: micro  # instead of 'all' - it should make it run faster
         type: string
 
 permissions:

@@ -23,7 +23,7 @@ included, the same rule as the root diagram. Both come from the crate manifests.
 | `ring_config` | 1 | types | Validated ring construction parameters |
 | `ring_index` | 1 | types | Maps a sequence number to its slot |
 | `ring_seqno` | 1 | types | Sequence arithmetic (laps, distance, may-claim) |
-| `ring_slot` | 1 | types | Typed and raw-byte slot payload views |
+| `ring_slot` | 1 | types | Typed, bare `Copy` and raw-byte slot payload views |
 | `ring_stats` | 1 | types | Claim/publish/drop counters, observability only |
 | `ring_trace` | 1 | types | Optional, off-by-default operation log |
 | `ring_batch` | 2 | atomic, index, seqno, types | Claims N items with a single atomic fence |
@@ -127,7 +127,7 @@ assert_eq!( ring_index::of( Seq( 8 ), cap ), SlotIndex( 0 ) );
 ```
 
 ### `ring_slot`. Payload views.
-`Slot` trait (`is_empty/clear`) + `TypedSlot<T>` (owns value, `set/get/take`, drop runs on `clear`) + `BytesSlot<N>` (memcpy into fixed storage; `clear` only moves len, bytes not zeroed). What `ring_event` fills and `ring_store` holds.
+`Slot` trait (`is_empty/clear`) + `TypedSlot<T>` (owns value, `set/get/take`, drop runs on `clear`) + `CopySlot<T: Copy + Default>` (the record bare, no tag: `set/get`; never `is_empty`, `clear` writes the default; an unwritten publish reads the previous lap) + `BytesSlot<N>` (memcpy into fixed storage; `clear` only moves len, bytes not zeroed). What `ring_event` fills and `ring_store` holds.
 > Granny: what a single box can hold: either a proper typed parcel (`TypedSlot<u32>`) or raw bytes (`BytesSlot`). Empty means "you must not read me", and cleaning a bytes-box just forgets the length, it does not shred the paper inside.
 ```rust
 let mut s = TypedSlot::< u32 >::empty();

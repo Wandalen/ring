@@ -62,7 +62,7 @@
 mod threaded {
   use core::sync::atomic::{AtomicUsize, Ordering};
 
-  use ring_slot::{BytesSlot, TypedSlot};
+  use ring_slot::{BytesSlot, CopySlot, TypedSlot};
   use ring_spsc::{Batch, Consumer, Producer, Reservation, Ring};
   use ring_types::{Capacity, RingError, Seq};
 
@@ -357,6 +357,48 @@ mod threaded {
 
     assert_eq!(producer.position(), Seq(1));
     assert_eq!(consumer.available(), 1);
+  }
+
+  #[test]
+  fn copy_slot_records_arrive_in_order_through_try_push() {
+    let mut ring: Ring<CopySlot<u64>> = Ring::new(cap(4));
+    let (mut producer, mut consumer) = ring.split();
+
+    for record in 1..=4 {
+      producer.try_push(record).unwrap();
+    }
+
+    let drained: Vec<u64> = consumer.drain().iter().map(CopySlot::get).collect();
+    assert_eq!(drained, [1, 2, 3, 4]);
+  }
+
+  #[test]
+  fn a_full_ring_hands_the_copy_slot_record_back() {
+    let mut ring: Ring<CopySlot<u64>> = Ring::new(cap(1));
+    let (mut producer, _consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+
+    assert_eq!(producer.try_push(2), Err(2));
+  }
+
+  /// `CopySlot`'s pitfall, pinned. With no tag, a reservation dropped unwritten
+  /// publishes whatever the slot last held, so the consumer receives the
+  /// previous lap's record a second time. A change that stopped publishing
+  /// unwritten slots would fail here, and the pitfall would then be stale.
+  #[test]
+  fn an_unwritten_copy_slot_reservation_republishes_the_previous_lap() {
+    let mut ring: Ring<CopySlot<u64>> = Ring::new(cap(1));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(7).unwrap();
+    let first: Vec<u64> = consumer.drain().iter().map(CopySlot::get).collect();
+    assert_eq!(first, [7]);
+
+    drop(producer.claim().unwrap());
+
+    let second: Vec<u64> = consumer.drain().iter().map(CopySlot::get).collect();
+    assert_eq!(second, [7], "the previous lap's record, delivered again");
   }
 
   #[test]

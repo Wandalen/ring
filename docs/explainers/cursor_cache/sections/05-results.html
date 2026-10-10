@@ -1,0 +1,1006 @@
+<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs, commits per PR, open questions, glossary.
+Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
+Hover or focus any mark for the exact two-round pair; every chart has a table twin. -->
+<section id="sec-results" class="section" data-title="Measurements, trade-offs, what changed">
+<style>
+  #sec-results { position: relative; }
+  #sec-results .r-lede { color: var(--muted); max-width: var(--measure); }
+  #sec-results .r-fig { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px 14px; margin: 14px 0 8px; }
+  #sec-results .r-fig svg { display: block; width: 100%; max-width: 1000px; height: auto; overflow: visible; }
+  #sec-results .r-fig figcaption, #sec-results .r-cap { color: var(--muted); font-size: 0.9rem; max-width: var(--measure); margin-top: 8px; }
+  #sec-results .r-read { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); font-size: 0.95rem; }
+  #sec-results .r-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  #sec-results .r-seg button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 5px 11px; }
+  #sec-results .r-seg button + button { border-left: 1px solid var(--line); }
+  #sec-results .r-seg button[aria-pressed="true"] { background: var(--accent); color: #0f1115; }
+  #sec-results .r-seg button:focus-visible, #sec-results .r-fig [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #sec-results .r-ctl-name { color: var(--muted); font-size: 0.85rem; margin-right: 4px; }
+  #sec-results .r-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.86rem; color: var(--muted); margin: 6px 0 4px; }
+  #sec-results .r-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #sec-results .r-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--sw); }
+  #sec-results .r-sw.ghost { background: transparent; border: 1.5px dashed var(--sw); }
+  #sec-results .r-sw.tick { width: 14px; height: 2px; border-radius: 0; background: var(--text); }
+  #sec-results .r-sw.faint { background: var(--muted); opacity: .45; }
+
+  /* bars */
+  #sec-results .bar .solid { fill: var(--bar); }
+  #sec-results .bar .faint { fill: var(--bar); opacity: .38; }
+  #sec-results .bar .tick { stroke: var(--text); stroke-width: 2; stroke-linecap: round; }
+  #sec-results .bar.ghost .solid { fill: none; stroke: var(--bar); stroke-width: 1.5; stroke-dasharray: 4 3; }
+  #sec-results .bar.ghost .faint { display: none; }
+  #sec-results .bar.ghost .tick { stroke: var(--bar); }
+  #sec-results .bar .hit { fill: transparent; stroke: none; }
+  #sec-results .bar { outline: none; cursor: default; }
+  #sec-results .bar:hover .solid:not([d=""]), #sec-results .bar:focus .solid { filter: brightness(1.18); }
+  #sec-results .bar:focus .hit { stroke: var(--accent); stroke-width: 1.5; }
+  #sec-results svg .gl { stroke: var(--line); stroke-width: 1; }
+  #sec-results svg .base { stroke: var(--muted); stroke-width: 1; }
+  #sec-results svg .tk { fill: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+  #sec-results svg .lab { fill: var(--text); font-size: 14px; }
+  #sec-results svg .sub { fill: var(--muted); font-size: 13px; }
+  #sec-results .wide-panels svg .tk { font-size: 14px; }
+  #sec-results .wide-panels svg .lab { font-size: 15px; }
+  #sec-results .wide-panels svg .sub { font-size: 14px; }
+  #sec-results svg .ref { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+
+  /* tooltip */
+  #sec-results .r-tip { position: absolute; z-index: 30; pointer-events: none; min-width: 180px; max-width: 300px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  #sec-results .r-tip .t { color: var(--muted); margin-bottom: 4px; }
+  #sec-results .r-tip .row { display: flex; align-items: center; gap: 8px; }
+  #sec-results .r-tip .row i { display: inline-block; width: 12px; height: 2px; background: var(--k); flex: none; }
+  #sec-results .r-tip .row b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  #sec-results .r-tip .row span { color: var(--muted); }
+  #sec-results .r-tip .n { color: var(--muted); margin-top: 4px; font-size: 0.8rem; }
+
+  /* tables */
+  #sec-results details { margin-top: 10px; }
+  #sec-results summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+  #sec-results .r-tbl { margin-top: 8px; font-size: 0.88rem; }
+  #sec-results .r-tbl td.k { color: var(--muted); }
+  #sec-results .r-scroll { overflow-x: auto; }
+
+  /* single-thread rows */
+  #sec-results .st-grid { display: grid; grid-template-columns: minmax(170px, 230px) minmax(0, 1fr) 150px; gap: 0 14px; align-items: center; }
+  #sec-results .st-grid > .h { color: var(--muted); font-size: 0.82rem; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  #sec-results .st-lab { font-size: 0.9rem; padding: 6px 0; }
+  #sec-results .st-lab small { color: var(--muted); display: block; font-size: 0.78rem; }
+  #sec-results .st-d { font-size: 0.88rem; font-variant-numeric: tabular-nums; }
+  #sec-results .flag { display: inline-flex; align-items: center; gap: 5px; margin-top: 3px; font-size: 0.76rem; color: var(--text); border: 1px solid var(--c-warn); border-radius: 999px; padding: 1px 8px 1px 6px; white-space: nowrap; }
+  #sec-results .flag::before { content: "?"; display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: var(--c-warn); color: #0f1115; font-weight: 700; font-size: 0.68rem; }
+  #sec-results .st-row-flag { background: color-mix(in srgb, var(--c-warn) 7%, transparent); }
+  #sec-results .pre { margin-top: 18px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  #sec-results .pre-tag { display: inline-block; font-size: 0.78rem; color: var(--text); border: 1px solid var(--muted); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+  #sec-results .hb { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 4px 12px; align-items: center; font-size: 0.86rem; margin: 8px 0; }
+  #sec-results .hb .lane { position: relative; height: 16px; }
+  #sec-results .hb .fill { position: absolute; left: 0; top: 2px; height: 12px; border-radius: 0 4px 4px 0; background: var(--sw); }
+  #sec-results .hb .v { position: absolute; top: -1px; font-variant-numeric: tabular-nums; font-size: 0.8rem; white-space: nowrap; }
+
+  /* wide panels */
+  #sec-results .wide-panels { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  #sec-results .wide-panels h4 { font-size: 0.95rem; margin: 0 0 2px; }
+  #sec-results .wide-panels .note { font-size: 0.8rem; color: var(--muted); min-height: 2.4em; }
+  #sec-results .open { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); margin-top: 10px; }
+  #sec-results .open::before { content: "Open · "; color: var(--accent); font-weight: 600; }
+  #sec-results ul.ruled { padding-left: 1.1em; margin: 6px 0; }
+  #sec-results ul.ruled li { margin: 2px 0; }
+  #sec-results ul.ruled li::marker { content: "✕  "; color: var(--muted); }
+
+  /* mutations */
+  #sec-results .chip { display: inline-block; font-size: 0.76rem; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+  #sec-results .chip.loom { border-color: var(--accent); }
+  #sec-results .chip.none { border-style: dashed; color: var(--muted); }
+  #sec-results .mut td { text-align: left; vertical-align: top; }
+  #sec-results .mut td code { font-size: 0.82em; }
+  #sec-results .mut tr[hidden] { display: none; }
+  #sec-results .survey { display: flex; height: 18px; border-radius: 4px; overflow: hidden; gap: 2px; background: var(--surface); margin: 8px 0 6px; max-width: 640px; }
+  #sec-results .survey div { background: var(--sw); outline: none; }
+  #sec-results .survey div:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+
+  /* trade-offs */
+  #sec-results .to { border: 1px solid var(--line); border-radius: var(--radius); margin: 14px 0; overflow: hidden; }
+  #sec-results .to > h4 { margin: 0; padding: 10px 16px; background: var(--surface-2); font-size: 1rem; border-left: 4px solid var(--tc); }
+  #sec-results .to .cols { display: grid; grid-template-columns: 1fr 1fr; }
+  #sec-results .to .cols > div { padding: 10px 16px 12px; }
+  #sec-results .to .cols > div + div { border-left: 1px solid var(--line); }
+  #sec-results .to h5 { margin: 0 0 4px; font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+  #sec-results .to ul { margin: 0; padding-left: 1.1em; font-size: 0.92rem; }
+  #sec-results .to li { margin: 4px 0; }
+
+  /* PRs */
+  #sec-results .prs { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  #sec-results .pr { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; background: var(--surface); }
+  #sec-results .pr h4 { margin: 0 0 2px; }
+  #sec-results .pr ol { margin: 8px 0 0; padding-left: 1.4em; }
+  #sec-results .pr li { margin: 8px 0; font-size: 0.92rem; }
+  #sec-results .pr li .h { color: var(--muted); }
+  #sec-results .pr li ul { margin: 2px 0 0; padding-left: 0; list-style: none; }
+  #sec-results .pr li ul li { margin: 0; font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); word-break: break-all; }
+  #sec-results .ctx { font-size: 0.88rem; color: var(--muted); }
+
+  /* glossary */
+  #sec-results dl.gl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; max-width: 92ch; }
+  #sec-results dl.gl dt { font-weight: 600; }
+  #sec-results dl.gl dd { margin: 0; color: var(--text); }
+  #sec-results ol.oq li { margin: 8px 0; }
+
+  @media (max-width: 700px) { #sec-results .wide-panels { grid-template-columns: 1fr; } }
+  @media (max-width: 1100px) {
+    #sec-results .prs, #sec-results .to .cols { grid-template-columns: 1fr; }
+    #sec-results .to .cols > div + div { border-left: 0; border-top: 1px solid var(--line); }
+    #sec-results .st-grid { grid-template-columns: 150px minmax(0, 1fr) 120px; }
+  }
+</style>
+
+<h2>Measurements, trade-offs, what changed</h2>
+<p class="r-lede">Every chart below draws straight from the recorded runs. Two-thread cells were run twice, in separate
+  processes; both rounds are drawn, never averaged. Throughput is in millions of records per second (M/s), higher is
+  better, unless a label says ns or µs. All on one Apple M4 Pro, threads not pinned, no hardware performance counters.</p>
+
+<div class="r-tip" hidden role="status" aria-live="polite"></div>
+
+<!-- ============ 1. stages ============ -->
+<h3>The three stages: master, #41, #38 on #41</h3>
+<p>Each group is one ring capacity. Each bar is one stage of the code: <strong>master</strong> (<code>TypedSlot</code>, no
+  consumer cache), <strong>#41</strong> (<code>TypedSlot</code>, the consumer caches the producer cursor),
+  <strong>#38 on #41</strong> (<code>CopySlot</code> with the cache). The dashed bar is <code>CopySlot</code>
+  <em>without</em> the cache, the state PR #38 was first measured in. Switch the cursor layout and watch which bars move.</p>
+<div class="controls" id="r-st-ctl">
+  <span><span class="r-ctl-name">Pop</span><span class="r-seg" role="group" aria-label="Pop mode">
+    <button type="button" data-k="mode" data-v="pop1" aria-pressed="true">pop1, one record per pop</button><button type="button" data-k="mode" data-v="popN" aria-pressed="false">popN, whole-lap drains</button></span></span>
+  <span><span class="r-ctl-name">Cursors</span><span class="r-seg" role="group" aria-label="Cursor layout">
+    <button type="button" data-k="layout" data-v="one_line" aria-pressed="false">one line</button><button type="button" data-k="layout" data-v="two_lines" aria-pressed="true">two lines</button></span></span>
+  <span><span class="r-ctl-name">Scale</span><span class="r-seg" role="group" aria-label="Y scale">
+    <button type="button" data-k="scale" data-v="lin" aria-pressed="true">linear</button><button type="button" data-k="scale" data-v="log" aria-pressed="false">log</button></span></span>
+</div>
+<figure class="r-fig" style="margin:0">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--c-master)"></i>master</span>
+    <span><i class="r-sw" style="--sw:var(--c-pr41)"></i>#41 consumer cache</span>
+    <span><i class="r-sw" style="--sw:var(--c-pr38)"></i>#38 CopySlot on #41</span>
+    <span><i class="r-sw ghost" style="--sw:var(--c-pr38)"></i>#38 without #41</span>
+    <span><i class="r-sw tick"></i>one round (two per bar)</span>
+    <span><i class="r-sw faint"></i>spread between the rounds</span>
+  </div>
+  <svg id="r-stages" viewBox="0 0 880 340" role="img" aria-label="Grouped bars of throughput per capacity for four code stages"></svg>
+  <p class="r-read" id="r-st-read"></p>
+  <details><summary>Table: every cell of this pop mode, both layouts</summary><div class="r-scroll"><table class="r-tbl" id="r-st-tbl"></table></div></details>
+</figure>
+<p class="r-cap">Rings heap-placed at a fixed offset: byte 0 of a 256-byte block puts both cursors in one 128-byte line,
+  byte 64 puts them in two. Solid bar to the lower round, faint to the higher; the two ticks are the rounds.</p>
+
+<!-- ============ 2. single thread ============ -->
+<h3>One thread: what #41 costs when nobody is on the other side</h3>
+<p>Single-threaded, the cache cannot save a cross-core transfer; there is none to save. These rows measure the bookkeeping
+  it adds. Lower is better here: time per operation or per lap. Grey dots are master, green dots #41, one dot per round.</p>
+<div class="controls">
+  <span><span class="r-ctl-name">Each row's axis</span><span class="r-seg" role="group" aria-label="Row axis">
+    <button type="button" id="r-st1-zero" aria-pressed="true">starts at zero</button><button type="button" id="r-st1-zoom" aria-pressed="false">zoomed to the values</button></span></span>
+</div>
+<div class="r-fig">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--c-master);border-radius:50%"></i>master (TypedSlot)</span>
+    <span><i class="r-sw" style="--sw:var(--c-pr41);border-radius:50%"></i>#41 (TypedSlot)</span>
+  </div>
+  <div class="st-grid" id="r-st1"></div>
+  <p class="r-cap">Each row has its own scale; compare dots within a row, not across rows. Rows with one dot per stage
+    were recorded as a single figure.</p>
+  <div class="hyp" style="margin-top:10px">The two rows marked <span class="flag">code layout, unexplained</span> got
+    slower although #41 adds no instruction to the push path and only a compare per lap to the whole-lap drain. ADR 002
+    attributes both to code layout. That is an inference from timing alone; no hardware counters were available to
+    confirm it.</div>
+
+  <div class="pre">
+    <h4 style="margin:0 0 4px">CopySlot against TypedSlot, single thread <span class="pre-tag">pre-rebase, c28bedb</span></h4>
+    <p class="r-cap" style="margin-top:0">From PR #38's benchmark record, before it was rebased onto #41. Four processes,
+      median. A different commit and session from the rows above, so do not compare these with them.</p>
+    <div id="r-pre"></div>
+  </div>
+</div>
+
+<!-- ============ 3. CL 64 vs 128 ============ -->
+<h3><code>CACHE_LINE</code> 64 against 128, and what the consumer cache does to it</h3>
+<p><code>ring_align::CACHE_LINE</code> is 64 on a machine whose lines are 128 bytes. Raising it to 128 (closed PR #23)
+  puts the two cursors on separate lines every time. Before #41 that was the slow layout. These runs use PR #38's code
+  without the consumer cache, rings fixed at a 256-byte boundary.</p>
+<div class="controls" id="r-cl-ctl">
+  <span><span class="r-ctl-name">Code</span><span class="r-seg" role="group" aria-label="Consumer cache">
+    <button type="button" data-k="cache" data-v="0" aria-pressed="true">without the consumer cache</button><button type="button" data-k="cache" data-v="1" aria-pressed="false">with it</button></span></span>
+  <span><span class="r-ctl-name">Cells</span><span class="r-seg" role="group" aria-label="Cell filter">
+    <button type="button" data-k="f" data-v="all" aria-pressed="true">all</button><button type="button" data-k="f" data-v="pop1" aria-pressed="false">pop1</button><button type="button" data-k="f" data-v="popN" aria-pressed="false">popN</button></span></span>
+  <span><span class="r-ctl-name">Scale</span><span class="r-seg" role="group" aria-label="X scale">
+    <button type="button" data-k="scale" data-v="lin" aria-pressed="true">linear</button><button type="button" data-k="scale" data-v="log" aria-pressed="false">log</button></span></span>
+</div>
+<figure class="r-fig" style="margin:0">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--muted)"></i>CACHE_LINE = 64 (shipped)</span>
+    <span><i class="r-sw" style="--sw:var(--accent)"></i>CACHE_LINE = 128</span>
+    <span><i class="r-sw tick"></i>one round</span>
+  </div>
+  <svg id="r-cl" viewBox="0 0 880 400" role="img" aria-label="Paired bars, CACHE_LINE 64 against 128 per benchmark cell"></svg>
+  <p class="r-read" id="r-cl-read"></p>
+  <details><summary>Table: CACHE_LINE 64 against 128</summary><div class="r-scroll"><table class="r-tbl" id="r-cl-tbl"></table></div></details>
+</figure>
+
+<!-- ============ 4. wide records ============ -->
+<h3>Wide records: the check, then the stride</h3>
+<p>The bench harness verifies each popped record with <code>Wide::whole</code>. It used to compare the first and last
+  word only. A 256-byte record spans two 128-byte lines plus a sliver; at the tagged 264-byte stride the old check never
+  read the middle line, so that line never crossed cores. Flip the check and watch the 256-byte panel.</p>
+<div class="controls" id="r-w-ctl">
+  <span><span class="r-ctl-name">Check</span><span class="r-seg" role="group" aria-label="Wide::whole check">
+    <button type="button" data-v="old" aria-pressed="false">first and last word (old)</button><button type="button" data-v="new" aria-pressed="true">every word (fixed)</button></span></span>
+</div>
+<div class="r-fig">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--c-tagged)"></i>TypedSlot (tagged)</span>
+    <span><i class="r-sw" style="--sw:var(--c-untagged)"></i>CopySlot (untagged)</span>
+    <span><i class="r-sw" style="--sw:var(--c-rtrb)"></i>rtrb</span>
+    <span><i class="r-sw tick"></i>one round</span>
+  </div>
+  <div class="wide-panels" id="r-wide"></div>
+  <p class="r-cap">Stock harness, 1024 slots, push1_popN, two rounds, M/s. Each panel has its own scale.</p>
+  <details><summary>Table: wide records, both checks</summary><div class="r-scroll"><table class="r-tbl" id="r-w-tbl"></table></div></details>
+</div>
+
+<h4 style="margin-top:22px">The 64-byte row is the stride, not the slot</h4>
+<p>With every word read, the 256-byte row ties. The 64-byte row does not: <code>CopySlot</code> at a 64-byte stride stays
+  behind <code>TypedSlot</code> at 72. Varying the stride and nothing else moves the result.</p>
+<div class="r-fig">
+  <svg id="r-stride" viewBox="0 0 880 170" role="img" aria-label="Ranges of throughput for four slot and stride combinations"></svg>
+  <p class="r-cap">Ranges over the review's runs, M/s, 64-byte records, 1024 slots.</p>
+  <table class="r-tbl" style="margin-top:8px">
+    <thead><tr><th>Experiment</th><th>stride 64 or 256</th><th>stride 72 or 264</th></tr></thead>
+    <tbody id="r-stride-tbl"></tbody>
+  </table>
+  <h5 style="margin:14px 0 2px;font-size:.9rem">Ruled out</h5>
+  <ul class="ruled" id="r-ruled"></ul>
+  <div class="open">Mechanism. A frontier effect: it shows only where the producer writes and the consumer reads the same
+    lines at the same moment, and vanishes when the consumer is held 64 records back. Why a power-of-two stride is slow
+    there is not known. It needs hardware counters, which this machine did not expose. A caller with 64-byte records
+    should measure, and may pad.</div>
+</div>
+
+<!-- ============ 5. env flip ============ -->
+<h3>The layout lottery, in one line per capacity</h3>
+<p>The same PR #38 binary, run with one unused environment variable <code>PAD</code> of growing length. The variable
+  shifts the stack, the stack holds the ring, and the ring's address decides whether the cursors share a line. The line
+  is CopySlot over TypedSlot; above 1 CopySlot looked faster, below 1 slower. <a href="#sec-layout">Section 03 shows the
+  mechanism</a>. Move along the line with the pointer, or focus it and use the arrow keys.</p>
+<div class="r-fig">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw tick" style="background:var(--accent)"></i>64 slots</span>
+    <span><i class="r-sw tick" style="background:var(--muted)"></i>1024 slots</span>
+  </div>
+  <svg id="r-env" viewBox="0 0 880 210" role="img" aria-label="Ratio of CopySlot to TypedSlot throughput by PAD length"></svg>
+  <details><summary>Table: PAD length against medians</summary><div class="r-scroll"><table class="r-tbl" id="r-env-tbl"></table></div></details>
+</div>
+
+<!-- ============ 6. mutations ============ -->
+<h3>Which test kills which mutation</h3>
+<p>Each row is a deliberate break of the consumer cache. A mutation is killed when some test fails on it. One is caught
+  only by the loom model, which explores thread interleavings that a real run may never hit.</p>
+<div class="controls" id="r-mut-ctl">
+  <span class="r-seg" role="group" aria-label="Filter mutations">
+    <button type="button" data-v="all" aria-pressed="true">all</button><button type="button" data-v="loom" aria-pressed="false">needs loom</button><button type="button" data-v="std" aria-pressed="false">std tests only</button><button type="button" data-v="none" aria-pressed="false">survives</button></span>
+</div>
+<div class="r-scroll"><table class="r-tbl mut" style="width:100%">
+  <thead><tr><th style="text-align:left">Mutation</th><th style="text-align:left">Killed by</th><th style="text-align:left">Kind</th></tr></thead>
+  <tbody id="r-mut"></tbody>
+</table></div>
+<h4 style="margin-top:18px">Mutation survey of <code>ring_spsc</code> after #41</h4>
+<div class="survey" id="r-survey" role="img" aria-label="Survey: 75 mutants"></div>
+<div class="r-legend" id="r-survey-leg"></div>
+
+<!-- ============ 7. trade-offs ============ -->
+<h3>Trade-offs, per change</h3>
+<div id="r-to"></div>
+
+<!-- ============ 8. PRs ============ -->
+<h3>What changed, by PR</h3>
+<p class="ctx" id="r-ctx"></p>
+<div class="prs" id="r-prs"></div>
+
+<!-- ============ 9. open + glossary ============ -->
+<h3>Open questions</h3>
+<ol class="oq">
+  <li><strong>Why is a 64-byte stride slow at the frontier?</strong> Ruled out: 4K aliasing, more line sharing, codegen.
+    Padding to 72 bytes fixes it; the mechanism needs hardware counters.</li>
+  <li><strong>Why did #41 slow two single-thread benchmarks?</strong> <code>push_pop</code> (3.60, 3.73 → 3.98, 3.98 ns)
+    and whole-lap <code>fill_drain</code> at 64 and 1024 slots. Labelled code layout; not observed directly.</li>
+  <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s</strong> in every mode and layout? Likely the
+    256 KB slot array spilling the 128 KB L1D (<code>CopySlot</code>'s is exactly 128 KB). The regimes review rates the
+    label medium and the cause low. #41 takes pop1 there from 46, 47 to 36, 35.</li>
+  <li><strong>Which mode of the bimodal popN 1024 cell is typical?</strong> The regimes review attributes the two modes to
+    the chase's initial race (high confidence). A separate review tied the tagged flip to the slot array sitting one page
+    after the ring, mechanism unknown.</li>
+  <li><strong>Where does the lockstep threshold sit now?</strong> The cache moved it. The steady-state model
+    R* ≈ m / (c − p) (m one refresh ≈ 45 ns, c the consumer's cost per pop, p the producer's cost per push) was fitted
+    qualitatively; c and p were never measured in isolation.</li>
+  <li><strong>Does the one-line layout batch about 4 records per transfer?</strong> Consistent with the timings (one-way
+    37.8 ns against ~9–10 ns per record), unobservable without counters. Hypothesis, ~70% confidence.</li>
+  <li><strong>Should <code>CACHE_LINE</code> become 128?</strong> With #41 the two layouts measure the same on pop1, so
+    this is now a footprint decision, not a speed one.</li>
+</ol>
+
+<h3>Glossary</h3>
+<dl class="gl">
+  <dt>Cache line</dt><dd>The unit a cache stores, moves and keeps coherent. 128 bytes on this M4 Pro; <code>ring_align</code> assumes 64.</dd>
+  <dt>Coherence transfer</dt><dd>Moving a line, or its write ownership, from one core's cache to another's, invalidating the old copy. One way inside a P-core cluster: median 37.8 ns.</dd>
+  <dt>Stride</dt><dd>Bytes from the start of one slot to the start of the next: 16 for <code>TypedSlot&lt;u64&gt;</code>, 8 for <code>CopySlot&lt;u64&gt;</code>, 72 against 64 and 264 against 256 for the wide records.</dd>
+  <dt>Frontier</dt><dd>The slots the producer is writing while the consumer reads right behind it. Lines there are hot on both cores at once.</dd>
+  <dt>Lockstep</dt><dd>The full ring with the producer one slot behind the consumer: it refreshes its cached consumer cursor before nearly every push, about 48 ns each.</dd>
+  <dt><code>OWN</code>, <code>GATING</code>, <code>HANDOFF</code></dt><dd>The three orderings the ring uses. <code>OWN</code> is <code>Relaxed</code>: an end reading the cursor only it writes. <code>GATING</code> is <code>Acquire</code>: reading the other end's cursor before touching the slots it guards. <code>HANDOFF</code> is <code>Release</code>: publishing one's own cursor after the slot writes.</dd>
+  <dt>LDAPR, STLR</dt><dd>The AArch64 instructions behind them: LDAPR (and LDAPUR) an acquire load in the weaker RCpc form, STLR (and STLUR) a release store. A push does one STLR; before #41, every pop did one LDAPR.</dd>
+  <dt>loom</dt><dd>A Rust model checker. It runs a concurrent test under every interleaving the memory model permits, up to a bound, and so catches orderings a real run rarely exposes.</dd>
+</dl>
+
+<script>
+(() => {
+  const root = document.getElementById('sec-results');
+  const $ = (s) => root.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- data, copied from tmp/explainer/data.json ---------------- */
+  const D = {
+    stages: {
+      pop1: [
+        { slots: 64,    layout: 'one_line',  master: [102, 101], pr41: [136, 128], pr38_no_cache: [102, 100], pr38_on_41: [136, 142] },
+        { slots: 64,    layout: 'two_lines', master: [29, 30],   pr41: [122, 123], pr38_no_cache: [24, 24],   pr38_on_41: [122, 124] },
+        { slots: 1024,  layout: 'one_line',  master: [261, 252], pr41: [333, 337], pr38_no_cache: [187, 199], pr38_on_41: [444, 360] },
+        { slots: 1024,  layout: 'two_lines', master: [216, 188], pr41: [332, 337], pr38_no_cache: [24, 24],   pr38_on_41: [443, 439] },
+        { slots: 16384, layout: 'one_line',  master: [46, 47],   pr41: [36, 35],   pr38_no_cache: [260, 264], pr38_on_41: [475, 445] },
+        { slots: 16384, layout: 'two_lines', master: [47, 48],   pr41: [36, 35],   pr38_no_cache: [29, 29],   pr38_on_41: [469, 393] }
+      ],
+      popN: [
+        { slots: 64,    layout: 'one_line',  master: [133, 137], pr41: [133, 129], pr38_no_cache: [145, 143], pr38_on_41: [133, 132] },
+        { slots: 64,    layout: 'two_lines', master: [125, 123], pr41: [123, 123], pr38_no_cache: [124, 131], pr38_on_41: [117, 114] },
+        { slots: 1024,  layout: 'one_line',  master: [292, 291], pr41: [416, 272], pr38_no_cache: [976, 978], pr38_on_41: [988, 732] },
+        { slots: 1024,  layout: 'two_lines', master: [295, 296], pr41: [343, 423], pr38_no_cache: [955, 891], pr38_on_41: [557, 557] },
+        { slots: 16384, layout: 'one_line',  master: [38, 38],   pr41: [35, 36],   pr38_no_cache: [631, 643], pr38_on_41: [565, 608] },
+        { slots: 16384, layout: 'two_lines', master: [38, 40],   pr41: [36, 35],   pr38_no_cache: [581, 608], pr38_on_41: [520, 530] }
+      ]
+    },
+    single: {
+      push_pop_ns: { master: [3.60, 3.73], pr41: [3.98, 3.98], copyslot_c28bedb: 2.97, typedslot_c28bedb: 3.81 },
+      pop_empty_pop1_ns: { master: [2.10, 1.56], pr41: [1.98, 1.84] },
+      pop_empty_popN_ns: { master: [1.95, 1.91], pr41: [1.73, 1.75] },
+      fill_drain_pop1: { s64_ns: { master: 177, pr41: 158 }, s1024_us: { master: 2.80, pr41: 2.51 }, s16384_us: { master: [338, 324], pr41: [318, 368] } },
+      fill_drain_popN: { s64_ns: { master: 65.0, pr41: 73.2 }, s1024_us: { master: 0.96, pr41: 1.06 }, s16384_us: { master: [307, 298], pr41: [297, 301] } },
+      fill_drain_popN_Mps_c28bedb: { typedslot: { 64: 884, 1024: 971, 16384: 53.1 }, copyslot: { 64: 1111, 1024: 1222, 16384: 1004 } }
+    },
+    cl: [
+      { cell: 'CopySlot push1_pop1 64',    cl64: [93.6, 86.1],   cl128: [20.5, 21.1] },
+      { cell: 'CopySlot push1_pop1 1024',  cl64: [186.7, 144.4], cl128: [25.4, 25.9] },
+      { cell: 'CopySlot push1_pop1 16384', cl64: [228.8, 206.5], cl128: [71.5, 32.7] },
+      { cell: 'CopySlot push1_popN 64',    cl64: [120.7, 133.1], cl128: [108.7, 121.4] },
+      { cell: 'CopySlot push1_popN 1024',  cl64: [814.0, 909.9], cl128: [649.3, 826.4] },
+      { cell: 'CopySlot push1_popN 16384', cl64: [532.0, 575.2], cl128: [412.1, 520.9] },
+      { cell: 'TypedSlot push1_pop1 64',   cl64: [91.6, 79.2],   cl128: [29.7, 30.3] },
+      { cell: 'TypedSlot push1_pop1 1024', cl64: [226.9, 219.9], cl128: [140.4, 192.5] }
+    ],
+    clCacheNote: 'with the consumer cache (one round), CL=64 vs CL=128 on CopySlot pop1: 64 slots 109.7 vs 103.4 (within 10%); 1024 slots 302.5 vs 371.8 (128 is 23% faster); 16384 slots 273.1 vs 409.5 (128 is 50% faster). Without the cache, CL=128 is 3-7x slower on pop1.',
+    clCache: [
+      { cell: 'CopySlot push1_pop1 1024',  cl64: [302.5], cl128: [371.8] },
+      { cell: 'CopySlot push1_pop1 16384', cl64: [273.1], cl128: [409.5] }
+    ],
+    wide: [
+      { bytes: 8,   typedslot_old: [271.3, 368.6], typedslot_new: [360.5, 280.9], copyslot_old: [569.7, 910.0], copyslot_new: [881.0, 728.4], rtrb_new: [143.9, 135.8] },
+      { bytes: 64,  typedslot_old: [80.7, 91.0],   typedslot_new: [99.3, 93.7],   copyslot_old: [42.0, 42.6],   copyslot_new: [62.6, 44.6],   rtrb_new: [65.9, 52.7] },
+      { bytes: 256, typedslot_old: [46.9, 52.0],   typedslot_new: [31.8, 30.2],   copyslot_old: [26.6, 26.9],   copyslot_new: [29.4, 29.1],   rtrb_new: [31.0, 29.6] }
+    ],
+    strides: { 8: [16, 8], 64: [72, 64], 256: [264, 256] },
+    stride: {
+      copyslot_stride_64: [38, 53], copyslot_padded_to_72: [81, 96], typedslot_stride_72: [70, 85], typedslot_no_tag_stride_64: [52, 73],
+      lag_64_vs_72: [180, 177], lag_256_vs_264: [110, 113], st_fill_drain_64_vs_72: [707, 483],
+      stride_128_vs_136: 'within ~10%',
+      ruled_out: ['4K aliasing (same-core effect, does not vanish with lag)', 'more line sharing (72 shares more boundaries yet is faster)', 'codegen (both store inline, no memcpy)']
+    },
+    linesRead: { stride_264: 1.06, stride_256: 2.00 },
+    env: [
+      { pad: 1,   spsc_64: 27.1, plain_64: 85.7,  spsc_1024: 243,  plain_1024: 180 },
+      { pad: 17,  spsc_64: 26.7, plain_64: 89.0,  spsc_1024: 244,  plain_1024: 206 },
+      { pad: 33,  spsc_64: 77.8, plain_64: 102.8, spsc_1024: 191,  plain_1024: 205 },
+      { pad: 49,  spsc_64: 96.7, plain_64: 26.0,  spsc_1024: 267,  plain_1024: 29.3 },
+      { pad: 65,  spsc_64: 84.1, plain_64: 24.3,  spsc_1024: 184,  plain_1024: 56.0 },
+      { pad: 81,  spsc_64: 83.8, plain_64: 23.5,  spsc_1024: 267,  plain_1024: 26.7 },
+      { pad: 97,  spsc_64: 32.7, plain_64: 23.9,  spsc_1024: 248,  plain_1024: 28.4 },
+      { pad: 113, spsc_64: 32.7, plain_64: 23.2,  spsc_1024: 86.5, plain_1024: 29.1 }
+    ],
+    mutations: [
+      { mutation: 'reload only when start == cached', killed_by: 'drain_takes_everything_published_after_a_bounded_drain (std)', kind: 'std' },
+      { mutation: 'cache starts at zero + == rule', killed_by: 'a_re_split_consumer_sees_what_the_first_generation_left_published (std)', kind: 'std' },
+      { mutation: 'never reload', killed_by: 'many std tests; the 100k threaded test hangs', kind: 'std' },
+      { mutation: 'reload at Relaxed', killed_by: 'loom model a_bounded_drain_hands_out_only_records_whose_writes_it_can_see (only loom catches it)', kind: 'loom' },
+      { mutation: 'extrapolate instead of load', killed_by: 'loom model and std tests', kind: 'both' },
+      { mutation: 'store only when equal (never updates)', killed_by: 'std tests', kind: 'std' },
+      { mutation: '< to <=', killed_by: 'nothing; equivalent, accepted with reason', kind: 'none' }
+    ],
+    survey: { mutants: 75, caught: 28, unviable: 38, timeouts: 7, accepted: 2, new_survivors: 0 },
+    prs: {
+      20: 'merged: the producer caches the consumer cursor (ring_spsc ADR 001)',
+      22: 'closed: both ends cache both cursors; its consumer half is #41',
+      23: 'closed: 128-byte cursor padding; measured 3-7x slower on pop1 without #41',
+      38: 'CopySlot, stacked on #41, 9 commits',
+      41: 'the consumer caches the producer cursor, 5 commits on master'
+    }
+  };
+
+  /* ---------------- helpers ---------------- */
+  const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const H = (tag, cls, text, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+  const T = (parent, x, y, text, cls, anchor) => { const t = S('text', { x, y, class: cls || 'tk', 'text-anchor': anchor || 'middle' }, parent); t.textContent = text; return t; };
+  const fmt = (v) => (Math.abs(v) >= 100 ? String(Math.round(v * 10) / 10) : String(v));
+  const pairTxt = (p) => p.map(fmt).join(', ');
+  const lin = (d0, d1, r0, r1) => (v) => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+  const logs = (d0, d1, r0, r1) => { const a = Math.log10(d0), b = Math.log10(d1); return (v) => r0 + (Math.log10(Math.max(v, d0)) - a) / (b - a) * (r1 - r0); };
+  const colPath = (x, w, base, top) => { const h = base - top; if (!(h > 0.2)) return ''; const r = Math.min(4, h, w / 2); return `M${x},${base}V${top + r}Q${x},${top} ${x + r},${top}H${x + w - r}Q${x + w},${top} ${x + w},${top + r}V${base}Z`; };
+  const rowPath = (x0, x1, y, h) => { const w = x1 - x0; if (!(w > 0.2)) return ''; const r = Math.min(4, w, h / 2); return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`; };
+  const pct = (x) => (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(1) + '%';
+  function ratioRange(num, den) { // range of num/den across the round pairings
+    const rs = []; num.forEach((a) => den.forEach((b) => rs.push(a / b)));
+    return [Math.min(...rs), Math.max(...rs)];
+  }
+  const xf = (r) => (r >= 10 ? r.toFixed(0) : r.toFixed(1));
+  const xr = (rr) => { const a = xf(rr[0]), b = xf(rr[1]); return a === b ? `${a}×` : `${a}–${b}×`; };
+
+  /* tooltip: values lead, labels follow; textContent only */
+  const tip = $('.r-tip');
+  function tipShow(c, cx, cy) {
+    tip.replaceChildren();
+    H('div', 't', c.title, tip);
+    (c.rows || []).forEach((r) => {
+      const row = H('div', 'row', null, tip);
+      const k = H('i', null, null, row); k.style.setProperty('--k', r.color || 'var(--muted)');
+      H('b', null, r.v, row); H('span', null, r.label, row);
+    });
+    if (c.note) H('div', 'n', c.note, tip);
+    tip.hidden = false;
+    const rr = root.getBoundingClientRect();
+    let x = cx - rr.left + 14, y = cy - rr.top + 14;
+    const tw = tip.offsetWidth;
+    if (x + tw > rr.width) x = Math.max(0, cx - rr.left - tw - 14);
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  const tipHide = () => { tip.hidden = true; };
+  function hover(el, fn) {
+    el.addEventListener('pointermove', (e) => tipShow(fn(), e.clientX, e.clientY));
+    el.addEventListener('pointerleave', tipHide);
+    el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); tipShow(fn(), r.right, r.top); });
+    el.addEventListener('blur', tipHide);
+  }
+  function segment(container, onPick) { // a r-seg group: buttons with data-v (and optional data-k)
+    container.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+      const grp = b.parentElement;
+      grp.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+      onPick(b.dataset.k, b.dataset.v);
+    }));
+  }
+
+  /* a vertical bar holding a two-round pair: solid to the lower round, faint to the higher, a tick per round */
+  function makeBar(parent, color, ghost) {
+    const g = S('g', { class: 'bar' + (ghost ? ' ghost' : ''), tabindex: '0', role: 'img' }, parent);
+    g.style.setProperty('--bar', color);
+    const faint = S('rect', { class: 'faint' }, g), solid = S('path', { class: 'solid' }, g);
+    const t1 = S('line', { class: 'tick' }, g), t2 = S('line', { class: 'tick' }, g);
+    const hit = S('rect', { class: 'hit', rx: 4 }, g);
+    return {
+      g,
+      draw(q) {
+        const show = !q.hidden;
+        g.style.display = show ? '' : 'none';
+        if (!show) return;
+        const lo = Math.max(q.yA, q.yB), hi = Math.min(q.yA, q.yB);
+        solid.setAttribute('d', ghost ? colPath(q.x, q.w, q.base, hi) : colPath(q.x, q.w, q.base, lo));
+        faint.setAttribute('x', q.x); faint.setAttribute('width', q.w); faint.setAttribute('y', hi); faint.setAttribute('height', Math.max(0, lo - hi));
+        [[t1, q.yA], [t2, q.yB]].forEach(([t, y]) => { t.setAttribute('x1', q.x - 3); t.setAttribute('x2', q.x + q.w + 3); t.setAttribute('y1', y); t.setAttribute('y2', y); });
+        hit.setAttribute('x', q.x - 6); hit.setAttribute('width', q.w + 12); hit.setAttribute('y', q.top); hit.setAttribute('height', Math.max(0, q.base - q.top + 2));
+      }
+    };
+  }
+  /* tween pixel geometry between two states */
+  function tweener() {
+    let prev = null, token = 0;
+    return (bars, next) => {
+      const from = prev; prev = next; const my = ++token;
+      if (reduce || !from) { bars.forEach((b, i) => b.draw(next[i])); return; }
+      const keys = ['x', 'w', 'base', 'yA', 'yB', 'top'], t0 = performance.now();
+      const step = (now) => {
+        if (my !== token) return;
+        let t = Math.min(1, (now - t0) / 420); t = 1 - Math.pow(1 - t, 3);
+        bars.forEach((b, i) => {
+          const a = from[i], z = next[i];
+          if (z.hidden || a.hidden) { b.draw(z); return; }
+          const q = {}; keys.forEach((k) => { q[k] = a[k] + (z[k] - a[k]) * t; }); b.draw(q);
+        });
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    };
+  }
+
+  /* ================= 1. stages ================= */
+  (() => {
+    const STG = [
+      { key: 'master', name: 'master', color: 'var(--c-master)' },
+      { key: 'pr41', name: '#41 consumer cache', color: 'var(--c-pr41)' },
+      { key: 'pr38_on_41', name: '#38 CopySlot on #41', color: 'var(--c-pr38)' },
+      { key: 'pr38_no_cache', name: '#38 without #41', color: 'var(--c-pr38)', ghost: true }
+    ];
+    const LAY = { one_line: 'one line', two_lines: 'two lines' };
+    const CAPS = [64, 1024, 16384];
+    const st = { mode: 'pop1', layout: 'two_lines', scale: 'lin' };
+    const svg = $('#r-stages');
+    const W = 880, Hh = 340, M = { l: 50, r: 12, t: 14, b: 70 };
+    const base = Hh - M.b;
+    const gridG = S('g', null, svg), barsG = S('g', null, svg), labG = S('g', null, svg);
+    const gw = (W - M.l - M.r) / CAPS.length, bw = 24, gap = 10, setW = STG.length * bw + (STG.length - 1) * gap;
+    const bars = [], meta = [];
+    const draw = tweener();
+    const READ = {
+      pop1_one_line: 'Both cursors in one line. #41 lifts TypedSlot from 102, 101 to 136, 128 at 64 slots and from 261, 252 to 333, 337 at 1024. At 16384 slots it costs TypedSlot 46, 47 → 36, 35 (−22% to −26% across round pairings), where the 256 KB tagged array likely spills the 128 KB L1D. CopySlot on #41 is the fastest stage at 1024 and 16384.',
+      pop1_two_lines: 'Cursors on two lines: the layout PR #38 lost the lottery in. Without the consumer cache, CopySlot sits at 24, 24 at 64 and 1024 slots: the ring is in lockstep and every record pays a cross-core round trip. With #41 the same slot measures 122, 124 and 443, 439. Master\'s TypedSlot at 64 slots goes from 29, 30 to 122, 123.',
+      popN_one_line: 'Whole-lap drains already read the producer cursor about once per lap, so #41 changes little at 64 and 16384 slots. The 1024 cell is bimodal on every stage (the chase\'s initial race): see #41\'s rounds, 416 and 272, and #38 on #41\'s, 988 and 732.',
+      popN_two_lines: 'Same picture on two lines. At 1024 slots CopySlot measured 955, 891 without the cache and 557, 557 with it; in a bimodal cell two rounds cannot say which mode is typical. At 16384 slots CopySlot (128 KB array) runs 520–608 where TypedSlot (256 KB) runs 35–40.'
+    };
+    CAPS.forEach((cap, ci) => {
+      const gx = M.l + ci * gw + (gw - setW) / 2;
+      STG.forEach((s, si) => {
+        const b = makeBar(barsG, s.color, s.ghost);
+        bars.push(b); meta.push({ cap, s, x: gx + si * (bw + gap) });
+        hover(b.g, () => {
+          const row = D.stages[st.mode].find((r) => r.slots === cap && r.layout === st.layout);
+          const p = row[s.key];
+          const m = row.master;
+          const rr = ratioRange(p, m);
+          return {
+            title: `${s.name}, ${cap} slots, ${LAY[st.layout]}, ${st.mode}`,
+            rows: [{ v: fmt(p[0]), label: 'round 1, M/s', color: s.color }, { v: fmt(p[1]), label: 'round 2, M/s', color: s.color }],
+            note: s.key === 'master' ? null : `${xr(rr)} master across round pairings`
+          };
+        });
+      });
+    });
+    const subLabs = CAPS.map((cap, ci) => {
+      const cx = M.l + ci * gw + gw / 2;
+      T(labG, cx, base + 22, `${cap} slots`, 'lab');
+      return T(labG, cx, base + 40, '', 'sub');
+    });
+
+    function scale() {
+      if (st.scale === 'log') return { y: logs(10, 1000, base, M.t), ticks: [10, 30, 100, 300, 1000], d0: 10 };
+      const max = st.mode === 'pop1' ? 500 : 1000, step = st.mode === 'pop1' ? 100 : 200;
+      const ticks = []; for (let v = 0; v <= max; v += step) ticks.push(v);
+      return { y: lin(0, max, base, M.t), ticks, d0: 0 };
+    }
+    function render() {
+      const sc = scale();
+      gridG.replaceChildren();
+      sc.ticks.forEach((v) => {
+        const y = sc.y(v);
+        S('line', { x1: M.l, x2: W - M.r, y1: y, y2: y, class: v === sc.d0 ? 'base' : 'gl' }, gridG);
+        T(gridG, M.l - 8, y + 4, String(v), 'tk', 'end');
+      });
+      T(gridG, M.l - 8, M.t - 16, 'M/s', 'tk', 'end');
+      const rows = D.stages[st.mode];
+      const geo = meta.map((m, i) => {
+        const row = rows.find((r) => r.slots === m.cap && r.layout === st.layout);
+        const p = row[m.s.key];
+        bars[i].g.setAttribute('aria-label', `${m.s.name}, ${m.cap} slots: ${pairTxt(p)} M/s`);
+        return { x: m.x, w: bw, base, yA: sc.y(p[0]), yB: sc.y(p[1]), top: M.t };
+      });
+      draw(bars, geo);
+      CAPS.forEach((cap, ci) => {
+        const row = rows.find((r) => r.slots === cap && r.layout === st.layout);
+        const rr = ratioRange(row.pr38_on_41, row.master);
+        subLabs[ci].textContent = `#38 on #41 ÷ master: ${xr(rr)}`;
+      });
+      $('#r-st-read').textContent = READ[`${st.mode}_${st.layout}`];
+      // table twin
+      const tb = $('#r-st-tbl'); tb.replaceChildren();
+      const hr = H('tr', null, null, H('thead', null, null, tb));
+      ['slots', 'cursors', ...STG.map((s) => s.name)].forEach((h) => H('th', null, h, hr));
+      const body = H('tbody', null, null, tb);
+      rows.forEach((r) => {
+        const tr = H('tr', null, null, body);
+        H('td', null, String(r.slots), tr); H('td', 'k', LAY[r.layout], tr);
+        STG.forEach((s) => H('td', null, pairTxt(r[s.key]), tr));
+      });
+    }
+    segment($('#r-st-ctl'), (k, v) => { st[k] = v; render(); });
+    render();
+  })();
+
+  /* ================= 2. single thread ================= */
+  (() => {
+    const s = D.single;
+    const one = (v) => (Array.isArray(v) ? v : [v]);
+    const ROWS = [
+      { label: 'push_pop', sub: 'ns per push and pop', m: s.push_pop_ns.master, p: s.push_pop_ns.pr41, flag: true },
+      { label: 'pop_empty, pop1', sub: 'ns per empty pop', m: s.pop_empty_pop1_ns.master, p: s.pop_empty_pop1_ns.pr41 },
+      { label: 'pop_empty, popN', sub: 'ns per empty pop', m: s.pop_empty_popN_ns.master, p: s.pop_empty_popN_ns.pr41 },
+      { label: 'fill_drain pop1, 64 slots', sub: 'ns per lap', m: one(s.fill_drain_pop1.s64_ns.master), p: one(s.fill_drain_pop1.s64_ns.pr41) },
+      { label: 'fill_drain pop1, 1024 slots', sub: 'µs per lap', m: one(s.fill_drain_pop1.s1024_us.master), p: one(s.fill_drain_pop1.s1024_us.pr41) },
+      { label: 'fill_drain pop1, 16384 slots', sub: 'µs per lap', m: s.fill_drain_pop1.s16384_us.master, p: s.fill_drain_pop1.s16384_us.pr41 },
+      { label: 'fill_drain popN, 64 slots', sub: 'ns per lap', m: one(s.fill_drain_popN.s64_ns.master), p: one(s.fill_drain_popN.s64_ns.pr41), flag: true },
+      { label: 'fill_drain popN, 1024 slots', sub: 'µs per lap', m: one(s.fill_drain_popN.s1024_us.master), p: one(s.fill_drain_popN.s1024_us.pr41), flag: true },
+      { label: 'fill_drain popN, 16384 slots', sub: 'µs per lap', m: s.fill_drain_popN.s16384_us.master, p: s.fill_drain_popN.s16384_us.pr41 }
+    ];
+    const grid = $('#r-st1');
+    ['Benchmark', 'master and #41, lower is better', '#41 against master'].forEach((h) => H('div', 'h', h, grid));
+    const W = 400, Hh = 30, L = 8, R = 392;
+    const tracks = [];
+    ROWS.forEach((r) => {
+      const lab = H('div', 'st-lab', r.label, grid); H('small', null, r.sub, lab);
+      const tr = H('div', 'st-track', null, grid);
+      const svg = S('svg', { viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': `${r.label}: master ${pairTxt(r.m)}, #41 ${pairTxt(r.p)} ${r.sub}` }, tr);
+      const d = H('div', 'st-d', null, grid);
+      const rr = ratioRange(r.p, r.m).map((x) => x - 1);
+      H('div', null, rr[0] === rr[1] ? pct(rr[0]) : `${pct(rr[0])} to ${pct(rr[1])}`, d);
+      if (r.flag) { H('span', 'flag', 'code layout, unexplained', d); [lab, tr, d].forEach((e) => e.classList.add('st-row-flag')); }
+      tracks.push({ r, svg });
+    });
+    function render(zoom) {
+      tracks.forEach(({ r, svg }) => {
+        svg.replaceChildren();
+        const all = [...r.m, ...r.p], mx = Math.max(...all), mn = Math.min(...all);
+        const d0 = zoom ? mn - (mx - mn) * 0.6 - mx * 0.02 : 0, d1 = zoom ? mx + (mx - mn) * 0.6 + mx * 0.02 : mx * 1.15;
+        const x = lin(d0, d1, L, R);
+        S('line', { x1: L, x2: R, y1: Hh / 2, y2: Hh / 2, class: 'gl' }, svg);
+        if (!zoom) S('line', { x1: L, x2: L, y1: 6, y2: Hh - 6, class: 'base' }, svg);
+        [['master', r.m, 'var(--c-master)'], ['#41', r.p, 'var(--c-pr41)']].forEach(([name, vals, c]) => {
+          vals.forEach((v, i) => {
+            const g = S('g', { tabindex: '0', role: 'img', 'aria-label': `${name}${vals.length > 1 ? ' round ' + (i + 1) : ''}: ${v} ${r.sub}`, class: 'bar' }, svg);
+            S('circle', { cx: x(v), cy: Hh / 2, r: 12, fill: 'transparent' }, g);
+            const dot = S('circle', { cx: x(v), cy: Hh / 2, r: 5.5 }, g);
+            dot.style.fill = c; dot.style.stroke = 'var(--surface)'; dot.style.strokeWidth = '2';
+            hover(g, () => ({ title: `${r.label}, ${r.sub}`, rows: [
+              { v: pairTxt(r.m), label: 'master' + (r.m.length > 1 ? ', rounds 1 and 2' : ''), color: 'var(--c-master)' },
+              { v: pairTxt(r.p), label: '#41' + (r.p.length > 1 ? ', rounds 1 and 2' : ''), color: 'var(--c-pr41)' }] }));
+          });
+        });
+      });
+    }
+    const zb = $('#r-st1-zero'), zz = $('#r-st1-zoom');
+    zb.addEventListener('click', () => { zb.setAttribute('aria-pressed', 'true'); zz.setAttribute('aria-pressed', 'false'); render(false); });
+    zz.addEventListener('click', () => { zz.setAttribute('aria-pressed', 'true'); zb.setAttribute('aria-pressed', 'false'); render(true); });
+    render(false);
+
+    // pre-rebase CopySlot figures
+    const pre = $('#r-pre');
+    function hbars(title, unit, better, items, max) {
+      H('div', 'r-cap', `${title} (${unit}, ${better} is better)`, pre).style.margin = '10px 0 0';
+      items.forEach(([lab, v, color]) => {
+        const row = H('div', 'hb', null, pre);
+        H('div', null, lab, row);
+        const lane = H('div', 'lane', null, row);
+        const f = H('div', 'fill', null, lane); f.style.setProperty('--sw', color); f.style.width = (v / max * 82) + '%';
+        const t = H('span', 'v', String(v), lane); t.style.left = `calc(${v / max * 82}% + 6px)`;
+      });
+    }
+    hbars('push_pop', 'ns', 'lower', [['TypedSlot', s.push_pop_ns.typedslot_c28bedb, 'var(--c-tagged)'], ['CopySlot', s.push_pop_ns.copyslot_c28bedb, 'var(--c-untagged)']], 4);
+    const fd = s.fill_drain_popN_Mps_c28bedb;
+    [64, 1024, 16384].forEach((n) => hbars(`fill_drain popN, ${n} slots`, 'M/s', 'higher', [['TypedSlot', fd.typedslot[n], 'var(--c-tagged)'], ['CopySlot', fd.copyslot[n], 'var(--c-untagged)']], 1300));
+  })();
+
+  /* ================= 3. CACHE_LINE 64 vs 128 ================= */
+  (() => {
+    const st = { cache: '0', f: 'all', scale: 'lin' };
+    const svg = $('#r-cl');
+    const W = 880, L = 220, R = 860, bh = 11, pairGap = 3, cellGap = 16, top = 22;
+    const SER = [{ k: 'cl64', name: 'CACHE_LINE 64', color: 'var(--muted)' }, { k: 'cl128', name: 'CACHE_LINE 128', color: 'var(--accent)' }];
+    function render() {
+      svg.replaceChildren();
+      let rows = st.cache === '1' ? D.clCache : D.cl;
+      if (st.f !== 'all') rows = rows.filter((r) => r.cell.includes('push1_' + st.f));
+      if (!rows.length) { svg.setAttribute('viewBox', `0 0 ${W} 60`); T(svg, W / 2, 34, 'No popN cell was recorded with the consumer cache in this set.', 'sub'); }
+      const h = top + Math.max(1, rows.length) * (2 * bh + pairGap + cellGap) + 26;
+      if (!rows.length) { finish(rows); return; }
+      svg.setAttribute('viewBox', `0 0 ${W} ${h}`);
+      const x = st.scale === 'log' ? logs(10, 1000, L, R) : lin(0, 1000, L, R);
+      const ticks = st.scale === 'log' ? [10, 30, 100, 300, 1000] : [0, 200, 400, 600, 800, 1000];
+      const axisY = h - 20;
+      ticks.forEach((v, i) => { S('line', { x1: x(v), x2: x(v), y1: top - 6, y2: axisY, class: i === 0 ? 'base' : 'gl' }, svg); T(svg, x(v), axisY + 14, String(v)); });
+      T(svg, R, top - 10, 'M/s', 'tk', 'end');
+      rows.forEach((r, i) => {
+        const y0 = top + i * (2 * bh + pairGap + cellGap);
+        const parts = r.cell.split(' ');
+        T(svg, L - 12, y0 + 9, `${parts[0]}, ${parts[1]}`, 'lab', 'end');
+        T(svg, L - 12, y0 + 23, `${parts[2]} slots`, 'sub', 'end');
+        SER.forEach((s, si) => {
+          const y = y0 + si * (bh + pairGap), p = r[s.k];
+          const g = S('g', { class: 'bar', tabindex: '0', role: 'img', 'aria-label': `${r.cell}, ${s.name}: ${pairTxt(p)} M/s` }, svg);
+          g.style.setProperty('--bar', s.color);
+          const lo = Math.min(...p), hi = Math.max(...p), x0 = x(st.scale === 'log' ? 10 : 0);
+          if (p.length > 1) S('rect', { class: 'faint', x: x(lo), y, width: Math.max(0, x(hi) - x(lo)), height: bh }, g);
+          S('path', { class: 'solid', d: rowPath(x0, x(lo), y, bh) }, g);
+          p.forEach((v) => S('line', { class: 'tick', x1: x(v), x2: x(v), y1: y - 2, y2: y + bh + 2 }, g));
+          S('rect', { class: 'hit', x: L, y: y - 1, width: R - L, height: bh + 2 }, g);
+          hover(g, () => {
+            return { title: `${r.cell}${st.cache === '1' ? ', with the consumer cache' : ''}`, rows: [
+              { v: pairTxt(r.cl64), label: 'CACHE_LINE 64' + (r.cl64.length > 1 ? ', two rounds' : ''), color: 'var(--muted)' },
+              { v: pairTxt(r.cl128), label: 'CACHE_LINE 128' + (r.cl128.length > 1 ? ', two rounds' : ''), color: 'var(--accent)' }] };
+          });
+        });
+      });
+      finish(rows);
+    }
+    function finish(rows) {
+      $('#r-cl-read').textContent = st.cache === '1'
+        ? 'With the consumer cache only two per-cell figures were recorded, shown here as single values. The data\'s note, verbatim: “' + D.clCacheNote + '” One round, so single values rather than pairs: once the per-pop read is gone, 128 is no longer the slow setting, and at 1024 and 16384 slots it is the faster one.'
+        : 'Without the consumer cache, 128 puts the cursors on two lines and pop1 collapses: CopySlot at 1024 slots drops from 186.7, 144.4 to 25.4, 25.9. Whole-lap drains (popN) barely care: they read the producer cursor about once per lap.';
+      const tb = $('#r-cl-tbl'); tb.replaceChildren();
+      const hr = H('tr', null, null, H('thead', null, null, tb));
+      ['cell', 'CACHE_LINE 64', 'CACHE_LINE 128'].forEach((x2) => H('th', null, x2, hr));
+      const body = H('tbody', null, null, tb);
+      rows.forEach((r) => { const tr = H('tr', null, null, body); H('td', null, r.cell, tr); H('td', null, pairTxt(r.cl64), tr); H('td', null, pairTxt(r.cl128), tr); });
+    }
+    segment($('#r-cl-ctl'), (k, v) => { st[k] = v; render(); });
+    render();
+  })();
+
+  /* ================= 4. wide records ================= */
+  (() => {
+    const SER = [
+      { k: 'typedslot', name: 'TypedSlot', short: 'Typed', color: 'var(--c-tagged)' },
+      { k: 'copyslot', name: 'CopySlot', short: 'Copy', color: 'var(--c-untagged)' },
+      { k: 'rtrb', name: 'rtrb', short: 'rtrb', color: 'var(--c-rtrb)' }
+    ];
+    const MAX = { 8: 1000, 64: 120, 256: 60 }, STEP = { 8: 250, 64: 30, 256: 15 };
+    const NOTE = {
+      8: 'Both rounds swing widely: this cell is bimodal.',
+      64: 'TypedSlot stride 72, CopySlot stride 64. The gap survives the fix.',
+      256: `The old check read ${D.linesRead.stride_264} lines per record at stride 264 and ${D.linesRead.stride_256.toFixed(2)} at stride 256.`
+    };
+    let check = 'new';
+    const wrap = $('#r-wide');
+    const W = 280, Hh = 230, M = { l: 40, r: 8, t: 14, b: 44 }, base = Hh - M.b, bw = 24;
+    const panels = D.wide.map((row) => {
+      const p = H('div', null, null, wrap);
+      H('h4', null, `${row.bytes}-byte records`, p);
+      H('div', 'note', NOTE[row.bytes], p);
+      const svg = S('svg', { viewBox: `0 0 ${W} ${Hh}`, role: 'img', 'aria-label': `${row.bytes}-byte records` }, p);
+      const y = lin(0, MAX[row.bytes], base, M.t);
+      for (let v = 0; v <= MAX[row.bytes]; v += STEP[row.bytes]) { S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v ? 'gl' : 'base' }, svg); T(svg, M.l - 6, y(v) + 4, String(v), 'tk', 'end'); }
+      const slotW = (W - M.l - M.r) / 3;
+      const bars = [], missing = [];
+      SER.forEach((s, i) => {
+        const cx = M.l + slotW * i + slotW / 2;
+        const b = makeBar(S('g', null, svg), s.color, false);
+        bars.push(b);
+        T(svg, cx, base + 16, s.short, 'lab');
+        const stride = s.k === 'rtrb' ? '' : `stride ${D.strides[row.bytes][s.k === 'typedslot' ? 0 : 1]}`;
+        T(svg, cx, base + 31, stride, 'sub');
+        const mt = T(svg, cx, base - 8, 'not run', 'sub'); missing.push(mt);
+        hover(b.g, () => {
+          const o = row[`${s.k}_old`], n = row[`${s.k}_new`];
+          const rows = [];
+          if (o) rows.push({ v: pairTxt(o), label: 'old check, M/s', color: s.color });
+          if (n) rows.push({ v: pairTxt(n), label: 'every word, M/s', color: s.color });
+          return { title: `${s.name}, ${row.bytes}-byte records`, rows, note: o ? null : 'rtrb was measured with the fixed check only' };
+        });
+      });
+      return { row, bars, missing, y, slotW, draw: tweener() };
+    });
+    function render() {
+      panels.forEach((P) => {
+        const geo = SER.map((s, i) => {
+          const p = P.row[`${s.k}_${check}`];
+          P.missing[i].style.display = p ? 'none' : '';
+          if (!p) return { hidden: true };
+          P.bars[i].g.setAttribute('aria-label', `${s.name}, ${P.row.bytes} bytes, ${check === 'old' ? 'old check' : 'every word'}: ${pairTxt(p)} M/s`);
+          return { x: M.l + P.slotW * i + P.slotW / 2 - bw / 2, w: bw, base, yA: P.y(p[0]), yB: P.y(p[1]), top: M.t };
+        });
+        P.draw(P.bars, geo);
+      });
+    }
+    segment($('#r-w-ctl'), (k, v) => { check = v; render(); });
+    render();
+    // table twin
+    const tb = $('#r-w-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, tb));
+    ['record', 'TypedSlot, old', 'TypedSlot, every word', 'CopySlot, old', 'CopySlot, every word', 'rtrb, every word'].forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, tb);
+    D.wide.forEach((r) => { const tr = H('tr', null, null, body); H('td', null, `${r.bytes} bytes`, tr); ['typedslot_old', 'typedslot_new', 'copyslot_old', 'copyslot_new', 'rtrb_new'].forEach((k) => H('td', null, pairTxt(r[k]), tr)); });
+
+    // stride ranges
+    const svg = $('#r-stride');
+    const L = 250, R = 860, x = lin(0, 100, L, R), bh = 14;
+    const RANGES = [
+      ['CopySlot, stride 64', D.stride.copyslot_stride_64, 'var(--c-untagged)'],
+      ['CopySlot padded to stride 72', D.stride.copyslot_padded_to_72, 'var(--c-untagged)'],
+      ['TypedSlot, stride 72', D.stride.typedslot_stride_72, 'var(--c-tagged)'],
+      ['TypedSlot, no tag word, stride 64', D.stride.typedslot_no_tag_stride_64, 'var(--c-tagged)']
+    ];
+    [0, 20, 40, 60, 80, 100].forEach((v, i) => { S('line', { x1: x(v), x2: x(v), y1: 6, y2: 140, class: i ? 'gl' : 'base' }, svg); T(svg, x(v), 156, String(v)); });
+    RANGES.forEach(([lab, r, c], i) => {
+      const y = 14 + i * 32;
+      T(svg, L - 12, y + 11, lab, 'lab', 'end');
+      const g = S('g', { class: 'bar', tabindex: '0', role: 'img', 'aria-label': `${lab}: ${r[0]} to ${r[1]} M/s` }, svg);
+      g.style.setProperty('--bar', c);
+      S('rect', { class: 'solid', x: x(r[0]), y, width: x(r[1]) - x(r[0]), height: bh, rx: 4 }, g);
+      T(g, x(r[1]) + 8, y + 11, `${r[0]}–${r[1]}`, 'sub', 'start');
+      S('rect', { class: 'hit', x: L, y: y - 4, width: R - L, height: bh + 8 }, g);
+      hover(g, () => ({ title: lab, rows: [{ v: `${r[0]}–${r[1]}`, label: 'M/s, range over runs', color: c }] }));
+    });
+    const stb = $('#r-stride-tbl');
+    [
+      ['Consumer held 64 records behind, 64-byte records', D.stride.lag_64_vs_72[0], D.stride.lag_64_vs_72[1]],
+      ['Consumer held 64 records behind, 256-byte records', D.stride.lag_256_vs_264[0], D.stride.lag_256_vs_264[1]],
+      ['Single thread, fill_drain, 64-byte records', D.stride.st_fill_drain_64_vs_72[0], D.stride.st_fill_drain_64_vs_72[1]]
+    ].forEach(([lab, a, b]) => { const tr = H('tr', null, null, stb); H('td', null, lab, tr); H('td', null, `${a} M/s`, tr); H('td', null, `${b} M/s`, tr); });
+    const tr = H('tr', null, null, stb); H('td', null, 'Stride 128 against 136', tr); const td = H('td', null, D.stride.stride_128_vs_136, tr); td.colSpan = 2; td.style.textAlign = 'center';
+    const ul = $('#r-ruled'); D.stride.ruled_out.forEach((t) => H('li', null, t, ul));
+  })();
+
+  /* ================= 5. env flip sparkline ================= */
+  (() => {
+    const svg = $('#r-env');
+    const W = 880, Hh = 210, M = { l: 54, r: 100, t: 14, b: 34 };
+    const rows = D.env;
+    const r64 = rows.map((r) => r.plain_64 / r.spsc_64), r1k = rows.map((r) => r.plain_1024 / r.spsc_1024);
+    const x = (i) => M.l + i * (W - M.l - M.r) / (rows.length - 1);
+    const y = logs(0.08, 4, Hh - M.b, M.t);
+    [0.1, 0.3, 1, 3].forEach((v) => { S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v === 1 ? 'ref' : 'gl' }, svg); T(svg, M.l - 8, y(v) + 4, v + '×', 'tk', 'end'); });
+    T(svg, W - M.r + 6, y(1) - 6, 'same speed', 'sub', 'start');
+    rows.forEach((r, i) => T(svg, x(i), Hh - M.b + 18, String(r.pad), 'tk'));
+    T(svg, M.l - 8, Hh - M.b + 18, 'PAD', 'tk', 'end');
+    const line = (vals, color) => {
+      const p = S('path', { d: vals.map((v, i) => `${i ? 'L' : 'M'}${x(i)},${y(v)}`).join(''), fill: 'none' }, svg);
+      p.style.stroke = color; p.style.strokeWidth = '2'; p.style.strokeLinejoin = 'round'; p.style.strokeLinecap = 'round';
+      vals.forEach((v, i) => { const c = S('circle', { cx: x(i), cy: y(v), r: 4 }, svg); c.style.fill = color; c.style.stroke = 'var(--surface)'; c.style.strokeWidth = '2'; });
+    };
+    line(r64, 'var(--accent)'); line(r1k, 'var(--muted)');
+    T(svg, W - M.r + 12, y(r64[r64.length - 1]) + 4, '64 slots', 'lab', 'start');
+    T(svg, W - M.r + 12, y(r1k[r1k.length - 1]) + 4, '1024 slots', 'lab', 'start');
+    const cross = S('line', { y1: M.t, y2: Hh - M.b, class: 'base' }, svg); cross.style.display = 'none';
+    const hit = S('rect', { x: M.l - 20, y: M.t, width: W - M.l - M.r + 40, height: Hh - M.t - M.b, fill: 'transparent', tabindex: '0', role: 'slider',
+      'aria-label': 'PAD length', 'aria-valuemin': rows[0].pad, 'aria-valuemax': rows[rows.length - 1].pad }, svg);
+    let idx = 0;
+    const content = (i) => {
+      const r = rows[i];
+      return { title: `PAD of ${r.pad} characters`, rows: [
+        { v: r64[i].toFixed(2) + '×', label: `64 slots: CopySlot ${r.plain_64}, TypedSlot ${r.spsc_64}`, color: 'var(--accent)' },
+        { v: r1k[i].toFixed(2) + '×', label: `1024 slots: CopySlot ${r.plain_1024}, TypedSlot ${r.spsc_1024}`, color: 'var(--muted)' }],
+        note: 'push1_pop1 criterion medians, M/s; ratio = CopySlot ÷ TypedSlot' };
+    };
+    const at = (i, cx, cy) => {
+      idx = i; cross.style.display = ''; cross.setAttribute('x1', x(i)); cross.setAttribute('x2', x(i));
+      hit.setAttribute('aria-valuenow', rows[i].pad); hit.setAttribute('aria-valuetext', `PAD ${rows[i].pad}: 64 slots ${r64[i].toFixed(2)}×, 1024 slots ${r1k[i].toFixed(2)}×`);
+      tipShow(content(i), cx, cy);
+    };
+    hit.addEventListener('pointermove', (e) => {
+      const b = svg.getBoundingClientRect(), vx = (e.clientX - b.left) / b.width * W;
+      let best = 0; rows.forEach((_, i) => { if (Math.abs(x(i) - vx) < Math.abs(x(best) - vx)) best = i; });
+      at(best, e.clientX, e.clientY);
+    });
+    const kbd = (i) => { const b = svg.getBoundingClientRect(); at(i, b.left + x(i) / W * b.width, b.top + 10); };
+    hit.addEventListener('focus', () => kbd(idx));
+    hit.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowUp') { kbd(Math.min(rows.length - 1, idx + 1)); e.preventDefault(); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') { kbd(Math.max(0, idx - 1)); e.preventDefault(); }
+    });
+    const off = () => { cross.style.display = 'none'; tipHide(); };
+    hit.addEventListener('pointerleave', off); hit.addEventListener('blur', off);
+    const tb = $('#r-env-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, tb));
+    ['PAD', 'TypedSlot 64', 'CopySlot 64', 'ratio 64', 'TypedSlot 1024', 'CopySlot 1024', 'ratio 1024'].forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, tb);
+    rows.forEach((r, i) => { const tr = H('tr', null, null, body); [r.pad, r.spsc_64, r.plain_64, r64[i].toFixed(2) + '×', r.spsc_1024, r.plain_1024, r1k[i].toFixed(2) + '×'].forEach((v) => H('td', null, String(v), tr)); });
+  })();
+
+  /* ================= 6. mutations ================= */
+  (() => {
+    const KIND = { std: ['std tests', ''], loom: ['loom only', 'loom'], both: ['loom and std', 'loom'], none: ['survives, equivalent', 'none'] };
+    const tb = $('#r-mut');
+    const trs = D.mutations.map((m) => {
+      const tr = H('tr', null, null, tb); tr.dataset.kind = m.kind;
+      H('code', null, m.mutation, H('td', null, null, tr));
+      H('td', null, m.killed_by, tr);
+      H('span', 'chip ' + KIND[m.kind][1], KIND[m.kind][0], H('td', null, null, tr));
+      return tr;
+    });
+    segment($('#r-mut-ctl'), (k, v) => {
+      trs.forEach((tr) => { const kd = tr.dataset.kind; tr.hidden = !(v === 'all' || (v === 'loom' && (kd === 'loom' || kd === 'both')) || (v === 'std' && kd === 'std') || (v === 'none' && kd === 'none')); });
+    });
+    const sv = D.survey, bar = $('#r-survey'), leg = $('#r-survey-leg');
+    [['caught', sv.caught, 'var(--c-good)', 'a test failed'], ['unviable', sv.unviable, 'var(--line)', 'did not compile'], ['timeouts', sv.timeouts, 'var(--c-warn)', 'a test hung'], ['accepted', sv.accepted, 'var(--muted)', 'survived, accepted with a reason']].forEach(([k, n, c, what]) => {
+      const d = H('div', null, null, bar); d.style.flex = String(n); d.style.setProperty('--sw', c); d.tabIndex = 0; d.setAttribute('role', 'img'); d.setAttribute('aria-label', `${k}: ${n} of ${sv.mutants}, ${what}`);
+      hover(d, () => ({ title: `${k}: ${what}`, rows: [{ v: `${n} of ${sv.mutants}`, label: 'mutants', color: c }] }));
+      const s = H('span', null, null, leg); const sw = H('i', 'r-sw', null, s); sw.style.setProperty('--sw', c); s.appendChild(document.createTextNode(`${k} ${n}`));
+    });
+    H('span', null, `${sv.mutants} mutants, new survivors ${sv.new_survivors}`, leg);
+  })();
+
+  /* ================= 7. trade-offs ================= */
+  (() => {
+    const TO = [
+      { title: '#41: the consumer caches the producer cursor', color: 'var(--c-pr41)',
+        get: [
+          'pop1, cursors on two lines, TypedSlot: 29, 30 → 122, 123 M/s at 64 slots; 216, 188 → 332, 337 at 1024.',
+          'One line and two lines now measure the same on pop1, so CACHE_LINE can be chosen on footprint (ADR 002).',
+          'Single thread: pop_empty popN 1.95, 1.91 → 1.73, 1.75 ns; fill_drain pop1 at 64 slots 177 → 158 ns per lap.'
+        ],
+        pay: [
+          'Consumer is one word larger. No public signature changes.',
+          'drain_up_to may serve a drain from an older observation and read no producer line. Results are identical: the observation lags, it is never extrapolated.',
+          'Single thread: push_pop 3.60, 3.73 → 3.98, 3.98 ns (+6.7% to +10.6%) and whole-lap fill_drain 65.0 → 73.2 ns per lap at 64 slots (+12.6%), 0.96 → 1.06 µs at 1024 (+10.4%). Code layout, unexplained.',
+          'TypedSlot pop1 at 16384 slots, one line: 46, 47 → 36, 35 M/s (−22% to −26%), in the regime where its 256 KB array spills the 128 KB L1D.',
+          'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.'
+        ] },
+      { title: '#38: CopySlot', color: 'var(--c-pr38)',
+        get: [
+          'An 8-byte record in an 8-byte slot, not 16: 131072 bytes at 16384 slots instead of 262144, inside the 128 KB L1D.',
+          'On #41, pop1, two lines: 443, 439 M/s at 1024 slots (TypedSlot 332, 337) and 469, 393 at 16384 (TypedSlot 36, 35).',
+          'Single thread on c28bedb: push_pop 2.97 against 3.81 ns; fill_drain popN at 16384 slots 1004 against 53.1 M/s.'
+        ],
+        pay: [
+          'T: Copy + Default.',
+          'A claim published without a write re-delivers the previous lap\'s record (the default on the first lap). Documented pitfall, not prevented; try_push always writes, so only a bare claim dropped unwritten reaches it.',
+          'Slot::is_empty is always false: the slot cannot report occupancy.',
+          '64-byte records at a 64-byte stride: 62.6, 44.6 against TypedSlot\'s 99.3, 93.7 M/s. The stride, not the slot: padded to 72, CopySlot runs 81–96. Mechanism open.',
+          'Without #41, a faster producer tips pop1 into lockstep sooner: 24, 24 M/s at 1024 slots on two lines.'
+        ] },
+      { title: 'Harness: Wide::whole reads every word', color: 'var(--muted)',
+        get: [
+          'The 256-byte row is honest: TypedSlot 31.8, 30.2, CopySlot 29.4, 29.1, rtrb 31.0, 29.6 M/s. A tie.',
+          'The 64-byte gap that remains is the one that is real.'
+        ],
+        pay: [
+          'The tagged 256-byte row lost 32–42% (46.9, 52.0 → 31.8, 30.2 M/s): the old check skipped the record\'s middle line (1.06 lines read per record at stride 264, against 2.00 at 256).',
+          'Rings are still placed on the stack in the stock suite, so an environment variable can still move the cursors between one line and two. With #41 pop1 no longer depends on it; the placement itself is not fixed.'
+        ] }
+    ];
+    const host = $('#r-to');
+    TO.forEach((t) => {
+      const box = H('div', 'to', null, host); box.style.setProperty('--tc', t.color);
+      H('h4', null, t.title, box);
+      const cols = H('div', 'cols', null, box);
+      [['What it buys', t.get], ['What it costs', t.pay]].forEach(([h, items]) => {
+        const c = H('div', null, null, cols); H('h5', null, h, c);
+        const ul = H('ul', null, null, c); items.forEach((i) => H('li', null, i, ul));
+      });
+    });
+  })();
+
+  /* ================= 8. PRs ================= */
+  (() => {
+    $('#r-ctx').textContent = `Context: #20 ${D.prs[20]}. #22 ${D.prs[22]}. #23 ${D.prs[23]}.`;
+    const PR = [
+      { n: 41, base: 'on master', commits: [
+        ['cf48ade', 'test(ring_spsc): pin the contract a consumer cursor cache must keep', ['ring_spsc/tests/spsc_test.rs']],
+        ['9164fa3', 'perf(ring_spsc): the consumer caches the producer cursor', ['ring_spsc/src/lib.rs']],
+        ['a897360', 'perf(ring_spsc): write the consumer\'s observation only when it moved', ['ring_spsc/src/lib.rs']],
+        ['84d0d71', 'docs(ring_spsc): ADR 002, the consumer caches the producer cursor', ['ring_spsc/docs/decisions/002_the_consumer_caches_the_producer_cursor.md', 'ring_spsc/readme.md', 'ring_spsc/tests/manual/readme.md']],
+        ['230ec51', 'survey(ring_spsc): re-sweep after the consumer cursor cache', ['bench_harness/gate/declared/ring/accepted/ring_spsc.accepted', 'bench_harness/gate/declared/ring/surveyed/ring_spsc.surveyed']]
+      ] },
+      { n: 38, base: 'stacked on #41', commits: [
+        ['11e6650', 'feat(ring_slot): CopySlot, a Copy record stored without TypedSlot\'s tag', ['ring_slot/src/lib.rs', 'ring_slot/tests/slot_test.rs', 'ring_slot/docs/decisions/002_copy_slot_stores_the_record_bare.md', 'ring_slot/readme.md', 'docs/crates_overview.md']],
+        ['4817355', 'feat(ring_spsc): try_push over CopySlot', ['ring_spsc/src/lib.rs', 'ring_spsc/tests/spsc_test.rs', 'ring_slot/src/lib.rs']],
+        ['8b26f68', 'bench(perf): spsc-plain and mpsc-plain, the rings over CopySlot', ['perf/benches/harness/candidates.rs', 'perf/benches/micro.rs', 'perf/benches/mpsc.rs', 'perf/benches/spsc.rs', 'perf/readme.md', 'perf/tests/harness_test.rs']],
+        ['c274e0d', 'docs(ring_slot): measure CopySlot against TypedSlot\'s tag', ['ring_slot/docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md', 'ring_slot/docs/decisions/002_copy_slot_stores_the_record_bare.md', 'ring_slot/readme.md']],
+        ['023fc3c', 'chore(gate): re-sweep ring_slot after CopySlot', ['bench_harness/gate/declared/ring/surveyed/ring_slot.surveyed']],
+        ['c448662', 'docs(ring_slot): readme says all three shapes implement Slot', ['ring_slot/readme.md']],
+        ['8d8017c', 'docs(ring_slot): Slot docs account for CopySlot, not two shapes', ['ring_slot/src/lib.rs']],
+        ['e07b804', 'fix(perf): the wide record\'s whole-record check reads every word', ['perf/benches/harness/candidates.rs']],
+        ['d6eee44', 'docs(ring_slot): addendum to benchmark 001, the two-thread cells and the 256-byte row', ['ring_slot/docs/benchmarks/001_the_tag_store_against_an_untagged_slot.md', 'ring_slot/docs/decisions/002_copy_slot_stores_the_record_bare.md']]
+      ] }
+    ];
+    const host = $('#r-prs');
+    PR.forEach((p) => {
+      const box = H('div', 'pr', null, host);
+      const h = H('h4', null, null, box);
+      const a = H('a', null, `#${p.n}`, h); a.href = `https://github.com/Wandalen/ring/pull/${p.n}`;
+      h.appendChild(document.createTextNode(` ${p.base}`));
+      H('div', 'ctx', `${D.prs[p.n]}.`, box);
+      const ol = H('ol', null, null, box);
+      p.commits.forEach(([hash, subj, files]) => {
+        const li = H('li', null, null, ol);
+        H('code', 'h', hash, li); li.appendChild(document.createTextNode(' ' + subj));
+        const ul = H('ul', null, null, li); files.forEach((f) => H('li', null, f, ul));
+      });
+    });
+  })();
+})();
+</script>
+</section>

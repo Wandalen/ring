@@ -10,6 +10,7 @@ and any benchmark records in its own `docs/benchmarks/`, and
 | [`benchmarking_guide.md`](benchmarking_guide.md) | How to run the benchmark suite (`perf`): quick check, full runs, comparison tables, baselines, Windows notes |
 | [`capstone/`](capstone/readme.md) | Rust bootcamp capstone assignment. Production-readiness topics, one file per topic |
 | [`crates_overview.md`](crates_overview.md) | Family-level crate guide. What each crate does, with usage and a plain-words explanation |
+| [`explainers/`](explainers/cursor_cache/readme.md) | Interactive, single-file HTML explainers of an investigation. `cursor_cache/`: cache lines, the SPSC cursor protocol, the placement lottery and the lockstep behind #41 and #38, with every measurement |
 
 ## Where a crate's design knowledge lives
 

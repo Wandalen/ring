@@ -63,6 +63,24 @@
 //! from an acquired one there, while on hardware without the edge the
 //! overwrite and the take can race.
 //!
+//! # The consumer's cursor cache
+//!
+//! The consumer keeps its latest observation of the producer cursor in the
+//! same way, and a drain reloads it only when the records it already knows of
+//! are fewer than the drain asks for. The observation can only lag: the
+//! producer cursor is monotone and the cache is refreshed to it, never
+//! extrapolated past it, so a stale value under-reports a ring that has more
+//! and never offers a record that is not published. Every record the cache
+//! does offer was published before a [`GATING`] load this end made, on this
+//! drain or an earlier one, and program order carries that edge forward to
+//! the slot read.
+//!
+//! What this buys is the two-thread hand-off: without it the consumer read the
+//! producer's line on every drain, so a one-record-per-pop consumer paid a
+//! cross-core transfer per record whenever the producer was the faster end.
+//! `available` and `is_empty` keep reading the shared cursor; the cache is
+//! visible nowhere.
+//!
 //! # The unsafe, and where its argument lives
 //!
 //! The producer writes slots while the consumer reads slots, through shared
@@ -471,7 +489,8 @@ impl<S> Ring<S> {
     // split a second time it carries over, and a cache that restarted at zero
     // would re-grant sequences the first generation published. The head cache
     // starts at zero on purpose — it can only lag a nonzero consumer cursor,
-    // and the first full ring refreshes it.
+    // and the first full ring refreshes it. The consumer's observation starts
+    // at its own position: it knows of nothing, so the first drain reloads.
     (
       Producer {
         ring: shared,
@@ -481,6 +500,7 @@ impl<S> Ring<S> {
       },
       Consumer {
         ring: shared,
+        cached_produced: shared.cursors.consumer().load(OWN),
         _one_thread: PhantomData,
       },
     )
@@ -911,6 +931,10 @@ impl<S> Drop for Reservation<'_, S> {
 #[derive(Debug)]
 pub struct Consumer<'a, S> {
   ring: &'a Ring<S>,
+  /// The latest [`GATING`] observation of the producer cursor. A drain
+  /// reloads it only when this end knows of fewer records than the drain
+  /// asks for. It can only lag the real cursor, never lead it.
+  cached_produced: Seq,
   /// See [`Producer`]'s field of the same name.
   _one_thread: PhantomData<Cell<()>>,
 }
@@ -1029,14 +1053,7 @@ impl<S> Consumer<'_, S> {
   /// assert_eq!( batch.iter().filter_map( TypedSlot::get ).copied().collect::< Vec< _ > >(), [ 10, 20 ] );
   /// ```
   pub fn drain(&mut self) -> Batch<'_, S> {
-    let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
-
-    Batch {
-      ring: self.ring,
-      start,
-      len: start.distance_to(produced) as usize,
-    }
+    self.drain_up_to(usize::MAX)
   }
 
   /// Take at most `max` published records.
@@ -1044,6 +1061,10 @@ impl<S> Consumer<'_, S> {
   /// The bounded form, for a caller that must not spend an unbounded amount of
   /// time in one drain, such as one working to a frame budget. What is left
   /// over stays published, and the next drain returns it.
+  ///
+  /// The producer cursor is reloaded only when this end knows of fewer than
+  /// `max` records; a drain that can be satisfied from what an earlier drain
+  /// observed reads no line the producer writes.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -1061,13 +1082,34 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    let produced = self.observe_produced(start, max);
 
     Batch {
       ring: self.ring,
       start,
       len: max.min(start.distance_to(produced) as usize),
     }
+  }
+
+  /// The producer cursor as this end knows it, reloaded when it knows of fewer
+  /// than `wanted` records past `start`.
+  ///
+  /// The reload is the one read of the producer's line on the drain path. Its
+  /// [`GATING`] order pairs with the producer's [`HANDOFF`] publish, so every
+  /// record below the returned value carries the write that preceded its
+  /// publish — and a value kept from an earlier drain carries the same
+  /// guarantee by program order. A cache that reloaded only when it knew of
+  /// nothing would make an unbounded drain report less than `available`.
+  fn observe_produced(&mut self, start: Seq, wanted: usize) -> Seq {
+    if (start.distance_to(self.cached_produced) as usize) < wanted {
+      let produced = self.ring.cursors.producer().load(GATING);
+      // Written only when it moved: a consumer polling an empty ring would
+      // otherwise store the same value every poll and read it back the next.
+      if produced != self.cached_produced {
+        self.cached_produced = produced;
+      }
+    }
+    self.cached_produced
   }
 }
 

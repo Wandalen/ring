@@ -7,4 +7,15 @@
 #
 # See accepted/readme.md, "The alignment canaries".
 
-ring_spsc/src/lib.rs:405:5: replace Ring<S>::on_distinct_lines -> bool with true
+ring_spsc/src/lib.rs:451:5: replace Ring<S>::on_distinct_lines -> bool with true
+
+# The consumer's reload test, off by one in the harmless direction.
+#
+# `Consumer::observe_produced` reloads the producer cursor only when the
+# records the consumer already knows of are fewer than the drain asks for.
+# Turning `<` into `<=` also reloads when they are exactly enough. The drain
+# then hands out the same records from a fresher observation; nothing a test
+# can see differs, only one atomic load per lap boundary. Equivalent mutant.
+# See docs/decisions/002_the_consumer_caches_the_producer_cursor.md.
+
+ring_spsc/src/lib.rs:1104:59: replace < with <= in Consumer<'_, S>::observe_produced

@@ -1,0 +1,805 @@
+{
+  "_about": "Every number in the explainer comes from here. All measured on one Apple M4 Pro (10 P + 4 E cores, 128-byte cache lines, 128 KB L1D per P-core, 16 MB L2 per cluster), macOS, rustc 1.98.0, bench profile (fat LTO), threads not pinned, 2026-10-09/10. Units: M records/s unless a key says ns or us. Pairs are two rounds in separate processes. 'one_line' = both cursors in one 128-byte line (ring at 0 mod 128); 'two_lines' = cursors on separate lines (ring at 64 mod 128). Rings heap-placed at a fixed offset for the two-thread cells unless 'stock_harness' is noted.",
+  "machine": {
+    "name": "Apple M4 Pro",
+    "p_cores": 10,
+    "e_cores": 4,
+    "cache_line_bytes": 128,
+    "l1d_bytes_per_pcore": 131072,
+    "l2_bytes_per_cluster": 16777216,
+    "core_to_core_one_way_ns": {
+      "same_cluster_median": 37.8,
+      "same_cluster_p25": 37.3,
+      "same_cluster_p75": 38.2,
+      "cross_cluster_range": [
+        58,
+        105
+      ]
+    }
+  },
+  "layout": {
+    "ring_align_cache_line_const": 64,
+    "padded_cursor_bytes": 64,
+    "ring_struct_bytes": 256,
+    "ring_struct_align": 64,
+    "ring_field_offsets": {
+      "producer_cursor": 0,
+      "consumer_cursor": 64,
+      "capacity": 128,
+      "slots_box_ptr": 192
+    },
+    "slot_bytes": {
+      "TypedSlot<u64>": 16,
+      "CopySlot<u64>": 8,
+      "TypedSlot<[u64;8]>": 72,
+      "CopySlot<[u64;8]>": 64,
+      "TypedSlot<[u64;32]>": 264,
+      "CopySlot<[u64;32]>": 256
+    },
+    "array_bytes_at_16384_slots": {
+      "TypedSlot<u64>": 262144,
+      "CopySlot<u64>": 131072
+    }
+  },
+  "protocol": {
+    "per_push_atomics": "one Release store of the producer cursor (STLR); the producer loads the consumer cursor only when its cache says full",
+    "per_pop_atomics_before_41": "one Acquire load of the producer cursor (LDAPR) on every drain_up_to, one Release store of the consumer cursor (STLUR) per batch",
+    "per_pop_atomics_after_41": "the Acquire load only when the consumer knows of fewer records than the drain asks for",
+    "orderings": {
+      "OWN": "Relaxed",
+      "GATING": "Acquire",
+      "HANDOFF": "Release"
+    },
+    "relaxed_corrupts": {
+      "relaxed_gate_max_misordered_of_1M": 506559,
+      "relaxed_publish_max_misordered_of_1M": 796494
+    }
+  },
+  "regime_model": {
+    "fit_1024_slots": {
+      "intercept_ns": 4.3,
+      "slope_ns_per_refresh": 48,
+      "r2": 0.91,
+      "runs": 144
+    },
+    "fit_64_slots": {
+      "intercept_ns": 10.2,
+      "slope_ns_per_refresh": 40,
+      "r2": 0.95,
+      "runs": 144
+    },
+    "slow_runs_refreshes_per_record": [
+      0.5,
+      1.0
+    ],
+    "fast_runs_refreshes_per_record_max": 0.04,
+    "interventions": [
+      {
+        "what": "slow the producer 3-9 ns per push, two lines",
+        "before": [
+          22,
+          28
+        ],
+        "after_tagged": [
+          54,
+          68
+        ],
+        "after_untagged": [
+          34,
+          53
+        ]
+      },
+      {
+        "what": "slow the consumer ~1 ns per record, tagged 1024 two lines (anomaly A)",
+        "before": 267,
+        "after": [
+          19.9,
+          23.6
+        ]
+      },
+      {
+        "what": "slow the consumer 4.5-6 ns per record, one line",
+        "before": [
+          76,
+          110
+        ],
+        "after": [
+          19,
+          33
+        ]
+      }
+    ],
+    "steady_state_room_formula": "R* ≈ m / (c − p), m ≈ 45 ns one refresh, c consumer cost per pop, p producer cost per push; lockstep when R* collapses to 1"
+  },
+  "env_padding_flip": {
+    "_about": "Unmodified PR #38 binary, stock stack-placed harness, one unused env var PAD of the given length. push1_pop1, criterion medians, M/s.",
+    "rows": [
+      {
+        "pad": 1,
+        "spsc_64": 27.1,
+        "plain_64": 85.7,
+        "spsc_1024": 243,
+        "plain_1024": 180
+      },
+      {
+        "pad": 17,
+        "spsc_64": 26.7,
+        "plain_64": 89.0,
+        "spsc_1024": 244,
+        "plain_1024": 206
+      },
+      {
+        "pad": 33,
+        "spsc_64": 77.8,
+        "plain_64": 102.8,
+        "spsc_1024": 191,
+        "plain_1024": 205
+      },
+      {
+        "pad": 49,
+        "spsc_64": 96.7,
+        "plain_64": 26.0,
+        "spsc_1024": 267,
+        "plain_1024": 29.3
+      },
+      {
+        "pad": 65,
+        "spsc_64": 84.1,
+        "plain_64": 24.3,
+        "spsc_1024": 184,
+        "plain_1024": 56.0
+      },
+      {
+        "pad": 81,
+        "spsc_64": 83.8,
+        "plain_64": 23.5,
+        "spsc_1024": 267,
+        "plain_1024": 26.7
+      },
+      {
+        "pad": 97,
+        "spsc_64": 32.7,
+        "plain_64": 23.9,
+        "spsc_1024": 248,
+        "plain_1024": 28.4
+      },
+      {
+        "pad": 113,
+        "spsc_64": 32.7,
+        "plain_64": 23.2,
+        "spsc_1024": 86.5,
+        "plain_1024": 29.1
+      }
+    ]
+  },
+  "four_offsets_push1_pop1": {
+    "_about": "PR #38 code (no consumer cache), ring at byte 0/64/128/192 of a 256-byte block. Per-run means, M/s. spsc = TypedSlot, plain = CopySlot.",
+    "rows": [
+      {
+        "offset": 0,
+        "cursors": "one line",
+        "spsc_64": 98,
+        "plain_64": 95,
+        "spsc_1024": 248,
+        "plain_1024": 192
+      },
+      {
+        "offset": 128,
+        "cursors": "one line",
+        "spsc_64": 87,
+        "plain_64": 92,
+        "spsc_1024": 236,
+        "plain_1024": 252
+      },
+      {
+        "offset": 64,
+        "cursors": "two lines",
+        "spsc_64": 23,
+        "plain_64": 22,
+        "spsc_1024": 196,
+        "plain_1024": 24
+      },
+      {
+        "offset": 192,
+        "cursors": "two lines",
+        "spsc_64": 24,
+        "plain_64": 27,
+        "spsc_1024": 232,
+        "plain_1024": 36
+      }
+    ],
+    "inlining_note": "the spsc_1024 two-line cells (196, 232) were a compile artefact: LLVM inlined the tagged adapter's pop_batch and outlined the plain one. With #[inline(always)] on both, every slot shape measured 24-37 on two lines and 100-112 on one line."
+  },
+  "stages_push1_pop1": {
+    "_about": "Two threads, one record per pop. master = TypedSlot on master; pr41 = TypedSlot with the consumer cache; pr38_on_41 = CopySlot with the consumer cache; pr38_no_cache = CopySlot without it. Pairs are two rounds.",
+    "rows": [
+      {
+        "slots": 64,
+        "layout": "one_line",
+        "master": [
+          102,
+          101
+        ],
+        "pr41": [
+          136,
+          128
+        ],
+        "pr38_no_cache": [
+          102,
+          100
+        ],
+        "pr38_on_41": [
+          136,
+          142
+        ]
+      },
+      {
+        "slots": 64,
+        "layout": "two_lines",
+        "master": [
+          29,
+          30
+        ],
+        "pr41": [
+          122,
+          123
+        ],
+        "pr38_no_cache": [
+          24,
+          24
+        ],
+        "pr38_on_41": [
+          122,
+          124
+        ]
+      },
+      {
+        "slots": 1024,
+        "layout": "one_line",
+        "master": [
+          261,
+          252
+        ],
+        "pr41": [
+          333,
+          337
+        ],
+        "pr38_no_cache": [
+          187,
+          199
+        ],
+        "pr38_on_41": [
+          444,
+          360
+        ]
+      },
+      {
+        "slots": 1024,
+        "layout": "two_lines",
+        "master": [
+          216,
+          188
+        ],
+        "pr41": [
+          332,
+          337
+        ],
+        "pr38_no_cache": [
+          24,
+          24
+        ],
+        "pr38_on_41": [
+          443,
+          439
+        ]
+      },
+      {
+        "slots": 16384,
+        "layout": "one_line",
+        "master": [
+          46,
+          47
+        ],
+        "pr41": [
+          36,
+          35
+        ],
+        "pr38_no_cache": [
+          260,
+          264
+        ],
+        "pr38_on_41": [
+          475,
+          445
+        ]
+      },
+      {
+        "slots": 16384,
+        "layout": "two_lines",
+        "master": [
+          47,
+          48
+        ],
+        "pr41": [
+          36,
+          35
+        ],
+        "pr38_no_cache": [
+          29,
+          29
+        ],
+        "pr38_on_41": [
+          469,
+          393
+        ]
+      }
+    ]
+  },
+  "stages_push1_popN": {
+    "_about": "Two threads, whole-lap drains. Same stages. The 1024 cell is bimodal on every stage (the chase's initial race).",
+    "rows": [
+      {
+        "slots": 64,
+        "layout": "one_line",
+        "master": [
+          133,
+          137
+        ],
+        "pr41": [
+          133,
+          129
+        ],
+        "pr38_no_cache": [
+          145,
+          143
+        ],
+        "pr38_on_41": [
+          133,
+          132
+        ]
+      },
+      {
+        "slots": 64,
+        "layout": "two_lines",
+        "master": [
+          125,
+          123
+        ],
+        "pr41": [
+          123,
+          123
+        ],
+        "pr38_no_cache": [
+          124,
+          131
+        ],
+        "pr38_on_41": [
+          117,
+          114
+        ]
+      },
+      {
+        "slots": 1024,
+        "layout": "one_line",
+        "master": [
+          292,
+          291
+        ],
+        "pr41": [
+          416,
+          272
+        ],
+        "pr38_no_cache": [
+          976,
+          978
+        ],
+        "pr38_on_41": [
+          988,
+          732
+        ]
+      },
+      {
+        "slots": 1024,
+        "layout": "two_lines",
+        "master": [
+          295,
+          296
+        ],
+        "pr41": [
+          343,
+          423
+        ],
+        "pr38_no_cache": [
+          955,
+          891
+        ],
+        "pr38_on_41": [
+          557,
+          557
+        ]
+      },
+      {
+        "slots": 16384,
+        "layout": "one_line",
+        "master": [
+          38,
+          38
+        ],
+        "pr41": [
+          35,
+          36
+        ],
+        "pr38_no_cache": [
+          631,
+          643
+        ],
+        "pr38_on_41": [
+          565,
+          608
+        ]
+      },
+      {
+        "slots": 16384,
+        "layout": "two_lines",
+        "master": [
+          38,
+          40
+        ],
+        "pr41": [
+          36,
+          35
+        ],
+        "pr38_no_cache": [
+          581,
+          608
+        ],
+        "pr38_on_41": [
+          520,
+          530
+        ]
+      }
+    ]
+  },
+  "single_thread": {
+    "_about": "One thread. master and pr41 are TypedSlot, measured in this session (two rounds). CopySlot numbers are from PR #38's record on c28bedb (before the rebase), 4 processes, median.",
+    "push_pop_ns": {
+      "master": [
+        3.6,
+        3.73
+      ],
+      "pr41": [
+        3.98,
+        3.98
+      ],
+      "copyslot_c28bedb": 2.97,
+      "typedslot_c28bedb": 3.81
+    },
+    "pop_empty_pop1_ns": {
+      "master": [
+        2.1,
+        1.56
+      ],
+      "pr41": [
+        1.98,
+        1.84
+      ]
+    },
+    "pop_empty_popN_ns": {
+      "master": [
+        1.95,
+        1.91
+      ],
+      "pr41": [
+        1.73,
+        1.75
+      ]
+    },
+    "fill_drain_pop1_us_per_lap": {
+      "slots_64_ns": {
+        "master": 177,
+        "pr41": 158
+      },
+      "slots_1024_us": {
+        "master": 2.8,
+        "pr41": 2.51
+      },
+      "slots_16384_us": {
+        "master": [
+          338,
+          324
+        ],
+        "pr41": [
+          318,
+          368
+        ]
+      }
+    },
+    "fill_drain_popN": {
+      "slots_64_ns_per_lap": {
+        "master": 65.0,
+        "pr41": 73.2
+      },
+      "slots_1024_us_per_lap": {
+        "master": 0.96,
+        "pr41": 1.06
+      },
+      "slots_16384_us_per_lap": {
+        "master": [
+          307,
+          298
+        ],
+        "pr41": [
+          297,
+          301
+        ]
+      }
+    },
+    "fill_drain_popN_Mps_c28bedb": {
+      "typedslot": {
+        "64": 884,
+        "1024": 971,
+        "16384": 53.1
+      },
+      "copyslot": {
+        "64": 1111,
+        "1024": 1222,
+        "16384": 1004
+      }
+    }
+  },
+  "cache_line_64_vs_128": {
+    "_about": "ring_align::CACHE_LINE 64 vs 128 (repr(align) too), PR #38 code without the consumer cache, rings fixed at a 256-byte boundary. Two rounds, criterion medians.",
+    "rows": [
+      {
+        "cell": "CopySlot push1_pop1 64",
+        "cl64": [
+          93.6,
+          86.1
+        ],
+        "cl128": [
+          20.5,
+          21.1
+        ]
+      },
+      {
+        "cell": "CopySlot push1_pop1 1024",
+        "cl64": [
+          186.7,
+          144.4
+        ],
+        "cl128": [
+          25.4,
+          25.9
+        ]
+      },
+      {
+        "cell": "CopySlot push1_pop1 16384",
+        "cl64": [
+          228.8,
+          206.5
+        ],
+        "cl128": [
+          71.5,
+          32.7
+        ]
+      },
+      {
+        "cell": "CopySlot push1_popN 64",
+        "cl64": [
+          120.7,
+          133.1
+        ],
+        "cl128": [
+          108.7,
+          121.4
+        ]
+      },
+      {
+        "cell": "CopySlot push1_popN 1024",
+        "cl64": [
+          814.0,
+          909.9
+        ],
+        "cl128": [
+          649.3,
+          826.4
+        ]
+      },
+      {
+        "cell": "CopySlot push1_popN 16384",
+        "cl64": [
+          532.0,
+          575.2
+        ],
+        "cl128": [
+          412.1,
+          520.9
+        ]
+      },
+      {
+        "cell": "TypedSlot push1_pop1 64",
+        "cl64": [
+          91.6,
+          79.2
+        ],
+        "cl128": [
+          29.7,
+          30.3
+        ]
+      },
+      {
+        "cell": "TypedSlot push1_pop1 1024",
+        "cl64": [
+          226.9,
+          219.9
+        ],
+        "cl128": [
+          140.4,
+          192.5
+        ]
+      }
+    ],
+    "with_consumer_cache_note": "with the consumer cache (E4, one round), CL=64 vs CL=128 on CopySlot pop1: 64 slots 109.7 vs 103.4 (within 10%); 1024 slots 302.5 vs 371.8 (128 is 23% faster); 16384 slots 273.1 vs 409.5 (128 is 50% faster). Without the cache, CL=128 is 3-7x slower on pop1."
+  },
+  "wide_records": {
+    "_about": "Stock harness, 1024 slots, push1_popN, two rounds. 'old_check' = Wide::whole compared first and last word only; 'every_word' = reads all words. Strides: TypedSlot 72/264 bytes, CopySlot 64/256.",
+    "rows": [
+      {
+        "bytes": 8,
+        "typedslot_old": [
+          271.3,
+          368.6
+        ],
+        "typedslot_new": [
+          360.5,
+          280.9
+        ],
+        "copyslot_old": [
+          569.7,
+          910.0
+        ],
+        "copyslot_new": [
+          881.0,
+          728.4
+        ],
+        "rtrb_new": [
+          143.9,
+          135.8
+        ]
+      },
+      {
+        "bytes": 64,
+        "typedslot_old": [
+          80.7,
+          91.0
+        ],
+        "typedslot_new": [
+          99.3,
+          93.7
+        ],
+        "copyslot_old": [
+          42.0,
+          42.6
+        ],
+        "copyslot_new": [
+          62.6,
+          44.6
+        ],
+        "rtrb_new": [
+          65.9,
+          52.7
+        ]
+      },
+      {
+        "bytes": 256,
+        "typedslot_old": [
+          46.9,
+          52.0
+        ],
+        "typedslot_new": [
+          31.8,
+          30.2
+        ],
+        "copyslot_old": [
+          26.6,
+          26.9
+        ],
+        "copyslot_new": [
+          29.4,
+          29.1
+        ],
+        "rtrb_new": [
+          31.0,
+          29.6
+        ]
+      }
+    ],
+    "stride_experiments": {
+      "copyslot_stride_64": [
+        38,
+        53
+      ],
+      "copyslot_padded_to_72": [
+        81,
+        96
+      ],
+      "typedslot_stride_72": [
+        70,
+        85
+      ],
+      "typedslot_no_tag_stride_64": [
+        52,
+        73
+      ],
+      "consumer_lagging_64_records_stride_64_vs_72": [
+        180,
+        177
+      ],
+      "consumer_lagging_64_records_stride_256_vs_264": [
+        110,
+        113
+      ],
+      "single_thread_fill_drain_stride_64_vs_72_Mps": [
+        707,
+        483
+      ],
+      "stride_128_vs_136": "within ~10%",
+      "ruled_out": [
+        "4K aliasing (same-core effect, does not vanish with lag)",
+        "more line sharing (72 shares more boundaries yet is faster)",
+        "codegen (both store inline, no memcpy)"
+      ]
+    },
+    "lines_read_per_record_by_old_check": {
+      "stride_264": 1.06,
+      "stride_256": 2.0
+    }
+  },
+  "mutations": {
+    "consumer_cache": [
+      {
+        "mutation": "reload only when start == cached",
+        "killed_by": "drain_takes_everything_published_after_a_bounded_drain (std)"
+      },
+      {
+        "mutation": "cache starts at zero + == rule",
+        "killed_by": "a_re_split_consumer_sees_what_the_first_generation_left_published (std)"
+      },
+      {
+        "mutation": "never reload",
+        "killed_by": "many std tests; the 100k threaded test hangs"
+      },
+      {
+        "mutation": "reload at Relaxed",
+        "killed_by": "loom model a_bounded_drain_hands_out_only_records_whose_writes_it_can_see (only loom catches it)"
+      },
+      {
+        "mutation": "extrapolate instead of load",
+        "killed_by": "loom model and std tests"
+      },
+      {
+        "mutation": "store only when equal (never updates)",
+        "killed_by": "std tests"
+      },
+      {
+        "mutation": "< to <=",
+        "killed_by": "nothing; equivalent, accepted with reason"
+      }
+    ],
+    "survey_ring_spsc": {
+      "mutants": 75,
+      "caught": 28,
+      "unviable": 38,
+      "timeouts": 7,
+      "accepted": 2,
+      "new_survivors": 0
+    }
+  },
+  "prs": {
+    "20": "merged: the producer caches the consumer cursor (ring_spsc ADR 001)",
+    "22": "closed: both ends cache both cursors; its consumer half is #41",
+    "23": "closed: 128-byte cursor padding; measured 3-7x slower on pop1 without #41",
+    "38": "CopySlot, stacked on #41, 9 commits",
+    "41": "the consumer caches the producer cursor, 5 commits on master"
+  }
+}

@@ -61,6 +61,7 @@ RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
 | `docs/workaround/` | Why the crate opts out of the workspace `unsafe` deny. See [docs/workaround/readme.md](docs/workaround/readme.md) |
+| `docs/decisions/` | The two cursor caches: the producer's ([001](docs/decisions/001_the_producer_cursor_cache_closed_the_two_thread_gap.md)) and the consumer's ([002](docs/decisions/002_the_consumer_caches_the_producer_cursor.md)), each with its measurement |
 | `src/lib.rs` | The `Ring`, its two ends, and the two publish/commit guards |
 | `tests/spsc_test.rs` | This crate's reached-test, the tests around the public API, and a `loom` model of every interleaving |
 | `tests/manual/readme.md` | The source readings and mutation checks automation cannot make |

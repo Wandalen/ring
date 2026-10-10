@@ -340,6 +340,39 @@ items on aarch64 (Neoverse-N1), precisely the kind of machine that is supposed
 to expose it, so the usual "it would only show on a weaker target" escape is
 unavailable.
 
+### Step 1b. The consumer's cache model fails when the reload stops acquiring
+
+The consumer keeps its latest observation of the producer cursor
+(`Consumer::cached_produced`, ADR 002) and reloads it in `observe_produced`.
+That reload is the consumer's only `GATING` load on the drain path, so it is
+the edge `a_bounded_drain_hands_out_only_records_whose_writes_it_can_see`
+exists to check. Weaken it alone, leaving `HANDOFF` intact:
+
+```bash
+sed -i '/fn observe_produced/,/^  }/ s|load(GATING)|load(Ordering::Relaxed)|' ring_spsc/src/lib.rs
+RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
+```
+
+**Expected:** `a_bounded_drain_hands_out_only_records_whose_writes_it_can_see`
+FAILS with "was handed out before the write that preceded its publish was
+visible", and the two older drain models fail with it, since every drain goes
+through the same reload. The ordinary suite stays green under this mutation,
+for the reason Step 1 gives.
+
+A second mutation checks the other half of the cache's soundness argument,
+that it is written from observations and never extrapolated:
+
+```bash
+cp /tmp/-spsc_orig.rs ring_spsc/src/lib.rs
+sed -i '/fn observe_produced/,/^  }/ s|let produced = self.ring.cursors.producer().load(GATING);|let produced = start.advanced_by(wanted.min(2) as u64);|' ring_spsc/src/lib.rs
+RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
+```
+
+**Expected:** all four drain models FAIL, the new one first, because the
+consumer is handed a record nobody published. This one the ordinary suite also
+catches, in `a_batch_commits_exactly_its_own_length` and others: an over-claim
+is behavioural, an ordering is not.
+
 ### Step 2. Restore, and confirm both halves are green
 
 ```bash

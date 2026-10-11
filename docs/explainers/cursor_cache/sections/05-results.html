@@ -178,10 +178,13 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   <div class="st-grid" id="r-st1"></div>
   <p class="r-cap">Each row has its own scale; compare dots within a row, not across rows. Rows with one dot per stage
     were recorded as a single figure.</p>
-  <div class="hyp" style="margin-top:10px">The two rows marked <span class="flag">code layout, unexplained</span> got
-    slower although #41 adds no instruction to the push path and only a compare per lap to the whole-lap drain. ADR 002
-    attributes both to code layout. That is an inference from timing alone; no hardware counters were available to
-    confirm it.</div>
+  <div class="measured" style="margin-top:10px">The two rows marked <span class="flag">code layout</span> are the
+    first version of #41, and a later round settled both. Whole-lap <code>fill_drain</code> follows where the linker
+    puts the drain loop's head: at an address ≡ 4 mod 8 it runs about 0.1 ns per record slower than at ≡ 0, an
+    unrelated 4-byte change flipped the sign, and with loop heads pinned (<code>-align-loops=16</code>) the two sides
+    measured equal within 0.5% (#53). <code>push_pop</code> measured 3.7 against 3.7 ns pinned. The final version of
+    #41 also decides a bounded drain's length before reloading, which removed the x86 runner's 22% loss on one-record
+    drains (#50).</div>
 
   <div class="pre">
     <h4 style="margin:0 0 4px">CopySlot against TypedSlot, single thread <span class="pre-tag">pre-rebase, c28bedb</span></h4>
@@ -597,7 +600,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
       const d = H('div', 'st-d', null, grid);
       const rr = ratioRange(r.p, r.m).map((x) => x - 1);
       H('div', null, rr[0] === rr[1] ? pct(rr[0]) : `${pct(rr[0])} to ${pct(rr[1])}`, d);
-      if (r.flag) { H('span', 'flag', 'code layout, unexplained', d); [lab, tr, d].forEach((e) => e.classList.add('st-row-flag')); }
+      if (r.flag) { H('span', 'flag', 'code layout', d); [lab, tr, d].forEach((e) => e.classList.add('st-row-flag')); }
       tracks.push({ r, svg });
     });
     function render(zoom) {
@@ -884,7 +887,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
         pay: [
           'Consumer is one word larger. No public signature changes.',
           'drain_up_to may serve a drain from an older observation and read no producer line. Results are identical: the observation lags, it is never extrapolated.',
-          'Single thread: push_pop 3.60, 3.73 → 3.98, 3.98 ns (+6.7% to +10.6%) and whole-lap fill_drain 65.0 → 73.2 ns per lap at 64 slots (+12.6%), 0.96 → 1.06 µs at 1024 (+10.4%). Code layout, unexplained.',
+          'Single thread: push_pop 3.60, 3.73 → 3.98, 3.98 ns (+6.7% to +10.6%) and whole-lap fill_drain 65.0 → 73.2 ns per lap at 64 slots (+12.6%), 0.96 → 1.06 µs at 1024 (+10.4%), in #41's first version. Code layout: equal within 0.5% with loop heads pinned (#53).',
           'TypedSlot pop1 at 16384 slots, one line: 46, 47 → 36, 35 M/s (−22% to −26%), in the regime where its 256 KB array spills the 128 KB L1D.',
           'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.'
         ] },

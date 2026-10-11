@@ -14,8 +14,11 @@
 <ol class="oq">
   <li><strong>Why is a 64-byte stride slow at the frontier?</strong> Ruled out: 4K aliasing, more line sharing, codegen.
     Padding to 72 bytes fixes it; the mechanism needs hardware counters.</li>
-  <li><strong>Why did #41 slow two single-thread benchmarks?</strong> <code>push_pop</code> (3.60, 3.73 → 3.98, 3.98 ns)
-    and whole-lap <code>fill_drain</code> at 64 and 1024 slots. Unconfirmed: the disassembly shows the per-record loop unchanged and 27 instructions added once per lap, which moved the loop's alignment; the x86 CI runner shows the opposite sign on the one-record cell. Tracked in #50; the 16384-slot cell in #49.</li>
+  <li><strong>Why did #41 slow two single-thread benchmarks?</strong> Settled. The M4's whole-lap <code>fill_drain</code>
+    followed the drain loop head's address mod 8 and measured equal within 0.5% with loop heads pinned; whether
+    <code>verb/bench</code> should pin them is #53. The x86 runner's 22% loss on one-record drains was the compiled
+    shape of the first version (a length LLVM could not see as constant), fixed in #41's final version; the x86 CI run
+    confirms it or not (#50). The 16384-slot cell is #49.</li>
   <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s</strong> in every mode and layout? Likely the
     256 KB slot array spilling the 128 KB L1D (<code>CopySlot</code>'s is exactly 128 KB). The regimes review rates the
     label medium and the cause low. #41 takes pop1 there from 46, 47 to 36, 35.</li>

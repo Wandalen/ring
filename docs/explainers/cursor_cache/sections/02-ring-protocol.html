@@ -191,10 +191,15 @@ self.cached_tail = seq.next();</code></pre>
   published, and returns a <code>Batch</code> that borrows the slots:</p>
 <pre><code>pub fn drain_up_to(&amp;mut self, max: usize) -&gt; Batch&lt;'_, S&gt; {
   let start = self.ring.cursors.consumer().load(OWN);
-<span class="hc">  let produced = self.observe_produced(start, max);</span>
-  Batch { ring: self.ring, start, len: max.min(start.distance_to(produced) as usize) }
+<span class="hc">  let known = start.distance_to(self.cached_produced) as usize;</span>
+<span class="hc">  let len = if known &gt;= max {</span>
+<span class="hc">    max.min(known)</span>
+<span class="hc">  } else {</span>
+<span class="hc">    max.min(start.distance_to(self.observe_produced()) as usize)</span>
+<span class="hc">  };</span>
+  Batch { ring: self.ring, start, len }
 }</code></pre>
-<p>Before #41, the highlighted line was an unconditional <code>self.ring.cursors.producer().load(GATING)</code>.
+<p>Before #41, the highlighted lines were one unconditional <code>self.ring.cursors.producer().load(GATING)</code>.
   Dropping the batch commits the whole batch with one store, even when it is empty:</p>
 <pre><code>impl&lt;S&gt; Drop for Batch&lt;'_, S&gt; {
   fn drop(&amp;mut self) {
@@ -260,19 +265,22 @@ self.cached_tail = seq.next();</code></pre>
 <p>#41 gives the consumer what #20 gave the producer: one private field, <code>cached_produced</code>, holding its
   last <code>GATING</code> observation of the producer cursor. A drain reloads it only when the records it already
   knows of are fewer than the drain asks for:</p>
-<pre><code>fn observe_produced(&amp;mut self, start: Seq, wanted: usize) -&gt; Seq {
-<span class="hc">  if (start.distance_to(self.cached_produced) as usize) &lt; wanted {</span>
-<span class="hc">    let produced = self.ring.cursors.producer().load(GATING);</span>
-    if produced != self.cached_produced {
-      self.cached_produced = produced;
-    }
+<pre><code>fn observe_produced(&amp;mut self) -&gt; Seq {
+<span class="hc">  let produced = self.ring.cursors.producer().load(GATING);</span>
+  if produced != self.cached_produced {
+    self.cached_produced = produced;
   }
   self.cached_produced
 }</code></pre>
-<p><code>drain()</code> asks for <code>usize::MAX</code>, so it always reloads. <code>drain_up_to(1)</code> reloads
-  only when it knows of nothing. When the producer is ahead, one load now serves many pops: in the ring above, with
+<p><code>drain_up_to</code>, above, calls it only when <code>known &lt; max</code>; <code>drain()</code> calls it on
+  every call. So <code>drain_up_to(1)</code> reloads only when it knows of nothing. When the producer is ahead, one load now serves many pops: in the ring above, with
   the cache on, Push ×4 then Pop ×4 loads the producer's line once instead of four times. The field is written only
   when the observation moved, so a consumer polling an empty ring does not store the same value every poll.</p>
+<p>The order of the two decisions matters to the compiler, not to the semantics. A first version reloaded inside
+  <code>observe_produced</code> and computed the length afterwards, through one value that was either cached or
+  reloaded. Inlined into a caller, a one-record drain then did not have a constant length, LLVM kept the batch loop
+  around it, and on the x86 CI runner single-threaded one-record drains got 22% slower (#50): two more taken branches
+  per record. Deciding the hit first lets the length fold to <code>1</code>.</p>
 <p>The cache is sound for the same reason as the producer's: it can only lag. Every record it offers was published
   before a Release store that some <code>GATING</code> load by this end observed, on this drain or an earlier one,
   and program order carries that edge forward to the slot read.</p>

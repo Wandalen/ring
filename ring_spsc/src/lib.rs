@@ -78,8 +78,8 @@
 //! What this buys is the two-thread hand-off: without it the consumer read the
 //! producer's line on every drain, so a one-record-per-pop consumer paid a
 //! cross-core transfer per record whenever the producer was the faster end.
-//! `available` and `is_empty` keep reading the shared cursor; the cache is
-//! visible nowhere.
+//! `available` and `is_empty` keep reading the shared cursor, so no query
+//! answers from the cache; only `Debug` prints it.
 //!
 //! # The unsafe, and where its argument lives
 //!
@@ -360,7 +360,11 @@ pub struct Ring<S> {
 // the `cached_head` field: the cache can only lag the consumer cursor, and a
 // lapped claim is granted only when the cached observation itself proves the
 // record consumed, at the `GATING` load that orders the consumer's take before
-// the producer's overwrite. The cursors are atomics and carry the
+// the producer's overwrite. The drain's length runs on the consumer's cached
+// observation of the producer cursor, by the same argument mirrored: it can only
+// lag, so a drain is offered only slots a `GATING` load already saw published,
+// and the edge that load carried reaches every later read on the same thread.
+// The cursors are atomics and carry the
 // happens-before edge (`HANDOFF` store, `GATING` load) that makes each side's
 // slot writes visible to the other before the other may touch that slot.
 // `S : Send` is required because a record is written on the producer's thread
@@ -1212,9 +1216,12 @@ impl<S> Batch<'_, S> {
     }
 
     // SAFETY: `offset < self.len`, and the batch's whole range was published
-    // and not committed when `drain` computed it. Its upper bound came from a
-    // `GATING` load of the producer cursor, and its lower bound is this end's
-    // own cursor, which only this value's `Drop` will advance.
+    // and not committed when the drain computed it. Its upper bound came from a
+    // `GATING` load of the producer cursor, on this drain or on an earlier one
+    // whose observation the consumer cached: the producer cursor is monotone, so
+    // an older observation only under-reports, and program order carries the
+    // load's edge from that drain to this read. Its lower bound is this end's own
+    // cursor, which only this value's `Drop` will advance.
     Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
   }
 

@@ -1053,7 +1053,14 @@ impl<S> Consumer<'_, S> {
   /// assert_eq!( batch.iter().filter_map( TypedSlot::get ).copied().collect::< Vec< _ > >(), [ 10, 20 ] );
   /// ```
   pub fn drain(&mut self) -> Batch<'_, S> {
-    self.drain_up_to(usize::MAX)
+    let start = self.ring.cursors.consumer().load(OWN);
+    let produced = self.observe_produced();
+
+    Batch {
+      ring: self.ring,
+      start,
+      len: start.distance_to(produced) as usize,
+    }
   }
 
   /// Take at most `max` published records.
@@ -1082,33 +1089,43 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.observe_produced(start, max);
+    // What the consumer already knows of. When it covers the request the
+    // batch is `max`, and LLVM sees that through the `min`: a one-record drain
+    // served from the cache has a constant length, and the caller's loop over
+    // the batch folds away. The `min` stays so that a wrong comparison here
+    // can only under-report, never hand out a record nobody observed.
+    let known = start.distance_to(self.cached_produced) as usize;
+    let len = if known >= max {
+      max.min(known)
+    } else {
+      max.min(start.distance_to(self.observe_produced()) as usize)
+    };
 
     Batch {
       ring: self.ring,
       start,
-      len: max.min(start.distance_to(produced) as usize),
+      len,
     }
   }
 
-  /// The producer cursor as this end knows it, reloaded when it knows of fewer
-  /// than `wanted` records past `start`.
+  /// The producer cursor, reloaded, and kept as this end's observation: the
+  /// one read of the producer's line on the drain path.
   ///
-  /// The reload is the one read of the producer's line on the drain path. Its
-  /// [`GATING`] order pairs with the producer's [`HANDOFF`] publish, so every
+  /// Its [`GATING`] order pairs with the producer's [`HANDOFF`] publish, so every
   /// record below the returned value carries the write that preceded its
   /// publish — and a value kept from an earlier drain carries the same
-  /// guarantee by program order. A cache that reloaded only when it knew of
-  /// nothing would make an unbounded drain report less than `available`.
-  fn observe_produced(&mut self, start: Seq, wanted: usize) -> Seq {
-    if (start.distance_to(self.cached_produced) as usize) < wanted {
-      let produced = self.ring.cursors.producer().load(GATING);
-      // Written only when it moved: a consumer polling an empty ring would
-      // otherwise store the same value every poll and read it back the next.
-      if produced != self.cached_produced {
-        self.cached_produced = produced;
-      }
+  /// guarantee by program order. [`Self::drain`] reloads on every call: a
+  /// cache it trusted would make an unbounded drain report less than
+  /// `available`.
+  fn observe_produced(&mut self) -> Seq {
+    let produced = self.ring.cursors.producer().load(GATING);
+    // Written only when it moved: a consumer polling an empty ring would
+    // otherwise store the same value every poll and read it back the next.
+    if produced != self.cached_produced {
+      self.cached_produced = produced;
     }
+    // The field, equal to `produced` here: read back, it lets a poll that found
+    // nothing new reuse the distance the caller already computed.
     self.cached_produced
   }
 }

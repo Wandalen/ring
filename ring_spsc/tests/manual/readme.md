@@ -364,7 +364,7 @@ that it is written from observations and never extrapolated:
 
 ```bash
 cp /tmp/-spsc_orig.rs ring_spsc/src/lib.rs
-sed -i '/fn observe_produced/,/^  }/ s|let produced = self.ring.cursors.producer().load(GATING);|let produced = start.advanced_by(wanted.min(2) as u64);|' ring_spsc/src/lib.rs
+sed -i '/fn observe_produced/,/^  }/ s|let produced = self.ring.cursors.producer().load(GATING);|let produced = self.ring.cursors.consumer().load(OWN).advanced_by(2);|' ring_spsc/src/lib.rs
 RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
 ```
 

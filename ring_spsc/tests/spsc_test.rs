@@ -547,6 +547,27 @@ mod threaded {
     assert_eq!(one(&mut consumer), Some(4));
   }
 
+  /// A bounded drain takes what it asks for, whatever the consumer already
+  /// knows of. Knowing of more, it takes `max` and no more: a drain that
+  /// handed out what it knew of would take three here. Knowing of fewer, it
+  /// reloads: one that trusted any nonzero knowledge would stop at two where
+  /// three are published.
+  #[test]
+  fn a_bounded_drain_takes_what_it_asks_for_whatever_the_consumer_knows() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(8));
+    let (mut producer, mut consumer) = ring.split();
+
+    for value in 1..=4 {
+      producer.try_push(value).unwrap();
+    }
+    assert_eq!(consumer.drain_up_to(1).len(), 1, "reloaded, knows of four");
+    assert_eq!(consumer.drain_up_to(1).len(), 1, "knows of three, asked for one");
+
+    producer.try_push(5).unwrap();
+    let taken: Vec<u8> = consumer.drain_up_to(3).iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(taken, [3, 4, 5], "knew of two, asked for three, reloaded");
+  }
+
   /// A second split carries the shared cursors over. The new consumer's cache
   /// starts behind them, and must still find the record the first generation
   /// left published. A cache that started at zero and compared for equality

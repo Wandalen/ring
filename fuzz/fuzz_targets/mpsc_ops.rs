@@ -16,21 +16,7 @@ use std::collections::VecDeque;
 #[path = "common.rs"]
 mod common;
 
-use common::Reader;
-
-const CAPACITIES: [usize; 6] = [1, 2, 4, 8, 32, 128];
-const OPS: usize = 1024;
-
-fn drain_all(
-  consumer: &mut ring_mpsc::Consumer<'_, TypedSlot<u64>>,
-  oracle: &mut VecDeque<u64>,
-) {
-  let mut batch = consumer.drain();
-  for offset in 0..batch.len() {
-    let got = batch.get_mut(offset).and_then(|slot| slot.take());
-    assert_eq!(got, oracle.pop_front(), "records must come back FIFO");
-  }
-}
+use common::{CAPACITIES, OPS, Reader, drain_all};
 
 fuzz_target!(|data: &[u8]| {
   let mut reader = Reader::new(data);
@@ -111,7 +97,10 @@ fuzz_target!(|data: &[u8]| {
         }
       }
       // Drain everything, in order.
-      4 => drain_all(&mut consumer, &mut oracle),
+      4 => {
+        let mut batch = consumer.drain();
+        drain_all(batch.len(), |o| batch.get_mut(o).and_then(|slot| slot.take()), &mut oracle);
+      }
       // Bounded drain.
       _ => {
         let max = reader.byte() as usize % (capacity + 1);
@@ -124,6 +113,7 @@ fuzz_target!(|data: &[u8]| {
     }
   }
 
-  drain_all(&mut consumer, &mut oracle);
+  let mut batch = consumer.drain();
+  drain_all(batch.len(), |o| batch.get_mut(o).and_then(|slot| slot.take()), &mut oracle);
   assert!(oracle.is_empty(), "everything pushed must be drainable");
 });

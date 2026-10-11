@@ -105,6 +105,7 @@ fuzz_target!(|data: &[u8]| {
       _ => {
         let max = reader.byte() as usize % (capacity + 1);
         let mut batch = consumer.drain_up_to(max);
+        assert!(batch.len() <= max, "drain_up_to({max}) returned {}", batch.len());
         for offset in 0..batch.len() {
           let got = batch.get_mut(offset).and_then(|slot| slot.take());
           assert_eq!(got, oracle.pop_front(), "records must come back FIFO");

@@ -1,8 +1,9 @@
-<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs, commits per PR, open questions, glossary.
+<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 06.
 Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
 Hover or focus any mark for the exact two-round pair; every chart has a table twin. -->
 <section id="sec-results" class="section" data-title="Measurements, trade-offs, what changed">
 <style>
+  #sec-results svg .gl { stroke: var(--line); stroke-width: 1; }
   #sec-results { position: relative; }
   #sec-results .r-lede { color: var(--muted); max-width: var(--measure); }
   #sec-results .r-fig { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px 14px; margin: 14px 0 8px; }
@@ -33,7 +34,6 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   #sec-results .bar { outline: none; cursor: default; }
   #sec-results .bar:hover .solid:not([d=""]), #sec-results .bar:focus .solid { filter: brightness(1.18); }
   #sec-results .bar:focus .hit { stroke: var(--accent); stroke-width: 1.5; }
-  #sec-results svg .gl { stroke: var(--line); stroke-width: 1; }
   #sec-results svg .base { stroke: var(--muted); stroke-width: 1; }
   #sec-results svg .tk { fill: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
   #sec-results svg .lab { fill: var(--text); font-size: 14px; }
@@ -116,12 +116,6 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   #sec-results .pr li ul { margin: 2px 0 0; padding-left: 0; list-style: none; }
   #sec-results .pr li ul li { margin: 0; font-family: var(--font-mono); font-size: 0.76rem; color: var(--muted); word-break: break-all; }
   #sec-results .ctx { font-size: 0.88rem; color: var(--muted); }
-
-  /* glossary */
-  #sec-results dl.gl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; max-width: 92ch; }
-  #sec-results dl.gl dt { font-weight: 600; }
-  #sec-results dl.gl dd { margin: 0; color: var(--text); }
-  #sec-results ol.oq li { margin: 8px 0; }
 
   @media (max-width: 700px) { #sec-results .wide-panels { grid-template-columns: 1fr; } }
   @media (max-width: 1100px) {
@@ -299,40 +293,6 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 <h3>What changed, by PR</h3>
 <p class="ctx" id="r-ctx"></p>
 <div class="prs" id="r-prs"></div>
-
-<!-- ============ 9. open + glossary ============ -->
-<h3>Open questions</h3>
-<ol class="oq">
-  <li><strong>Why is a 64-byte stride slow at the frontier?</strong> Ruled out: 4K aliasing, more line sharing, codegen.
-    Padding to 72 bytes fixes it; the mechanism needs hardware counters.</li>
-  <li><strong>Why did #41 slow two single-thread benchmarks?</strong> <code>push_pop</code> (3.60, 3.73 → 3.98, 3.98 ns)
-    and whole-lap <code>fill_drain</code> at 64 and 1024 slots. Labelled code layout; not observed directly.</li>
-  <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s</strong> in every mode and layout? Likely the
-    256 KB slot array spilling the 128 KB L1D (<code>CopySlot</code>'s is exactly 128 KB). The regimes review rates the
-    label medium and the cause low. #41 takes pop1 there from 46, 47 to 36, 35.</li>
-  <li><strong>Which mode of the bimodal popN 1024 cell is typical?</strong> The regimes review attributes the two modes to
-    the chase's initial race (high confidence). A separate review tied the tagged flip to the slot array sitting one page
-    after the ring, mechanism unknown.</li>
-  <li><strong>Where does the lockstep threshold sit now?</strong> The cache moved it. The steady-state model
-    R* ≈ m / (c − p) (m one refresh ≈ 45 ns, c the consumer's cost per pop, p the producer's cost per push) was fitted
-    qualitatively; c and p were never measured in isolation.</li>
-  <li><strong>Does the one-line layout batch about 4 records per transfer?</strong> Consistent with the timings (one-way
-    37.8 ns against ~9–10 ns per record), unobservable without counters. Hypothesis, ~70% confidence.</li>
-  <li><strong>Should <code>CACHE_LINE</code> become 128?</strong> With #41 the two layouts measure the same on pop1, so
-    this is now a footprint decision, not a speed one.</li>
-</ol>
-
-<h3>Glossary</h3>
-<dl class="gl">
-  <dt>Cache line</dt><dd>The unit a cache stores, moves and keeps coherent. 128 bytes on this M4 Pro; <code>ring_align</code> assumes 64.</dd>
-  <dt>Coherence transfer</dt><dd>Moving a line, or its write ownership, from one core's cache to another's, invalidating the old copy. One way inside a P-core cluster: median 37.8 ns.</dd>
-  <dt>Stride</dt><dd>Bytes from the start of one slot to the start of the next: 16 for <code>TypedSlot&lt;u64&gt;</code>, 8 for <code>CopySlot&lt;u64&gt;</code>, 72 against 64 and 264 against 256 for the wide records.</dd>
-  <dt>Frontier</dt><dd>The slots the producer is writing while the consumer reads right behind it. Lines there are hot on both cores at once.</dd>
-  <dt>Lockstep</dt><dd>The full ring with the producer one slot behind the consumer: it refreshes its cached consumer cursor before nearly every push, about 48 ns each.</dd>
-  <dt><code>OWN</code>, <code>GATING</code>, <code>HANDOFF</code></dt><dd>The three orderings the ring uses. <code>OWN</code> is <code>Relaxed</code>: an end reading the cursor only it writes. <code>GATING</code> is <code>Acquire</code>: reading the other end's cursor before touching the slots it guards. <code>HANDOFF</code> is <code>Release</code>: publishing one's own cursor after the slot writes.</dd>
-  <dt>LDAPR, STLR</dt><dd>The AArch64 instructions behind them: LDAPR (and LDAPUR) an acquire load in the weaker RCpc form, STLR (and STLUR) a release store. A push does one STLR; before #41, every pop did one LDAPR.</dd>
-  <dt>loom</dt><dd>A Rust model checker. It runs a concurrent test under every interleaving the memory model permits, up to a bound, and so catches orderings a real run rarely exposes.</dd>
-</dl>
 
 <script>
 (() => {

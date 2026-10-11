@@ -1493,4 +1493,157 @@ mod exhaustive {
       assert!(taken <= 2, "drained {taken} records against two pushes");
     });
   }
+
+  /// What the cache must never do silently: stop short. Three records are
+  /// pushed while the consumer takes two bounded looks; after both threads
+  /// join, one unbounded drain must hand over the rest. Across every
+  /// interleaving the consumer receives each record exactly once, in order,
+  /// each carrying the write that preceded its publish.
+  ///
+  /// The safety models above only bound what a drain hands out; none fails
+  /// when a drain reports less than is published. Red under a reload rule of
+  /// `start == cached` (the final drain answers from a partial observation),
+  /// and under a cache that is never written back.
+  #[test]
+  fn every_record_arrives_exactly_once_and_in_order_across_cached_drains() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 3] =
+        Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (mut producer, consumer) = leaked_ring(4).split();
+
+      let producing = loom::thread::spawn(move || {
+        for (seq, payload) in payloads.iter().enumerate() {
+          payload.store(WRITTEN, Ordering::Relaxed);
+          producer.try_push(seq as u8 + 1).expect("a four-slot ring admits three");
+        }
+      });
+
+      let draining = loom::thread::spawn(move || {
+        let mut consumer = consumer;
+        let mut taken = Vec::new();
+        for _ in 0..2 {
+          let batch = consumer.drain_up_to(1);
+          for (offset, slot) in batch.iter().enumerate() {
+            let seq = batch.start().advanced_by(offset as u64);
+            assert_eq!(
+              payloads[seq.0 as usize].load(Ordering::Relaxed),
+              WRITTEN,
+              "record {seq:?} unwritten"
+            );
+            taken.push(slot.get().copied().expect("a pushed record"));
+          }
+        }
+        (consumer, taken)
+      });
+
+      producing.join().expect("the producer thread");
+      let (mut consumer, mut taken) = draining.join().expect("the drain thread");
+
+      // Quiescent: every push has published and both threads have joined.
+      taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+      assert_eq!(taken, [1, 2, 3], "lost, duplicated or reordered across the cache");
+      assert!(consumer.is_empty());
+    });
+  }
+
+  /// `available` reads the shared cursor and a bounded drain may answer from
+  /// the cache. A count `available` reported must still be handed out by the
+  /// next drain asked for that many: the reading is a lower bound until this
+  /// end drains (`Consumer::available`'s invariant, and `ring_core`'s `len`).
+  ///
+  /// Red under a reload rule of `start == cached`: after a bounded look that
+  /// left one record known, `available` sees two and the drain hands out one.
+  #[test]
+  fn a_drain_for_what_available_reported_hands_out_that_many() {
+    loom::model(|| {
+      let (mut producer, mut consumer) = leaked_ring(4).split();
+
+      let producing = loom::thread::spawn(move || {
+        for value in 1..=3u8 {
+          producer.try_push(value).expect("a four-slot ring admits three");
+        }
+      });
+
+      let draining = loom::thread::spawn(move || {
+        drop(consumer.drain_up_to(1));
+        let reported = consumer.available();
+        let batch = consumer.drain_up_to(reported);
+        assert_eq!(
+          batch.len(),
+          reported,
+          "available() reported {reported}, the next drain for that many handed out {}",
+          batch.len(),
+        );
+      });
+
+      producing.join().expect("the producer thread");
+      draining.join().expect("the drain thread");
+    });
+  }
+
+  /// Both caches across a lap: a two-slot ring carries three records, so the
+  /// producer refreshes its head while the consumer may be answering from its
+  /// observation of the producer. Every record arrives once, in order, with
+  /// its write visible — keyed by sequence, so a lapped slot's old payload
+  /// cannot pass for the new one.
+  #[test]
+  fn both_caches_across_a_lap_deliver_every_record_once_with_its_write() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 3] =
+        Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (mut producer, mut consumer) = leaked_ring(2).split();
+
+      let producing = loom::thread::spawn(move || {
+        let mut next = 0usize;
+        for _ in 0..4 {
+          if next == 3 {
+            break;
+          }
+          payloads[next].store(WRITTEN, Ordering::Relaxed);
+          if producer.try_push(next as u8 + 1).is_ok() {
+            next += 1;
+          } else {
+            loom::thread::yield_now();
+          }
+        }
+        (producer, next)
+      });
+
+      let draining = loom::thread::spawn(move || {
+        let mut taken = Vec::new();
+        for _ in 0..3 {
+          let batch = consumer.drain_up_to(1);
+          for (offset, slot) in batch.iter().enumerate() {
+            let seq = batch.start().advanced_by(offset as u64);
+            assert_eq!(
+              payloads[seq.0 as usize].load(Ordering::Relaxed),
+              WRITTEN,
+              "record {seq:?} handed out before its write was visible",
+            );
+            taken.push(slot.get().copied().expect("a pushed record"));
+          }
+        }
+        (consumer, taken)
+      });
+
+      let (mut producer, mut next) = producing.join().expect("the producer thread");
+      let (mut consumer, mut taken) = draining.join().expect("the drain thread");
+
+      // Bounded, so a cache that stopped reloading fails the assertion below
+      // instead of spinning the model forever.
+      for _ in 0..8 {
+        if next == 3 {
+          break;
+        }
+        payloads[next].store(WRITTEN, Ordering::Relaxed);
+        if producer.try_push(next as u8 + 1).is_ok() {
+          next += 1;
+        } else {
+          taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+        }
+      }
+      taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+      assert_eq!(taken, [1, 2, 3], "lost, duplicated or reordered across a lap");
+    });
+  }
 }

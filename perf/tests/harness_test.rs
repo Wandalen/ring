@@ -16,7 +16,6 @@ use std::marker::PhantomData;
 use std::time::Duration;
 
 use harness::candidates::{
-  self,
   Candidate,
   CrossbeamQueue,
   Mpsc,
@@ -128,21 +127,26 @@ fn wide_records_arrive_whole_through_every_candidate() {
   driver::run::<MutexDeque<Wide<32>>>(&shape);
 }
 
-/// Every candidate is built at the start of a 128-byte block, so its layout against the cache lines
-/// is the same in every process. Why that matters is on `candidates::build`.
+/// Every candidate is built at a chosen byte of a 256-byte block, so its layout against the cache
+/// lines is the same in every process and the other layout is one environment variable away. Why
+/// that matters is on `candidates::build`.
 #[test]
-fn every_candidate_is_built_at_the_start_of_a_128_byte_block() {
-  fn offset<C: Candidate>() -> usize {
-    std::ptr::from_ref::<C>(&candidates::build::<C>(64)).addr() % 128
+fn every_candidate_is_built_at_the_chosen_byte_of_a_256_byte_block() {
+  use harness::candidates::{Placement, build_at};
+
+  fn offset<C: Candidate>(placement: Placement) -> usize {
+    std::ptr::from_ref::<C>(&build_at::<C>(placement, 64)).addr() % 256
   }
 
-  assert_eq!(offset::<Spsc>(), 0, "spsc");
-  assert_eq!(offset::<Rtrb>(), 0, "rtrb");
-  assert_eq!(offset::<Mpsc>(), 0, "mpsc");
-  assert_eq!(offset::<MpscPrimary>(), 0, "mpsc-primary");
-  assert_eq!(offset::<SyncChannel>(), 0, "sync_channel");
-  assert_eq!(offset::<CrossbeamQueue>(), 0, "arrayqueue");
-  assert_eq!(offset::<MutexDeque>(), 0, "mutex");
+  for (placement, expected) in [(Placement::LineStart, 0), (Placement::LineMiddle, 64)] {
+    assert_eq!(offset::<Spsc>(placement), expected, "spsc at {placement:?}");
+    assert_eq!(offset::<Rtrb>(placement), expected, "rtrb at {placement:?}");
+    assert_eq!(offset::<Mpsc>(placement), expected, "mpsc at {placement:?}");
+    assert_eq!(offset::<MpscPrimary>(placement), expected, "mpsc-primary at {placement:?}");
+    assert_eq!(offset::<SyncChannel>(placement), expected, "sync_channel at {placement:?}");
+    assert_eq!(offset::<CrossbeamQueue>(placement), expected, "arrayqueue at {placement:?}");
+    assert_eq!(offset::<MutexDeque>(placement), expected, "mutex at {placement:?}");
+  }
 }
 
 #[test]

@@ -45,7 +45,7 @@ pub fn ping_pong<C: Candidate<Record = u64>>(capacity: usize, round_trips: u64) 
   candidates::build::<C>(capacity).split(
     1,
     Forth {
-      back: &mut **back,
+      back: &mut *back,
       round_trips,
       name: C::NAME,
     },

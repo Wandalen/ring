@@ -69,8 +69,10 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 
 Threaded runs build a fresh queue per run and time from a spinning start line to the consumer's
 last record; building, spawning and validation stay outside the clock. Every queue is built on the
-heap at the start of a 128-byte block (`candidates::build`), so a ring's cursors fall on the same
-cache lines in every process rather than wherever the bench thread's stack put them. Producers spin on a full
+heap at byte 0 of a 256-byte block (`candidates::build`), so a ring's cursors fall on the same
+cache lines in every process rather than wherever the bench thread's stack put them; `RING_OFFSET=64`
+builds every queue at byte 64 instead, which on a 128-byte-line host puts a ring's two cursors on two
+lines rather than one. Report which layout a two-thread number came from. Producers spin on a full
 queue and the consumer on an empty one; both counts per record follow criterion's lines as
 `spins:`. The consumer checksums every record and checks per-producer order, and wide records
 end-to-end: a lost, duplicated, reordered or torn record panics with the candidate's name and no

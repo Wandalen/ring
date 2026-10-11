@@ -16,10 +16,12 @@ core_affinity = { workspace = true }
 criterion = { workspace = true }
 crossbeam-queue = { workspace = true }
 hdrhistogram = { workspace = true }
+ring_cursor = { workspace = true }
 ring_mpsc = { workspace = true }
 ring_slot = { workspace = true }
 ring_spsc = { workspace = true }
 ring_types = { workspace = true }
+ring_wait = { workspace = true }
 rtrb = { workspace = true }
 serde_json = { workspace = true }
 
@@ -37,6 +39,10 @@ harness = false
 
 [[bench]]
 name = "batch"
+harness = false
+
+[[bench]]
+name = "wait"
 harness = false
 
 # Its own `main`, not criterion's: it reports percentiles per record.

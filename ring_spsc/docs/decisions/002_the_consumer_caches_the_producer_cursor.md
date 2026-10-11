@@ -76,9 +76,11 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   the two layouts now agree within 5% at both capacities. The one-line layout gains 30% as well.
 - **Whole-lap drains are unchanged.** They read the producer cursor once per lap already. The 1024-slot cell is
   bimodal in both columns; which mode a run lands in is the chase's initial race, recorded in PR #38's review.
-- **`push1_pop1` at 16384 slots loses 23%.** That cell is the 256 KB `TypedSlot` array leaving the 128 KB L1D with
-  the consumer polling right behind the producer; the reviews found it producer-bound in every layout. A smaller
-  array (`CopySlot`) does not have it. Recorded, not explained.
+- **`push1_pop1` at 16384 slots loses 23%, on this machine only.** That cell is the 256 KB `TypedSlot` array leaving
+  the 128 KB L1D with the consumer polling right behind the producer; the reviews found it producer-bound in every
+  layout, and a 128 KB array (`CopySlot`) measures 445–475 M/s on the same cell with the cache. On the x86_64 CI
+  runner the same cell measures +87% against master. A worst-case shape on one core, not a decision-changing cell;
+  tracked in #49 with the counters that would settle it.
 - **Single-threaded, the one-record drain is 10% faster and the whole-lap drain 10% slower.** The first is one
   atomic load fewer per record. The second is one compare per lap, which cannot cost 100 ns; it moved with the
   conditional store and did not move with the reload rule, so it is code layout. `push_pop` pays 7%, the same shape

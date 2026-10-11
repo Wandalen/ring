@@ -612,7 +612,15 @@
        ['refreshes per record', ss.refr < 0.01 ? ss.refr.toFixed(4) : f2(ss.refr)], ['time per record', f1(ss.t) + ' ns']]
         .forEach(([k, v], i) => { if (i) nums.append('    '); nums.append(k + ' '); const b = document.createElement('b'); b.textContent = v; nums.appendChild(b); });
 
-      // ---- trace
+      renderTrace(s);
+      renderSweep(s, ss);
+      // keep crosshair layers above the redrawn content
+      for (const [svg, layer] of [[tSvg, tLayer], [wSvg, wLayer]]) svg.insertBefore(layer, svg.firstChild);
+      if (tCross) tCross.refresh(); if (wCross) wCross.refresh();
+    }
+
+    // The room-per-refresh trace: one line per cache mode, the active one bright.
+    function renderTrace(s) {
       tLayer.remove(); tLayer = el('g', {}, tSvg);
       const L = Math.log2(s.N);
       const ty = R => TH - tm.b - Math.log2(R) / L * (TH - tm.t - tm.b);
@@ -632,7 +640,10 @@
         head: v => `refresh ${Math.round(v)}`,
         rows: v => ['off', 'on'].map(k => ({ key: 'k-' + k, value: fR(tCtx.trs[k][Math.round(v)]) + ' slots', label: 'cache ' + k })) });
 
-      // ---- sweep
+    }
+
+    // The throughput sweep over c − p, with the measured interventions as a strip beside it.
+    function renderSweep(s, ss) {
       wLayer.remove(); wLayer = el('g', {}, wSvg);
       const ds = []; for (let d = DX0; d <= DX1 + 1e-9; d += 0.1) ds.push(+d.toFixed(2));
       const curve = on => ds.map(d => { const c = s.p + d; return c < 0.2 ? null : { d, ...steady({ ...s, c }, on) }; });
@@ -709,9 +720,6 @@
         toVal: px => Math.round(((px - wm.l) / (PX1 - wm.l) * (DX1 - DX0) + DX0) * 10) / 10, toPx: wx,
         head: v => `c − p = ${(v > 0 ? '+' : '') + f1(v)} ns (c = ${f1(wCtx.s.p + v)} ns)`,
         rows: v => ['off', 'on'].map(k => { const pt = wCtx.cv[k][Math.round((v - DX0) * 10)]; return { key: 'k-' + k, value: pt ? f1(pt.mps) + ' M/s' : '–', label: `cache ${k}, ${pt ? f2(pt.refr) : '–'} refreshes/record` }; }) });
-      // keep crosshair layers above the redrawn content
-      for (const [svg, layer] of [[tSvg, tLayer], [wSvg, wLayer]]) svg.insertBefore(layer, svg.firstChild);
-      if (tCross) tCross.refresh(); if (wCross) wCross.refresh();
     }
 
     for (const k in inputs) inputs[k].addEventListener('input', () => { highlight = -1; render(); });

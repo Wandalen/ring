@@ -29,7 +29,10 @@ false, because the slot always holds a value, and `clear` writes the default bac
 
 A slot published without a write hands the reader whatever it last held: the previous lap's record, or the default
 on the first lap. That is documented as `CopySlot`'s pitfall, not prevented. `ring_spsc` gets a `try_push` over
-`CopySlot` that always writes, so the trap is reachable only through a bare `claim` dropped unwritten.
+`CopySlot` that always writes, with no early return or panic point between claim and publish. Every other path that
+hands out `&mut` to a claimed slot reaches the trap when it does not write: `ring_spsc`'s bare `claim`, `push_with`
+with a closure that returns early or panics, and `ring_mpsc`'s `claim` and `claim_batch`, which have no fused
+`try_push` over `CopySlot`. A lock-free review on 2026-10-11 reached each through safe API.
 
 `TypedSlot` stays the default everywhere it is today. `ring_core` and `ring_mpsc` do not change.
 

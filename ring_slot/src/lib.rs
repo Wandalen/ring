@@ -216,7 +216,12 @@ impl<T> Slot for TypedSlot<T> {
 /// second time, or the default on the first lap.
 ///
 /// **Mitigation.** Write every claimed slot. `ring_spsc`'s `try_push` over a
-/// `CopySlot` always does; the trap is reachable only through a bare `claim`.
+/// `CopySlot` always does: claim, set, publish, with no early return or panic
+/// point between. Every other path that hands out `&mut` to a claimed slot
+/// reaches the trap when it does not write: `ring_spsc`'s `claim` and
+/// `push_with` (a closure that returns early, through `?` or otherwise, or that
+/// panics, still publishes), and `ring_mpsc`'s `claim` and `claim_batch`, which
+/// are the only ways to write a `CopySlot` there.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CopySlot<T>(T);
 

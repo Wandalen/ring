@@ -859,9 +859,12 @@ impl<T: Copy + Send> Producer<'_, CopySlot<T>> {
   /// Put one record into the ring, stored bare: no tag beside it.
   ///
   /// The same fused shape as the [`TypedSlot`] `try_push`, over [`claim`].
-  /// It always writes the slot it claims, which is what keeps
-  /// [`CopySlot`]'s pitfall out of reach: an unwritten publish happens only
-  /// through a bare `claim` dropped without a write.
+  /// It always writes the slot it claims, with no early return or panic
+  /// point between the claim and the publish, which is what keeps
+  /// [`CopySlot`]'s pitfall out of reach here. [`claim`] and
+  /// [`push_with`](Producer::push_with) still reach it: a guard dropped
+  /// unwritten, or a closure that returns early or panics, publishes the
+  /// previous lap's record.
   ///
   /// [`claim`]: Producer::claim
   ///

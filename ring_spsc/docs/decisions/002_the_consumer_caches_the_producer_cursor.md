@@ -28,9 +28,16 @@ result, on the same machine, reached the same place from five directions:
 ## Decision
 
 `Consumer` carries one plain field, `cached_produced`: its latest `GATING` observation of the producer cursor. A
-drain reloads it only when the records it already knows of, `start.distance_to(cached_produced)`, are fewer than
-the drain asks for. `drain` asks for `usize::MAX`, so it always reloads. The reload writes the field only when the
-observation moved. `available` and `is_empty` keep reading the shared cursor.
+bounded drain decides on the records it already knows of, `start.distance_to(cached_produced)`, first: when they
+cover the request the batch is `max` and nothing is loaded; otherwise it reloads and takes what the fresh observation
+allows. `drain` reloads on every call. The reload writes the field only when the observation moved. `available` and
+`is_empty` keep reading the shared cursor.
+
+The order of those two decisions is about the compiled code, not the semantics. The first version reloaded inside a
+helper and computed the length afterwards, through one value that was either cached or reloaded. Inlined into a
+caller, a one-record drain then had no constant length, LLVM kept the batch loop around it, and the x86 CI runner
+measured single-threaded one-record drains 22% slower (#50): seven taken branches per record became nine. Deciding the
+hit first lets the length fold to the constant the caller asked for.
 
 The reload rule is `distance < max`, not `start == cached`. The equality rule, which an earlier draft of this
 change used, makes `drain()` return fewer records than `available()` reports after a bounded drain, and a cache that
@@ -81,21 +88,29 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   layout, and a 128 KB array (`CopySlot`) measures 445–475 M/s on the same cell with the cache. On the x86_64 CI
   runner the same cell measures +87% against master. A worst-case shape on one core, not a decision-changing cell;
   tracked in #49 with the counters that would settle it.
-- **Single-threaded, the one-record drain is 10% faster and the whole-lap drain 10% slower, and the x86 CI runner
-  shows the opposite sign on the one-record cell (−22%).** Unconfirmed, both. What the M4 disassembly of the
-  whole-lap cell establishes: the per-record inner loop is instruction-identical before and after; the function grew
-  by 27 instructions, all in the once-per-lap drain entry (the `distance < max` check and the conditional store) and
-  in a commit tail LLVM now duplicates; the inner loop's alignment moved with it. A once-per-lap change cannot cost
-  100 ns per 1024 records on its own, so loop alignment is the reading, and without counters it stays a reading.
-  On x86 the Acquire load the cache skips was already a plain load, so the check is pure overhead there; also a
-  reading. `push_pop` pays 7% on the M4 and gains 17% on x86. Tracked in #50, with the measurements that would
-  confirm either, and small against the two-thread change on both machines.
+- **The single-thread deltas in the tables above belong to the first version, and a second round settled both.**
+  - *M4, whole-lap drain 10% slower: code layout, confirmed.* The whole-lap drain loop is 16 instructions with one
+    taken branch, and its speed follows the address of its head: at ≡ 4 mod 8 it runs about 0.10 ns per record slower
+    than at ≡ 0 (523–530 against 419–425 ns per 1024-record drain, the fill phase constant). rustc's default AArch64
+    tuning leaves these loop heads unaligned, so each build lands on one or the other by chance; an unrelated 4-byte
+    change flipped this cell's sign, and with `-C llvm-args=-align-loops=16` master and the cache measured equal within
+    0.5%, `push_pop` 3.7 against 3.7 ns. Whether the suite should pin loop alignment is #53.
+  - *x86, one-record drain 22% slower: the first version's codegen, described in the Decision above.* Read from the
+    cross-compiled x86_64 assembly; the CI runner's next comparison on this PR confirms it or not (#50).
+  - *The final version on the M4* (rings placed at a fixed layout through the harness of #51, criterion medians):
+    one-record `fill_drain` 2.44 µs per 1024 (first version 2.50–2.62, master 2.89–3.39); whole-lap 0.92 µs (first
+    version 1.05–1.11, master 0.98–0.99); `pop_empty` 1.84 and 1.55 ns (master 2.28 and 2.15–2.30); two threads,
+    `push1_pop1` at 1024 slots 305–403 M/s against the first version's 212–343, in both layouts. `push1_popN` at 1024
+    stays bimodal for every build; its mode follows the process's history, not the code.
 
 ## Consequences
 
 - `Consumer` is one word larger. The ends are still `!Clone` and `!Sync`; no public signature changes.
 - `drain_up_to` can be satisfied from an earlier observation and then reads no line the producer writes. A caller
-  that polls with `drain_up_to(1)` on an empty ring reloads every call, as before, and stores nothing.
+  that polls with `drain_up_to(1)` on an empty ring reloads every call, as before, and skips the write to its own
+  field; dropping the empty batch still stores the consumer cursor, with the value it already held, as it did before
+  this change. Skipping that store too is sound (one writer, one live batch; every model and test stays green under
+  it) and is left as a measured decision for later, since an earlier measurement of it was mixed.
 - A consumer that is slower than its producer still parks the ring at full and pays the producer's refresh per
   record in `pop1`. The cache moves the threshold at which that happens; it does not remove the state. Whole-lap
   drains are the answer to that, as they were.
@@ -108,5 +123,5 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   a 256-byte block. The stock suite still builds rings on the bench thread's stack, so it cannot reproduce them and
   keeps reporting layout-dependent `push1_pop1` cells. The placement harness lands as its own change
   (`bench/perf-aligned-rings`, with the offset switch), and the cells here should be re-run on it once it does.
-- Revisit when a workload shows the 16384-slot `pop1` cell (#49), or when hardware counters become available to
-  replace the timing inference the single-thread deltas rest on (#50).
+- Revisit when a workload shows the 16384-slot `pop1` cell (#49), when the x86 runner contradicts the codegen
+  account in the Decision (#50), or when the suite decides how to treat loop alignment (#53).

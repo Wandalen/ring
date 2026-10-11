@@ -12,7 +12,9 @@
 //! `Mpsc` runs the same one-producer hand-off through its shared claim path,
 //! which is the configuration whose regression would hurt first.
 //!
-//! Fails by asserting inside the bench: a red `cargo bench` is the gate.
+//! Fails fast, before timing: one back-to-back comparison per candidate panics
+//! on a closed gap, so a red `cargo bench` is the gate. The benches below only
+//! report the numbers.
 
 mod harness;
 
@@ -39,30 +41,35 @@ fn p99<C: Candidate<Record = u64>>() -> f64 {
   histogram.value_at_quantile(0.99) as f64
 }
 
+/// One back-to-back comparison: panic here, with both numbers in the message.
+/// Exactly one comparison per candidate per invocation, deliberately — an
+/// `assert!` inside `b.iter` would re-run once per criterion sample, a
+/// repetition count set by criterion's calibration rather than by us.
+fn gate(name: &str, baseline: f64, ring: f64) {
+  assert!(
+    ring <= baseline,
+    "{name} p99 {ring:.1} ns must beat mutex p99 {baseline:.1} ns on the same runner"
+  );
+}
+
 /// The ring must hand off faster than the mutex at p99, same runner, same
 /// minutes. `Spsc` first, then `Mpsc` through the shared path.
+///
+/// The pass/fail decision is made above, before criterion spends minutes
+/// timing; the benches below only report the numbers. `quick::1` (`--test`)
+/// validates the wiring without paying for 300-sample histograms.
 fn regression(c: &mut Criterion) {
+  if !harness::output::quick() {
+    gate("spsc", p99::<MutexDeque>(), p99::<Spsc>());
+    gate("mpsc", p99::<MutexDeque>(), p99::<Mpsc>());
+  }
   let mut group = c.benchmark_group("regression");
   group.sample_size(10);
   group.bench_function("spsc_vs_mutex_p99", |b| {
-    b.iter(|| {
-      let baseline = p99::<MutexDeque>();
-      let ring = p99::<Spsc>();
-      assert!(
-        ring <= baseline,
-        "spsc p99 {ring:.1} ns must beat mutex p99 {baseline:.1} ns on the same runner"
-      );
-    });
+    b.iter(|| black_box((p99::<MutexDeque>(), p99::<Spsc>())));
   });
   group.bench_function("mpsc_vs_mutex_p99", |b| {
-    b.iter(|| {
-      let baseline = p99::<MutexDeque>();
-      let ring = p99::<Mpsc>();
-      assert!(
-        ring <= baseline,
-        "mpsc p99 {ring:.1} ns must beat mutex p99 {baseline:.1} ns on the same runner"
-      );
-    });
+    b.iter(|| black_box((p99::<MutexDeque>(), p99::<Mpsc>())));
   });
   group.finish();
 }

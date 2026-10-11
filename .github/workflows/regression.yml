@@ -25,6 +25,15 @@ on:
       - ring_cursor/**
       - ring_atomic/**
       - ring_claim/**
+      # Transitive hot-path deps of ring_spsc/ring_mpsc: a regression smuggled
+      # through any of them must trip the gate, so the list must follow the
+      # dependency closure, not just the crates named in the bench.
+      - ring_store/**
+      - ring_config/**
+      - ring_gating/**
+      - ring_index/**
+      - ring_seqno/**
+      - ring_align/**
       - .github/workflows/regression.yml
   push:
     branches: [master]

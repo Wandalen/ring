@@ -24,4 +24,5 @@
 # `crate_name  reason` form as every other entry this family will ever add.
 
 perf  benchmark suite, not a family crate: bench, example and test targets only, graded by none of the family's gates
+fuzz  fuzz workspace, not a family crate: libfuzzer targets only, graded by none of the family's gates
 

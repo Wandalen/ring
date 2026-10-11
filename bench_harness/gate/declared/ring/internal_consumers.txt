@@ -7,3 +7,4 @@
 # build in the same workspace, so a refactor that breaks one breaks it in the same change.
 
 perf  benchmark suite: measures ring_spsc and ring_mpsc directly, below the export surface, next to off-the-shelf queues
+fuzz  fuzz workspace: exercises ring_spsc and ring_mpsc operation sequences against an oracle, below the export surface

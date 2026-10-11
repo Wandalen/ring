@@ -1,0 +1,37 @@
+[package]
+name = "ring-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.ring_mpsc]
+path = "../ring_mpsc"
+
+[dependencies.ring_slot]
+path = "../ring_slot"
+
+[dependencies.ring_spsc]
+path = "../ring_spsc"
+
+[dependencies.ring_types]
+path = "../ring_types"
+
+[[bin]]
+name = "spsc_ops"
+path = "fuzz_targets/spsc_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mpsc_ops"
+path = "fuzz_targets/mpsc_ops.rs"
+test = false
+doc = false
+bench = false

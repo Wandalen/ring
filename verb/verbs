@@ -12,6 +12,6 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 
 for f in *; do
   [[ -f "$f" && -x "$f" && "$f" != _* ]] || continue
-  _purpose="$(grep -m1 '^#@ purpose:' "$f" | sed -E 's/^#@ purpose: //')"
+  _purpose="$(grep -m1 '^#@ purpose:' "$f" | sed -E 's/^#@ purpose: //')" || _purpose="(no #@ purpose: header)"
   printf '%-12s %s\n' "$f" "$_purpose"
 done

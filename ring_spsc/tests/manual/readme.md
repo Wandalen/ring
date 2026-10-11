@@ -312,15 +312,19 @@ this stage guards against.
 
 ### Step 1. The model fails when the publish stops releasing
 
+Run every step from the workspace root. The edits use `perl -pi`, which behaves the same on macOS and Linux
+(GNU `sed -i` does not run on macOS), and each is followed by a `grep -c` that must print `1`: a pattern that matches
+nothing leaves the source unmutated and the model green, which is exactly the failure this stage exists to catch.
+
 ```bash
-cd ring_spsc
-sed -i 's|^pub const HANDOFF : Ordering = Ordering::Release;|pub const HANDOFF : Ordering = Ordering::Relaxed;|' src/lib.rs
-RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | tail -20
+perl -pi -e 's/^pub const HANDOFF: Ordering = Ordering::Release;/pub const HANDOFF: Ordering = Ordering::Relaxed;/' ring_spsc/src/lib.rs
+grep -c '^pub const HANDOFF: Ordering = Ordering::Relaxed;' ring_spsc/src/lib.rs   # must print 1
+RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
 ```
 
-**Expected:** `a_published_record_is_never_observed_before_the_write_that_preceded_it`
-FAILS with "a drained record did not carry the write that preceded its
-publish". Loom finds an interleaving in which the drain is offered the record
+**Expected:** five of the eight models FAIL, among them
+`a_published_record_is_never_observed_before_the_write_that_preceded_it` with "a drained record did not carry the
+write that preceded its publish". Every model that checks a payload behind a drain sees the missing edge. Loom finds an interleaving in which the drain is offered the record
 while the earlier `payload.store` is still unobserved.
 
 **Also expected, and the reason loom is here at all:** the ordinary suite does
@@ -349,27 +353,30 @@ the edge `a_bounded_drain_hands_out_only_records_whose_writes_it_can_see`
 exists to check. Weaken it alone, leaving `HANDOFF` intact:
 
 ```bash
-sed -i '/fn observe_produced/,/^  }/ s|load(GATING)|load(Ordering::Relaxed)|' ring_spsc/src/lib.rs
+cp /tmp/-spsc_orig.rs ring_spsc/src/lib.rs
+perl -pi -e 'if (/fn observe_produced/ .. /^  }$/) { s/load\(GATING\)/load(Ordering::Relaxed)/ }' ring_spsc/src/lib.rs
+sed -n '/fn observe_produced/,/^  }$/p' ring_spsc/src/lib.rs | grep -c 'load(Ordering::Relaxed)'   # must print 1
 RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
 ```
 
-**Expected:** `a_bounded_drain_hands_out_only_records_whose_writes_it_can_see`
-FAILS with "was handed out before the write that preceded its publish was
-visible", and the two older drain models fail with it, since every drain goes
-through the same reload. The ordinary suite stays green under this mutation,
-for the reason Step 1 gives.
+**Expected:** five of the eight models FAIL, the same five as Step 1, among them
+`a_bounded_drain_hands_out_only_records_whose_writes_it_can_see` with "was handed out before the write that preceded
+its publish was visible": every drain goes through the same reload. The ordinary suite stays green under this
+mutation, for the reason Step 1 gives.
 
 A second mutation checks the other half of the cache's soundness argument,
 that it is written from observations and never extrapolated:
 
 ```bash
 cp /tmp/-spsc_orig.rs ring_spsc/src/lib.rs
-sed -i '/fn observe_produced/,/^  }/ s|let produced = self.ring.cursors.producer().load(GATING);|let produced = self.ring.cursors.consumer().load(OWN).advanced_by(2);|' ring_spsc/src/lib.rs
+perl -pi -e 'if (/fn observe_produced/ .. /^  }$/) { s/let produced = self\.ring\.cursors\.producer\(\)\.load\(GATING\);/let produced = self.ring.cursors.consumer().load(OWN).advanced_by(2);/ }' ring_spsc/src/lib.rs
+sed -n '/fn observe_produced/,/^  }$/p' ring_spsc/src/lib.rs | grep -c 'advanced_by(2)'   # must print 1
 RUSTFLAGS="--cfg loom" cargo test -p ring_spsc --test spsc_test 2>&1 | grep -E "FAILED|test result"
 ```
 
-**Expected:** all four drain models FAIL, the new one first, because the
-consumer is handed a record nobody published. This one the ordinary suite also
+**Expected:** six of the eight models FAIL, because the consumer is handed a record nobody published. Run the
+ordinary suite under this mutation with a time limit: the 100 000-item reached-test spins forever on a consumer that
+believes in records that never arrive. This one the ordinary suite also
 catches, in `a_batch_commits_exactly_its_own_length` and others: an over-claim
 is behavioural, an ordering is not.
 

@@ -3,4 +3,4 @@
 # once it stops matching the crate on disk.
 crate: ring_spsc
 swept: 2026-10-11
-digest: 8c924b682eaa1eb69f856cd4d7d5111c2e99b53b3e8bd31cb350a810061c1bf5
+digest: c72ff01b837160b444f0dfd33427c7b24c7c01d53beb60f13ed8e3f52c831bf7

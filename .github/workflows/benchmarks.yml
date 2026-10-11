@@ -69,7 +69,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: verb/bench suite — comparison, micro, spsc, mpsc, batch, latency, report, all
+        description: verb/bench suite — comparison, micro, spsc, mpsc, batch, wait, overflow, latency, regression, report, all
         required: false
         default: all
         type: string

@@ -53,12 +53,15 @@ with a closure that returns early or panics, and `ring_mpsc`'s `claim` and `clai
   `ring_store::Buffer::all_empty` over `CopySlot`s is false from construction on. The rings never ask.
 - A reader of a `CopySlot` ring cannot detect a stale duplicate. A producer that claims and drops unwritten delivers
   the previous lap's record a second time. Rust's type system does not prevent it; the pitfall and `try_push` do.
-- 64-byte records at a 64-byte stride measure 30–45% slower untagged on the 128-byte-line M4, and 2.7x faster on a
-  64-byte-line Raspberry Pi 5. The benchmark record's addendum places the M4 result on the stride, not the slot:
-  padding to 72 bytes recovers it, stride 128 is fine, and it vanishes when the consumer lags the producer by a lap
-  of lines. 4K aliasing is ruled out; the mechanism is open. A caller with 64-byte records on a 128-byte-line host
-  should measure, and may pad; on 64-byte lines the untagged stride is the aligned one. The 256-byte row that first looked the same was the harness's whole-record check reading two
-  words of thirty-two; read whole, the two slots and `rtrb` tie.
+- No record size separates where `CopySlot` gains from where it loses; the stride against the host's cache line
+  does. In the same two-thread cell (1024 slots, whole-lap drains), 8-byte records gain on the 128-byte-line M4 and
+  lose 6% on a 64-byte-line Raspberry Pi 5; 64-byte records measure 30–45% slower untagged on the M4 and 2.7x faster
+  on the Pi; 256-byte records sit within 8% on both. The benchmark record's addendum places the M4's 64-byte result
+  on the stride, not the slot: padding to 72 bytes recovers it, stride 128 is fine, and it vanishes when the consumer
+  lags the producer by a lap of lines. 4K aliasing is ruled out; the mechanism is open. A caller with 64-byte records
+  on a 128-byte-line host should measure, and may pad; on 64-byte lines the untagged stride is the aligned one. The
+  256-byte row that first looked like the 64-byte one was the harness's whole-record check reading two words of
+  thirty-two; read whole, the two slots and `rtrb` tie.
 - Two-thread one-record hand-off followed where each ring's cursors landed because `ring_spsc`'s consumer read the
   producer cursor on every drain; `CopySlot`'s faster producer tipped that pattern into a full-ring lockstep sooner.
   `ring_spsc` ADR 002 caches that read. On it, `CopySlot` leads `TypedSlot` on every one-record cell, in both layouts.

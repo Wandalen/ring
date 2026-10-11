@@ -205,6 +205,15 @@ impl<T> Slot for TypedSlot<T> {
 /// assert_eq!( size_of::< CopySlot< u64 > >(), 8 );
 /// ```
 ///
+/// # Which records gain
+///
+/// No record size separates gains from losses; the stride against the host's
+/// cache line does. Two threads, 1024 slots: 8-byte records ran faster than
+/// `TypedSlot` on a 128-byte-line Apple M4 and 6% slower on a 64-byte-line
+/// Raspberry Pi 5, and 64-byte records ran slower on the M4 and 2.7x faster on
+/// the Pi. A 64-byte record on a 128-byte-line host is the measured loss:
+/// measure it before choosing, or pad it to 72 bytes.
+///
 /// # Pitfall: an unwritten publish hands back the previous lap's record
 ///
 /// **Trap.** Claiming a slot and dropping the claim without writing, the way a

@@ -13,26 +13,10 @@ use ring_slot::TypedSlot;
 use ring_types::{Capacity, RingError};
 use std::collections::VecDeque;
 
-struct Reader<'a> {
-  data: &'a [u8],
-  pos: usize,
-}
+#[path = "common.rs"]
+mod common;
 
-impl<'a> Reader<'a> {
-  fn byte(&mut self) -> u8 {
-    let byte = *self.data.get(self.pos).unwrap_or(&0);
-    self.pos += 1;
-    byte
-  }
-
-  fn intake(&mut self) -> u64 {
-    let mut value = 0u64;
-    for shift in 0..8 {
-      value |= (self.byte() as u64) << (8 * shift);
-    }
-    value
-  }
-}
+use common::Reader;
 
 const CAPACITIES: [usize; 6] = [1, 2, 4, 8, 32, 128];
 const OPS: usize = 1024;
@@ -49,7 +33,7 @@ fn drain_all(
 }
 
 fuzz_target!(|data: &[u8]| {
-  let mut reader = Reader { data, pos: 0 };
+  let mut reader = Reader::new(data);
   let capacity = CAPACITIES[reader.byte() as usize % CAPACITIES.len()];
   let mut ring: ring_mpsc::Ring<TypedSlot<u64>> = ring_mpsc::Ring::new(Capacity::new(capacity).unwrap());
   let mut ends = ring.ends();

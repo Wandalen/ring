@@ -5,6 +5,10 @@ An interactive explainer of the investigation behind #41 (`ring_spsc`'s consumer
 benchmark into a lottery, the chase between producer and consumer and the full-ring lockstep, and every measurement
 at every stage with its trade-offs.
 
+> **Depends on #41 and #38.** The page quotes `ring_spsc`'s consumer cursor cache and `ring_slot::CopySlot` as source.
+> Both exist on those PRs' branches, and this page is stacked after them so that the tree it ships in has the code it
+> quotes. Until they merge, `master` does not.
+
 ## View it
 
 - Open [`index.html`](index.html) in a browser. One self-contained file: no server, no network, dark and light mode.

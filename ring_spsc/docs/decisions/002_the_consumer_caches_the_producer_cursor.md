@@ -81,10 +81,15 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   layout, and a 128 KB array (`CopySlot`) measures 445–475 M/s on the same cell with the cache. On the x86_64 CI
   runner the same cell measures +87% against master. A worst-case shape on one core, not a decision-changing cell;
   tracked in #49 with the counters that would settle it.
-- **Single-threaded, the one-record drain is 10% faster and the whole-lap drain 10% slower.** The first is one
-  atomic load fewer per record. The second is one compare per lap, which cannot cost 100 ns; it moved with the
-  conditional store and did not move with the reload rule, so it is code layout. `push_pop` pays 7%, the same shape
-  ADR 001 recorded for the producer cache. Unexplained, and small against the two-thread change.
+- **Single-threaded, the one-record drain is 10% faster and the whole-lap drain 10% slower, and the x86 CI runner
+  shows the opposite sign on the one-record cell (−22%).** Unconfirmed, both. What the M4 disassembly of the
+  whole-lap cell establishes: the per-record inner loop is instruction-identical before and after; the function grew
+  by 27 instructions, all in the once-per-lap drain entry (the `distance < max` check and the conditional store) and
+  in a commit tail LLVM now duplicates; the inner loop's alignment moved with it. A once-per-lap change cannot cost
+  100 ns per 1024 records on its own, so loop alignment is the reading, and without counters it stays a reading.
+  On x86 the Acquire load the cache skips was already a plain load, so the check is pure overhead there; also a
+  reading. `push_pop` pays 7% on the M4 and gains 17% on x86. Tracked in #50, with the measurements that would
+  confirm either, and small against the two-thread change on both machines.
 
 ## Consequences
 

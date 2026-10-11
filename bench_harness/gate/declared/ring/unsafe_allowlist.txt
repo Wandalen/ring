@@ -27,8 +27,16 @@
 # ring_core was listed third, as the shared assembly, but it carries no
 # `unsafe` and never has in this tree: it composes the two crates above (and
 # the crossbeam interim backend) behind a safe API, so there is nothing here
-# to exempt. G6's stale-entry check caught it. Two crates, and the list is
-# meant to stay two. A third needs a decision.
+# to exempt. G6's stale-entry check caught it.
+#
+# ring_store is the third that the paragraph above asks a decision of,
+# admitted for two unchecked mask-folded index expressions and no aliasing.
+# Unlike the aliasing unsafe the list's history rules storage crates out of,
+# a mask-folded range proof needs only the allocation ring_store itself owns.
+# A length-masked safe spelling was benched first and keeps the check; only
+# the unchecked form measures faster. The decision record is
+# its docs/workaround/readme.md.
 
 ring_spsc
 ring_mpsc
+ring_store

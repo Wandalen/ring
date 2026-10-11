@@ -9,7 +9,9 @@ Part of the `ring` family; [../readme.md](../readme.md) describes the whole.
 `ring_types::SlotIndex` and leaves the fold from a sequence to `ring_index`. It
 holds no cursor and no ordering state.
 An SPSC ring and an MPSC ring want different cursor arrangements, so a buffer
-that owned one would serve only one of them. There is no `unsafe`.
+that owned one would serve only one of them. The only `unsafe` is the
+mask-folded indexing in `at`/`at_mut`, justified in
+[docs/workaround/readme.md](docs/workaround/readme.md).
 
 ## Decisions
 
@@ -31,6 +33,7 @@ cargo test --doc -p ring_store --all-features
 | File | Responsibility |
 |------|-----------------|
 | `verb/` | Crate-scoped test/lint/build. See the workspace [verb/readme.md](../verb/readme.md) |
+| `docs/workaround/` | Why the crate opts out of the workspace `unsafe` deny. See [docs/workaround/readme.md](docs/workaround/readme.md) |
 | `docs/decisions/` | Architecture decision records |
 | `src/lib.rs` | Crate root, holding the crate's whole public API |
 | `tests/` | `buffer_test.rs` and the manual plan under `manual/` |

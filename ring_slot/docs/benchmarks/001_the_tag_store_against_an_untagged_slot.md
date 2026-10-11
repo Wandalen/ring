@@ -171,9 +171,21 @@ rounds, M records/s:
   that cell producer-bound (full ≈ 0.14–0.17 per record) and the store did not show. Open, like the M4's 64-byte row.
 - **256 bytes: both slots tie and both trail `rtrb` by 2x.** The remaining gap is the copy path, not the slot.
 
-Revised verdict: `CopySlot` pays for `Copy` records in `ring_spsc` at every capacity and in both threading shapes once
-the consumer caches the producer cursor, and the 256-byte row was never about the slot. The one open row is 64-byte
-records at a 64-byte stride, on 128-byte-line hosts only; on a 64-byte-line Pi 5 that row is `CopySlot`'s largest win.
+**What a second review round added (2026-10-11).**
+
+- **The large-capacity win is the slot's size, not its missing tag.** Two-thread one-record hand-off falls off a
+  cliff past a slot-array size: the producer's stores stall and the consumer gets stuck polling one record behind it.
+  The onset follows slot size: none up to 65536 slots for 8-byte slots, from 16384 for 16-byte slots, and
+  `CopySlot<Wide<2>>` (16 bytes, untagged) falls with `TypedSlot<u64>`. `CopySlot<u64>`'s 16384-slot figures above
+  are that of an 8-byte slot. A producer store prefetch removes the cliff (`ring_spsc` #54).
+- **On x86 the two-thread one-record cell depends on the core.** The consumer cache this record is measured on is
+  slower than master on a Zen 3 CI runner, in lockstep (#55), and faster on a Zen 5 one. The two-thread `CopySlot`
+  figures above are the M4's.
+
+Revised verdict: `CopySlot` pays for `Copy` records in `ring_spsc` at every capacity and in both threading shapes on
+the M4 once the consumer caches the producer cursor, and the 256-byte row was never about the slot. Its
+large-capacity lead comes from the 8-byte slot. Open: 64-byte records at a 64-byte stride on 128-byte-line hosts (on
+a 64-byte-line Pi 5 that row is `CopySlot`'s largest win), the 8-byte row on the Pi, and the two-thread cell on Zen 3.
 
 ## Reproduce
 

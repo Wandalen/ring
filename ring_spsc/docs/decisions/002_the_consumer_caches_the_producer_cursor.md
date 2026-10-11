@@ -104,5 +104,9 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   footprint rather than on this hand-off; without this change it measured 3–7x slower on `pop1`.
 - Idea #22 in the family's improvement notes, "both ends cache both cursors", is no longer ruled out: its consumer
   half is this ADR. The remaining half of #22, the ends keeping their own position in a field, is not taken here.
-- Revisit when a workload shows the 16384-slot `pop1` cell, or when hardware counters become available to replace
-  the timing inference the two unexplained single-thread deltas rest on.
+- The two-thread numbers above come from a measurement-only harness patch that places each ring at a chosen byte of
+  a 256-byte block. The stock suite still builds rings on the bench thread's stack, so it cannot reproduce them and
+  keeps reporting layout-dependent `push1_pop1` cells. The placement harness lands as its own change
+  (`bench/perf-aligned-rings`, with the offset switch), and the cells here should be re-run on it once it does.
+- Revisit when a workload shows the 16384-slot `pop1` cell (#49), or when hardware counters become available to
+  replace the timing inference the single-thread deltas rest on (#50).

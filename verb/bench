@@ -47,7 +47,12 @@ case "$_suite" in
   # machinery (a suite the base branch lacks aborts the head comparison —
   # this is what turned Bench Compare red on the gate's own PR). It runs
   # standalone via regression.yml.
-  all) _suites=( comparison micro spsc mpsc batch wait overflow latency report ) ;;
+  # `overflow` stays out for the same mechanical reason until a
+  # default-branch run saves its first baseline: it is new in this PR, so
+  # the base commit has no `overflow` baseline to compare against. Add it
+  # back to `all` once that baseline exists; until then it runs standalone
+  # as `suite::overflow`.
+  all) _suites=( comparison micro spsc mpsc batch wait latency report ) ;;
   *)
     echo "verb/bench: suite::$_suite is not one of $_names" >&2
     exit 2

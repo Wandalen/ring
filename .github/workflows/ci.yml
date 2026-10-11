@@ -103,3 +103,22 @@ jobs:
           bash verb/bench suite::latency dry::1
           bash verb/bench suite::report dry::1
           bash verb/bench suite::micro dry::1
+      - name: verb/verbs lists a headerless verb instead of aborting (pipefail)
+        # Regression guard for the set -euo pipefail abort this PR fixed in
+        # verb/verbs: grep exits 1 on no match, so without the `||` fallback
+        # the whole listing dies on the first headerless executable. The
+        # fixture copies the verb into a temp dir (it lists its own
+        # directory) next to one headerless executable, then asserts exit 0
+        # and the fallback row. Shellcheck cannot cover this — it has no rule
+        # for grep's exit status under pipefail — so this behavior step is the
+        # coverage, not the shellcheck list above.
+        run: |
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          cp verb/verbs "$tmpdir"/verbs
+          chmod +x "$tmpdir"/verbs
+          printf '#!/usr/bin/env bash\necho hi\n' > "$tmpdir"/headerless
+          chmod +x "$tmpdir"/headerless
+          out="$(bash "$tmpdir"/verbs)"
+          echo "$out" | grep -q '^headerless' || { echo "$out"; echo 'verb/verbs: headerless fixture missing from listing' >&2; exit 1; }
+          echo "$out" | grep -qF '(no #@ purpose: header)' || { echo "$out"; echo 'verb/verbs: fallback text missing for headerless fixture' >&2; exit 1; }

@@ -37,11 +37,12 @@ The other two deliverables are deferred, on the record:
   there; until a publisher (GitHub Pages, or a longer artifact
   retention) is chosen deliberately, the markdown report and the raw
   JSON in the artifact are the durable form.
-- The regression gate. The benchmarking guide's § Fair measurements
-  says unpinned threads on shared hardware swing tens of percent in
-  both directions; a p99 threshold fed by such numbers fails on noise,
-  not regressions. It waits for numbers from one dedicated machine with
-  an established noise floor.
+- The regression gate. Shipped as a same-run relative comparison (PR
+  #39): no absolute nanosecond threshold anywhere — the ring's p99 must
+  beat the mutex p99 measured back-to-back in the same process, and the
+  documented multi-fold margin is what separates signal from shared-hardware
+  noise. This sidesteps the dedicated-machine precondition rather than
+  satisfying it: any future absolute-number threshold still waits for it.
 
 ## Why this one matters more than it looks
 

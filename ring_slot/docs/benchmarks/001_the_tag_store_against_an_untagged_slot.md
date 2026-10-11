@@ -8,6 +8,12 @@ The commit under test is `bench(perf): spsc-plain and mpsc-plain, the rings over
 `0aeea4e` plus `CopySlot` (`bfe34b5`) and `ring_spsc`'s `try_push` over it (`548df5e`). `spsc-plain` and `mpsc-plain`
 run beside their tagged pairs, `spsc` and `mpsc`, in the same binary. The tagged adapters are master's, unchanged.
 
+These tables were measured on master, before `ring_spsc`'s consumer cache (#41) existed: neither side has it. The PR
+was later rebased onto #41, so its history now shows the cache first and the three commits carry new hashes:
+`bfe34b5` is `776dd99`, `548df5e` is `6ad712c`, `c28bedb` is `02614b2`. The original hashes are on no branch; GitHub
+still serves them by hash. Building `02614b2` measures with the cache. The addendum's two-thread table is the one
+that does, and its columns say so.
+
 The two sides differ in the read as well as the write. The tagged adapters filter every record through
 `TypedSlot::get`, a branch on the tag; the untagged ones read `CopySlot::get`. An earlier bench-only experiment
 measured that branch at noise level (a tag written and checked, 27–28 M/s, against written and not checked, 32 M/s),

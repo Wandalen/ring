@@ -3954,11 +3954,16 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   <li><strong>Why did #41 slow two single-thread benchmarks?</strong> Settled. The M4's whole-lap <code>fill_drain</code>
     followed the drain loop head's address mod 8 and measured equal within 0.5% with loop heads pinned; whether
     <code>verb/bench</code> should pin them is #53. The x86 runner's 22% loss on one-record drains was the compiled
-    shape of the first version (a length LLVM could not see as constant), fixed in #41's final version; the x86 CI run
-    confirms it or not (#50). The 16384-slot cell is #49.</li>
-  <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s</strong> in every mode and layout? Likely the
-    256 KB slot array spilling the 128 KB L1D (<code>CopySlot</code>'s is exactly 128 KB). The regimes review rates the
-    label medium and the cause low. #41 takes pop1 there from 46, 47 to 36, 35.</li>
+    shape of the first version (a length LLVM could not see as constant); the final version measures +17…+21% on a
+    Zen 3 runner (#50).</li>
+  <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s?</strong> Answered: past a slot-array size
+    the producer's stores stall and the consumer gets stuck polling one record behind. The onset follows slot size (none
+    to 65536 for 8-byte slots, from 16384 for 16-byte, from 2048 for 32-byte), the cache moves it from 16384 to 8192,
+    and a producer store prefetch removes it (#49, #54). Why the stores stall, an L1 miss or a coherence upgrade, needs
+    counters.</li>
+  <li><strong>Why is the two-thread one-record hand-off slower with #41 on a Zen 3 core?</strong> On an EPYC 7763 CI
+    runner it sits in the full-ring lockstep at −38…−74% against master, while the M4 and a Zen 5 runner gain. Not
+    established; tracked in #55, the open merge question for #41.</li>
   <li><strong>Which mode of the bimodal popN 1024 cell is typical?</strong> The regimes review attributes the two modes to
     the chase's initial race (high confidence). A separate review tied the tagged flip to the slot array sitting one page
     after the ring, mechanism unknown.</li>

@@ -50,10 +50,11 @@ on the first lap. That is documented as `CopySlot`'s pitfall, not prevented. `ri
   `ring_store::Buffer::all_empty` over `CopySlot`s is false from construction on. The rings never ask.
 - A reader of a `CopySlot` ring cannot detect a stale duplicate. A producer that claims and drops unwritten delivers
   the previous lap's record a second time. Rust's type system does not prevent it; the pitfall and `try_push` do.
-- 64-byte records at a 64-byte stride measure 30–45% slower untagged. The benchmark record's addendum places it on
-  the stride, not the slot: padding to 72 bytes recovers it, stride 128 is fine, and it vanishes when the consumer lags
-  the producer by a lap of lines. 4K aliasing is ruled out; the mechanism is open. A caller with 64-byte records should
-  measure, and may pad. The 256-byte row that first looked the same was the harness's whole-record check reading two
+- 64-byte records at a 64-byte stride measure 30–45% slower untagged on the 128-byte-line M4, and 2.7x faster on a
+  64-byte-line Raspberry Pi 5. The benchmark record's addendum places the M4 result on the stride, not the slot:
+  padding to 72 bytes recovers it, stride 128 is fine, and it vanishes when the consumer lags the producer by a lap
+  of lines. 4K aliasing is ruled out; the mechanism is open. A caller with 64-byte records on a 128-byte-line host
+  should measure, and may pad; on 64-byte lines the untagged stride is the aligned one. The 256-byte row that first looked the same was the harness's whole-record check reading two
   words of thirty-two; read whole, the two slots and `rtrb` tie.
 - Two-thread one-record hand-off followed where each ring's cursors landed because `ring_spsc`'s consumer read the
   producer cursor on every drain; `CopySlot`'s faster producer tipped that pattern into a full-ring lockstep sooner.

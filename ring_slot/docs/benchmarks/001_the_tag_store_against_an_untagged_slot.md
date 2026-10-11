@@ -156,9 +156,24 @@ rounds, M records/s:
   4K aliasing is ruled out: a same-core effect that does not vanish with lag. The mechanism is open without hardware
   counters. A caller with 64-byte records should measure, and may pad.
 
+**The same payload group on a Raspberry Pi 5** (64-byte lines; measured by saqw3r, reported on #38, 1024 slots,
+`push1_popN`, M records/s):
+
+| record | `TypedSlot` | `CopySlot` | `rtrb` |
+|---|---|---|---|
+| 8 bytes | 196.6 | 183.8 (−6%) | 191.2 |
+| 64 bytes | 45.9 | **125.4 (+173%)** | 125.2 |
+| 256 bytes | 29.4 | 28.4 (−3%) | 62.8 |
+
+- **The 64-byte-stride penalty is this machine's.** On 64-byte lines a 64-byte stride is one record per line, exactly
+  aligned, and `CopySlot` wins by 2.7x; the 72-byte tagged stride spills 8 bytes into the next line on every slot.
+- **8 bytes did not improve on the Pi.** The tag store's cost is a per-core quantity; on the Pi the spin counts put
+  that cell producer-bound (full ≈ 0.14–0.17 per record) and the store did not show. Open, like the M4's 64-byte row.
+- **256 bytes: both slots tie and both trail `rtrb` by 2x.** The remaining gap is the copy path, not the slot.
+
 Revised verdict: `CopySlot` pays for `Copy` records in `ring_spsc` at every capacity and in both threading shapes once
 the consumer caches the producer cursor, and the 256-byte row was never about the slot. The one open row is 64-byte
-records at a 64-byte stride.
+records at a 64-byte stride, on 128-byte-line hosts only; on a 64-byte-line Pi 5 that row is `CopySlot`'s largest win.
 
 ## Reproduce
 

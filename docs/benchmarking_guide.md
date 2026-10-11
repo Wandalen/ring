@@ -100,13 +100,15 @@ example prints to stdout only, so neither saves or reads a baseline.
 ```sh
 cargo bench -p perf --bench spsc -- --save-baseline before   # on the "before" commit
 # change the code
-cargo bench -p perf --bench spsc -- --baseline before        # on the "after" commit
+cargo bench -p perf --bench spsc                              # on the "after" commit
 cargo run -q -p perf --example report -- --baseline before --out target/perf_report.md
 ```
 
-The report then shows each cell's change against the baseline, positive when faster. Criterion
-saves baselines per benchmark — compare each suite against its own baseline, on the same
-machine. Git Bash shorthand: `./verb/bench suite::spsc save::before`, then on the other commit
+The report then shows each cell's change against the baseline, positive when faster, and leaves a
+cell the baseline has no entry for uncompared. Do not pass `--baseline` to criterion itself: it
+panics on the first benchmark id the saved baseline lacks, which is every run that adds a
+candidate or a cell. Criterion saves baselines per benchmark — compare each suite against its own
+baseline, on the same machine. Git Bash shorthand: `./verb/bench suite::spsc save::before`, then on the other commit
 `./verb/bench suite::spsc baseline::before` and `./verb/bench suite::report baseline::before
 out::target/perf_report.md`.
 

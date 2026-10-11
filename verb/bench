@@ -61,10 +61,12 @@ if (( _quick )); then
   _latency+=( --test )
 fi
 [ -n "$_save" ] && _criterion+=( --save-baseline "$_save" )
-if [ -n "$_baseline" ]; then
-  _criterion+=( --baseline "$_baseline" )
-  _report+=( --baseline "$_baseline" )
-fi
+# The comparison is the report's, not criterion's. Criterion's own `--baseline`
+# panics on the first benchmark id the saved baseline has no entry for, which
+# is every PR that adds a candidate or a cell (#38's bench-compare went red on
+# `push_pop/spsc-plain`). The report reads the same saved directory and leaves
+# a cell without a baseline uncompared.
+[ -n "$_baseline" ] && _report+=( --baseline "$_baseline" )
 [ -n "$_out" ] && _report+=( --out "$_out" )
 if [ -n "$_filter" ]; then
   _criterion+=( "$_filter" )

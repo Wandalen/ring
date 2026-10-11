@@ -636,8 +636,12 @@ impl<S> Ring<S> {
   fn stamp(&self, seq: Seq) -> &AtomicSeq {
     let index = (seq.0 as usize) & self.capacity().mask();
     // The mask is `capacity - 1` for a power-of-two capacity, which `Capacity`
-    // enforces at construction, so the index is always in range.
-    &self.stamps[index]
+    // enforces at construction, so the index is always in range. One stamp
+    // per slot is pinned by test, so the array is exactly `capacity` long.
+    // SAFETY: mask-folded index below `capacity`, array length equals capacity.
+    // A length-masked safe variant was benched and keeps the check; only the
+    // unchecked form measures faster (see the PR record).
+    unsafe { self.stamps.get_unchecked(index) }
   }
 
   /// The single consumer cursor.

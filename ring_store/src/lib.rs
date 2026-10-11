@@ -20,6 +20,9 @@
 //! slots is allocated in one go, which is what "exactly N slots once" asks for.
 
 #![deny(missing_docs)]
+// See docs/workaround/readme.md: the unchecked masked indexing below is why
+// this crate opts out of the workspace unsafe-code deny.
+#![allow(unsafe_code)]
 
 use ring_index::of;
 use ring_slot::Slot;
@@ -233,14 +236,22 @@ impl<S> Buffer<S> {
   /// ```
   #[must_use]
   pub fn at(&self, seq: Seq) -> &S {
-    self.get(of(seq, self.capacity))
+    let index = of(seq, self.capacity);
+    // SAFETY: `of` folds through `capacity.mask()`, so `index < capacity`;
+    // `Buffer::new` allocates exactly `capacity` slots and nothing here
+    // reallocates, so the index is in range. The length-masked safe variant
+    // was benched and keeps the check (see the PR record); only the
+    // unchecked form measures faster.
+    unsafe { self.slots.get_unchecked(index.get()) }
   }
 
   /// Mutably borrow the slot a sequence addresses.
   #[must_use]
   pub fn at_mut(&mut self, seq: Seq) -> &mut S {
     let index = of(seq, self.capacity);
-    self.get_mut(index)
+    // SAFETY: as in `at` above; the allocation is unchanged by a borrow,
+    // shared or mutable.
+    unsafe { self.slots.get_unchecked_mut(index.get()) }
   }
 
   /// Iterate every slot in index order.

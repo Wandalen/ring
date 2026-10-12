@@ -2966,8 +2966,8 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
 </script>
 </section>
 
-<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 07.
-Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
+<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128, then 128-byte padding against both placements with #41 (M4, 2026-10-11/12); wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 07.
+Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; capacity toggle on the 128-byte padding chart; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
 Hover or focus any mark for the exact two-round pair; every chart has a table twin. -->
 <section id="sec-results" class="section" data-title="Measurements, trade-offs, what changed">
 <style>
@@ -3186,6 +3186,27 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   <details><summary>Table: CACHE_LINE 64 against 128</summary><div class="r-scroll"><table class="r-tbl" id="r-cl-tbl"></table></div></details>
 </figure>
 
+<h4 style="margin-top:22px">With #41, against both placements</h4>
+<p>The runs above fixed the ring at one boundary and had no consumer cache. A later round put master and #41 in both
+  placements of the 64-byte padding and next to <code>CACHE_LINE = 128</code>, which always gives two lines.
+  <code>TypedSlot</code>, <code>push1_pop1</code>, three rounds (five at 1024 slots). M4 Pro, 2026-10-11/12, loop heads
+  pinned with <code>-align-loops=16</code>, rings placed by the placement harness (#51).</p>
+<div class="controls" id="r-p128-ctl">
+  <span><span class="r-ctl-name">Capacity</span><span class="r-seg" role="group" aria-label="Ring capacity">
+    <button type="button" data-k="slots" data-v="64" aria-pressed="true">64 slots</button><button type="button" data-k="slots" data-v="1024" aria-pressed="false">1024 slots</button><button type="button" data-k="slots" data-v="16384" aria-pressed="false">16384 slots</button></span></span>
+</div>
+<figure class="r-fig" style="margin:0">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--c-master)"></i>master</span>
+    <span><i class="r-sw" style="--sw:var(--c-pr41)"></i>#41 consumer cache</span>
+    <span><i class="r-sw tick"></i>range over all five rounds, where recorded</span>
+  </div>
+  <svg id="r-p128" viewBox="0 0 880 300" role="img" aria-label="push1_pop1 for master and #41 with the cursors on one line, on two lines, and with CACHE_LINE = 128"></svg>
+  <p class="r-read" id="r-p128-read"></p>
+  <details><summary>Table: 128-byte padding against both placements</summary><div class="r-scroll"><table class="r-tbl" id="r-p128-tbl"></table></div></details>
+</figure>
+<p class="measured">Single-thread cells do not move with padding (within 1–3%).</p>
+
 <!-- ============ 4. wide records ============ -->
 <h3>Wide records: the check, then the stride</h3>
 <p>The bench harness verifies each popped record with <code>Wide::whole</code>. It used to compare the first and last
@@ -3315,6 +3336,14 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
       { cell: 'CopySlot push1_pop1 1024',  cl64: [302.5], cl128: [371.8] },
       { cell: 'CopySlot push1_pop1 16384', cl64: [273.1], cl128: [409.5] }
     ],
+    pad128: { // data.json padding_128_m4: TypedSlot push1_pop1, M/s, M4 Pro 2026-10-11/12
+      rows: [
+        { slots: 64,    master: { one: 98,  two: 31,  cl128: 42 },  pr41: { one: 128, two: 111, cl128: 109 } },
+        { slots: 1024,  master: { one: 244, two: 246, cl128: 234 }, pr41: { one: 363, two: 329, cl128: 395 } },
+        { slots: 16384, master: { one: 43,  two: 48,  cl128: 42 },  pr41: { one: 35,  two: 34,  cl128: 34 } }
+      ],
+      pr41_cl128_1024_five_rounds: [375, 398]
+    },
     wide: [
       { bytes: 8,   typedslot_old: [271.3, 368.6], typedslot_new: [360.5, 280.9], copyslot_old: [569.7, 910.0], copyslot_new: [881.0, 728.4], rtrb_new: [143.9, 135.8] },
       { bytes: 64,  typedslot_old: [80.7, 91.0],   typedslot_new: [99.3, 93.7],   copyslot_old: [42.0, 42.6],   copyslot_new: [62.6, 44.6],   rtrb_new: [65.9, 52.7] },
@@ -3667,6 +3696,56 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
       rows.forEach((r) => { const tr = H('tr', null, null, body); H('td', null, r.cell, tr); H('td', null, pairTxt(r.cl64), tr); H('td', null, pairTxt(r.cl128), tr); });
     }
     segment($('#r-cl-ctl'), (k, v) => { st[k] = v; render(); });
+    render();
+  })();
+
+  /* ================= 3b. 128-byte padding against both placements ================= */
+  (() => {
+    const st = { slots: '64' };
+    const svg = $('#r-p128');
+    const W = 880, Hh = 300, M = { l: 50, r: 12, t: 20, b: 62 }, base = Hh - M.b;
+    const y = lin(0, 450, base, M.t);
+    const STG = [{ k: 'master', name: 'master', color: 'var(--c-master)' }, { k: 'pr41', name: '#41', color: 'var(--c-pr41)' }];
+    const LAY = [{ k: 'one', name: 'one line' }, { k: 'two', name: 'two lines' }, { k: 'cl128', name: 'CACHE_LINE = 128' }];
+    const READ = {
+      64: 'Master runs 98 on one line, 31 on two, 42 with 128-byte padding: 128 helps master only against its unlucky layout and loses to its lucky one. #41 runs 128, 111 and 109: with the cache, 128 equals the two-line layout.',
+      1024: 'Master: 244, 246, 234. #41: 363 on one line, 329 on two, 395 with 128-byte padding, the steadiest result here: all five rounds fell between 375 and 398.',
+      16384: 'Every cell sits between 34 and 48 M/s, at TypedSlot\'s 16384-slot cliff (#49): master 43, 48, 42; #41 35, 34, 34.'
+    };
+    function render() {
+      svg.replaceChildren();
+      const row = D.pad128.rows.find((r) => String(r.slots) === st.slots);
+      [0, 100, 200, 300, 400].forEach((v) => { S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v ? 'gl' : 'base' }, svg); T(svg, M.l - 8, y(v) + 4, String(v), 'tk', 'end'); });
+      T(svg, M.l - 8, M.t - 6, 'M/s', 'tk', 'end');
+      const gw = (W - M.l - M.r) / STG.length, bw = 58, gap = 22, setW = LAY.length * bw + (LAY.length - 1) * gap;
+      STG.forEach((sg, gi) => {
+        const gx = M.l + gi * gw + (gw - setW) / 2;
+        LAY.forEach((ly, li) => {
+          const x = gx + li * (bw + gap), v = row[sg.k][ly.k];
+          const g = S('g', { class: 'bar', tabindex: '0', role: 'img', 'aria-label': `${sg.name}, ${row.slots} slots, ${ly.name}: ${v} M/s` }, svg);
+          g.style.setProperty('--bar', sg.color);
+          S('path', { class: 'solid', d: colPath(x, bw, base, y(v)) }, g);
+          const rr = sg.k === 'pr41' && ly.k === 'cl128' && row.slots === 1024 ? D.pad128.pr41_cl128_1024_five_rounds : null;
+          if (rr) {
+            S('line', { class: 'tick', x1: x + bw / 2, x2: x + bw / 2, y1: y(rr[0]), y2: y(rr[1]) }, g);
+            rr.forEach((q) => S('line', { class: 'tick', x1: x + bw / 2 - 6, x2: x + bw / 2 + 6, y1: y(q), y2: y(q) }, g));
+          }
+          T(g, x + bw / 2, Math.min(y(v), rr ? y(rr[1]) : y(v)) - 7, String(v), 'tk');
+          T(svg, x + bw / 2, base + 18, ly.k === 'cl128' ? 'CACHE_LINE' : ly.name, 'sub');
+          if (ly.k === 'cl128') T(svg, x + bw / 2, base + 33, '= 128', 'sub');
+          S('rect', { class: 'hit', x: x - 4, y: M.t, width: bw + 8, height: base - M.t }, g);
+          hover(g, () => ({ title: `${sg.name}, ${row.slots} slots, ${ly.name}`, rows: [{ v: `${v} M/s`, label: rr ? 'all five rounds 375–398' : (row.slots === 1024 ? 'five rounds' : 'three rounds'), color: sg.color }] }));
+        });
+        T(svg, M.l + gi * gw + gw / 2, base + 54, sg.name, 'lab');
+      });
+      $('#r-p128-read').textContent = READ[st.slots];
+    }
+    const tb = $('#r-p128-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, tb));
+    ['slots', 'master, one line', 'master, two lines', 'master, 128', '#41, one line', '#41, two lines', '#41, 128'].forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, tb);
+    D.pad128.rows.forEach((r) => { const tr = H('tr', null, null, body); [r.slots, r.master.one, r.master.two, r.master.cl128, r.pr41.one, r.pr41.two, r.slots === 1024 ? `${r.pr41.cl128} (375–398, all five rounds)` : r.pr41.cl128].forEach((c) => H('td', null, String(c), tr)); });
+    segment($('#r-p128-ctl'), (k, v) => { st[k] = v; render(); });
     render();
   })();
 

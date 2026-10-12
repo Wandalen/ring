@@ -128,6 +128,15 @@ jobs:
         # dispatch with "is not one of". Both lists live in different files
         # with only a comment linking them, so drift is silent without this.
         run: |
-          opts="$(sed -n '/^ *options:$/,/^[^[:space:]]/p' .github/workflows/bench-compare.yml | grep -oE '^ +- [a-z_]+' | awk '{print $2}' | sort)"
+          lists_match() { [ "$1" = "$2" ]; }
+          opts="$(sed -n '/^ *options:$/,/^[^[:space:]]/p' .github/workflows/bench-compare.yml | grep -oE '^ +- [A-Za-z0-9_-]+' | awk '{print $2}' | sort)"
           names="$(grep -oE "^_names='[^']*'" verb/bench | sed "s/^_names='//; s/'$//; s/, /\n/g" | sort)"
-          [ "$opts" = "$names" ] || { echo "--- workflow options: ---"; echo "$opts"; echo "--- verb/bench _names: ---"; echo "$names"; echo 'bench-compare options: diverged from verb/bench suite names' >&2; exit 1; }
+          lists_match "$opts" "$names" || { echo "--- workflow options: ---"; echo "$opts"; echo "--- verb/bench _names: ---"; echo "$names"; echo 'bench-compare options: diverged from verb/bench suite names' >&2; exit 1; }
+          # Self-test the guard above: a deliberately diverged pair must not
+          # match, so the failure path is exercised on every run, not just
+          # when the real lists drift. Single-line printf fixtures: raw
+          # newlines inside this YAML block scalar would dedent and end it.
+          if lists_match "$(printf 'all\nmicro')" "$(printf 'all\nmicro\nspsc')"; then
+            echo 'sync-check self-test: diverged fixture reported as matching' >&2
+            exit 1
+          fi

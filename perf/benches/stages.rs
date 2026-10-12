@@ -18,8 +18,12 @@ use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_mai
 use ring_slot::TypedSlot;
 use ring_types::Capacity;
 
+/// Ring capacity for every bench in this file: roomy enough that a burst
+/// never fills it between observing drains.
 const CAPACITY: usize = 1024;
+/// Records per measured batch: the observing drain amortises over this many.
 const BURST: usize = 256;
+/// Sequences per batch-claim grant: the width `claim_batch` is asked for.
 const GROUP: usize = 32;
 
 /// Claim without write: the reservation round-trips empty, so the write's

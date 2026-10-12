@@ -1,6 +1,7 @@
 <!-- summary: Ring against rtrb on the M4 (2026-10-11/12): the 64-slot gap at one record per hand-off; the differences removed one rung at a time (slot size, consumer rungs A-D, producer rungs E-F, cursor order, code and placement); the kperf counters; the sampling probe that flipped the result; the consumer-work sweep; the capacity-in-producer change, tested and dropped.
-Controls: rung stepper (chips, back / next) drawing ring at each rung against the rung before and rtrb, with a byte map for the code-and-placement step; consumer-work slider over the sweep at 64 and 1024 slots. Hover or focus any mark for its values; every chart has a table twin.
-Numbers inlined from data.json (rtrb_against_ring_m4). -->
+Then #55 (CI, 2026-10-12): #41 against master on Zen 3, Zen 3 SMT siblings and Zen 5 over the same knob, the refusals, the padding result and the 16384-slot caveat.
+Controls: rung stepper (chips, back / next) drawing ring at each rung against the rung before and rtrb, with a byte map for the code-and-placement step; consumer-work slider over the sweep at 64 and 1024 slots. A second consumer-work slider over #55's four runner panels. Hover or focus any mark for its values; every chart has a table twin.
+Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci). -->
 <section id="sec-rtrb" class="section" data-title="Ring against rtrb, and the lean consumer">
 <style>
   #sec-rtrb { position: relative; }
@@ -71,6 +72,13 @@ Numbers inlined from data.json (rtrb_against_ring_m4). -->
   #sec-rtrb .rt-tip .row b { font-variant-numeric: tabular-nums; font-weight: 650; }
   #sec-rtrb .rt-tip .row span { color: var(--muted); }
   #sec-rtrb .rt-tip .n { color: var(--muted); margin-top: 4px; font-size: 0.8rem; }
+  #sec-rtrb .rt-caveat { border-left: 3px solid var(--c-warn); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); margin-top: 12px; }
+  #sec-rtrb .rt-caveat::before { content: "Caveat · "; color: var(--c-warn); font-weight: 600; }
+  #sec-rtrb .rt-z3-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 14px; margin-top: 8px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  #sec-rtrb .rt-z3-grid .h { color: var(--muted); font-size: 0.82rem; }
+  #sec-rtrb .rt-z3-grid .v { font-weight: 650; }
+  #sec-rtrb .rt-z3-abs { margin: 10px 0 0; font-size: 0.92rem; font-variant-numeric: tabular-nums; max-width: var(--measure); min-height: 2.8em; }
+  @media (max-width: 900px) { #sec-rtrb .rt-z3-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 900px) { #sec-rtrb .rt-panels { grid-template-columns: 1fr; } }
 </style>
 
@@ -203,6 +211,48 @@ Numbers inlined from data.json (rtrb_against_ring_m4). -->
 <p class="measured">Keeping <code>capacity</code> in ring's producer helps the two-line layout a little (0 to +15%). It
   costs <code>CopySlot</code>'s single-thread <code>push_pop</code> 16% (2.56 → 2.98 ns) and its whole-lap drain 10%
   (1280 → 1150 M/s), and <code>TypedSlot</code>'s one-line 64-slot hand-off about 15%. Dropped, no PR.</p>
+
+<h3>The same knob on Zen 3 (#55)</h3>
+<p>On x86 CI, Bench Compare put #41 at −36…−42% against master on an AMD EPYC 7763 (Zen 3) for the two-thread
+  one-record hand-off, and at −74% with 16384 slots. On the M4 and on a Zen 5 runner #41 gains. Issue #55 asks why. It
+  answers part of it by sweeping the same consumer-work knob on CI.</p>
+<p class="muted">Master <code>ab9b3e4</code> against #41 <code>4e8ddff</code>, 2026-10-12,
+  <a href="https://github.com/Wandalen/ring/actions/runs/38187586690">run 38187586690</a>. GitHub CI runners, 4 vCPU
+  Azure VMs: AMD EPYC 7763 (Zen 3) and AMD EPYC 9V45 (Zen 5). One CI job per runner, both sides built with 64- and
+  128-byte padding, the knob swept 0, 1, 2, 4 and 8, two rounds interleaved, rtrb as the control (within ±5% in all
+  but two cells).</p>
+
+<div class="rt-fig" id="rt-z3">
+  <div class="controls" style="margin-top:0">
+    <label class="rt-slider" for="rt-z3-n">Consumer work <input id="rt-z3-n" type="range" min="0" max="4" step="1" value="0"
+      aria-label="Consumer work, multiply-adds per record"> <output id="rt-z3-out">0</output> multiply-adds per record</label>
+  </div>
+  <div class="rt-legend" aria-hidden="true">
+    <span><i class="rt-sw" style="--sw:var(--c-good)"></i>#41 faster than master</span>
+    <span><i class="rt-sw" style="--sw:var(--c-bad)"></i>#41 slower than master</span>
+    <span>a bar spans a range, a dot is a single value</span>
+  </div>
+  <svg id="rt-z3-svg" viewBox="0 0 900 300" role="img" aria-label="Change of #41 against master by consumer work, one panel per runner"></svg>
+  <div class="rt-z3-grid" id="rt-z3-grid" aria-live="polite"></div>
+  <p class="rt-z3-abs" id="rt-z3-abs" aria-live="polite"></p>
+  <p class="rt-cap">Change of #41 against master, one-record hand-off, in percent. Each bar is the range the record
+    gives over 64 slots, 1024 slots and the pair pinned to two cores. Click a column to jump to it.</p>
+  <details><summary>Table: #41 against master by consumer work</summary><div class="rt-scroll"><table class="rt-t" id="rt-z3-tbl"></table></div></details>
+</div>
+<div class="measured"><ul class="rt-list">
+  <li>The loss shrinks with every step, crosses zero at about four and is a gain at eight. At no work it reproduces
+    Bench Compare's −36…−42%.</li>
+  <li>Zen 3, two cores: master ~31–34 M/s and #41 ~19–21 at no work; at 8 steps master ~25 and #41 ~28–32. rtrb runs
+    ~75–80 at no work and ~53–57 at 8 steps.</li>
+  <li>Refused pushes per record: #41 ~1.2 against master ~0.7 at no work; 0.7 against 0.8 at 8 steps.</li>
+  <li>128-byte padding moves neither side on Zen 3 by more than ~10% and flips no row. On Zen 5 it lifts master by up
+    to 24% at no work, and #41 still leads every row. The prefetcher-pairing hypothesis is ruled out.</li>
+</ul></div>
+<p class="rt-caveat">16384 slots was not swept. Bench Compare's −74% there has no consumer-work reading yet.</p>
+<p>The M4 and Zen 3 gaps share a shape. On the M4, rtrb's lead over ring holds only with a lean consumer, and from
+  four steps both ring variants beat it. On Zen 3, #41's loss against master holds only with a lean consumer and
+  crosses zero at about four. Whether one mechanism drives both is not measured.</p>
+<p class="rt-open">Why does a lean consumer deepen the lockstep on Zen 3?</p>
 
 <div class="rt-tip" hidden role="status" aria-live="polite"></div>
 
@@ -659,6 +709,69 @@ Numbers inlined from data.json (rtrb_against_ring_m4). -->
     const body = H('tbody', null, null, t);
     D.sweep.forEach((r) => { const tr = H('tr', null, null, body); [r.work, ...r.s64, ...r.s1024.map((v, si) => (r.work === D.unreliable.work && si === D.unreliable.series ? `${v} (rounds 45, 321: unreliable)` : v))].forEach((c) => H('td', null, String(c), tr)); });
     H('caption', null, 'M4 Pro, push1_pop1, median of 2 rounds, M/s.', t);
+    render();
+  })();
+
+  /* ================= 5. #55: the knob on Zen 3 and Zen 5 ================= */
+  (() => {
+    // Copied from data.json (issue_55_consumer_work_ci). Ranges keep the record's order.
+    const Z = {
+      cols: [
+        { k: 'zen3_vm1', name: 'Zen 3, first VM' }, { k: 'zen3_vm2', name: 'Zen 3, second VM' },
+        { k: 'zen3_smt', name: 'Zen 3, SMT siblings' }, { k: 'zen5', name: 'Zen 5, two cores' }
+      ],
+      rows: [
+        { work: 0, zen3_vm1: [-38, -41], zen3_vm2: [-32, -36], zen3_smt: [40], zen5: [40, 106] },
+        { work: 1, zen3_vm1: [-29, -31], zen3_vm2: [-32, -33], zen3_smt: [39, 41], zen5: [43, 103] },
+        { work: 2, zen3_vm1: [-25, -30], zen3_vm2: [-27, -28], zen3_smt: [33, 34], zen5: [41, 108] },
+        { work: 4, zen3_vm1: [-7, -10], zen3_vm2: [5, 9], zen3_smt: [33], zen5: [30, 96] },
+        { work: 8, zen3_vm1: [13, 15], zen3_vm2: [23, 26], zen3_smt: [24, 25], zen5: [38, 76] }
+      ],
+      abs: {
+        0: 'Zen 3, two cores, at no work: master ~31–34 M/s, #41 ~19–21, rtrb ~75–80. Refused pushes per record: #41 ~1.2, master ~0.7.',
+        8: 'Zen 3, two cores, at 8 steps: master ~25 M/s, #41 ~28–32, rtrb ~53–57. Refused pushes per record: #41 0.7, master 0.8.'
+      }
+    };
+    const pc = (v) => (v < 0 ? '−' + Math.abs(v) : '+' + v);
+    const rtxt = (r) => (r.length > 1 ? `${pc(r[0])} … ${pc(r[1])}%` : `${pc(r[0])}%`);
+    const svg = $('#rt-z3-svg'), slider = $('#rt-z3-n'), out = $('#rt-z3-out');
+    const W = 900, Hh = 300, M = { l: 48, r: 6, t: 40, b: 40 }, pw = (W - M.l - M.r) / Z.cols.length;
+    const y = lin(-50, 120, Hh - M.b, M.t);
+    let idx = 0;
+    function render() {
+      svg.replaceChildren();
+      out.textContent = String(Z.rows[idx].work);
+      slider.setAttribute('aria-valuetext', `${Z.rows[idx].work} multiply-adds per record`);
+      [-40, 0, 40, 80, 120].forEach((v) => {
+        S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v === 0 ? 'rt-base' : 'rt-gl' }, svg);
+        T(svg, M.l - 8, y(v) + 4, v === 0 ? '0' : pc(v) + '%', 'rt-tk', 'end');
+      });
+      Z.cols.forEach((c, ci) => {
+        const px0 = M.l + ci * pw, xs = (i) => px0 + 22 + i * ((pw - 44) / (Z.rows.length - 1));
+        T(svg, px0 + pw / 2, 16, c.name, 'rt-lab b');
+        if (ci) S('line', { x1: px0, x2: px0, y1: M.t - 10, y2: Hh - M.b, class: 'rt-gl' }, svg);
+        S('rect', { class: 'rt-cur', x: xs(idx) - 15, y: M.t - 8, width: 30, height: Hh - M.b - M.t + 8, rx: 6 }, svg);
+        Z.rows.forEach((r, i) => {
+          const v = r[c.k], lo = Math.min(...v), hi = Math.max(...v), col = hi < 0 ? 'var(--c-bad)' : 'var(--c-good)';
+          const on = i === idx, g = S('g', { class: 'rt-mark', opacity: on ? 1 : 0.5 }, svg);
+          const bw = on ? 12 : 9, h = Math.max(bw, y(lo) - y(hi)), top = (y(lo) + y(hi)) / 2 - h / 2;
+          if (v.length > 1 && lo !== hi) S('rect', { x: xs(i) - bw / 2, y: top, width: bw, height: h, rx: bw / 2, fill: col }, g);
+          else S('circle', { cx: xs(i), cy: y(lo), r: on ? 6 : 4.5, fill: col, stroke: 'var(--surface)', 'stroke-width': 2 }, g);
+          if (on) T(g, xs(i), Math.min(top, y(hi) - 6) - 6, rtxt(v), 'rt-val');
+          T(svg, xs(i), Hh - M.b + 16, String(r.work), on ? 'rt-lab b' : 'rt-tk');
+          S('rect', { class: 'rt-hit', x: xs(i) - 16, y: M.t - 8, width: 32, height: Hh - M.t - M.b + 26 }, g);
+          g.addEventListener('click', () => { idx = i; slider.value = String(i); render(); });
+          hover(g, () => ({ title: `${c.name}, ${r.work} multiply-adds per record`, rows: [{ v: rtxt(v), label: '#41 against master', color: col }] }));
+        });
+      });
+      T(svg, M.l + (W - M.l - M.r) / 2, Hh - 6, 'consumer work, multiply-adds per record', 'rt-tk');
+      const grid = $('#rt-z3-grid'); grid.replaceChildren();
+      Z.cols.forEach((c) => { const d = H('div', null, null, grid); H('div', 'h', c.name, d); H('div', 'v', rtxt(Z.rows[idx][c.k]), d); });
+      $('#rt-z3-abs').textContent = Z.abs[Z.rows[idx].work] || 'Absolute M/s and refused pushes are given for 0 and 8 steps only.';
+    }
+    slider.addEventListener('input', () => { idx = +slider.value; render(); });
+    table($('#rt-z3-tbl').parentNode, null, ['consumer work', ...Z.cols.map((c) => c.name)], Z.rows.map((r) => [r.work, ...Z.cols.map((c) => rtxt(r[c.k]))]));
+    $('#rt-z3-tbl').remove();
     render();
   })();
 })();

@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 use hdrhistogram::Histogram;
 use serde_json::{Value, json};
 
-use super::candidates::{Candidate, Record, Run, Rx, SEQ_BITS, Tx};
+use super::candidates::{self, Candidate, Record, Run, Rx, SEQ_BITS, Tx};
 use super::driver::{self, Check, Mode};
 use super::output::duration;
 
@@ -41,11 +41,11 @@ impl Record for Stamped {
 ///
 /// Naming `C`, when an echo comes back as a different record.
 pub fn ping_pong<C: Candidate<Record = u64>>(capacity: usize, round_trips: u64) -> f64 {
-  let mut back = C::new(capacity);
-  C::new(capacity).split(
+  let mut back = candidates::build::<C>(capacity);
+  candidates::build::<C>(capacity).split(
     1,
     Forth {
-      back: &mut back,
+      back: &mut *back,
       round_trips,
       name: C::NAME,
     },
@@ -180,7 +180,7 @@ pub fn open_loop<C: Candidate<Record = Stamped>>(load: &Load) -> Latency {
     C::MAX_PRODUCERS
   );
 
-  C::new(load.capacity).split(load.producers, Open { load, name: C::NAME })
+  candidates::build::<C>(load.capacity).split(load.producers, Open { load, name: C::NAME })
 }
 
 struct Open<'l> {

@@ -68,7 +68,11 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 | `regression` | `regression`       | spsc and mpsc p99 hand-off each asserted to beat the mutex p99 measured back-to-back on the same runner                        | —                                    |
 
 Threaded runs build a fresh queue per run and time from a spinning start line to the consumer's
-last record; building, spawning and validation stay outside the clock. Producers spin on a full
+last record; building, spawning and validation stay outside the clock. Every queue is built on the
+heap at byte 0 of a 256-byte block (`candidates::build`), so a ring's cursors fall on the same
+cache lines in every process rather than wherever the bench thread's stack put them; `RING_OFFSET=64`
+builds every queue at byte 64 instead, which on a 128-byte-line host puts a ring's two cursors on two
+lines rather than one. Report which layout a two-thread number came from. Producers spin on a full
 queue and the consumer on an empty one; both counts per record follow criterion's lines as
 `spins:`. The consumer checksums every record and checks per-producer order, and wide records
 end-to-end: a lost, duplicated, reordered or torn record panics with the candidate's name and no
@@ -96,3 +100,9 @@ Implement `Candidate` in `benches/harness/candidates.rs`: `new`, and `split` han
 ends to a `Run`. Use the crate's fastest idiomatic API and name it in the doc comment; set
 `PUSH_BATCH` only for a real batch push. Add it to the bench functions and to
 `tests/harness_test.rs`.
+
+## Records
+
+Before/after measurements of changes to the harness itself are in `docs/benchmarks/`, numbered like ADRs:
+
+- [Candidates built at a 128-byte boundary](docs/benchmarks/001_candidates_built_at_a_128_byte_boundary.md)

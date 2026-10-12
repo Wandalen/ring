@@ -3,6 +3,7 @@
 
 use std::collections::VecDeque;
 use std::marker::PhantomData;
+use std::ops::{Deref, DerefMut};
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
@@ -103,6 +104,91 @@ pub trait Candidate {
 
   /// Split into `producers` sending ends and the receiving end, and hand them to `run`.
   fn split<V: Run<Self::Record>>(&mut self, producers: usize, run: V) -> V::Output;
+}
+
+/// A candidate of `capacity` slots, on the heap at a chosen byte of a 256-byte block.
+///
+/// A ring holds its cursors inline, so built on the stack its layout against the cache lines moved
+/// with the bench thread's stack: the same commit measured 25 or 72 M/s from one process to the
+/// next, and later 24 or 200, depending on nothing but the length of the environment. Placed here,
+/// every process sees the same layout, and `RING_OFFSET` chooses which one.
+///
+/// Two layouts exist on a 128-byte-line host for a ring whose cursors sit 64 bytes apart (`ring_align`
+/// pads to 64): at byte 0 of a line both cursors share it, at byte 64 they sit on two. The suite
+/// defaults to byte 0. Set `RING_OFFSET=64` to measure the other layout; anything else is byte 0.
+/// `rtrb` and `ArrayQueue` pad their own indices to 128 and are indifferent to the choice.
+pub fn build<C: Candidate>(capacity: usize) -> Placed<C> {
+  build_at(placement_from_env(), capacity)
+}
+
+/// Where [`build`] puts a candidate inside its 256-byte block.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Placement {
+  /// Byte 0: on a 128-byte-line host the two cursors of a ring share one line.
+  LineStart,
+  /// Byte 64: the two cursors sit on two lines.
+  LineMiddle,
+}
+
+/// `RING_OFFSET=64` selects [`Placement::LineMiddle`]; anything else, including unset, is
+/// [`Placement::LineStart`].
+pub fn placement_from_env() -> Placement {
+  match std::env::var("RING_OFFSET").as_deref() {
+    Ok("64") => Placement::LineMiddle,
+    _ => Placement::LineStart,
+  }
+}
+
+/// [`build`] with the placement chosen by the caller, for a test or a sweep over both layouts.
+pub fn build_at<C: Candidate>(placement: Placement, capacity: usize) -> Placed<C> {
+  match placement {
+    Placement::LineStart => Placed::LineStart(Box::new(At {
+      _pad: [],
+      candidate: C::new(capacity),
+    })),
+    Placement::LineMiddle => Placed::LineMiddle(Box::new(At {
+      _pad: [0; 64],
+      candidate: C::new(capacity),
+    })),
+  }
+}
+
+/// What [`build`] returns: the candidate at byte 0 or byte 64 of a 256-byte-aligned block, with cold
+/// padding on both sides so nothing else shares its lines.
+#[derive(Debug)]
+pub enum Placed<C> {
+  /// See [`Placement::LineStart`].
+  LineStart(Box<At<0, C>>),
+  /// See [`Placement::LineMiddle`].
+  LineMiddle(Box<At<64, C>>),
+}
+
+/// `PAD` bytes, then the candidate, in a 256-byte-aligned block.
+#[derive(Debug)]
+#[repr(C, align(256))]
+pub struct At<const PAD: usize, C> {
+  _pad: [u8; PAD],
+  candidate: C,
+}
+
+impl<C> Deref for Placed<C> {
+  type Target = C;
+
+  fn deref(&self) -> &C {
+    match self {
+      Self::LineStart(at) => &at.candidate,
+      Self::LineMiddle(at) => &at.candidate,
+    }
+  }
+}
+
+impl<C> DerefMut for Placed<C> {
+  fn deref_mut(&mut self) -> &mut C {
+    match self {
+      Self::LineStart(at) => &mut at.candidate,
+      Self::LineMiddle(at) => &mut at.candidate,
+    }
+  }
 }
 
 /// What is done with a split queue. A trait rather than a closure because the ends borrow the

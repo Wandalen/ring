@@ -127,6 +127,28 @@ fn wide_records_arrive_whole_through_every_candidate() {
   driver::run::<MutexDeque<Wide<32>>>(&shape);
 }
 
+/// Every candidate is built at a chosen byte of a 256-byte block, so its layout against the cache
+/// lines is the same in every process and the other layout is one environment variable away. Why
+/// that matters is on `candidates::build`.
+#[test]
+fn every_candidate_is_built_at_the_chosen_byte_of_a_256_byte_block() {
+  use harness::candidates::{Placement, build_at};
+
+  fn offset<C: Candidate>(placement: Placement) -> usize {
+    std::ptr::from_ref::<C>(&build_at::<C>(placement, 64)).addr() % 256
+  }
+
+  for (placement, expected) in [(Placement::LineStart, 0), (Placement::LineMiddle, 64)] {
+    assert_eq!(offset::<Spsc>(placement), expected, "spsc at {placement:?}");
+    assert_eq!(offset::<Rtrb>(placement), expected, "rtrb at {placement:?}");
+    assert_eq!(offset::<Mpsc>(placement), expected, "mpsc at {placement:?}");
+    assert_eq!(offset::<MpscPrimary>(placement), expected, "mpsc-primary at {placement:?}");
+    assert_eq!(offset::<SyncChannel>(placement), expected, "sync_channel at {placement:?}");
+    assert_eq!(offset::<CrossbeamQueue>(placement), expected, "arrayqueue at {placement:?}");
+    assert_eq!(offset::<MutexDeque>(placement), expected, "mutex at {placement:?}");
+  }
+}
+
 #[test]
 fn gaps_are_measured_only_when_asked_for() {
   let shape = Shape::new(1024, 2, RECORDS, Mode::PUSH1_POPN);

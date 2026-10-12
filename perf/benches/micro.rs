@@ -8,6 +8,7 @@ use std::time::Duration;
 use criterion::measurement::WallTime;
 use criterion::{BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use harness::candidates::{
+  self,
   Candidate,
   CrossbeamQueue,
   Mpsc,
@@ -36,7 +37,7 @@ macro_rules! every_candidate {
   };
   (@ $group:expr, $visitor:ident, $($candidate:ident),*) => {
     $(
-      <$candidate>::new(CAPACITY).split(1, $visitor { group: &mut $group, name: <$candidate>::NAME });
+      candidates::build::<$candidate>(CAPACITY).split(1, $visitor { group: &mut $group, name: <$candidate>::NAME });
     )*
   };
 }
@@ -151,7 +152,7 @@ fn fill_drain(c: &mut Criterion) {
 
 fn fill_drain_on<C: Candidate<Record = u64>>(group: &mut BenchmarkGroup<'_, WallTime>, capacity: usize) {
   for mode in Mode::of::<C>() {
-    C::new(capacity).split(
+    candidates::build::<C>(capacity).split(
       1,
       FillDrain {
         group: &mut *group,

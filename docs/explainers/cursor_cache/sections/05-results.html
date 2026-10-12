@@ -1,5 +1,5 @@
-<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128, then 128-byte padding against both placements with #41 (M4, 2026-10-11/12); wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 07.
-Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; capacity toggle on the 128-byte padding chart; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
+<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; Bench Compare on the rebased heads on x86 CI (#41 on Zen 3, #38 on a Xeon) with the noise caveat; CACHE_LINE 64 vs 128, then 128-byte padding against both placements with #41 (M4, 2026-10-11/12); wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 07.
+Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; run toggle on the CI chart; cell filter, scale and cache toggles on CL 64 vs 128; capacity toggle on the 128-byte padding chart; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
 Hover or focus any mark for the exact two-round pair; every chart has a table twin. -->
 <section id="sec-results" class="section" data-title="Measurements, trade-offs, what changed">
 <style>
@@ -81,6 +81,8 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   #sec-results .wide-panels .note { font-size: 0.8rem; color: var(--muted); min-height: 2.4em; }
   #sec-results .open { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); margin-top: 10px; }
   #sec-results .open::before { content: "Open · "; color: var(--accent); font-weight: 600; }
+  #sec-results .caveat { border-left: 3px solid var(--c-warn); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); margin-top: 10px; }
+  #sec-results .caveat::before { content: "Caveat · "; color: var(--c-warn); font-weight: 600; }
   #sec-results ul.ruled { padding-left: 1.1em; margin: 6px 0; }
   #sec-results ul.ruled li { margin: 2px 0; }
   #sec-results ul.ruled li::marker { content: "✕  "; color: var(--muted); }
@@ -193,6 +195,29 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
     <div id="r-pre"></div>
   </div>
 </div>
+
+<!-- ============ 2b. CI on the rebased heads ============ -->
+<h3>The rebased heads on x86 CI</h3>
+<p>After the rebase, Bench Compare ran both PRs on GitHub's x86 runners (4 vCPU Azure VMs) on 2026-10-12: #41 at
+  <code>4e8ddff</code> against master on an AMD EPYC 7763 (Zen 3), and #38 at <code>4c8ecce</code> on an Intel Xeon
+  Platinum 8573C, where <code>CopySlot</code> is compared with <code>TypedSlot</code> in the same head run. Each bar is
+  the change Bench Compare reports, + faster and − slower. One run each, so no round pairs here.</p>
+<div class="controls" id="r-ci-ctl">
+  <span><span class="r-ctl-name">Run</span><span class="r-seg" role="group" aria-label="Which run">
+    <button type="button" data-k="pr" data-v="41" aria-pressed="true">#41 against master, Zen 3</button><button type="button" data-k="pr" data-v="38" aria-pressed="false">#38 CopySlot against TypedSlot, Xeon</button></span></span>
+</div>
+<figure class="r-fig" style="margin:0">
+  <div class="r-legend" aria-hidden="true">
+    <span><i class="r-sw" style="--sw:var(--c-good)"></i>faster</span>
+    <span><i class="r-sw" style="--sw:var(--c-bad)"></i>slower</span>
+    <span><i class="r-sw faint"></i>a row the noise caveat below does not let read as real</span>
+  </div>
+  <svg id="r-ci" viewBox="0 0 880 330" role="img" aria-label="Bench Compare changes per benchmark row on the x86 CI runners"></svg>
+  <p class="r-read" id="r-ci-read"></p>
+  <details><summary>Table: both runs</summary><div class="r-scroll"><table class="r-tbl" id="r-ci-tbl"></table></div></details>
+</figure>
+<p class="caveat">In the #38 run, <code>TypedSlot</code> rows that #38 does not change moved −15…+48% between base and
+  head. Only the consistent single-thread gains read as real.</p>
 
 <!-- ============ 3. CL 64 vs 128 ============ -->
 <h3><code>CACHE_LINE</code> 64 against 128, and what the consumer cache does to it</h3>
@@ -368,6 +393,44 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
       { cell: 'CopySlot push1_pop1 1024',  cl64: [302.5], cl128: [371.8] },
       { cell: 'CopySlot push1_pop1 16384', cl64: [273.1], cl128: [409.5] }
     ],
+    ci: { // data.json ci_rebased_heads: Bench Compare, GitHub CI x86 runners, 2026-10-12; percent, + faster
+      41: {
+        rows: [
+          { g: 'two threads, push1_pop1', label: '64 slots', v: [-41], note: '21.8 M/s in the record' },
+          { g: 'two threads, push1_pop1', label: '1024 slots', v: [-42], note: '23.2 M/s in the record' },
+          { g: 'two threads, push1_pop1', label: '16384 slots', v: [-74], note: '30.2 M/s in the record' },
+          { g: 'two threads, push1_pop1', label: 'pinned to two cores', v: [-36] },
+          { g: 'two threads, push1_pop1', label: 'pinned to SMT siblings', v: [47] },
+          { g: 'one thread', label: 'one-record fill_drain, 64', v: [18] },
+          { g: 'one thread', label: 'one-record fill_drain, 1024', v: [22] },
+          { g: 'one thread', label: 'one-record fill_drain, 16384', v: [20] },
+          { g: 'one thread', label: 'push_pop', v: [18.5], text: '18.5% faster' },
+          { g: 'one thread', label: 'pop_empty', v: [-33, -50], text: '33–50% slower' }
+        ],
+        rtrb: [105, 178]
+      },
+      38: {
+        rows: [
+          { g: 'one thread', label: 'push_pop', v: null, text: '3.3 against 3.5 ns', real: true },
+          { g: 'one thread', label: 'one-record fill_drain, 64', v: [39], real: true },
+          { g: 'one thread', label: 'one-record fill_drain, 1024', v: [21], real: true },
+          { g: 'one thread', label: 'one-record fill_drain, 16384', v: [25], real: true },
+          { g: 'one thread', label: 'whole-lap fill_drain, 64', v: [31], real: true },
+          { g: 'one thread', label: 'whole-lap fill_drain, 1024', v: [34], real: true },
+          { g: 'one thread', label: 'whole-lap fill_drain, 16384', v: [33], real: true },
+          { g: 'two threads', label: 'push1_pop1, 64', v: [9] },
+          { g: 'two threads', label: 'push1_pop1, 1024', v: [68] },
+          { g: 'two threads', label: 'push1_pop1, 16384', v: [51] },
+          { g: 'two threads', label: 'push1_popN, 64', v: [-19] },
+          { g: 'two threads', label: 'push1_popN, 1024', v: [46] },
+          { g: 'two threads', label: 'push1_popN, 16384', v: [-66], note: '107 against 314 M/s' },
+          { g: 'record size', label: '8-byte records', v: [48] },
+          { g: 'record size', label: '64-byte records', v: [-6] },
+          { g: 'record size', label: '256-byte records', v: [0], text: 'tie' },
+          { g: 'mpsc', label: 'mpsc-plain against mpsc', v: [2, 3] }
+        ]
+      }
+    },
     pad128: { // data.json padding_128_m4: TypedSlot push1_pop1, M/s, M4 Pro 2026-10-11/12
       rows: [
         { slots: 64,    master: { one: 98,  two: 31,  cl128: 42 },  pr41: { one: 128, two: 111, cl128: 109 } },
@@ -673,6 +736,63 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
     hbars('push_pop', 'ns', 'lower', [['TypedSlot', s.push_pop_ns.typedslot_c28bedb, 'var(--c-tagged)'], ['CopySlot', s.push_pop_ns.copyslot_c28bedb, 'var(--c-untagged)']], 4);
     const fd = s.fill_drain_popN_Mps_c28bedb;
     [64, 1024, 16384].forEach((n) => hbars(`fill_drain popN, ${n} slots`, 'M/s', 'higher', [['TypedSlot', fd.typedslot[n], 'var(--c-tagged)'], ['CopySlot', fd.copyslot[n], 'var(--c-untagged)']], 1300));
+  })();
+
+  /* ================= 2b. CI on the rebased heads ================= */
+  (() => {
+    const st = { pr: '41' };
+    const svg = $('#r-ci');
+    const W = 880, L = 300, R = 830, rowH = 24, gH = 26, top = 30;
+    const x = lin(-80, 80, L, R);
+    const pc = (v) => (v < 0 ? '−' + Math.abs(v) : '+' + v);
+    const vtxt = (r) => r.text || (r.v.length > 1 ? `${pc(r.v[0])}…${pc(r.v[1])}%` : `${pc(r.v[0])}%`);
+    const leftPath = (x0, x1, y, h) => { const r = Math.min(4, (x0 - x1) / 2, h / 2); return `M${x0},${y}H${x1 + r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 + r},${y + h}H${x0}Z`; };
+    const READ = {
+      41: 'On Zen 3 #41 loses the two-thread one-record hand-off at every capacity: −41%, −42% and −74% at 64, 1024 and 16384 slots, and −36% pinned to two cores. Pinned to SMT siblings it gains 47%. Single-threaded it gains: one-record fill_drain +18%, +22% and +20%, push_pop 18.5% faster; pop_empty is 33–50% slower. rtrb ran 105–178 M/s in the same run. Section 6 sweeps the two-thread loss over consumer work (#55).',
+      38: 'Single-threaded, CopySlot is ahead on every row: push_pop 3.3 against 3.5 ns, one-record fill_drain +39%, +21% and +25%, whole-lap +31%, +34% and +33%. The two-thread and record-size rows swing both ways, from +68% to −66%, and with the noise below none of them reads as real.'
+    };
+    function render() {
+      svg.replaceChildren();
+      const rows = D.ci[st.pr].rows;
+      let yy = top, last = null;
+      const placed = rows.map((r) => { if (r.g !== last) { yy += gH; last = r.g; } const y0 = yy; yy += rowH; return { r, y0 }; });
+      const h = yy + 30;
+      svg.setAttribute('viewBox', `0 0 ${W} ${h}`);
+      [-80, -40, 0, 40, 80].forEach((v) => { S('line', { x1: x(v), x2: x(v), y1: top + 6, y2: h - 26, class: v ? 'gl' : 'base' }, svg); T(svg, x(v), h - 10, v ? pc(v) + '%' : '0'); });
+      T(svg, x(-80), top - 6, '← slower', 'sub', 'start'); T(svg, x(80), top - 6, 'faster →', 'sub', 'end');
+      last = null;
+      placed.forEach(({ r, y0 }) => {
+        if (r.g !== last) { T(svg, 16, y0 - 8, r.g, 'sub', 'start'); last = r.g; }
+        const faint = st.pr === '38' && !r.real;
+        const g = S('g', { class: 'bar', tabindex: '0', role: 'img', 'aria-label': `${r.g}, ${r.label}: ${vtxt(r)}` }, svg);
+        T(g, 30, y0 + 15, r.label, 'lab', 'start');
+        if (r.v) {
+          const lo = Math.min(...r.v), hi = Math.max(...r.v), neg = hi <= 0 && lo < 0;
+          const col = lo === 0 && hi === 0 ? 'var(--muted)' : neg ? 'var(--c-bad)' : 'var(--c-good)';
+          g.style.setProperty('--bar', col);
+          if (r.v.length > 1) S('rect', { class: faint ? 'faint' : 'solid', x: x(lo), y: y0 + 5, width: Math.max(3, x(hi) - x(lo)), height: 12, rx: 4, fill: col }, g);
+          else if (lo === 0) S('circle', { cx: x(0), cy: y0 + 11, r: 5, fill: col }, g);
+          else S('path', { class: faint ? 'faint' : 'solid', d: neg ? leftPath(x(0), x(lo), y0 + 5, 12) : rowPath(x(0), x(hi), y0 + 5, 12) }, g);
+          const tx = neg ? x(lo) - 6 : x(Math.max(hi, 0)) + (lo === 0 && hi === 0 ? 10 : 6);
+          T(g, tx, y0 + 15, vtxt(r) + (r.note ? ` · ${r.note}` : ''), 'tk', neg ? 'end' : 'start');
+        } else {
+          T(g, x(0) + 6, y0 + 15, r.text, 'tk', 'start');
+        }
+        S('rect', { class: 'hit', x: 10, y: y0, width: W - 20, height: rowH }, g);
+        hover(g, () => ({ title: `${r.g}, ${r.label}`, rows: [{ v: vtxt(r), label: r.note || (st.pr === '41' ? '#41 against master' : 'CopySlot against TypedSlot'), color: g.style.getPropertyValue('--bar') || 'var(--muted)' }],
+          note: faint ? 'Inside the noise this run showed on rows #38 does not change.' : null }));
+      });
+      $('#r-ci-read').textContent = READ[st.pr];
+    }
+    const tb = $('#r-ci-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, tb));
+    ['run', 'group', 'row', 'change'].forEach((c) => H('th', null, c, hr));
+    const body = H('tbody', null, null, tb);
+    [['41', '#41 4e8ddff vs master, EPYC 7763'], ['38', '#38 4c8ecce, CopySlot vs TypedSlot, Xeon 8573C']].forEach(([k, name]) => D.ci[k].rows.forEach((r) => {
+      const tr = H('tr', null, null, body); [name, r.g, r.label, vtxt(r) + (r.note ? ` (${r.note})` : '')].forEach((c) => H('td', null, c, tr));
+    }));
+    segment($('#r-ci-ctl'), (k, v) => { st[k] = v; render(); });
+    render();
   })();
 
   /* ================= 3. CACHE_LINE 64 vs 128 ================= */

@@ -2,5 +2,5 @@
 # Regenerate by re-surveying the crate; G13 reads `digest` and fails
 # once it stops matching the crate on disk.
 crate: ring_mpsc
-swept: 2026-10-08
-digest: 5e9b58522f59c036b789be31f4aaa5b84f1a1d3299ee83600a51e7a35693df88
+swept: 2026-10-12
+digest: 180e54cef5f4184a415b1a4696f7b4ad3f0dcead0aba3a2e56789e3cf761195e

@@ -6,7 +6,7 @@ use std::marker::PhantomData;
 use std::sync::mpsc::{Receiver, SyncSender};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use ring_slot::TypedSlot;
+use ring_slot::{CopySlot, TypedSlot};
 use ring_types::Capacity;
 
 /// A record's key is its producer's id above these bits and the producer's sequence number in them.
@@ -36,9 +36,21 @@ impl Record for u64 {
   }
 }
 
-/// `N` words with the key in the first and the last: a payload the queue has to copy whole.
+/// `N` words, every one the key: a payload the queue has to copy whole, and whose check reads every word.
+///
+/// The check used to compare the first and last word only. At a 264-byte stride that never touched the middle
+/// 128-byte line of a 256-byte record, so the consumer pulled one line fewer per record than at a 256-byte stride,
+/// and the payload bench measured the checker's footprint instead of the queue's.
 #[derive(Clone, Copy, Debug)]
 pub struct Wide<const N: usize>(pub [u64; N]);
+
+// By hand: std's `Default` for arrays stops at 32 elements, so a derive could not cover every `N`.
+// `CopySlot` needs it to fill a ring before the first write.
+impl<const N: usize> Default for Wide<N> {
+  fn default() -> Self {
+    Self([0; N])
+  }
+}
 
 impl<const N: usize> Record for Wide<N> {
   fn new(key: u64) -> Self {
@@ -50,7 +62,7 @@ impl<const N: usize> Record for Wide<N> {
   }
 
   fn whole(&self) -> bool {
-    self.0[0] == self.0[N - 1]
+    self.0.iter().all(|word| *word == self.0[0])
   }
 }
 
@@ -250,6 +262,113 @@ struct MpscPrimaryTx<'a, R>(ring_mpsc::PrimaryProducer<'a, TypedSlot<R>>);
 impl<R: Record> Tx<R> for MpscPrimaryTx<'_, R> {
   fn try_push(&mut self, record: R) -> bool {
     self.0.try_push(record).is_ok()
+  }
+}
+
+/// `ring_spsc` over `CopySlot`, the record stored without `TypedSlot`'s tag: `try_push`;
+/// `drain_up_to`, read through `CopySlot::get`.
+#[derive(Debug)]
+pub struct SpscPlain<R = u64>(ring_spsc::Ring<CopySlot<R>>);
+
+impl<R: Record + Default> Candidate for SpscPlain<R> {
+  type Record = R;
+
+  const NAME: &'static str = "spsc-plain";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(slots: usize) -> Self {
+    Self(ring_spsc::Ring::new(capacity(slots)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    assert_eq!(producers, 1, "spsc takes one producer");
+    let (tx, rx) = self.0.split();
+
+    run.run(vec![SpscPlainTx(tx)], SpscPlainRx(rx))
+  }
+}
+
+struct SpscPlainTx<'a, R>(ring_spsc::Producer<'a, CopySlot<R>>);
+
+impl<R: Record> Tx<R> for SpscPlainTx<'_, R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_push(record).is_ok()
+  }
+}
+
+struct SpscPlainRx<'a, R>(ring_spsc::Consumer<'a, CopySlot<R>>);
+
+impl<R: Record> Rx<R> for SpscPlainRx<'_, R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.pop_batch(1, sink) == 1
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    self.0.drain_up_to(max).iter().map(|slot| sink(slot.get())).count()
+  }
+}
+
+/// `ring_mpsc` over `CopySlot`: `claim` and `CopySlot::set`, `claim_batch` for the batch modes;
+/// `drain_up_to`, read through `CopySlot::get`.
+#[derive(Debug)]
+pub struct MpscPlain<R = u64>(ring_mpsc::Ring<CopySlot<R>>);
+
+impl<R: Record + Default> Candidate for MpscPlain<R> {
+  type Record = R;
+
+  const NAME: &'static str = "mpsc-plain";
+  const PUSH_BATCH: bool = true;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(slots: usize) -> Self {
+    Self(ring_mpsc::Ring::new(capacity(slots)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let mut ends = self.0.ends();
+    let (tx, rx) = ends.split();
+
+    run.run(vec![MpscPlainTx(tx); producers], MpscPlainRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct MpscPlainTx<'a, R>(ring_mpsc::Producer<'a, CopySlot<R>>);
+
+impl<R: Record> Tx<R> for MpscPlainTx<'_, R> {
+  fn try_push(&mut self, record: R) -> bool {
+    let Ok(mut slot) = self.0.claim() else {
+      return false;
+    };
+    slot.set(record);
+
+    true
+  }
+
+  fn push_batch(&mut self, records: &[R]) -> usize {
+    let Ok(mut guard) = self.0.claim_batch(records.len()) else {
+      return 0;
+    };
+    let granted = guard.len();
+    for (offset, &record) in records.iter().enumerate().take(granted) {
+      guard.slot_mut(offset).expect("within the grant").set(record);
+    }
+    drop(guard);
+
+    granted
+  }
+}
+
+struct MpscPlainRx<'a, R>(ring_mpsc::Consumer<'a, CopySlot<R>>);
+
+impl<R: Record> Rx<R> for MpscPlainRx<'_, R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.pop_batch(1, sink) == 1
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    self.0.drain_up_to(max).iter().map(|slot| sink(slot.get())).count()
   }
 }
 

@@ -41,6 +41,26 @@ mod threaded {
     assert_eq!(batch.get_mut(2).and_then(TypedSlot::take), Some(3));
   }
 
+  /// The primary handle's room is the cursors' room, not its cache's: the same
+  /// advisory figure `Producer::free_capacity` reports, full before a claim,
+  /// none at full, and what a drain frees once it commits.
+  #[test]
+  fn the_primary_free_capacity_is_the_room_the_cursors_leave() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+    let mut primary = producer.primary();
+
+    assert_eq!(primary.free_capacity(), 4, "an empty ring");
+    for value in 1..=4 {
+      primary.try_push(value).expect("room");
+    }
+    assert_eq!(primary.free_capacity(), 0, "a full ring");
+
+    drop(consumer.drain_up_to(2));
+    assert_eq!(primary.free_capacity(), 2, "the two the drain committed");
+  }
+
   /// The cached head can only lag the consumer, so after the cache reports
   /// full the next claim refreshes it against the consumer's commit and
   /// succeeds — the conservative refusal never wedges the handle.

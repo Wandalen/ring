@@ -1,5 +1,5 @@
 {
-  "_about": "Every number in the explainer comes from here. All measured on one Apple M4 Pro (10 P + 4 E cores, 128-byte cache lines, 128 KB L1D per P-core, 16 MB L2 per cluster), macOS, rustc 1.98.0, bench profile (fat LTO), threads not pinned, 2026-10-09/10. Units: M records/s unless a key says ns or us. Pairs are two rounds in separate processes. 'one_line' = both cursors in one 128-byte line (ring at 0 mod 128); 'two_lines' = cursors on separate lines (ring at 64 mod 128). Rings heap-placed at a fixed offset for the two-thread cells unless 'stock_harness' is noted.",
+  "_about": "Every number in the explainer comes from here. Keys without a provenance of their own were measured on one Apple M4 Pro (10 P + 4 E cores, 128-byte cache lines, 128 KB L1D per P-core, 16 MB L2 per cluster), macOS, rustc 1.98.0, bench profile (fat LTO), threads not pinned, 2026-10-09/10. Units: M records/s unless a key says ns or us. Pairs are two rounds in separate processes. 'one_line' = both cursors in one 128-byte line (ring at 0 mod 128); 'two_lines' = cursors on separate lines (ring at 64 mod 128). Rings heap-placed at a fixed offset for the two-thread cells unless 'stock_harness' is noted. Keys measured later carry their own provenance (date, machine, build, commit or run): padding_128_m4, rtrb_against_ring_m4, issue_55_consumer_work_ci and ci_rebased_heads. Their M4 runs (2026-10-11/12) used rustc 1.97/1.98, the fat-LTO bench profile and loop heads pinned with -C llvm-args=-align-loops=16; their 'one_line' / 'two_lines' is the ring at byte 0 / 64 of a 256-byte block by the placement harness (#51). Ring = this repo's ring_spsc; rtrb = the rtrb 0.4 crate.",
   "machine": {
     "name": "Apple M4 Pro",
     "p_cores": 10,
@@ -800,6 +800,613 @@
     "22": "closed: both ends cache both cursors; its consumer half is #41",
     "23": "closed: 128-byte cursor padding; measured 3-7x slower on pop1 without #41",
     "38": "CopySlot, stacked on #41, 9 commits",
-    "41": "the consumer caches the producer cursor, 5 commits on master"
+    "41": "the consumer caches the producer cursor, 5 commits on master",
+    "48": "merged: Bench Compare passes the baseline to the report, not to criterion",
+    "49": "the 16384-slot producer store-latency cliff (with #54)",
+    "51": "the bench harness builds rings at a chosen cursor layout (placement harness)",
+    "53": "the loop-alignment lottery",
+    "54": "the 16384-slot producer store-latency cliff (with #49)",
+    "55": "issue: #41's two-thread loss on Zen 3"
+  },
+  "ci_runners": {
+    "_about": "GitHub CI x86 runners, 4 vCPU Azure VMs, 64-byte lines on x86.",
+    "zen3": "AMD EPYC 7763 (Zen 3)",
+    "zen5": "AMD EPYC 9V45 (Zen 5)",
+    "intel": "Intel Xeon Platinum 8573C"
+  },
+  "padding_128_m4": {
+    "_about": "ring_align::CACHE_LINE = 128 against the two placements of the 64-byte padding. spsc (TypedSlot) push1_pop1, M/s. Three rounds (1024 cells: five rounds). 128-byte padding always gives the two-lines layout. 'cl128' = CACHE_LINE = 128.",
+    "date": "2026-10-11/12",
+    "machine": "Apple M4 Pro, 128-byte lines, macOS",
+    "build": "rustc 1.97/1.98, fat-LTO bench profile, -C llvm-args=-align-loops=16",
+    "harness": "placement harness (#51): ring at byte 0 (one line) or 64 (two lines) of a 256-byte block",
+    "rows": [
+      {
+        "slots": 64,
+        "master_one_line": 98,
+        "master_two_lines": 31,
+        "master_cl128": 42,
+        "pr41_one_line": 128,
+        "pr41_two_lines": 111,
+        "pr41_cl128": 109
+      },
+      {
+        "slots": 1024,
+        "master_one_line": 244,
+        "master_two_lines": 246,
+        "master_cl128": 234,
+        "pr41_one_line": 363,
+        "pr41_two_lines": 329,
+        "pr41_cl128": 395
+      },
+      {
+        "slots": 16384,
+        "master_one_line": 43,
+        "master_two_lines": 48,
+        "master_cl128": 42,
+        "pr41_one_line": 35,
+        "pr41_two_lines": 34,
+        "pr41_cl128": 34
+      }
+    ],
+    "pr41_cl128_1024_all_five_rounds": [
+      375,
+      398
+    ],
+    "single_thread": "single-thread cells do not move with padding (within 1-3%)",
+    "reading": "128-byte padding helps master only against its unlucky layout (42 vs 31) and loses to its lucky one (98). For #41 it equals the two-line layout at 64 slots and is the steadiest result at 1024."
+  },
+  "rtrb_against_ring_m4": {
+    "_about": "Why rtrb beats ring at 64 slots on the M4: the differences between the two, removed one at a time. push1_pop1 (two threads, one record per hand-off), M/s. Ring = #41 + #38 unless a row says otherwise. 'cl128' = 128-byte cursor padding.",
+    "date": "2026-10-11/12",
+    "machine": "Apple M4 Pro, 128-byte lines, macOS",
+    "build": "rustc 1.97/1.98, fat-LTO bench profile, -C llvm-args=-align-loops=16",
+    "harness": "placement harness (#51): ring at byte 0 (one line) or 64 (two lines) of a 256-byte block",
+    "headline_approx": {
+      "_about": "approximate figures, as the record states them (~)",
+      "rtrb_64": 280,
+      "ring_copyslot_64": 150,
+      "ring_1024": 440,
+      "rtrb_1024": 310,
+      "ring_typedslot_16384": 35,
+      "rtrb_16384": 370,
+      "ring_copyslot_16384_range": [
+        393,
+        475
+      ],
+      "note_16384": "TypedSlot hits the #49 cliff; CopySlot ties or leads"
+    },
+    "protocol_shared": "both rings cache the other end's cursor on both sides, write one slot and do one release store per record, and reload only when the cache says full/empty",
+    "slot_size": {
+      "_about": "same run, 8- vs 16-byte slots",
+      "rows": [
+        {
+          "candidate": "rtrb, 8-byte",
+          "s64_one_line": 284,
+          "s64_two_lines": 272,
+          "s1024_one_line": 316,
+          "s1024_two_lines": 315
+        },
+        {
+          "candidate": "rtrb, 16-byte",
+          "s64_one_line": 227,
+          "s64_two_lines": 212,
+          "s1024_one_line": 164,
+          "s1024_two_lines": 159
+        },
+        {
+          "candidate": "ring CopySlot, 8-byte",
+          "s64_one_line": 153,
+          "s64_two_lines": 133,
+          "s1024_one_line": 433,
+          "s1024_two_lines": 444
+        },
+        {
+          "candidate": "ring CopySlot, 16-byte",
+          "s64_one_line": 141,
+          "s64_two_lines": 121,
+          "s1024_one_line": 330,
+          "s1024_two_lines": 370
+        },
+        {
+          "candidate": "ring TypedSlot (16-byte)",
+          "s64_one_line": 133,
+          "s64_two_lines": 117,
+          "s1024_one_line": 388,
+          "s1024_two_lines": 388
+        }
+      ],
+      "reading": "Equal slot size: rtrb still 1.6-1.9x faster at 64 slots. Not the slot."
+    },
+    "consumer_rungs": {
+      "_about": "8-byte CopySlot ring, each rung removes one difference",
+      "rows": [
+        {
+          "candidate": "A: today's drain_up_to(1) through a Batch",
+          "s64_one_line": 154,
+          "s64_two_lines": 116,
+          "s1024_one_line": 455,
+          "s1024_two_lines": 488
+        },
+        {
+          "candidate": "B: A, empty poll stores nothing",
+          "s64_one_line": 150,
+          "s64_two_lines": 115,
+          "s1024_one_line": 448,
+          "s1024_two_lines": 484
+        },
+        {
+          "candidate": "C: B, own position kept in a field",
+          "s64_one_line": 145,
+          "s64_two_lines": 121,
+          "s1024_one_line": 510,
+          "s1024_two_lines": 490
+        },
+        {
+          "candidate": "D: rtrb-shaped pop_one, no Batch",
+          "s64_one_line": 155,
+          "s64_two_lines": 119,
+          "s1024_one_line": 292,
+          "s1024_two_lines": 368
+        },
+        {
+          "candidate": "rtrb",
+          "s64_one_line": 284,
+          "s64_two_lines": 285,
+          "s1024_one_line": 293,
+          "s1024_two_lines": 310
+        }
+      ],
+      "reading": "At 64 slots no consumer change matters. At 1024 the Batch path is ring's advantage: rtrb-shaped pop drops ring to rtrb's level."
+    },
+    "producer_rungs": {
+      "_about": "consumer D in all",
+      "rows": [
+        {
+          "candidate": "E: + producer = rtrb's push",
+          "s64_one_line": 149,
+          "s64_two_lines": 130,
+          "s64_cl128": 113,
+          "s1024_one_line": 290
+        },
+        {
+          "candidate": "F: E + capacity kept in the producer",
+          "s64_one_line": 189,
+          "s64_two_lines": 153,
+          "s64_cl128": 134,
+          "s1024_one_line": 248
+        },
+        {
+          "candidate": "rtrb",
+          "s64_one_line": 281,
+          "s64_two_lines": 275,
+          "s64_cl128": 282,
+          "s1024_one_line": 315
+        }
+      ]
+    },
+    "cursor_order": {
+      "_about": "128-byte padding; ring's producer-first order against rtrb's consumer-first order. [producer-first, consumer-first], M/s",
+      "rung_D": [
+        146,
+        94
+      ],
+      "rung_F": [
+        158,
+        127
+      ],
+      "rtrb": "unaffected",
+      "reading": "consumer-first made ring slower. Not the order."
+    },
+    "code_and_placement": {
+      "code": "the disassembled push and pop loops of rung F and rtrb are nearly instruction for instruction the same (~15 instructions per push; both pops out-of-line, same sequence)",
+      "ring_offsets": {
+        "producer_cursor": "0x00",
+        "consumer_cursor": "0x40",
+        "CursorPair.capacity": "0x80",
+        "slot_array_pointer": "0xc0"
+      },
+      "rtrb_offsets": {
+        "consumer_cursor_head": "0x00",
+        "producer_cursor_tail": "0x80",
+        "data_pointer_capacity": "0x100"
+      },
+      "addresses": "ring's and rtrb's slot arrays landed at the same address in a run; the per-record checker word and the two handles (each on its own thread's stack) never shared a line with either array"
+    },
+    "counters": {
+      "_about": "macOS kperf, per thread, per record; cursors on one line; ring today = CopySlot ring",
+      "date": "2026-10-12",
+      "rows": [
+        {
+          "candidate": "rtrb",
+          "slots": 64,
+          "Mps": 257,
+          "cycles": 15.4,
+          "instructions_producer": 25,
+          "instructions_consumer": 43,
+          "l1d_load_misses_consumer": 0.69,
+          "cycles_waiting_older_l1d_miss_producer": 1.4,
+          "cycles_waiting_older_l1d_miss_consumer": 1.8
+        },
+        {
+          "candidate": "ring rung F",
+          "slots": 64,
+          "Mps": 161,
+          "cycles": 24.4,
+          "instructions_producer": 17,
+          "instructions_consumer": 47,
+          "l1d_load_misses_consumer": 0.74,
+          "cycles_waiting_older_l1d_miss_producer": 6.1,
+          "cycles_waiting_older_l1d_miss_consumer": 4.5
+        },
+        {
+          "candidate": "ring today",
+          "slots": 64,
+          "Mps": 142,
+          "cycles": 28.4,
+          "instructions_producer": 19,
+          "instructions_consumer": 42,
+          "l1d_load_misses_consumer": 0.78,
+          "cycles_waiting_older_l1d_miss_producer": 8.9,
+          "cycles_waiting_older_l1d_miss_consumer": 8.4
+        },
+        {
+          "candidate": "ring today",
+          "slots": 1024,
+          "Mps": 393,
+          "cycles": 10.2,
+          "instructions_producer": 19,
+          "instructions_consumer": 41,
+          "l1d_load_misses_consumer": 0.39,
+          "cycles_waiting_older_l1d_miss_producer": 1.0,
+          "cycles_waiting_older_l1d_miss_consumer": 1.2
+        }
+      ],
+      "reading": "Same work and the same number of misses; ring's misses cost 4-6x more cycles.",
+      "hypothesis": "the two cores keep trading the same lines; the counters cannot say which line"
+    },
+    "probe": {
+      "_about": "a sampling probe added ~20 instructions per record to every consumer",
+      "rtrb_Mps": {
+        "without": 257,
+        "with": [
+          100,
+          114
+        ]
+      },
+      "rtrb_cycles_per_record": {
+        "without": 15,
+        "with": [
+          37,
+          41
+        ]
+      },
+      "ring_today_Mps_with": [
+        130,
+        152
+      ],
+      "ring_today_cycles_per_record": {
+        "without": 28,
+        "with": [
+          28,
+          32
+        ]
+      },
+      "note": "fill-level samples taken by that probe are from the slow regime and not used"
+    },
+    "consumer_work_sweep": {
+      "_about": "a knob makes the consumer run n dependent multiply-adds per record, identical for every candidate; median of 2 rounds; M/s",
+      "rows": [
+        {
+          "work": 0,
+          "s64_typedslot": 148,
+          "s64_copyslot": 166,
+          "s64_rtrb": 214,
+          "s1024_typedslot": 416,
+          "s1024_copyslot": 370,
+          "s1024_rtrb": 218
+        },
+        {
+          "work": 1,
+          "s64_typedslot": 144,
+          "s64_copyslot": 194,
+          "s64_rtrb": 187,
+          "s1024_typedslot": 401,
+          "s1024_copyslot": 272,
+          "s1024_rtrb": 190
+        },
+        {
+          "work": 2,
+          "s64_typedslot": 141,
+          "s64_copyslot": 192,
+          "s64_rtrb": 155,
+          "s1024_typedslot": 183,
+          "s1024_copyslot": 204,
+          "s1024_rtrb": 169
+        },
+        {
+          "work": 4,
+          "s64_typedslot": 134,
+          "s64_copyslot": 151,
+          "s64_rtrb": 95,
+          "s1024_typedslot": 170,
+          "s1024_copyslot": 146,
+          "s1024_rtrb": 109
+        },
+        {
+          "work": 8,
+          "s64_typedslot": 114,
+          "s64_copyslot": 52,
+          "s64_rtrb": 64,
+          "s1024_typedslot": 154,
+          "s1024_copyslot": 47,
+          "s1024_rtrb": 70
+        },
+        {
+          "work": 16,
+          "s64_typedslot": 56,
+          "s64_copyslot": 33,
+          "s64_rtrb": 36,
+          "s1024_typedslot": 60,
+          "s1024_copyslot": 34,
+          "s1024_rtrb": 36
+        }
+      ],
+      "unreliable": {
+        "work": 2,
+        "cell": "s1024_typedslot",
+        "rounds": [
+          45,
+          321
+        ]
+      },
+      "readings": [
+        "rtrb's 64-slot lead exists only at zero consumer work; from one step ring with CopySlot is level or ahead, from four both ring variants beat rtrb.",
+        "With heavy consumer work the two 8-byte-slot rings fall into the full-ring lockstep (refused pushes 0.1-0.3 per record); TypedSlot's slower producer avoids it.",
+        "Merely compiling the knob in (set to 0) moved rtrb's baseline from ~280 to 214: this cell is extremely sensitive to generated code."
+      ],
+      "open": "why rtrb's threads pay 4-6x less per miss with a nearly empty consumer"
+    },
+    "capacity_in_producer_dropped": {
+      "what": "keeping capacity in ring's producer on the shipped path",
+      "two_lines_gain_pct": [
+        0,
+        15
+      ],
+      "copyslot_single_thread_push_pop_ns": [
+        2.56,
+        2.98
+      ],
+      "copyslot_whole_lap_drain_Mps": [
+        1280,
+        1150
+      ],
+      "typedslot_one_line_64_handoff": "about -15%",
+      "outcome": "tested and dropped, no PR"
+    }
+  },
+  "issue_55_consumer_work_ci": {
+    "_about": "#55: #41's two-thread loss on Zen 3 is a lean-consumer regime. Change of #41 against master, one-record hand-off, percent; each entry is the range the record gives over 64 slots, 1024 slots and the pair pinned to two cores (one value where the range collapses).",
+    "date": "2026-10-12",
+    "machines": "GitHub CI x86 runners: AMD EPYC 7763 (Zen 3), AMD EPYC 9V45 (Zen 5)",
+    "master": "ab9b3e4",
+    "pr41": "4e8ddff",
+    "run": "https://github.com/Wandalen/ring/actions/runs/38187586690",
+    "method": "one CI job per runner, both built with 64- and 128-byte padding, the consumer-work knob swept 0/1/2/4/8, two rounds interleaved, rtrb as control (within +-5% in all but two cells)",
+    "columns": {
+      "zen3_vm1": "Zen 3, first VM",
+      "zen3_vm2": "Zen 3, second VM",
+      "zen3_smt": "Zen 3, SMT siblings",
+      "zen5": "Zen 5, two cores"
+    },
+    "rows": [
+      {
+        "work": 0,
+        "zen3_vm1": [
+          -38,
+          -41
+        ],
+        "zen3_vm2": [
+          -32,
+          -36
+        ],
+        "zen3_smt": [
+          40
+        ],
+        "zen5": [
+          40,
+          106
+        ]
+      },
+      {
+        "work": 1,
+        "zen3_vm1": [
+          -29,
+          -31
+        ],
+        "zen3_vm2": [
+          -32,
+          -33
+        ],
+        "zen3_smt": [
+          39,
+          41
+        ],
+        "zen5": [
+          43,
+          103
+        ]
+      },
+      {
+        "work": 2,
+        "zen3_vm1": [
+          -25,
+          -30
+        ],
+        "zen3_vm2": [
+          -27,
+          -28
+        ],
+        "zen3_smt": [
+          33,
+          34
+        ],
+        "zen5": [
+          41,
+          108
+        ]
+      },
+      {
+        "work": 4,
+        "zen3_vm1": [
+          -7,
+          -10
+        ],
+        "zen3_vm2": [
+          5,
+          9
+        ],
+        "zen3_smt": [
+          33
+        ],
+        "zen5": [
+          30,
+          96
+        ]
+      },
+      {
+        "work": 8,
+        "zen3_vm1": [
+          13,
+          15
+        ],
+        "zen3_vm2": [
+          23,
+          26
+        ],
+        "zen3_smt": [
+          24,
+          25
+        ],
+        "zen5": [
+          38,
+          76
+        ]
+      }
+    ],
+    "absolute_zen3_two_cores_approx_Mps": {
+      "master_work0": [
+        31,
+        34
+      ],
+      "pr41_work0": [
+        19,
+        21
+      ],
+      "master_work8": 25,
+      "pr41_work8": [
+        28,
+        32
+      ],
+      "rtrb_work0": [
+        75,
+        80
+      ],
+      "rtrb_work8": [
+        53,
+        57
+      ]
+    },
+    "refused_pushes_per_record_approx": {
+      "work0": {
+        "pr41": 1.2,
+        "master": 0.7
+      },
+      "work8": {
+        "pr41": 0.7,
+        "master": 0.8
+      }
+    },
+    "readings": [
+      "The loss shrinks with every step, crosses zero at about four, is a gain at eight; reproduces Bench Compare's -36...-42% at no work.",
+      "16384 slots (-74% in Bench Compare) was not swept.",
+      "128-byte padding moves neither side on Zen 3 by more than ~10% and flips no row; on Zen 5 it lifts master up to 24% at no work, #41 still leads every row. The prefetcher-pairing hypothesis is ruled out."
+    ],
+    "open": "why a lean consumer deepens the lockstep on Zen 3"
+  },
+  "ci_rebased_heads": {
+    "_about": "Bench Compare on the rebased heads, GitHub CI x86 runners. Percent changes as Bench Compare reports them.",
+    "date": "2026-10-12",
+    "pr41_zen3": {
+      "head": "4e8ddff",
+      "against": "master",
+      "runner": "AMD EPYC 7763 (Zen 3)",
+      "push1_pop1_change_pct": {
+        "64": -41,
+        "1024": -42,
+        "16384": -74
+      },
+      "push1_pop1_Mps_as_given": {
+        "64": 21.8,
+        "1024": 23.2,
+        "16384": 30.2
+      },
+      "pinned_two_cores_change_pct": -36,
+      "smt_siblings_change_pct": 47,
+      "single_thread_fill_drain_one_record_change_pct": {
+        "64": 18,
+        "1024": 22,
+        "16384": 20
+      },
+      "push_pop": "18.5% faster",
+      "pop_empty": "33-50% slower",
+      "rtrb_same_run_Mps": [
+        105,
+        178
+      ]
+    },
+    "pr38_intel": {
+      "head": "4c8ecce",
+      "runner": "Intel Xeon Platinum 8573C",
+      "compares": "CopySlot against TypedSlot in the same head run",
+      "push_pop_ns": {
+        "copyslot": 3.3,
+        "typedslot": 3.5
+      },
+      "fill_drain_one_thread_one_record_pct": {
+        "64": 39,
+        "1024": 21,
+        "16384": 25
+      },
+      "fill_drain_whole_lap_pct": {
+        "64": 31,
+        "1024": 34,
+        "16384": 33
+      },
+      "push1_pop1_pct": {
+        "64": 9,
+        "1024": 68,
+        "16384": 51
+      },
+      "push1_popN_pct": {
+        "64": -19,
+        "1024": 46,
+        "16384": -66
+      },
+      "push1_popN_16384_Mps": {
+        "copyslot": 107,
+        "typedslot": 314
+      },
+      "record_bytes_pct": {
+        "8": 48,
+        "64": -6,
+        "256": "tie"
+      },
+      "mpsc_plain_vs_mpsc_pct": [
+        2,
+        3
+      ],
+      "noise_caveat": "TypedSlot rows that #38 does not change moved -15...+48% between base and head in that same run, so only the consistent single-thread gains read as real."
+    }
   }
 }

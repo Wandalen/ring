@@ -4921,7 +4921,7 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
 </script>
 </section>
 
-<!-- summary: Reference material split out of the measurements chapter: the seven open questions with their confidence, and the glossary of the terms the page relies on. No controls; it is the place the other sections link to. -->
+<!-- summary: Reference material split out of the measurements chapter: the open questions with their confidence (two of them settled since, one tested and dropped), and the glossary of the terms the page relies on. No controls; it is the place the other sections link to. -->
 <section id="sec-reference" class="section" data-title="Open questions and glossary">
 <style>
 
@@ -4936,7 +4936,8 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
 <h3>Open questions</h3>
 <ol class="oq">
   <li><strong>Why is a 64-byte stride slow at the frontier?</strong> Ruled out: 4K aliasing, more line sharing, codegen.
-    Padding to 72 bytes fixes it; the mechanism needs hardware counters.</li>
+    Padding to 72 bytes fixes it. No counter run has looked at it: the kperf counters of section 6 measured the
+    one-record hand-off only.</li>
   <li><strong>Why did #41 slow two single-thread benchmarks?</strong> Settled. The M4's whole-lap <code>fill_drain</code>
     followed the drain loop head's address mod 8 and measured equal within 0.5% with loop heads pinned; whether
     <code>verb/bench</code> should pin them is #53. The x86 runner's 22% loss on one-record drains was the compiled
@@ -4945,11 +4946,19 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
   <li><strong>What holds <code>TypedSlot</code> at 16384 slots to 25–48 M/s?</strong> Answered: past a slot-array size
     the producer's stores stall and the consumer gets stuck polling one record behind. The onset follows slot size (none
     to 65536 for 8-byte slots, from 16384 for 16-byte, from 2048 for 32-byte), the cache moves it from 16384 to 8192,
-    and a producer store prefetch removes it (#49, #54). Why the stores stall, an L1 miss or a coherence upgrade, needs
-    counters.</li>
-  <li><strong>Why is the two-thread one-record hand-off slower with #41 on a Zen 3 core?</strong> On an EPYC 7763 CI
-    runner it sits in the full-ring lockstep at −38…−74% against master, while the M4 and a Zen 5 runner gain. Not
-    established; tracked in #55, the open merge question for #41.</li>
+    and a producer store prefetch removes it (#49, #54). Why the stores stall, an L1 miss or a coherence upgrade, no
+    counter run has checked.</li>
+  <li><strong>Why is the two-thread one-record hand-off slower with #41 on a Zen 3 core?</strong> Bounded (#55,
+    section 6). It is a lean-consumer regime. At no consumer work #41 measured −38…−41% and −32…−36% against master on
+    two Zen 3 VMs; the loss shrinks with every step of the consumer-work knob, crosses zero at about four and is a gain
+    at eight. Pinned to SMT siblings and on Zen 5, #41 gains at every step. 128-byte padding flips no row, which rules
+    out the prefetcher-pairing hypothesis. Still open: why a lean consumer deepens the lockstep on Zen 3, and the
+    16384-slot cell (−74% in Bench Compare), which was not swept. This remains the open merge question for #41.</li>
+  <li><strong>Why are rtrb's misses cheap with a near-empty consumer?</strong> Open. On the M4 at 64 slots, rtrb and
+    ring take about the same number of L1D load misses per record (0.69 against 0.78 in the consumer), and ring's cost
+    4–6x more cycles. Slot size, consumer shape, producer shape, cursor order, code and placement were tested one at a
+    time and none closed the gap; rtrb's 64-slot lead exists only at zero consumer work (section 6). The counters
+    cannot say which line misses.</li>
   <li><strong>Which mode of the bimodal popN 1024 cell is typical?</strong> The regimes review attributes the two modes to
     the chase's initial race (high confidence). A separate review tied the tagged flip to the slot array sitting one page
     after the ring, mechanism unknown.</li>
@@ -4957,20 +4966,37 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
     R* ≈ m / (c − p) (m one refresh ≈ 45 ns, c the consumer's cost per pop, p the producer's cost per push) was fitted
     qualitatively; c and p were never measured in isolation.</li>
   <li><strong>Does the one-line layout batch about 4 records per transfer?</strong> Consistent with the timings (one-way
-    37.8 ns against ~9–10 ns per record), unobservable without counters. Hypothesis, ~70% confidence.</li>
-  <li><strong>Should <code>CACHE_LINE</code> become 128?</strong> With #41 the two layouts measure the same on pop1, so
-    this is now a footprint decision, not a speed one.</li>
+    37.8 ns against ~9–10 ns per record). The kperf counters read since count misses per record but cannot say which
+    line missed, so it is still unobserved. Hypothesis, ~70% confidence.</li>
+  <li><strong>Should <code>CACHE_LINE</code> become 128?</strong> Tested, not decided. On the M4 with #41, 128-byte
+    padding equals the two-line layout at 64 slots (109 against 111 M/s) and gives the steadiest 1024-slot result (395,
+    all five rounds 375–398); single-thread cells do not move (within 1–3%). For master it helps only against the
+    unlucky layout (42 against 31) and loses to the lucky one (98). On Zen 3 it moves neither side by more than ~10%; on
+    Zen 5 it lifts master by up to 24% at no consumer work, and #41 still leads (section 5, #55).</li>
+  <li><strong>Should the producer keep the capacity in a field?</strong> Tested and dropped. On the shipped path it helps
+    the two-line layout by 0 to +15%, and costs <code>CopySlot</code>'s single-thread <code>push_pop</code> 16% (2.56 →
+    2.98 ns), its whole-lap drain 10% (1280 → 1150 M/s) and <code>TypedSlot</code>'s one-line 64-slot hand-off about
+    15%. No PR (section 6).</li>
 </ol>
 
 <h3>Glossary</h3>
 <dl class="gl">
-  <dt>Cache line</dt><dd>The unit a cache stores, moves and keeps coherent. 128 bytes on this M4 Pro; <code>ring_align</code> assumes 64.</dd>
+  <dt>Cache line</dt><dd>The unit a cache stores, moves and keeps coherent. 128 bytes on this M4 Pro, 64 on the x86 CI runners; <code>ring_align</code> assumes 64.</dd>
   <dt>Coherence transfer</dt><dd>Moving a line, or its write ownership, from one core's cache to another's, invalidating the old copy. One way inside a P-core cluster: median 37.8 ns.</dd>
   <dt>Stride</dt><dd>Bytes from the start of one slot to the start of the next: 16 for <code>TypedSlot&lt;u64&gt;</code>, 8 for <code>CopySlot&lt;u64&gt;</code>, 72 against 64 and 264 against 256 for the wide records.</dd>
   <dt>Frontier</dt><dd>The slots the producer is writing while the consumer reads right behind it. Lines there are hot on both cores at once.</dd>
   <dt>Lockstep</dt><dd>The full ring with the producer one slot behind the consumer: it refreshes its cached consumer cursor before nearly every push, about 48 ns each.</dd>
   <dt><code>OWN</code>, <code>GATING</code>, <code>HANDOFF</code></dt><dd>The three orderings the ring uses. <code>OWN</code> is <code>Relaxed</code>: an end reading the cursor only it writes. <code>GATING</code> is <code>Acquire</code>: reading the other end's cursor before touching the slots it guards. <code>HANDOFF</code> is <code>Release</code>: publishing one's own cursor after the slot writes.</dd>
   <dt>LDAPR, STLR</dt><dd>The AArch64 instructions behind them: LDAPR (and LDAPUR) an acquire load in the weaker RCpc form, STLR (and STLUR) a release store. A push does one STLR; before #41, every pop did one LDAPR.</dd>
+  <dt>rtrb</dt><dd>The <code>rtrb</code> 0.4 crate, a published single-producer, single-consumer ring with 8-byte slots for a <code>u64</code>. Section 6 compares ring against it.</dd>
+  <dt>Rung</dt><dd>One step of section 6's comparison: ring with one more difference from rtrb removed, measured beside rtrb in the same run.</dd>
+  <dt>Consumer work</dt><dd>A benchmark knob that makes the consumer run <var>n</var> dependent multiply-adds per record, the same for every candidate.</dd>
+  <dt>Lean-consumer regime</dt><dd>A consumer that does almost no work per record. On the M4, rtrb's 64-slot lead over ring exists only there; on Zen 3, #41's loss against master lives there and turns into a gain by eight steps of consumer work (#55).</dd>
+  <dt>Refused push</dt><dd>A push the ring turns away because it is full. Counted per record, as in #55's 1.2 for #41 against 0.7 for master at no consumer work.</dd>
+  <dt>kperf</dt><dd>macOS's interface to the CPU's performance counters. Section 6 reads cycles, instructions and L1D misses per thread through it.</dd>
+  <dt>Placement harness</dt><dd>#51: the bench harness builds each ring at a chosen byte of a 256-byte block (0 or 64), so a run reports one cursor layout instead of whatever the stack gave it.</dd>
+  <dt>Bench Compare</dt><dd>The CI job that runs a PR's base and head in the same run and reports the change per benchmark.</dd>
+  <dt>SMT siblings</dt><dd>The two hardware threads of one physical core. A pair pinned there shares that core's L1 cache.</dd>
   <dt>loom</dt><dd>A Rust model checker. It runs a concurrent test under every interleaving the memory model permits, up to a bound, and so catches orderings a real run rarely exposes.</dd>
 </dl>
 

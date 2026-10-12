@@ -489,6 +489,134 @@ mod threaded {
     assert_eq!(values, vec![1, 2]);
   }
 
+  // ── the consumer's cursor cache ────────────────────────────────────────────
+  //
+  // The consumer keeps its latest observation of the producer cursor and
+  // reloads it only when it knows of fewer records than a drain asks for. The
+  // cache must be invisible: every test here passes against a consumer that
+  // reloads on every drain, and each pins one way a cache could go wrong.
+
+  /// A bounded drain leaves the consumer knowing of records it did not take. A
+  /// later unbounded drain must still report everything published since,
+  /// including what the consumer has not looked at yet. A cache that reloads
+  /// only when it knows of nothing would hand out one record here and leave
+  /// the third published but unreported.
+  #[test]
+  fn drain_takes_everything_published_after_a_bounded_drain() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(8));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    let first: Vec<u8> = consumer.drain_up_to(1).iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(first, [1]);
+
+    producer.try_push(3).unwrap();
+    let rest: Vec<u8> = consumer.drain().iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(
+      rest,
+      [2, 3],
+      "an unbounded drain reports the shared cursor, not what the consumer last knew"
+    );
+  }
+
+  /// One record per drain, across pushes that land between drains. A cache
+  /// that never reloaded would run dry after what the first look saw; one that
+  /// reloaded too eagerly would still be correct, only slower.
+  #[test]
+  fn bounded_drains_hand_out_every_record_one_at_a_time_across_later_pushes() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let (mut producer, mut consumer) = ring.split();
+
+    fn one(consumer: &mut Consumer<'_, TypedSlot<u8>>) -> Option<u8> {
+      consumer.drain_up_to(1).get(0).and_then(TypedSlot::get).copied()
+    }
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    assert_eq!(one(&mut consumer), Some(1));
+    producer.try_push(3).unwrap();
+    assert_eq!(
+      one(&mut consumer),
+      Some(2),
+      "known before the third push, handed out without a reload"
+    );
+    assert_eq!(one(&mut consumer), Some(3), "known of nothing, reloaded, found the third");
+    assert_eq!(one(&mut consumer), None);
+    producer.try_push(4).unwrap();
+    assert_eq!(one(&mut consumer), Some(4));
+  }
+
+  /// A bounded drain takes what it asks for, whatever the consumer already
+  /// knows of. Knowing of more, it takes `max` and no more: a drain that
+  /// handed out what it knew of would take three here. Knowing of fewer, it
+  /// reloads: one that trusted any nonzero knowledge would stop at two where
+  /// three are published.
+  #[test]
+  fn a_bounded_drain_takes_what_it_asks_for_whatever_the_consumer_knows() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(8));
+    let (mut producer, mut consumer) = ring.split();
+
+    for value in 1..=4 {
+      producer.try_push(value).unwrap();
+    }
+    assert_eq!(consumer.drain_up_to(1).len(), 1, "reloaded, knows of four");
+    assert_eq!(consumer.drain_up_to(1).len(), 1, "knows of three, asked for one");
+
+    producer.try_push(5).unwrap();
+    let taken: Vec<u8> = consumer.drain_up_to(3).iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(taken, [3, 4, 5], "knew of two, asked for three, reloaded");
+  }
+
+  /// A second split carries the shared cursors over. The new consumer's cache
+  /// starts behind them, and must still find the record the first generation
+  /// left published. A cache that started at zero and compared for equality
+  /// with its position would report an empty ring here forever.
+  #[test]
+  fn a_re_split_consumer_sees_what_the_first_generation_left_published() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    {
+      let (mut producer, mut consumer) = ring.split();
+      producer.try_push(1).unwrap();
+      producer.try_push(2).unwrap();
+      assert_eq!(consumer.drain_up_to(1).len(), 1);
+    }
+
+    let (mut producer, mut consumer) = ring.split();
+    assert_eq!(consumer.position(), Seq(1), "the shared cursor carried over");
+    producer.try_push(3).unwrap();
+
+    let drained: Vec<u8> = consumer.drain_up_to(1).iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(drained, [2], "the record the first generation left published");
+    let drained: Vec<u8> = consumer.drain_up_to(1).iter().filter_map(TypedSlot::get).copied().collect();
+    assert_eq!(drained, [3]);
+    assert!(consumer.is_empty());
+  }
+
+  /// The queries keep their binding to the shared cursor. Between a bounded
+  /// drain and the next, the consumer may know of fewer records than are
+  /// published; `available` and `is_empty` answer for the ring, not the cache.
+  #[test]
+  fn available_and_is_empty_bind_to_the_shared_cursor_not_the_cache() {
+    let mut ring: Ring<TypedSlot<u8>> = Ring::new(cap(4));
+    let (mut producer, mut consumer) = ring.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+    assert_eq!(consumer.drain_up_to(1).len(), 1);
+    producer.try_push(3).unwrap();
+
+    assert_eq!(consumer.available(), 2, "two published records the consumer has not taken");
+    assert!(!consumer.is_empty());
+
+    assert_eq!(consumer.drain_up_to(1).len(), 1);
+    assert_eq!(consumer.available(), 1);
+
+    assert_eq!(consumer.drain().len(), 1);
+    assert_eq!(consumer.available(), 0);
+    assert!(consumer.is_empty());
+  }
+
   #[test]
   fn get_and_iter_agree_at_every_offset() {
     let mut ring: Ring<TypedSlot<u32>> = Ring::new(cap(8));
@@ -1307,6 +1435,215 @@ mod exhaustive {
         "the consumer drained {second_len} reclaimed record(s) against {} grant(s)",
         granted.load(Ordering::Relaxed),
       );
+    });
+  }
+
+  /// The consumer's cache of the producer cursor is refreshed by a [`GATING`]
+  /// load, and every record a bounded drain hands out was published before a
+  /// store that load observed — on this drain or an earlier one, since program
+  /// order carries the edge forward. A refresh at `Relaxed` lets the drain
+  /// below reach a record whose payload store is not yet visible; a cache that
+  /// extrapolated past its observation would hand out a record never published
+  /// at all. Both fail here.
+  ///
+  /// [`GATING`]: ring_spsc::GATING
+  #[test]
+  fn a_bounded_drain_hands_out_only_records_whose_writes_it_can_see() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 2] = Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (mut producer, mut consumer) = leaked_ring(2).split();
+
+      let producing = loom::thread::spawn(move || {
+        for (slot, value) in [(0usize, 1u8), (1, 2)] {
+          // The payload store before each publish is what the drain checks for.
+          payloads[slot].store(WRITTEN, Ordering::Relaxed);
+          producer.try_push(value).expect("a two-slot ring admits two");
+        }
+      });
+
+      let draining = loom::thread::spawn(move || {
+        // Two looks of one record each, not a loop: every point the looks can
+        // land is an execution loom already runs. The second look is the one
+        // the cache may answer without reloading.
+        let mut taken = 0;
+        for _ in 0..2 {
+          let batch = consumer.drain_up_to(1);
+          assert!(batch.len() <= 1, "a drain bounded to one handed out {}", batch.len());
+          let Some(slot) = batch.get(0) else {
+            continue;
+          };
+          let seq = batch.start();
+          assert_eq!(
+            payloads[(seq.0 & 1) as usize].load(Ordering::Relaxed),
+            WRITTEN,
+            "record {seq:?} was handed out before the write that preceded its publish was visible",
+          );
+          assert_eq!(
+            slot.get().copied(),
+            Some(seq.0 as u8 + 1),
+            "record {seq:?} carried another record's value"
+          );
+          taken += 1;
+        }
+        taken
+      });
+
+      producing.join().expect("the producer thread");
+      let taken = draining.join().expect("the drain thread");
+      assert!(taken <= 2, "drained {taken} records against two pushes");
+    });
+  }
+
+  /// What the cache must never do silently: stop short. Three records are
+  /// pushed while the consumer takes two bounded looks; after both threads
+  /// join, one unbounded drain must hand over the rest. Across every
+  /// interleaving the consumer receives each record exactly once, in order,
+  /// each carrying the write that preceded its publish.
+  ///
+  /// The safety models above only bound what a drain hands out; none fails
+  /// when a drain reports less than is published. Red under a reload rule of
+  /// `start == cached` (the final drain answers from a partial observation),
+  /// and under a cache that is never written back.
+  #[test]
+  fn every_record_arrives_exactly_once_and_in_order_across_cached_drains() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 3] =
+        Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (mut producer, consumer) = leaked_ring(4).split();
+
+      let producing = loom::thread::spawn(move || {
+        for (seq, payload) in payloads.iter().enumerate() {
+          payload.store(WRITTEN, Ordering::Relaxed);
+          producer.try_push(seq as u8 + 1).expect("a four-slot ring admits three");
+        }
+      });
+
+      let draining = loom::thread::spawn(move || {
+        let mut consumer = consumer;
+        let mut taken = Vec::new();
+        for _ in 0..2 {
+          let batch = consumer.drain_up_to(1);
+          for (offset, slot) in batch.iter().enumerate() {
+            let seq = batch.start().advanced_by(offset as u64);
+            assert_eq!(
+              payloads[seq.0 as usize].load(Ordering::Relaxed),
+              WRITTEN,
+              "record {seq:?} unwritten"
+            );
+            taken.push(slot.get().copied().expect("a pushed record"));
+          }
+        }
+        (consumer, taken)
+      });
+
+      producing.join().expect("the producer thread");
+      let (mut consumer, mut taken) = draining.join().expect("the drain thread");
+
+      // Quiescent: every push has published and both threads have joined.
+      taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+      assert_eq!(taken, [1, 2, 3], "lost, duplicated or reordered across the cache");
+      assert!(consumer.is_empty());
+    });
+  }
+
+  /// `available` reads the shared cursor and a bounded drain may answer from
+  /// the cache. A count `available` reported must still be handed out by the
+  /// next drain asked for that many: the reading is a lower bound until this
+  /// end drains (`Consumer::available`'s invariant, and `ring_core`'s `len`).
+  ///
+  /// Red under a reload rule of `start == cached`: after a bounded look that
+  /// left one record known, `available` sees two and the drain hands out one.
+  #[test]
+  fn a_drain_for_what_available_reported_hands_out_that_many() {
+    loom::model(|| {
+      let (mut producer, mut consumer) = leaked_ring(4).split();
+
+      let producing = loom::thread::spawn(move || {
+        for value in 1..=3u8 {
+          producer.try_push(value).expect("a four-slot ring admits three");
+        }
+      });
+
+      let draining = loom::thread::spawn(move || {
+        drop(consumer.drain_up_to(1));
+        let reported = consumer.available();
+        let batch = consumer.drain_up_to(reported);
+        assert_eq!(
+          batch.len(),
+          reported,
+          "available() reported {reported}, the next drain for that many handed out {}",
+          batch.len(),
+        );
+      });
+
+      producing.join().expect("the producer thread");
+      draining.join().expect("the drain thread");
+    });
+  }
+
+  /// Both caches across a lap: a two-slot ring carries three records, so the
+  /// producer refreshes its head while the consumer may be answering from its
+  /// observation of the producer. Every record arrives once, in order, with
+  /// its write visible — keyed by sequence, so a lapped slot's old payload
+  /// cannot pass for the new one.
+  #[test]
+  fn both_caches_across_a_lap_deliver_every_record_once_with_its_write() {
+    loom::model(|| {
+      let payloads: &'static [AtomicUsize; 3] =
+        Box::leak(Box::new([AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0)]));
+      let (mut producer, mut consumer) = leaked_ring(2).split();
+
+      let producing = loom::thread::spawn(move || {
+        let mut next = 0usize;
+        for _ in 0..4 {
+          if next == 3 {
+            break;
+          }
+          payloads[next].store(WRITTEN, Ordering::Relaxed);
+          if producer.try_push(next as u8 + 1).is_ok() {
+            next += 1;
+          } else {
+            loom::thread::yield_now();
+          }
+        }
+        (producer, next)
+      });
+
+      let draining = loom::thread::spawn(move || {
+        let mut taken = Vec::new();
+        for _ in 0..3 {
+          let batch = consumer.drain_up_to(1);
+          for (offset, slot) in batch.iter().enumerate() {
+            let seq = batch.start().advanced_by(offset as u64);
+            assert_eq!(
+              payloads[seq.0 as usize].load(Ordering::Relaxed),
+              WRITTEN,
+              "record {seq:?} handed out before its write was visible",
+            );
+            taken.push(slot.get().copied().expect("a pushed record"));
+          }
+        }
+        (consumer, taken)
+      });
+
+      let (mut producer, mut next) = producing.join().expect("the producer thread");
+      let (mut consumer, mut taken) = draining.join().expect("the drain thread");
+
+      // Bounded, so a cache that stopped reloading fails the assertion below
+      // instead of spinning the model forever.
+      for _ in 0..8 {
+        if next == 3 {
+          break;
+        }
+        payloads[next].store(WRITTEN, Ordering::Relaxed);
+        if producer.try_push(next as u8 + 1).is_ok() {
+          next += 1;
+        } else {
+          taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+        }
+      }
+      taken.extend(consumer.drain().iter().filter_map(TypedSlot::get).copied());
+      assert_eq!(taken, [1, 2, 3], "lost, duplicated or reordered across a lap");
     });
   }
 }

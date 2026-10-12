@@ -63,6 +63,24 @@
 //! from an acquired one there, while on hardware without the edge the
 //! overwrite and the take can race.
 //!
+//! # The consumer's cursor cache
+//!
+//! The consumer keeps its latest observation of the producer cursor in the
+//! same way, and a drain reloads it only when the records it already knows of
+//! are fewer than the drain asks for. The observation can only lag: the
+//! producer cursor is monotone and the cache is refreshed to it, never
+//! extrapolated past it, so a stale value under-reports a ring that has more
+//! and never offers a record that is not published. Every record the cache
+//! does offer was published before a [`GATING`] load this end made, on this
+//! drain or an earlier one, and program order carries that edge forward to
+//! the slot read.
+//!
+//! What this buys is the two-thread hand-off: without it the consumer read the
+//! producer's line on every drain, so a one-record-per-pop consumer paid a
+//! cross-core transfer per record whenever the producer was the faster end.
+//! `available` and `is_empty` keep reading the shared cursor, so no query
+//! answers from the cache; only `Debug` prints it.
+//!
 //! # The unsafe, and where its argument lives
 //!
 //! The producer writes slots while the consumer reads slots, through shared
@@ -342,7 +360,11 @@ pub struct Ring<S> {
 // the `cached_head` field: the cache can only lag the consumer cursor, and a
 // lapped claim is granted only when the cached observation itself proves the
 // record consumed, at the `GATING` load that orders the consumer's take before
-// the producer's overwrite. The cursors are atomics and carry the
+// the producer's overwrite. The drain's length runs on the consumer's cached
+// observation of the producer cursor, by the same argument mirrored: it can only
+// lag, so a drain is offered only slots a `GATING` load already saw published,
+// and the edge that load carried reaches every later read on the same thread.
+// The cursors are atomics and carry the
 // happens-before edge (`HANDOFF` store, `GATING` load) that makes each side's
 // slot writes visible to the other before the other may touch that slot.
 // `S : Send` is required because a record is written on the producer's thread
@@ -471,7 +493,8 @@ impl<S> Ring<S> {
     // split a second time it carries over, and a cache that restarted at zero
     // would re-grant sequences the first generation published. The head cache
     // starts at zero on purpose — it can only lag a nonzero consumer cursor,
-    // and the first full ring refreshes it.
+    // and the first full ring refreshes it. The consumer's observation starts
+    // at its own position: it knows of nothing, so the first drain reloads.
     (
       Producer {
         ring: shared,
@@ -481,6 +504,7 @@ impl<S> Ring<S> {
       },
       Consumer {
         ring: shared,
+        cached_produced: shared.cursors.consumer().load(OWN),
         _one_thread: PhantomData,
       },
     )
@@ -911,6 +935,10 @@ impl<S> Drop for Reservation<'_, S> {
 #[derive(Debug)]
 pub struct Consumer<'a, S> {
   ring: &'a Ring<S>,
+  /// The latest [`GATING`] observation of the producer cursor. A drain
+  /// reloads it only when this end knows of fewer records than the drain
+  /// asks for. It can only lag the real cursor, never lead it.
+  cached_produced: Seq,
   /// See [`Producer`]'s field of the same name.
   _one_thread: PhantomData<Cell<()>>,
 }
@@ -1030,7 +1058,7 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain(&mut self) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    let produced = self.observe_produced();
 
     Batch {
       ring: self.ring,
@@ -1044,6 +1072,10 @@ impl<S> Consumer<'_, S> {
   /// The bounded form, for a caller that must not spend an unbounded amount of
   /// time in one drain, such as one working to a frame budget. What is left
   /// over stays published, and the next drain returns it.
+  ///
+  /// The producer cursor is reloaded only when this end knows of fewer than
+  /// `max` records; a drain that can be satisfied from what an earlier drain
+  /// observed reads no line the producer writes.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -1061,13 +1093,44 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    // What the consumer already knows of. When it covers the request the
+    // batch is `max`, and LLVM sees that through the `min`: a one-record drain
+    // served from the cache has a constant length, and the caller's loop over
+    // the batch folds away. The `min` stays so that a wrong comparison here
+    // can only under-report, never hand out a record nobody observed.
+    let known = start.distance_to(self.cached_produced) as usize;
+    let len = if known >= max {
+      max.min(known)
+    } else {
+      max.min(start.distance_to(self.observe_produced()) as usize)
+    };
 
     Batch {
       ring: self.ring,
       start,
-      len: max.min(start.distance_to(produced) as usize),
+      len,
     }
+  }
+
+  /// The producer cursor, reloaded, and kept as this end's observation: the
+  /// one read of the producer's line on the drain path.
+  ///
+  /// Its [`GATING`] order pairs with the producer's [`HANDOFF`] publish, so every
+  /// record below the returned value carries the write that preceded its
+  /// publish — and a value kept from an earlier drain carries the same
+  /// guarantee by program order. [`Self::drain`] reloads on every call: a
+  /// cache it trusted would make an unbounded drain report less than
+  /// `available`.
+  fn observe_produced(&mut self) -> Seq {
+    let produced = self.ring.cursors.producer().load(GATING);
+    // Written only when it moved: a consumer polling an empty ring would
+    // otherwise store the same value every poll and read it back the next.
+    if produced != self.cached_produced {
+      self.cached_produced = produced;
+    }
+    // The field, equal to `produced` here: read back, it lets a poll that found
+    // nothing new reuse the distance the caller already computed.
+    self.cached_produced
   }
 }
 
@@ -1153,9 +1216,12 @@ impl<S> Batch<'_, S> {
     }
 
     // SAFETY: `offset < self.len`, and the batch's whole range was published
-    // and not committed when `drain` computed it. Its upper bound came from a
-    // `GATING` load of the producer cursor, and its lower bound is this end's
-    // own cursor, which only this value's `Drop` will advance.
+    // and not committed when the drain computed it. Its upper bound came from a
+    // `GATING` load of the producer cursor, on this drain or on an earlier one
+    // whose observation the consumer cached: the producer cursor is monotone, so
+    // an older observation only under-reports, and program order carries the
+    // load's edge from that drain to this read. Its lower bound is this end's own
+    // cursor, which only this value's `Drop` will advance.
     Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
   }
 

@@ -92,10 +92,12 @@
       <p class="lede">A lock-free single-producer, single-consumer ring got a cheaper slot type and, in one benchmark,
         ran four times slower. The slot was innocent. This is the chain of mechanisms behind that number: cache lines,
         two cursors, a layout decided by the length of an environment variable, a chase between two cores, and the one
-        load that turned a faster producer into a slower queue. Every number here was measured on one Apple M4 Pro; every
-        inference is labelled as one.</p>
+        load that turned a faster producer into a slower queue. Then a comparison with <code>rtrb</code> that ends in a
+        regime, not a bug: a consumer with nothing to do per record. Most numbers here were measured on one Apple M4 Pro;
+        the x86 ones come from GitHub CI runners and say so. Every inference is labelled as one.</p>
       <p class="muted">Pull requests: <a href="https://github.com/Wandalen/ring/pull/41">#41</a> the consumer caches the
-        producer cursor · <a href="https://github.com/Wandalen/ring/pull/38">#38</a> <code>CopySlot</code>, stacked on #41.</p>
+        producer cursor · <a href="https://github.com/Wandalen/ring/pull/38">#38</a> <code>CopySlot</code>, stacked on #41. Issue:
+        <a href="https://github.com/Wandalen/ring/issues/55">#55</a> #41's two-thread loss on Zen 3.</p>
       <p class="hyp">This page documents those two changes. Until both are merged, the code it quotes
         (<code>Consumer::cached_produced</code>, <code>observe_produced</code>, <code>ring_slot::CopySlot</code>) exists on
         their branches and not on <code>master</code>; the page ships on the same stack, after them.</p>
@@ -5005,9 +5007,13 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
 </script>
 </section>
 
-    <footer>Measured 2026-10-09/10 on an Apple M4 Pro (10 P + 4 E cores, 128-byte lines, 128 KB L1D per P-core), macOS,
-      rustc 1.98.0, fat-LTO bench profile, threads not pinned. No hardware performance counters were available; every
-      mechanism is inferred from timing and intervention and is marked as such.</footer>
+    <footer>Unless a chart says otherwise, measured 2026-10-09/10 on an Apple M4 Pro (10 P + 4 E cores, 128-byte lines,
+      128 KB L1D per P-core), macOS, rustc 1.98.0, fat-LTO bench profile, threads not pinned. The 128-byte padding, rtrb
+      and consumer-work runs are from 2026-10-11/12 on the same machine (rustc 1.97/1.98, loop heads pinned with
+      <code>-align-loops=16</code>), with kperf hardware counters on 2026-10-12. The x86 figures come from GitHub CI
+      runners, 4 vCPU Azure VMs (AMD EPYC 7763 = Zen 3, AMD EPYC 9V45 = Zen 5, Intel Xeon Platinum 8573C), on
+      2026-10-12. The counters give cycles, instructions and L1D misses per record but cannot say which line missed, so
+      every mechanism is still inferred from timing and intervention and is marked as such.</footer>
   </main>
 </div>
 <script>

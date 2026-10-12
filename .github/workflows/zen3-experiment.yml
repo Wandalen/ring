@@ -1,0 +1,86 @@
+# Temporary experiment for #55 (the consumer cursor cache's two-thread loss on Zen 3).
+# Runs master and #41, each with 64- and 128-byte cursor padding, under a sweep of
+# consumer work per record. Three parallel jobs: the runner's CPU is assigned at random
+# and the target is an AMD EPYC 7763 (Zen 3); the other CPUs are recorded too.
+# Delete this branch when the question is answered.
+name: zen3 experiment (#55, temporary)
+
+on:
+  push:
+    branches: [bench/zen3-consumer-work]
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    name: attempt ${{ matrix.attempt }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        attempt: [1, 2, 3]
+    env:
+      MASTER_SHA: ab9b3e45afb7f3ff09f3b064e25eb0575870092d
+      PR41_SHA: 4e8ddffb6de0f474085bde95aa503fa291d00020
+      CELLS: '^spsc(_pinned)?/(spsc|rtrb)/push1_pop1/(64|1024|siblings|cores)$'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: exp
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.MASTER_SHA }}
+          path: master
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PR41_SHA }}
+          path: pr41
+      - uses: dtolnay/rust-toolchain@1.98.0
+
+      - name: CPU
+        id: cpu
+        run: |
+          model=$(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2- | xargs)
+          echo "model=$model" >> "$GITHUB_OUTPUT"
+          echo "## attempt ${{ matrix.attempt }}: $model" >> "$GITHUB_STEP_SUMMARY"
+          lscpu | grep -E 'Model name|Thread|Core|Socket|L1d|L2|L3'
+
+      - name: Build master and #41, each at 64- and 128-byte padding
+        run: |
+          mkdir -p bin
+          for side in master pr41; do
+            python3 exp/bench_harness/experiments/zen3/patch.py "$side" work
+            for cl in 64 128; do
+              if [ "$cl" = 128 ]; then python3 exp/bench_harness/experiments/zen3/patch.py "$side" cacheline128; fi
+              exe=$(cd "$side" && CARGO_TARGET_DIR="$GITHUB_WORKSPACE/target-$side" \
+                cargo bench -q -p perf --bench spsc --no-run --message-format=json \
+                | jq -r 'select(.executable != null and .target.kind[0] == "bench") | .executable')
+              cp "$exe" "bin/spsc-$side-$cl"
+            done
+          done
+          ls -la bin
+
+      - name: Run (two rounds, variants interleaved)
+        run: |
+          CRIT="--warm-up-time 1 --measurement-time 3 --sample-size 10 --noplot"
+          for round in 1 2; do
+            for w in 0 1 2 4 8; do
+              for v in master-64 pr41-64 master-128 pr41-128; do
+                CONSUMER_WORK=$w ./bin/spsc-$v --bench "$CELLS" $CRIT 2>&1 \
+                  | grep -E "^spsc|thrpt: +\[[0-9]|spins:" | sed "s/^/r$round w$w $v /" >> results.log
+              done
+            done
+          done
+
+      - name: Summary
+        if: always()
+        run: |
+          python3 exp/bench_harness/experiments/zen3/summarize.py results.log | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: zen3-attempt-${{ matrix.attempt }}
+          path: results.log

@@ -63,6 +63,7 @@ on:
           - mpsc
           - batch
           - wait
+          - overflow
           - latency
           - regression
           - report

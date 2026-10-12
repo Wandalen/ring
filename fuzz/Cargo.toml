@@ -10,6 +10,12 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 
+[dependencies.ring_config]
+path = "../ring_config"
+
+[dependencies.ring_core]
+path = "../ring_core"
+
 [dependencies.ring_mpsc]
 path = "../ring_mpsc"
 
@@ -23,15 +29,23 @@ path = "../ring_spsc"
 path = "../ring_types"
 
 [[bin]]
+name = "mpsc_ops"
+path = "fuzz_targets/mpsc_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ring_core_ops"
+path = "fuzz_targets/ring_core_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "spsc_ops"
 path = "fuzz_targets/spsc_ops.rs"
 test = false
 doc = false
 bench = false
 
-[[bin]]
-name = "mpsc_ops"
-path = "fuzz_targets/mpsc_ops.rs"
-test = false
-doc = false
-bench = false

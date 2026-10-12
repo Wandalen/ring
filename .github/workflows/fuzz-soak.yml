@@ -44,7 +44,7 @@ jobs:
         run: cargo install cargo-fuzz --version 0.13.2 --locked
       - name: seed the corpus
         run: |
-          for target in spsc_ops mpsc_ops; do
+          for target in spsc_ops mpsc_ops ring_core_ops; do
             mkdir -p fuzz/corpus/"$target"
             cp fuzz/seeds/"$target"/* fuzz/corpus/"$target"/
           done
@@ -52,3 +52,5 @@ jobs:
         run: cd fuzz && cargo +nightly fuzz run spsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}
       - name: fuzz mpsc_ops
         run: cd fuzz && cargo +nightly fuzz run mpsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}
+      - name: fuzz ring_core_ops
+        run: cd fuzz && cargo +nightly fuzz run ring_core_ops -- -max_total_time=${{ inputs.seconds || '600' }}

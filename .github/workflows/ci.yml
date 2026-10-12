@@ -122,3 +122,12 @@ jobs:
           out="$(bash "$tmpdir"/verbs)"
           echo "$out" | grep -q '^headerless' || { echo "$out"; echo 'verb/verbs: headerless fixture missing from listing' >&2; exit 1; }
           echo "$out" | grep -qF '(no #@ purpose: header)' || { echo "$out"; echo 'verb/verbs: fallback text missing for headerless fixture' >&2; exit 1; }
+      - name: bench-compare options match verb/bench suite names
+        # The dispatch dropdown must offer exactly the suites verb/bench
+        # accepts: fewer hides suites from manual runs, more fails them at
+        # dispatch with "is not one of". Both lists live in different files
+        # with only a comment linking them, so drift is silent without this.
+        run: |
+          opts="$(sed -n '/^ *options:$/,/^[^[:space:]]/p' .github/workflows/bench-compare.yml | grep -oE '^ +- [a-z_]+' | awk '{print $2}' | sort)"
+          names="$(grep -oE "^_names='[^']*'" verb/bench | sed "s/^_names='//; s/'$//; s/, /\n/g" | sort)"
+          [ "$opts" = "$names" ] || { echo "--- workflow options: ---"; echo "$opts"; echo "--- verb/bench _names: ---"; echo "$names"; echo 'bench-compare options: diverged from verb/bench suite names' >&2; exit 1; }

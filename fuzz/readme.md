@@ -50,6 +50,15 @@ vector), op 2 is `claim_batch` + hand write of every granted slot + drop
 (the grant may be narrower than asked — adaptive partial grants on a
 nearly-full ring), op 3 is `claim` + write + drop, ops 4/5 are the drains.
 
+`ring_core_ops` (`byte % 5`) drives the composed API on both backends
+(SPSC at 1 producer, MPSC at 4) under `Fail` and `DropNewest`: op 0 is
+`try_push`, op 1 is `try_push_batch` (width `1 + byte % 16`; `Ok` means the
+iterator ran dry, `Err((n, record))` hands back the first unlanded record),
+op 2 is `try_recv`, op 3 is `try_recv_batch`, op 4 probes full-ring refusal
+(`Fail` refuses, `DropNewest` discards with success). The oracle tracks
+room, not just pushes: under `DropNewest` an `Ok` on a full ring discards,
+so only arrivals with room are remembered.
+
 Invariants, checked on every step: FIFO order against a `VecDeque` oracle,
 `Full` if and only if the oracle holds `capacity` records, refused pushes
 keep their record (spsc) or vector (batch) untouched, and the final drain
@@ -59,9 +68,10 @@ to loom.
 ## Targets
 
 | Target      | What it drives |
-|-------------|----------------|
-| `spsc_ops`  | `try_push`, `claim` + write + drop through `Reservation`, `drain`, `drain_up_to` |
-| `mpsc_ops`  | `push`, `push_batch`, `claim_batch` + hand write + drop, `claim` + write + drop, `drain`, `drain_up_to` |
+|-------------|-------------------------------------------------------------------------------------------------------------------|
+| `spsc_ops`  | `try_push`, `claim` + write + drop through `Reservation`, `drain`, `drain_up_to`                                    |
+| `mpsc_ops`  | `push`, `push_batch`, `claim_batch` + hand write + drop, `claim` + write + drop, `drain`, `drain_up_to`            |
+| `ring_core_ops` | `try_push`, `try_push_batch`, `try_recv`, `try_recv_batch` on both backends under `Fail`/`DropNewest`          |
 
 ## When it finds a crash
 
@@ -75,10 +85,11 @@ to loom.
 
 ## CI mapping
 
-`.github/workflows/fuzz.yml` runs `short` (120 s/target) on pull requests
-touching the fuzzed crates and `soak` (600 s/target) on the nightly schedule
-plus manual dispatch. `soak` shows SKIPPED on pull requests by design — the
-short job is the PR signal. See the workflow header for the rationale.
+`fuzz.yml` runs the short job (120 s/target) on pull requests touching the
+fuzzed crates. `fuzz-soak.yml` runs the soak (600 s/target) on the nightly
+schedule plus manual dispatch. The soak never appears as a pull-request
+check — it lives in its own workflow precisely so no PR displays a verdict
+it cannot have. See the workflow headers for the rationale.
 
 ## Seeds
 

@@ -53,7 +53,7 @@ mod threaded {
   use ring_atomic::SeqCell;
   use ring_config::RingConfig;
   use ring_mpsc::{COMMIT, Consumer, OBSERVE, OWN, PUBLISH, Producer, Reserved, Ring, UNSTAMPED};
-  use ring_slot::{BytesSlot, Slot, TypedSlot};
+  use ring_slot::{BytesSlot, CopySlot, Slot, TypedSlot};
   use ring_types::{Capacity, RingError, Seq};
 
   fn capacity(slots: usize) -> Capacity {
@@ -768,8 +768,9 @@ mod threaded {
   /// does not. It publishes the slot as it stands. On the first lap the slot is
   /// still `Default`, so the observable result is one empty record: defined,
   /// drainable, and distinguishable from a written one. On a later lap the slot
-  /// holds whatever record the consumer did not take, which this test does not
-  /// cover.
+  /// holds what the previous lap left there; for a `TypedSlot` the consumer's
+  /// `take` left it empty, and the next test pins the `CopySlot` case, where it
+  /// did not.
   #[test]
   fn a_claim_dropped_without_a_write_publishes_an_empty_record() {
     let mut ring: Ring<TypedSlot<u8>> = Ring::new(capacity(4));
@@ -783,6 +784,27 @@ mod threaded {
     assert_eq!(batch.len(), 2, "the skipped write still occupies its sequence");
     assert_eq!(batch.get(0).and_then(TypedSlot::get), None, "empty, not torn");
     assert_eq!(batch.get_mut(1).and_then(TypedSlot::take), Some(7));
+  }
+
+  /// `CopySlot`'s pitfall, pinned for `ring_mpsc`. With no tag, a claim dropped
+  /// unwritten publishes whatever the slot last held, so the consumer receives
+  /// the previous lap's record a second time. `ring_slot`'s ADR 002 names this
+  /// path; a change that stopped publishing unwritten claims would fail here,
+  /// and that ADR's pitfall would then be stale.
+  #[test]
+  fn an_unwritten_copy_slot_claim_republishes_the_previous_lap() {
+    let mut ring: Ring<CopySlot<u64>> = Ring::new(capacity(1));
+    let mut ends = ring.ends();
+    let (producer, mut consumer) = ends.split();
+
+    producer.claim().expect("room").set(7);
+    let first: Vec<u64> = consumer.drain().iter().map(CopySlot::get).collect();
+    assert_eq!(first, [7]);
+
+    drop(producer.claim().expect("room"));
+
+    let second: Vec<u64> = consumer.drain().iter().map(CopySlot::get).collect();
+    assert_eq!(second, [7], "the previous lap's record, delivered again");
   }
 
   /// A claim never published stalls the ring, which is the cost the guard

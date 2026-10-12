@@ -83,7 +83,8 @@
     <a href="#sec-layout" data-target="sec-layout">3. Where the ring lands</a>
     <a href="#sec-regimes" data-target="sec-regimes">4. Who chases whom</a>
     <a href="#sec-results" data-target="sec-results">5. Measurements, trade-offs, what changed</a>
-    <a href="#sec-reference" data-target="sec-reference">6. Open questions and glossary</a>
+    <a href="#sec-rtrb" data-target="sec-rtrb">6. Ring against rtrb, and the lean consumer</a>
+    <a href="#sec-reference" data-target="sec-reference">7. Open questions and glossary</a>
   </nav>
   <main>
     <header class="hero">
@@ -2965,7 +2966,7 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
 </script>
 </section>
 
-<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 06.
+<!-- summary: Every measurement as charts: the three stages (master, #41, #38 on #41, plus #38 without the cache) on pop1/popN at one or two cursor lines; single-thread deltas; CACHE_LINE 64 vs 128; wide records before and after the Wide::whole fix plus the stride experiments; the env-var flip; the mutation table; then trade-offs and commits per PR. Open questions and the glossary are section 07.
 Controls: pop1/popN, one line/two lines and linear/log toggles on the stages chart; zoom toggle on single-thread rows; cell filter, scale and cache toggles on CL 64 vs 128; check toggle on wide records; keyboard crosshair on the env sparkline; mutation filter.
 Hover or focus any mark for the exact two-round pair; every chart has a table twin. -->
 <section id="sec-results" class="section" data-title="Measurements, trade-offs, what changed">
@@ -3935,6 +3936,673 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 </script>
 </section>
 
+<!-- summary: Ring against rtrb on the M4 (2026-10-11/12): the 64-slot gap at one record per hand-off; the differences removed one rung at a time (slot size, consumer rungs A-D, producer rungs E-F, cursor order, code and placement); the kperf counters; the sampling probe that flipped the result; the consumer-work sweep; the capacity-in-producer change, tested and dropped.
+Controls: rung stepper (chips, back / next) drawing ring at each rung against the rung before and rtrb, with a byte map for the code-and-placement step; consumer-work slider over the sweep at 64 and 1024 slots. Hover or focus any mark for its values; every chart has a table twin.
+Numbers inlined from data.json (rtrb_against_ring_m4). -->
+<section id="sec-rtrb" class="section" data-title="Ring against rtrb, and the lean consumer">
+<style>
+  #sec-rtrb { position: relative; }
+  #sec-rtrb .rt-lede { font-size: 1.05rem; }
+  #sec-rtrb .rt-fig { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px 18px 14px; margin: 16px 0 10px; max-width: 940px; }
+  #sec-rtrb .rt-fig svg { display: block; width: 100%; height: auto; overflow: visible; }
+  #sec-rtrb .rt-cap { color: var(--muted); font-size: 0.88rem; margin: 8px 0 0; max-width: var(--measure); }
+  #sec-rtrb .rt-seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  #sec-rtrb .rt-seg button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 5px 10px; }
+  #sec-rtrb .rt-seg button + button { border-left: 1px solid var(--line); }
+  #sec-rtrb .rt-seg button[aria-pressed="true"] { background: var(--accent); color: #0f1115; }
+  #sec-rtrb button:focus-visible, #sec-rtrb [tabindex]:focus-visible, #sec-rtrb input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #sec-rtrb .rt-grp { display: inline-flex; align-items: center; gap: 6px; }
+  #sec-rtrb .rt-glabel { color: var(--muted); font-size: 0.85rem; }
+  #sec-rtrb .rt-head { margin: 10px 0 4px; }
+  #sec-rtrb .rt-head .n { color: var(--muted); font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+  #sec-rtrb .rt-head h4 { margin: 2px 0 4px; font-size: 1.05rem; }
+  #sec-rtrb .rt-head p { margin: 0; min-height: 3.1em; max-width: var(--measure); }
+  #sec-rtrb .rt-moved { font-size: 0.92rem; font-variant-numeric: tabular-nums; margin: 8px 0 0; max-width: var(--measure); min-height: 2.8em; }
+  #sec-rtrb .rt-verdict { margin-top: 10px; }
+  #sec-rtrb .rt-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 0.86rem; color: var(--muted); margin: 6px 0 2px; min-height: 1.4em; }
+  #sec-rtrb .rt-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  #sec-rtrb .rt-sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; background: var(--sw); }
+  #sec-rtrb .rt-sw.ghost { background: transparent; border: 1.5px dashed var(--sw); }
+  #sec-rtrb .rt-ln { display: inline-block; width: 24px; height: 0; border-top: 2px solid var(--sw); }
+  #sec-rtrb .rt-ln.dash { border-top-style: dashed; }
+  #sec-rtrb .rt-ln.dot { border-top-style: dotted; }
+  #sec-rtrb .rt-nav { display: flex; gap: 8px; margin-top: 12px; }
+  #sec-rtrb table.rt-t { margin: 10px 0; font-size: 0.9rem; }
+  #sec-rtrb table.rt-t caption { caption-side: bottom; text-align: left; color: var(--muted); font-size: 0.85rem; padding-top: 6px; }
+  #sec-rtrb details { margin-top: 10px; }
+  #sec-rtrb summary { cursor: pointer; color: var(--accent); font-size: 0.9rem; }
+  #sec-rtrb .rt-scroll { overflow-x: auto; }
+  #sec-rtrb .rt-open { border-left: 3px solid var(--accent); padding: 8px 12px; background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); margin-top: 12px; }
+  #sec-rtrb .rt-open::before { content: "Open · "; color: var(--accent); font-weight: 600; }
+  #sec-rtrb ul.rt-list { margin: 4px 0 0; padding-left: 1.2em; }
+  #sec-rtrb ul.rt-list li { margin: 4px 0; }
+  #sec-rtrb .rt-slider { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); font-size: 0.92rem; }
+  #sec-rtrb .rt-slider output { color: var(--text); font-family: var(--font-mono); min-width: 2ch; text-align: right; }
+  #sec-rtrb .rt-panels { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  #sec-rtrb .rt-panels h4 { margin: 0 0 2px; font-size: 0.95rem; }
+  #sec-rtrb .rt-read { margin: 10px 0 0; padding: 10px 12px; border-left: 3px solid var(--accent); background: var(--surface-2); border-radius: 0 var(--radius) var(--radius) 0; max-width: var(--measure); font-size: 0.95rem; min-height: 4.4em; }
+  #sec-rtrb .rt-rows { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 3px 10px; font-size: 0.88rem; font-variant-numeric: tabular-nums; margin-top: 6px; align-items: center; max-width: 340px; }
+  #sec-rtrb .rt-rows .lead { font-weight: 650; }
+  #sec-rtrb .rt-rows .v { text-align: right; }
+  #sec-rtrb .rt-rows .note { grid-column: 2 / -1; color: var(--muted); font-size: 0.8rem; margin-top: -2px; }
+  #sec-rtrb svg .rt-gl { stroke: var(--line); stroke-width: 1; }
+  #sec-rtrb svg .rt-base { stroke: var(--muted); stroke-width: 1; }
+  #sec-rtrb svg .rt-tk { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+  #sec-rtrb svg .rt-lab { fill: var(--text); font-size: 12px; }
+  #sec-rtrb svg .rt-lab.b { font-weight: 650; }
+  #sec-rtrb svg .rt-val { fill: var(--text); font-size: 11px; font-variant-numeric: tabular-nums; }
+  #sec-rtrb svg .rt-val.dim { fill: var(--muted); }
+  #sec-rtrb svg .rt-in { fill: #0f1115; font-size: 10.5px; font-weight: 600; }
+  #sec-rtrb svg .rt-in.t { fill: var(--text); font-weight: 500; }
+  #sec-rtrb svg .rt-mono { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); font-variant-ligatures: none; }
+  #sec-rtrb svg .rt-hit { fill: transparent; }
+  #sec-rtrb svg g.rt-mark { outline: none; cursor: default; }
+  #sec-rtrb svg g.rt-mark:focus .rt-hit { stroke: var(--accent); stroke-width: 1.5; }
+  #sec-rtrb svg .rt-cur { fill: var(--accent); opacity: 0.12; }
+  #sec-rtrb svg .rt-band-a { fill: var(--surface-2); }
+  #sec-rtrb svg .rt-band-b { fill: var(--surface); }
+  #sec-rtrb svg .rt-bound { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+  #sec-rtrb .rt-tip { position: absolute; z-index: 30; pointer-events: none; min-width: 170px; max-width: 320px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 0.85rem; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  #sec-rtrb .rt-tip .t { color: var(--muted); margin-bottom: 4px; }
+  #sec-rtrb .rt-tip .row { display: flex; align-items: center; gap: 8px; }
+  #sec-rtrb .rt-tip .row i { display: inline-block; width: 12px; height: 3px; background: var(--k); flex: none; }
+  #sec-rtrb .rt-tip .row b { font-variant-numeric: tabular-nums; font-weight: 650; }
+  #sec-rtrb .rt-tip .row span { color: var(--muted); }
+  #sec-rtrb .rt-tip .n { color: var(--muted); margin-top: 4px; font-size: 0.8rem; }
+  @media (max-width: 900px) { #sec-rtrb .rt-panels { grid-template-columns: 1fr; } }
+</style>
+
+<h2><span class="num">06</span>Ring against rtrb, and the lean-consumer regime</h2>
+<p class="rt-lede"><code>rtrb</code> (the <code>rtrb</code> 0.4 crate) is a published single-producer, single-consumer
+  ring. On the M4 its one-record hand-off at 64 slots ran about 280 M/s. Ring with #41 and #38 (<code>CopySlot</code>,
+  8-byte slots) ran about 150. This section takes the two rings apart one difference at a time. No difference in the
+  code accounts for the gap. The gap belongs to a regime instead: it exists only while the consumer does no work per
+  record. Why rtrb is fast in that regime is still open.</p>
+<p class="muted">Measured 2026-10-11/12 on the M4 Pro: rustc 1.97/1.98, fat-LTO bench profile, loop heads pinned with
+  <code>-C llvm-args=-align-loops=16</code>. The placement harness (#51) puts the ring at byte 0 or byte 64 of a
+  256-byte block, so its two cursors (64-byte padding) share one 128-byte line or sit on two. Two threads, one record
+  per hand-off (<code>push1_pop1</code>), M records/s, higher is better.</p>
+
+<table class="rt-t">
+  <thead><tr><th>Slots</th><th>rtrb</th><th>ring, <code>CopySlot</code></th><th>ring, <code>TypedSlot</code></th></tr></thead>
+  <tbody>
+    <tr><td>64</td><td>~280</td><td>~150</td><td class="muted">not in this set</td></tr>
+    <tr><td>1024</td><td>~310</td><td>~440</td><td class="muted">not in this set</td></tr>
+    <tr><td>16384</td><td>~370</td><td>393–475, ties or leads</td><td>~35, the #49 cliff</td></tr>
+  </tbody>
+  <caption>Approximate, as the record states them. Ring here is #41 + #38.</caption>
+</table>
+
+<h3>Same protocol, different speed</h3>
+<p>On paper the two rings do the same work per record. Both cache the other end's cursor, on both sides. Both write
+  one slot and do one release store per record. Both reload a cursor only when their cache says full or empty. So the
+  gap has to come from something the protocol leaves open: the slot size, the shape of the consumer, the shape of the
+  producer, the order of the two cursors, the generated code, or where things land in memory. The investigation
+  tested each one on its own.</p>
+
+<h3>Removing the differences, one rung at a time</h3>
+<p>Each rung removes one difference between ring and rtrb and keeps the rest. Step through them. The solid blue bar is
+  ring at this rung, the dashed outline is ring at the rung before, and the grey bar is rtrb in the same run. A rung
+  that touched the cause would lift the blue bar to the grey one at 64 slots.</p>
+
+<div class="rt-fig" id="rt-step">
+  <div class="controls" id="rt-chips" style="margin:0"></div>
+  <div class="rt-head">
+    <div class="n" data-o="n"></div>
+    <h4 data-o="title"></h4>
+    <p data-o="removed"></p>
+  </div>
+  <div class="rt-legend" data-o="legend" aria-hidden="true"></div>
+  <svg id="rt-step-svg" viewBox="0 0 720 300" role="img" aria-label="Ring at the current rung against the rung before and rtrb, M records per second per cell"></svg>
+  <p class="rt-moved" data-o="moved" aria-live="polite"></p>
+  <p class="measured rt-verdict" data-o="verdict"></p>
+  <div class="rt-nav">
+    <button type="button" data-act="prev">Back</button>
+    <button type="button" data-act="next">Next rung</button>
+  </div>
+  <details><summary>Every rung as a table</summary><div class="rt-scroll" id="rt-step-tables"></div></details>
+</div>
+
+<p>None of the rungs closes the gap: at 64 slots every ring variant stays below rtrb in the same run. At 1024 slots
+  the consumer rungs show the opposite of a gap. Ring's <code>Batch</code> path is what puts it ahead there, and the
+  rtrb-shaped pop of rung D takes ring down to rtrb's level.</p>
+
+<h3>Counting cycles</h3>
+<p>macOS exposes the M4's performance counters through kperf. These runs read them per thread and divide by the
+  records moved, with the cursors on one line. "Ring today" is the <code>CopySlot</code> ring as it ships.</p>
+
+<div class="rt-fig" id="rt-cnt">
+  <div class="rt-legend" aria-hidden="true">
+    <span><i class="rt-sw" style="--sw:var(--c-rtrb)"></i>rtrb</span>
+    <span><i class="rt-sw" style="--sw:var(--c-untagged)"></i>ring</span>
+    <span><i class="rt-sw" style="--sw:var(--c-producer)"></i>producer thread</span>
+    <span><i class="rt-sw" style="--sw:var(--c-consumer)"></i>consumer thread</span>
+  </div>
+  <svg id="rt-cnt-svg" viewBox="0 0 900 232" role="img" aria-label="Per-record counters for rtrb and ring: cycles, consumer L1D load misses, and cycles waiting on an older L1D miss for each thread"></svg>
+  <p class="rt-cap">Per record, per thread. Each panel has its own scale. The right panel splits the wait by thread.</p>
+  <details><summary>Table: the counters</summary><div class="rt-scroll"><table class="rt-t" id="rt-cnt-tbl"></table></div></details>
+</div>
+<p class="measured">Same work and the same number of misses; ring's misses cost 4–6x more cycles. At 64 slots ring
+  today waits 8.9 cycles per record on an older miss in the producer and 8.4 in the consumer, against rtrb's 1.4 and
+  1.8, for 0.78 against 0.69 consumer misses per record. At 1024 slots the same ring waits 1.0 and 1.2.</p>
+<p class="hyp">The two cores keep trading the same lines. The counters cannot say which line.</p>
+
+<h3>The probe that flipped the result</h3>
+<p>A sampling probe was meant to show how full the ring runs. It added about 20 instructions per record to every
+  consumer, and that was enough to change who wins.</p>
+<div class="rt-fig" id="rt-probe">
+  <svg id="rt-probe-svg" viewBox="0 0 720 250" role="img" aria-label="rtrb and ring today at 64 slots, without and with the sampling probe"></svg>
+  <p class="rt-cap">Without the probe: the counter run above. With it: the range over the probe's runs. Cycles are per
+    record.</p>
+</div>
+<p class="measured">With the probe, rtrb fell from 257 to 100–114 M/s (15 to 37–41 cycles per record) and lost to ring
+  today, which barely moved: 130–152 M/s, 28 to 28–32 cycles. The fill-level samples that probe took come from the
+  slow regime, so none of them is used.</p>
+<p>rtrb's lead needs a consumer that does almost nothing per record. Call that the lean-consumer regime. It can be
+  swept.</p>
+
+<h3>Sweeping the consumer's work</h3>
+<p>A knob makes the consumer run <var>n</var> dependent multiply-adds per record, the same for every candidate. At
+  <var>n</var>&nbsp;=&nbsp;0 the consumer is as lean as the benchmark allows. Move the knob and watch the leader
+  change. Each point is the median of two rounds.</p>
+<div class="rt-fig" id="rt-sweep">
+  <div class="controls" style="margin-top:0">
+    <label class="rt-slider" for="rt-sw-n">Consumer work <input id="rt-sw-n" type="range" min="0" max="5" step="1" value="0"
+      aria-label="Consumer work, multiply-adds per record"> <output id="rt-sw-out">0</output> multiply-adds per record</label>
+  </div>
+  <div class="rt-legend" aria-hidden="true">
+    <span><i class="rt-ln" style="--sw:var(--c-tagged)"></i>● ring <code>TypedSlot</code> (16-byte slots)</span>
+    <span><i class="rt-ln dash" style="--sw:var(--c-untagged)"></i>■ ring <code>CopySlot</code> (8-byte slots)</span>
+    <span><i class="rt-ln dot" style="--sw:var(--c-rtrb)"></i>◆ rtrb (8-byte slots)</span>
+    <span>○ unreliable cell, whisker spans its two rounds</span>
+  </div>
+  <div class="rt-panels">
+    <div><h4>64 slots</h4><svg id="rt-sw-64" viewBox="0 0 440 262" role="img" aria-label="Throughput against consumer work at 64 slots"></svg><div class="rt-rows" id="rt-sw-64-rows" aria-live="polite"></div></div>
+    <div><h4>1024 slots</h4><svg id="rt-sw-1024" viewBox="0 0 440 262" role="img" aria-label="Throughput against consumer work at 1024 slots"></svg><div class="rt-rows" id="rt-sw-1024-rows" aria-live="polite"></div></div>
+  </div>
+  <p class="rt-read" id="rt-sw-read" aria-live="polite"></p>
+  <p class="rt-cap">The x axis is categorical: the knob was set to 0, 1, 2, 4, 8 and 16. Click a column to jump to it.</p>
+  <details><summary>Table: the sweep</summary><div class="rt-scroll"><table class="rt-t" id="rt-sw-tbl"></table></div></details>
+</div>
+<div class="measured"><ul class="rt-list">
+  <li>rtrb's 64-slot lead exists only at zero consumer work. From one step ring with <code>CopySlot</code> is level or
+    ahead; from four both ring variants beat rtrb.</li>
+  <li>With heavy consumer work the two rings with 8-byte slots fall into the full-ring lockstep (refused pushes 0.1–0.3
+    per record). <code>TypedSlot</code>'s slower producer avoids it.</li>
+  <li>Merely compiling the knob in, set to 0, moved rtrb's baseline from ~280 to 214. This cell is extremely sensitive
+    to generated code.</li>
+</ul></div>
+<p class="rt-open">Why do rtrb's threads pay 4–6x less per miss with a nearly empty consumer? The counters see the
+  same number of misses on both rings and cannot say which line misses. Nothing measured so far answers it.</p>
+
+<h3>Tested and dropped: capacity in the producer</h3>
+<p>Rung F kept the ring's capacity in a field of the producer, and at 64 slots on one line it lifted ring from 149 to
+  189 M/s. The same change was then tried on the shipped path, with ring's own consumer.</p>
+<p class="measured">Keeping <code>capacity</code> in ring's producer helps the two-line layout a little (0 to +15%). It
+  costs <code>CopySlot</code>'s single-thread <code>push_pop</code> 16% (2.56 → 2.98 ns) and its whole-lap drain 10%
+  (1280 → 1150 M/s), and <code>TypedSlot</code>'s one-line 64-slot hand-off about 15%. Dropped, no PR.</p>
+
+<div class="rt-tip" hidden role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const root = document.getElementById('sec-rtrb');
+  if (!root) return;
+  const NS = 'http://www.w3.org/2000/svg';
+  const $ = (s) => root.querySelector(s);
+  const S = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+  const H = (tag, cls, text, parent) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; };
+  const T = (parent, x, y, text, cls, anchor) => { const t = S('text', { x, y, class: cls || 'rt-tk', 'text-anchor': anchor || 'middle' }, parent); t.textContent = text; return t; };
+  const lin = (d0, d1, r0, r1) => (v) => r0 + (v - d0) / (d1 - d0) * (r1 - r0);
+  const colPath = (x, w, base, top) => { const h = base - top; if (!(h > 0.2)) return ''; const r = Math.min(4, h, w / 2); return `M${x},${base}V${top + r}Q${x},${top} ${x + r},${top}H${x + w - r}Q${x + w},${top} ${x + w},${top + r}V${base}Z`; };
+  const rowPath = (x0, x1, y, h) => { const w = x1 - x0; if (!(w > 0.2)) return ''; const r = Math.min(4, w, h / 2); return `M${x0},${y}H${x1 - r}Q${x1},${y} ${x1},${y + r}V${y + h - r}Q${x1},${y + h} ${x1 - r},${y + h}H${x0}Z`; };
+  const span = (v) => { const lo = Math.min(...v), hi = Math.max(...v); return lo === hi ? String(lo) : `${lo}–${hi}`; };
+  const RING = 'var(--c-untagged)', RTRB = 'var(--c-rtrb)';
+
+  /* ---------------- data, copied from data.json (rtrb_against_ring_m4) ---------------- */
+  const D = {
+    slot: [
+      { name: 'rtrb, 8-byte', v: [284, 272, 316, 315] },
+      { name: 'rtrb, 16-byte', v: [227, 212, 164, 159] },
+      { name: 'ring CopySlot, 8-byte', v: [153, 133, 433, 444] },
+      { name: 'ring CopySlot, 16-byte', v: [141, 121, 330, 370] },
+      { name: 'ring TypedSlot (16-byte)', v: [133, 117, 388, 388] }
+    ],
+    consumer: [
+      { rung: 'A', name: "today's drain_up_to(1) through a Batch", v: [154, 116, 455, 488] },
+      { rung: 'B', name: 'A, empty poll stores nothing', v: [150, 115, 448, 484] },
+      { rung: 'C', name: 'B, own position kept in a field', v: [145, 121, 510, 490] },
+      { rung: 'D', name: 'rtrb-shaped pop_one, no Batch', v: [155, 119, 292, 368] },
+      { rung: 'rtrb', name: 'rtrb', v: [284, 285, 293, 310] }
+    ],
+    producer: [
+      { rung: 'E', name: "+ producer = rtrb's push", v: [149, 130, 113, 290] },
+      { rung: 'F', name: 'E + capacity kept in the producer', v: [189, 153, 134, 248] },
+      { rung: 'rtrb', name: 'rtrb', v: [281, 275, 282, 315] }
+    ],
+    order: { D: [146, 94], F: [158, 127] },
+    counters: [
+      { name: 'rtrb', slots: 64, mps: 257, cyc: 15.4, insP: 25, insC: 43, miss: 0.69, waitP: 1.4, waitC: 1.8 },
+      { name: 'ring rung F', slots: 64, mps: 161, cyc: 24.4, insP: 17, insC: 47, miss: 0.74, waitP: 6.1, waitC: 4.5 },
+      { name: 'ring today', slots: 64, mps: 142, cyc: 28.4, insP: 19, insC: 42, miss: 0.78, waitP: 8.9, waitC: 8.4 },
+      { name: 'ring today', slots: 1024, mps: 393, cyc: 10.2, insP: 19, insC: 41, miss: 0.39, waitP: 1.0, waitC: 1.2 }
+    ],
+    probe: [
+      { name: 'rtrb', color: RTRB, without: 257, with: [100, 114], cycWithout: '15', cycWith: '37–41' },
+      { name: 'ring today', color: RING, without: 142, with: [130, 152], cycWithout: '28', cycWith: '28–32' }
+    ],
+    sweep: [ // [TypedSlot, CopySlot, rtrb]
+      { work: 0, s64: [148, 166, 214], s1024: [416, 370, 218] },
+      { work: 1, s64: [144, 194, 187], s1024: [401, 272, 190] },
+      { work: 2, s64: [141, 192, 155], s1024: [183, 204, 169] },
+      { work: 4, s64: [134, 151, 95], s1024: [170, 146, 109] },
+      { work: 8, s64: [114, 52, 64], s1024: [154, 47, 70] },
+      { work: 16, s64: [56, 33, 36], s1024: [60, 34, 36] }
+    ],
+    unreliable: { work: 2, panel: 's1024', series: 0, rounds: [45, 321] }
+  };
+
+  /* ---------------- tooltip: values lead, labels follow; textContent only ---------------- */
+  const tip = $('.rt-tip');
+  function tipShow(c, cx, cy) {
+    tip.replaceChildren();
+    H('div', 't', c.title, tip);
+    (c.rows || []).forEach((r) => {
+      const row = H('div', 'row', null, tip);
+      const k = H('i', null, null, row); k.style.setProperty('--k', r.color || 'var(--muted)');
+      H('b', null, r.v, row); H('span', null, r.label, row);
+    });
+    if (c.note) H('div', 'n', c.note, tip);
+    tip.hidden = false;
+    const rr = root.getBoundingClientRect();
+    let x = cx - rr.left + 14;
+    const y = cy - rr.top + 14;
+    const tw = tip.offsetWidth;
+    if (x + tw > rr.width) x = Math.max(0, cx - rr.left - tw - 14);
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  const tipHide = () => { tip.hidden = true; };
+  function hover(el, fn) {
+    el.addEventListener('pointermove', (e) => tipShow(fn(), e.clientX, e.clientY));
+    el.addEventListener('pointerleave', tipHide);
+    el.addEventListener('focus', () => { const r = el.getBoundingClientRect(); tipShow(fn(), r.right, r.top); });
+    el.addEventListener('blur', tipHide);
+  }
+  function table(host, caption, head, rows) {
+    const t = H('table', 'rt-t', null, host);
+    if (caption) H('caption', null, caption, t);
+    const hr = H('tr', null, null, H('thead', null, null, t));
+    head.forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, t);
+    rows.forEach((r) => { const tr = H('tr', null, null, body); r.forEach((c) => H('td', null, String(c), tr)); });
+    return t;
+  }
+
+  /* ================= 1. rung stepper ================= */
+  (() => {
+    const C4 = ['64 slots, one line', '64 slots, two lines', '1024 slots, one line', '1024 slots, two lines'];
+    const CP = ['64 slots, one line', '64 slots, two lines', '64 slots, 128-byte padding', '1024 slots, one line'];
+    const cons = (r) => D.consumer.find((q) => q.rung === r).v;
+    const prod = (r) => D.producer.find((q) => q.rung === r).v;
+    const STEPS = [
+      { group: 'Slot size', chip: '8-byte', title: 'Both rings with 8-byte slots',
+        removed: "The slot-size run's starting point. Ring's CopySlot stores a u64 record in an 8-byte slot, as rtrb does.",
+        cells: C4, series: [
+          { kind: 'ring', label: 'ring CopySlot, 8-byte', v: D.slot[2].v },
+          { kind: 'rtrb', label: 'rtrb, 8-byte', v: D.slot[0].v }] },
+      { group: 'Slot size', chip: '16-byte', title: 'Both rings with 16-byte slots',
+        removed: 'Both rings now store each record in a 16-byte slot, the size of TypedSlot<u64>. In the same run TypedSlot itself measured 133, 117, 388 and 388.',
+        cells: C4, series: [
+          { kind: 'prev', label: 'ring CopySlot, 8-byte', v: D.slot[2].v },
+          { kind: 'ring', label: 'ring CopySlot, 16-byte', v: D.slot[3].v },
+          { kind: 'rtrbPrev', label: 'rtrb, 8-byte', v: D.slot[0].v },
+          { kind: 'rtrb', label: 'rtrb, 16-byte', v: D.slot[1].v }],
+        verdict: 'Equal slot size: rtrb still 1.6–1.9x faster at 64 slots. Not the slot.' },
+      { group: 'Consumer', chip: 'A', title: "Rung A: ring's consumer as it ships",
+        removed: 'Nothing removed yet. The consumer pops through drain_up_to(1), which hands out a Batch. Every consumer rung runs the 8-byte CopySlot ring.',
+        cells: C4, series: [
+          { kind: 'ring', label: 'rung A', v: cons('A') },
+          { kind: 'rtrb', label: 'rtrb', v: cons('rtrb') }] },
+      { group: 'Consumer', chip: 'B', title: 'Rung B: the empty poll stores nothing',
+        removed: 'Rung A, and an empty poll stores nothing: a batch that took no record no longer commits the consumer cursor.',
+        cells: C4, series: [
+          { kind: 'prev', label: 'rung A', v: cons('A') },
+          { kind: 'ring', label: 'rung B', v: cons('B') },
+          { kind: 'rtrb', label: 'rtrb', v: cons('rtrb') }] },
+      { group: 'Consumer', chip: 'C', title: 'Rung C: the consumer keeps its own position',
+        removed: 'Rung B, and the consumer keeps its own position in a field.',
+        cells: C4, series: [
+          { kind: 'prev', label: 'rung B', v: cons('B') },
+          { kind: 'ring', label: 'rung C', v: cons('C') },
+          { kind: 'rtrb', label: 'rtrb', v: cons('rtrb') }] },
+      { group: 'Consumer', chip: 'D', title: 'Rung D: an rtrb-shaped pop',
+        removed: 'The consumer pops one record the way rtrb does, with pop_one and no Batch.',
+        cells: C4, series: [
+          { kind: 'prev', label: 'rung C', v: cons('C') },
+          { kind: 'ring', label: 'rung D', v: cons('D') },
+          { kind: 'rtrb', label: 'rtrb', v: cons('rtrb') }],
+        verdict: "At 64 slots no consumer change matters. At 1024 the Batch path is ring's advantage: rtrb-shaped pop drops ring to rtrb's level." },
+      { group: 'Producer', chip: 'E', title: "Rung E: rtrb's push",
+        removed: "The producer is now rtrb's push; the consumer stays rung D. This run adds a cell with 128-byte cursor padding.",
+        cells: CP, series: [
+          { kind: 'ring', label: 'rung E', v: prod('E') },
+          { kind: 'rtrb', label: 'rtrb', v: prod('rtrb') }] },
+      { group: 'Producer', chip: 'F', title: 'Rung F: capacity in the producer',
+        removed: 'Rung E, and the producer keeps the capacity in a field of its own.',
+        cells: CP, series: [
+          { kind: 'prev', label: 'rung E', v: prod('E') },
+          { kind: 'ring', label: 'rung F', v: prod('F') },
+          { kind: 'rtrb', label: 'rtrb', v: prod('rtrb') }] },
+      { group: 'Cursor order', chip: 'Order', title: 'The order of the two cursors',
+        removed: "rtrb puts its consumer cursor first, ring its producer cursor. With 128-byte padding, rungs D and F tried rtrb's consumer-first order.",
+        cells: ['rung D, 128-byte padding', 'rung F, 128-byte padding'], series: [
+          { kind: 'prev', label: "producer-first (ring's order)", v: D.order.D.slice(0, 1).concat(D.order.F.slice(0, 1)) },
+          { kind: 'ring', label: "consumer-first (rtrb's order)", v: D.order.D.slice(1).concat(D.order.F.slice(1)) }],
+        verdict: 'Consumer-first made ring slower (rung D 146 → 94, F 158 → 127); rtrb unaffected. Not the order.' },
+      { group: 'Code and placement', chip: 'Code', title: 'The code and where it lands', map: true,
+        removed: 'Nothing left to remove, so the last differences were checked directly: the instructions, the field layout and the addresses.',
+        moved: "rtrb's two cursors sit 0x80 (128) bytes apart, so on the M4 they can never share a line. Ring's sit 0x40 apart and share one in the one-line placement. With 128-byte padding ring's cursors sit on two lines as well, and rung F still measured 134 against rtrb's 282 at 64 slots.",
+        verdict: "The disassembled push and pop loops of rung F and rtrb are nearly instruction for instruction the same: about 15 instructions per push, both pops out-of-line with the same sequence. In one run ring's and rtrb's slot arrays landed at the same address. The per-record checker word and the two handles, each on its own thread's stack, never shared a line with either array." }
+    ];
+
+    const fig = $('#rt-step'), svg = $('#rt-step-svg');
+    const o = (k) => fig.querySelector(`[data-o="${k}"]`);
+    let cur = 0;
+
+    // chips, one segmented group per kind of difference
+    const chips = [];
+    const host = $('#rt-chips');
+    [...new Set(STEPS.map((s) => s.group))].forEach((g) => {
+      const grp = H('span', 'rt-grp', null, host);
+      if (STEPS.filter((s) => s.group === g).length > 1) H('span', 'rt-glabel', g, grp);
+      const seg = H('span', 'rt-seg', null, grp);
+      seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', g);
+      STEPS.forEach((s, i) => {
+        if (s.group !== g) return;
+        const b = H('button', null, s.chip, seg); b.type = 'button';
+        b.setAttribute('aria-label', `${g}: ${s.title}`);
+        b.addEventListener('click', () => go(i));
+        chips[i] = b;
+      });
+    });
+
+    const W = 720, Hh = 300, M = { l: 46, r: 10, t: 22, b: 50 }, base = Hh - M.b;
+    const y = lin(0, 550, base, M.t);
+    const colorOf = (s) => (s.kind === 'rtrb' || s.kind === 'rtrbPrev' ? RTRB : RING);
+    const ghostOf = (s) => s.kind === 'prev' || s.kind === 'rtrbPrev';
+
+    function drawBars(st) {
+      svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+      [0, 100, 200, 300, 400, 500].forEach((v) => {
+        S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v ? 'rt-gl' : 'rt-base' }, svg);
+        T(svg, M.l - 8, y(v) + 4, String(v), 'rt-tk', 'end');
+      });
+      T(svg, M.l - 8, M.t - 8, 'M/s', 'rt-tk', 'end');
+      const ser = st.series, n = st.cells.length, gw = (W - M.l - M.r) / n;
+      const gap = 6, bw = Math.min(34, (gw - 30) / ser.length - gap), setW = ser.length * bw + (ser.length - 1) * gap;
+      st.cells.forEach((cell, j) => {
+        const gx = M.l + j * gw + (gw - setW) / 2;
+        ser.forEach((s, k) => {
+          const x = gx + k * (bw + gap), v = s.v[j], ghost = ghostOf(s), color = colorOf(s);
+          const g = S('g', { class: 'rt-mark', tabindex: '0', role: 'img', 'aria-label': `${s.label}, ${cell}: ${v} M/s` }, svg);
+          const p = S('path', { d: colPath(x, bw, base, y(v)) }, g);
+          if (ghost) { p.setAttribute('fill', 'none'); p.setAttribute('stroke', color); p.setAttribute('stroke-width', '1.5'); p.setAttribute('stroke-dasharray', '4 3'); }
+          else p.setAttribute('fill', color);
+          T(g, x + bw / 2, y(v) - 5, String(v), ghost ? 'rt-val dim' : 'rt-val');
+          S('rect', { class: 'rt-hit', x: x - gap / 2, y: M.t, width: bw + gap, height: base - M.t }, g);
+          hover(g, () => ({ title: cell, rows: ser.map((q) => ({ v: `${q.v[j]} M/s`, label: q.label, color: colorOf(q) })) }));
+        });
+        const [a, b] = cell.split(', ');
+        T(svg, M.l + j * gw + gw / 2, base + 20, a, 'rt-lab');
+        T(svg, M.l + j * gw + gw / 2, base + 36, b || '', 'rt-tk');
+      });
+    }
+
+    function drawMap() {
+      const Hm = 270;
+      svg.setAttribute('viewBox', `0 0 ${W} ${Hm}`);
+      const x0 = 150, x1 = 706, x = lin(0, 0x140, x0, x1);
+      const top = 26, bot = 214;
+      [[0, 0x80, 'rt-band-a'], [0x80, 0x100, 'rt-band-b'], [0x100, 0x140, 'rt-band-a']].forEach(([a, b, c], i) => {
+        S('rect', { x: x(a), y: top, width: x(b) - x(a), height: bot - top, class: c }, svg);
+        T(svg, (x(a) + x(b)) / 2, top - 8, i < 2 ? `128-byte line ${i}` : 'line 2', 'rt-tk');
+      });
+      [0, 0x80, 0x100].forEach((b) => S('line', { x1: x(b), x2: x(b), y1: top, y2: bot, class: 'rt-bound' }, svg));
+      const ROWS = [
+        { name: 'ring_spsc', sub: '64-byte padding', y: 54, fields: [
+          [0x00, 0x40, 'producer', 'cursor', 'p'], [0x40, 0x80, 'consumer', 'cursor', 'c'],
+          [0x80, 0xc0, 'capacity', 'CursorPair', 'o'], [0xc0, 0x100, 'slot-array', 'pointer', 'o']] },
+        { name: 'rtrb 0.4', sub: '', y: 140, fields: [
+          [0x00, 0x80, 'consumer cursor', '(head)', 'c'], [0x80, 0x100, 'producer cursor', '(tail)', 'p'],
+          [0x100, 0x140, 'data pointer,', 'capacity', 'o', true]] }
+      ];
+      const FILL = { p: 'var(--c-producer)', c: 'var(--c-consumer)', o: 'var(--muted)' };
+      ROWS.forEach((r) => {
+        T(svg, x0 - 14, r.y + 24, r.name, 'rt-lab b', 'end');
+        if (r.sub) T(svg, x0 - 14, r.y + 40, r.sub, 'rt-tk', 'end');
+        r.fields.forEach(([a, b, l1, l2, k, open]) => {
+          const g = S('g', { class: 'rt-mark', tabindex: '0', role: 'img', 'aria-label': `${r.name}: ${l1} ${l2} at +0x${a.toString(16)}` }, svg);
+          const w = x(b) - x(a) - 3;
+          S('rect', { x: x(a) + 1.5, y: r.y, width: w, height: 52, rx: 5, fill: FILL[k], 'fill-opacity': k === 'o' ? 0.3 : 0.9,
+            stroke: open ? 'var(--muted)' : 'none', 'stroke-dasharray': open ? '4 3' : '' }, g);
+          T(g, x(a) + 1.5 + w / 2, r.y + 22, l1, k === 'o' ? 'rt-in t' : 'rt-in');
+          T(g, x(a) + 1.5 + w / 2, r.y + 37, l2, k === 'o' ? 'rt-in t' : 'rt-in');
+          T(g, x(a) + 4, r.y + 66, `+0x${a.toString(16).padStart(2, '0')}`, 'rt-mono', 'start');
+          hover(g, () => ({ title: r.name, rows: [{ v: `+0x${a.toString(16).padStart(2, '0')}`, label: `${l1} ${l2}`, color: FILL[k] }],
+            note: open ? 'The record gives this field\'s offset, not its size; the block is drawn to +0x140.' : null }));
+        });
+      });
+      T(svg, x0, 246, 'Each struct drawn from a 128-byte line boundary. A block runs from its field\'s offset to the next field\'s.', 'rt-tk', 'start');
+    }
+
+    function legend(st) {
+      const lg = o('legend'); lg.replaceChildren();
+      if (st.map) {
+        [['var(--c-producer)', 'producer cursor'], ['var(--c-consumer)', 'consumer cursor'], ['var(--muted)', 'other field']].forEach(([c, l]) => {
+          const s = H('span', null, null, lg); const i = H('i', 'rt-sw', null, s); i.style.setProperty('--sw', c); s.appendChild(document.createTextNode(l));
+        });
+        return;
+      }
+      st.series.forEach((q) => {
+        const s = H('span', null, null, lg); const i = H('i', 'rt-sw' + (ghostOf(q) ? ' ghost' : ''), null, s);
+        i.style.setProperty('--sw', colorOf(q)); s.appendChild(document.createTextNode(q.label));
+      });
+    }
+
+    function moved(st) {
+      if (st.moved) return st.moved;
+      const cellTxt = (q, p) => st.cells.map((c, j) => `${c} ${p ? p.v[j] + ' → ' : ''}${q.v[j]}`).join('; ');
+      const ring = st.series.find((q) => q.kind === 'ring'), prev = st.series.find((q) => q.kind === 'prev');
+      const rtrb = st.series.find((q) => q.kind === 'rtrb'), rtrbPrev = st.series.find((q) => q.kind === 'rtrbPrev');
+      const parts = [];
+      parts.push(prev ? `${prev.label} → ${ring.label}: ${cellTxt(ring, prev)}.` : `${ring.label}: ${cellTxt(ring)}.`);
+      if (rtrb) parts.push(rtrbPrev ? `${rtrbPrev.label} → ${rtrb.label}: ${cellTxt(rtrb, rtrbPrev)}.` : `rtrb in the same run: ${cellTxt(rtrb)}.`);
+      else parts.push('rtrb: unaffected; no figure recorded for these cells.');
+      return parts.join(' ');
+    }
+
+    function go(i) {
+      cur = Math.max(0, Math.min(STEPS.length - 1, i));
+      const st = STEPS[cur];
+      chips.forEach((b, k) => b.setAttribute('aria-pressed', String(k === cur)));
+      o('n').textContent = `Rung ${cur + 1} of ${STEPS.length} · ${st.group}`;
+      o('title').textContent = st.title;
+      o('removed').textContent = st.removed;
+      svg.replaceChildren(); tipHide();
+      if (st.map) drawMap(); else drawBars(st);
+      legend(st);
+      o('moved').textContent = moved(st);
+      const v = o('verdict'); v.textContent = st.verdict || ''; v.hidden = !st.verdict;
+      fig.querySelector('[data-act="prev"]').disabled = cur === 0;
+      fig.querySelector('[data-act="next"]').disabled = cur === STEPS.length - 1;
+    }
+    fig.querySelector('[data-act="prev"]').addEventListener('click', () => go(cur - 1));
+    fig.querySelector('[data-act="next"]').addEventListener('click', () => go(cur + 1));
+
+    const tb = $('#rt-step-tables');
+    const head4 = ['', '64, one line', '64, two lines', '1024, one line', '1024, two lines'];
+    table(tb, 'Slot size, same run, M/s.', head4, D.slot.map((r) => [r.name, ...r.v]));
+    table(tb, 'Consumer rungs, 8-byte CopySlot ring, M/s.', head4, D.consumer.map((r) => [r.rung === 'rtrb' ? 'rtrb' : `${r.rung}: ${r.name}`, ...r.v]));
+    table(tb, 'Producer rungs, consumer D in all, M/s.', ['', '64, one line', '64, two lines', '64, 128-byte padding', '1024, one line'], D.producer.map((r) => [r.rung === 'rtrb' ? 'rtrb' : `${r.rung}: ${r.name}`, ...r.v]));
+    table(tb, 'Cursor order, 128-byte padding, M/s. rtrb unaffected.', ['', "producer-first (ring's order)", "consumer-first (rtrb's order)"], [['rung D', ...D.order.D], ['rung F', ...D.order.F]]);
+    go(0);
+  })();
+
+  /* ================= 2. counters ================= */
+  (() => {
+    const svg = $('#rt-cnt-svg');
+    const f = (k, v) => (k === 'miss' ? v.toFixed(2) : k === 'insP' || k === 'insC' || k === 'mps' ? String(v) : v.toFixed(1));
+    const top = 58, rowH = 38, L = 150;
+    const P = [
+      { x0: 168, x1: 380, max: 30, ticks: [0, 10, 20, 30], title: ['cycles per record', ''], bars: [['cyc', null]] },
+      { x0: 418, x1: 610, max: 1, ticks: [0, 0.5, 1], title: ['L1D load misses', 'per record, consumer'], bars: [['miss', null]] },
+      { x0: 648, x1: 880, max: 10, ticks: [0, 5, 10], title: ['cycles waiting on an', 'older L1D miss'], bars: [['waitP', 'var(--c-producer)'], ['waitC', 'var(--c-consumer)']] }
+    ];
+    const bot = top + D.counters.length * rowH;
+    P.forEach((p) => {
+      const x = lin(0, p.max, p.x0, p.x1);
+      T(svg, p.x0, 16, p.title[0], 'rt-lab', 'start');
+      if (p.title[1]) T(svg, p.x0, 31, p.title[1], 'rt-lab', 'start');
+      p.ticks.forEach((v, i) => { S('line', { x1: x(v), x2: x(v), y1: top - 8, y2: bot, class: i ? 'rt-gl' : 'rt-base' }, svg); T(svg, x(v), bot + 16, String(v)); });
+      D.counters.forEach((r, ri) => {
+        const y0 = top + ri * rowH, isR = r.name === 'rtrb';
+        const nb = p.bars.length, bh = nb > 1 ? 11 : 18, gap = 3;
+        p.bars.forEach(([k, col], bi) => {
+          const y = y0 + (rowH - 10 - (nb * bh + (nb - 1) * gap)) / 2 + bi * (bh + gap);
+          S('path', { d: rowPath(x(0), x(r[k]), y, bh), fill: col || (isR ? RTRB : RING) }, svg);
+          T(svg, x(r[k]) + 5, y + bh / 2 + 4, f(k, r[k]), 'rt-val', 'start');
+        });
+      });
+    });
+    D.counters.forEach((r, ri) => {
+      const y0 = top + ri * rowH;
+      const g = S('g', { class: 'rt-mark', tabindex: '0', role: 'img', 'aria-label': `${r.name}, ${r.slots} slots: ${r.mps} M/s, ${f('cyc', r.cyc)} cycles per record, ${f('miss', r.miss)} consumer L1D load misses, waiting ${f('waitP', r.waitP)} producer and ${f('waitC', r.waitC)} consumer cycles` }, svg);
+      T(g, L, y0 + 13, r.name, 'rt-lab', 'end');
+      T(g, L, y0 + 27, `${r.slots} slots, ${r.mps} M/s`, 'rt-tk', 'end');
+      S('rect', { class: 'rt-hit', x: 0, y: y0 - 4, width: 900, height: rowH - 2 }, g);
+      hover(g, () => ({ title: `${r.name}, ${r.slots} slots`, rows: [
+        { v: `${r.mps} M/s`, label: 'throughput', color: r.name === 'rtrb' ? RTRB : RING },
+        { v: f('cyc', r.cyc), label: 'cycles per record', color: r.name === 'rtrb' ? RTRB : RING },
+        { v: `${r.insP} / ${r.insC}`, label: 'instructions, producer / consumer', color: 'var(--muted)' },
+        { v: f('miss', r.miss), label: 'L1D load misses, consumer', color: r.name === 'rtrb' ? RTRB : RING },
+        { v: f('waitP', r.waitP), label: 'cycles waiting, producer', color: 'var(--c-producer)' },
+        { v: f('waitC', r.waitC), label: 'cycles waiting, consumer', color: 'var(--c-consumer)' }] }));
+    });
+    const t = $('#rt-cnt-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, t));
+    ['', 'M/s', 'cycles', 'instructions (producer / consumer)', 'L1D load misses, consumer', 'cycles waiting on an older L1D miss (producer / consumer)'].forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, t);
+    D.counters.forEach((r) => { const tr = H('tr', null, null, body); [`${r.name}, ${r.slots}`, r.mps, f('cyc', r.cyc), `${r.insP} / ${r.insC}`, f('miss', r.miss), `${f('waitP', r.waitP)} / ${f('waitC', r.waitC)}`].forEach((c) => H('td', null, String(c), tr)); });
+    H('caption', null, 'macOS kperf, per thread, per record, 2026-10-12. Cursors on one line; ring today = CopySlot ring.', t);
+  })();
+
+  /* ================= 3. the probe ================= */
+  (() => {
+    const svg = $('#rt-probe-svg');
+    const y = lin(0, 300, 206, 22), xA = 260, xB = 470;
+    [0, 100, 200, 300].forEach((v) => { S('line', { x1: 120, x2: 640, y1: y(v), y2: y(v), class: v ? 'rt-gl' : 'rt-base' }, svg); T(svg, 112, y(v) + 4, String(v), 'rt-tk', 'end'); });
+    T(svg, 112, 10, 'M/s', 'rt-tk', 'end');
+    T(svg, xA, 226, 'without the probe', 'rt-lab');
+    T(svg, xB, 226, 'with the probe', 'rt-lab');
+    T(svg, xB, 241, 'about 20 more instructions per record', 'rt-tk');
+    D.probe.forEach((p) => {
+      const g = S('g', { class: 'rt-mark', tabindex: '0', role: 'img', 'aria-label': `${p.name}: ${p.without} M/s without the probe, ${span(p.with)} with it` }, svg);
+      const mid = (p.with[0] + p.with[1]) / 2;
+      S('path', { d: `M${xA + 7} ${y(p.without)} L${xB - 7} ${y(mid)}`, stroke: p.color, 'stroke-width': 2, fill: 'none', 'stroke-dasharray': '4 3' }, g);
+      S('circle', { cx: xA, cy: y(p.without), r: 6, fill: p.color, stroke: 'var(--surface)', 'stroke-width': 2 }, g);
+      S('rect', { x: xB - 6, y: y(p.with[1]) - 2, width: 12, height: y(p.with[0]) - y(p.with[1]) + 4, rx: 5, fill: p.color, stroke: 'var(--surface)', 'stroke-width': 2 }, g);
+      T(g, xA - 14, y(p.without) + 4, `${p.name} ${p.without} M/s · ${p.cycWithout} cycles`, 'rt-val', 'end');
+      T(g, xB + 14, y(mid) + 4, `${p.name} ${span(p.with)} M/s · ${p.cycWith} cycles`, 'rt-val', 'start');
+      S('rect', { class: 'rt-hit', x: 120, y: Math.min(y(p.without), y(p.with[1])) - 10, width: 520, height: Math.abs(y(p.without) - y(mid)) + 20 }, g);
+      hover(g, () => ({ title: `${p.name}, 64 slots, cursors on one line`, rows: [
+        { v: `${p.without} M/s`, label: `without the probe, ${p.cycWithout} cycles per record`, color: p.color },
+        { v: `${span(p.with)} M/s`, label: `with it, ${p.cycWith} cycles per record`, color: p.color }] }));
+    });
+  })();
+
+  /* ================= 4. consumer-work sweep ================= */
+  (() => {
+    const SER = [
+      { name: 'ring TypedSlot', color: 'var(--c-tagged)', dash: '', shape: 'circle' },
+      { name: 'ring CopySlot', color: 'var(--c-untagged)', dash: '7 4', shape: 'square' },
+      { name: 'rtrb', color: 'var(--c-rtrb)', dash: '2 3', shape: 'diamond' }
+    ];
+    const XS = D.sweep.map((r) => r.work);
+    const PANELS = [
+      { key: 's64', title: '64 slots', svg: $('#rt-sw-64'), rows: $('#rt-sw-64-rows') },
+      { key: 's1024', title: '1024 slots', svg: $('#rt-sw-1024'), rows: $('#rt-sw-1024-rows') }
+    ];
+    const NOTES = {
+      0: "Zero consumer work, the lean consumer. rtrb leads at 64 slots here and at no other step. Compiling the knob in, set to 0, had already moved rtrb's 64-slot baseline from ~280 to 214.",
+      1: 'One multiply-add per record. At 64 slots ring with CopySlot is level with rtrb or ahead, from here on.',
+      2: 'Two steps. At 1024 slots ring with TypedSlot reads 183, the median of rounds 45 and 321: unreliable.',
+      4: 'Four steps. From here both ring variants beat rtrb at 64 slots.',
+      8: "Heavy consumer work. The two rings with 8-byte slots, ring CopySlot and rtrb, fall into the full-ring lockstep (refused pushes 0.1–0.3 per record). TypedSlot's slower producer avoids it.",
+      16: "Heavy consumer work. The two rings with 8-byte slots, ring CopySlot and rtrb, fall into the full-ring lockstep (refused pushes 0.1–0.3 per record). TypedSlot's slower producer avoids it."
+    };
+    const W = 440, Hh = 262, M = { l: 40, r: 14, t: 14, b: 44 };
+    const x = (i) => M.l + 16 + i * ((W - M.l - M.r - 32) / (XS.length - 1));
+    const y = lin(0, 450, Hh - M.b, M.t);
+    const slider = $('#rt-sw-n'), out = $('#rt-sw-out'), read = $('#rt-sw-read');
+    let idx = 0;
+    const isUnrel = (key, i, si) => key === D.unreliable.panel && XS[i] === D.unreliable.work && si === D.unreliable.series;
+
+    function marker(parent, shape, cx, cy, r, color, hollow) {
+      const a = { fill: hollow ? 'var(--surface)' : color, stroke: hollow ? color : 'var(--surface)', 'stroke-width': 2 };
+      if (shape === 'square') return S('rect', { x: cx - r, y: cy - r, width: 2 * r, height: 2 * r, rx: 1.5, ...a }, parent);
+      if (shape === 'diamond') return S('path', { d: `M${cx} ${cy - r * 1.3}L${cx + r * 1.3} ${cy}L${cx} ${cy + r * 1.3}L${cx - r * 1.3} ${cy}Z`, ...a }, parent);
+      return S('circle', { cx, cy, r, ...a }, parent);
+    }
+    function render() {
+      out.textContent = String(XS[idx]);
+      slider.setAttribute('aria-valuetext', `${XS[idx]} multiply-adds per record`);
+      PANELS.forEach((p) => {
+        const svg = p.svg; svg.replaceChildren();
+        [0, 100, 200, 300, 400].forEach((v) => { S('line', { x1: M.l, x2: W - M.r, y1: y(v), y2: y(v), class: v ? 'rt-gl' : 'rt-base' }, svg); T(svg, M.l - 6, y(v) + 4, String(v), 'rt-tk', 'end'); });
+        T(svg, M.l - 6, M.t - 4, 'M/s', 'rt-tk', 'end');
+        S('rect', { class: 'rt-cur', x: x(idx) - 17, y: M.t - 2, width: 34, height: Hh - M.b - M.t + 2, rx: 6 }, svg);
+        XS.forEach((w, i) => T(svg, x(i), Hh - M.b + 16, String(w), i === idx ? 'rt-lab b' : 'rt-tk'));
+        T(svg, (M.l + W - M.r) / 2, Hh - 8, 'consumer work, multiply-adds per record', 'rt-tk');
+        SER.forEach((s, si) => {
+          const d = D.sweep.map((r, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)} ${y(r[p.key][si]).toFixed(1)}`).join(' ');
+          S('path', { d, fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-dasharray': s.dash, 'stroke-linejoin': 'round' }, svg);
+        });
+        D.sweep.forEach((r, i) => SER.forEach((s, si) => {
+          const un = isUnrel(p.key, i, si);
+          if (un) S('line', { x1: x(i), x2: x(i), y1: y(D.unreliable.rounds[0]), y2: y(D.unreliable.rounds[1]), stroke: s.color, 'stroke-width': 1.5, 'stroke-dasharray': '2 2' }, svg);
+          marker(svg, s.shape, x(i), y(r[p.key][si]), i === idx ? 5.5 : 3.8, s.color, un);
+        }));
+        XS.forEach((w, i) => {
+          const g = S('g', { class: 'rt-mark' }, svg);
+          S('rect', { class: 'rt-hit', x: x(i) - 18, y: M.t, width: 36, height: Hh - M.b - M.t + 22 }, g);
+          g.addEventListener('click', () => { idx = i; slider.value = String(i); render(); });
+          hover(g, () => ({ title: `${p.title}, ${w} multiply-adds per record`, rows: SER.map((s, si) => ({ v: `${D.sweep[i][p.key][si]} M/s`, label: s.name + (isUnrel(p.key, i, si) ? ', rounds 45 and 321: unreliable' : ''), color: s.color })) }));
+        });
+        // readout: the three values at this step, leader first
+        const rowsEl = p.rows; rowsEl.replaceChildren();
+        const vals = SER.map((s, si) => ({ s, si, v: D.sweep[idx][p.key][si] })).sort((a, b) => b.v - a.v);
+        vals.forEach((q, rank) => {
+          const sw = H('i', 'rt-ln' + (q.s.dash ? (q.s.shape === 'diamond' ? ' dot' : ' dash') : ''), null, rowsEl); sw.style.setProperty('--sw', q.s.color);
+          H('span', rank === 0 ? 'lead' : null, q.s.name + (rank === 0 ? ', leads' : ''), rowsEl);
+          H('span', 'v' + (rank === 0 ? ' lead' : ''), `${q.v} M/s`, rowsEl);
+          if (isUnrel(p.key, idx, q.si)) H('span', 'note', 'median of rounds 45 and 321: unreliable', rowsEl);
+        });
+      });
+      read.textContent = NOTES[XS[idx]];
+    }
+    slider.addEventListener('input', () => { idx = +slider.value; render(); });
+    const t = $('#rt-sw-tbl');
+    const hr = H('tr', null, null, H('thead', null, null, t));
+    ['consumer work', '64: TypedSlot', '64: CopySlot', '64: rtrb', '1024: TypedSlot', '1024: CopySlot', '1024: rtrb'].forEach((h) => H('th', null, h, hr));
+    const body = H('tbody', null, null, t);
+    D.sweep.forEach((r) => { const tr = H('tr', null, null, body); [r.work, ...r.s64, ...r.s1024.map((v, si) => (r.work === D.unreliable.work && si === D.unreliable.series ? `${v} (rounds 45, 321: unreliable)` : v))].forEach((c) => H('td', null, String(c), tr)); });
+    H('caption', null, 'M4 Pro, push1_pop1, median of 2 rounds, M/s.', t);
+    render();
+  })();
+})();
+</script>
+</section>
+
 <!-- summary: Reference material split out of the measurements chapter: the seven open questions with their confidence, and the glossary of the terms the page relies on. No controls; it is the place the other sections link to. -->
 <section id="sec-reference" class="section" data-title="Open questions and glossary">
 <style>
@@ -3945,7 +4613,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   #sec-reference dl.gl dd { margin: 0; color: var(--text); }
   #sec-reference ol.oq li { margin: 8px 0; }
 </style>
-<h2><span class="num">06</span>Open questions and glossary</h2>
+<h2><span class="num">07</span>Open questions and glossary</h2>
 <p>What the investigation did not settle, with the confidence each reading carries, and the terms the page uses.</p>
 <h3>Open questions</h3>
 <ol class="oq">

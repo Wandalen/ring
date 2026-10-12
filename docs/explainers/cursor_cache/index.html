@@ -4994,7 +4994,7 @@ Numbers inlined from data.json (rtrb_against_ring_m4, issue_55_consumer_work_ci)
   <dt>Rung</dt><dd>One step of section 6's comparison: ring with one more difference from rtrb removed, measured beside rtrb in the same run.</dd>
   <dt>Consumer work</dt><dd>A benchmark knob that makes the consumer run <var>n</var> dependent multiply-adds per record, the same for every candidate.</dd>
   <dt>Lean-consumer regime</dt><dd>A consumer that does almost no work per record. On the M4, rtrb's 64-slot lead over ring exists only there; on Zen 3, #41's loss against master lives there and turns into a gain by eight steps of consumer work (#55).</dd>
-  <dt>Refused push</dt><dd>A push the ring turns away because it is full. Counted per record, as in #55's 1.2 for #41 against 0.7 for master at no consumer work.</dd>
+  <dt>Refused push</dt><dd>A push the ring turns away because it is full. Counted per record, as in #55's ~1.2 for #41 against ~0.7 for master at no consumer work.</dd>
   <dt>kperf</dt><dd>macOS's interface to the CPU's performance counters. Section 6 reads cycles, instructions and L1D misses per thread through it.</dd>
   <dt>Placement harness</dt><dd>#51: the bench harness builds each ring at a chosen byte of a 256-byte block (0 or 64), so a run reports one cursor layout instead of whatever the stack gave it.</dd>
   <dt>Bench Compare</dt><dd>The CI job that runs a PR's base and head in the same run and reports the change per benchmark.</dd>

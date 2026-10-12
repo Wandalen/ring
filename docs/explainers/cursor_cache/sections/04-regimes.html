@@ -147,7 +147,7 @@
   The ring is never short of records; the consumer is slow because each slot it frees is fought over at once.</p>
 <div class="measured">Slow <code>push1_pop1</code> runs refresh 0.5 to 1.0 times per record, and the refreshes find
   room for exactly one slot. Fast runs refresh at most 0.04 times per record. The review counted the refreshes with a
-  counter added to <code>Producer</code>; no hardware counters were available on this machine.</div>
+  counter added to <code>Producer</code>; no hardware counters were read in that round.</div>
 
 <p>Plot time per record against refreshes per record and the runs fall on a line. The slope is the price of one
   refresh.</p>
@@ -256,8 +256,8 @@
   </div>
 </div>
 <div class="hyp" style="margin-top:12px">The feedback term, a refresh costing the consumer a line re-acquisition when
-  the cursors sit on separate lines, was inferred from how added delays moved the result. Nobody observed it: there are
-  no PMU counters on this machine. Review "regimes" rates the direction high confidence and the thresholds medium. The
+  the cursors sit on separate lines, was inferred from how added delays moved the result. Nobody observed it: no hardware
+  counters were read in that round, and the kperf counters read later (section 6) cannot say which line moved. Review "regimes" rates the direction high confidence and the thresholds medium. The
   model keeps three costs and nothing else. It gets the direction of all three measured interventions right and
   over-predicts the gain from slowing the producer.</div>
 

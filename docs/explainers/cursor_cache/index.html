@@ -150,8 +150,8 @@
 
 <p>A core never fetches one byte from memory. It fetches a <dfn>cache line</dfn>: a fixed, aligned block of bytes that
 the caches store, copy and track as one unit. Touch one byte and the whole line comes along. The line is 64 bytes on x86
-and most ARM cores. It is 128 bytes on Apple silicon, including the Apple M4 Pro where every number in this explainer
-was measured.</p>
+and most ARM cores. It is 128 bytes on Apple silicon, including the Apple M4 Pro where most numbers in this explainer
+were measured. The rest come from x86 CI runners, and the page says so where they appear.</p>
 
 <h3>The unit the memory system moves</h3>
 <p>The ruler below is 256 bytes of memory, split into 8-byte words (one <code>u64</code> each). Switch the line size and
@@ -282,7 +282,8 @@ consumer stores its own cursor it takes ownership of the whole shared line. The 
 store buffer (a queue of stores not yet visible to other cores) until the line comes back, then land together. The
 consumer then finds several new records per fetch and pops them as local hits. The measurements confirm the trigger:
 placement decides the speed, and caching the producer cursor in the consumer removes that dependence. They do not prove
-this mechanism. This machine had no hardware performance counters, so nobody counted the moves.</p>
+this mechanism. No hardware counters were read in that round. The kperf counters read later (section 6) count misses
+per record, not which line moved, so nobody has counted the moves.</p>
 
 <h3>What to carry into the next sections</h3>
 <ul class="carry">
@@ -783,8 +784,9 @@ self.cached_tail = seq.next();</code></pre>
   wrote it a moment ago, so its only up-to-date copy sits in the producer core's cache, and the load has to fetch it
   across cores (measured at <span data-out="oneway"></span> ns one way, section 1).</p>
 <p class="hyp">The per-pop cost is that coherence miss, not the Acquire ordering. Evidence: with the load weakened to
-  Relaxed (a plain <code>ldr</code>), the slow cells stayed slow. Confidence high (orderings review, F1). No hardware
-  performance counters were available to observe the miss directly.</p>
+  Relaxed (a plain <code>ldr</code>), the slow cells stayed slow. Confidence high (orderings review, F1). The kperf
+  counters read later (section 6) count L1D misses per record but cannot say which line missed, so this miss is still
+  not observed directly.</p>
 
 <h3>Release and Acquire, one record end to end</h3>
 
@@ -1480,10 +1482,11 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
 <p>At 0 mod 128 both cursors share a line. Every store by either side takes the one line holding both, and the other
   core's copy is invalidated. At 64 mod 128 they sit on separate lines, which is what the padding was written to
   achieve. It measured slower: the closed PR #23, which padded the cursors to 128 bytes, was 3&ndash;7x slower on pop1
-  without #41. <a href="#sec-regimes">Section 4</a> explains why.</p>
+  without #41. <a href="#sec-regimes">Section 4</a> explains why, and section 5 measures 128 again with #41.</p>
 <p class="measured">In the two-line layout <code>capacity</code> (+128) lands on the consumer cursor's line, and the
   producer loads it on every push. Hoisting it into the producer removed the load from the assembly and left two-line
-  pop1 as slow as before. It breaks the rule that no hot field shares a cursor's line. It is not the regression.</p>
+  pop1 as slow as before. It breaks the rule that no hot field shares a cursor's line. It is not the regression. Tried
+  again on the shipped path on 2026-10-11/12, it cost single-thread time and was dropped (section 6).</p>
 
 <h3>The harness never chose the address</h3>
 <p>The benchmark built the ring as a temporary on the main thread's stack. On macOS the stack pointer at
@@ -1612,7 +1615,7 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
   against 483 at 72. Stride 128 runs within ~10% of 136.</p>
 <p class="hyp">The 64-byte-stride penalty lives at the frontier, where the producer writes slot i+1 next to the
   slot i the consumer reads; it vanishes when the two are 64 records apart. Why a power-of-two stride is slow there is
-  not known. This machine exposed no PMU counters. Ruled out: 4K aliasing (a same-core effect that would not vanish
+  not known, and no counter run has looked at it. Ruled out: 4K aliasing (a same-core effect that would not vanish
   with lag), more line sharing (72 shares more boundaries yet is faster), and codegen (both store inline, no memcpy).</p>
 
 <h3>The check that never read the middle line</h3>
@@ -2279,7 +2282,7 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
   The ring is never short of records; the consumer is slow because each slot it frees is fought over at once.</p>
 <div class="measured">Slow <code>push1_pop1</code> runs refresh 0.5 to 1.0 times per record, and the refreshes find
   room for exactly one slot. Fast runs refresh at most 0.04 times per record. The review counted the refreshes with a
-  counter added to <code>Producer</code>; no hardware counters were available on this machine.</div>
+  counter added to <code>Producer</code>; no hardware counters were read in that round.</div>
 
 <p>Plot time per record against refreshes per record and the runs fall on a line. The slope is the price of one
   refresh.</p>
@@ -2388,8 +2391,8 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
   </div>
 </div>
 <div class="hyp" style="margin-top:12px">The feedback term, a refresh costing the consumer a line re-acquisition when
-  the cursors sit on separate lines, was inferred from how added delays moved the result. Nobody observed it: there are
-  no PMU counters on this machine. Review "regimes" rates the direction high confidence and the thresholds medium. The
+  the cursors sit on separate lines, was inferred from how added delays moved the result. Nobody observed it: no hardware
+  counters were read in that round, and the kperf counters read later (section 6) cannot say which line moved. Review "regimes" rates the direction high confidence and the thresholds medium. The
   model keeps three costs and nothing else. It gets the direction of all three measured interventions right and
   over-predicts the gain from slowing the producer.</div>
 
@@ -3098,7 +3101,8 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 <h2><span class="num">05</span>Measurements, trade-offs, what changed</h2>
 <p class="r-lede">Every chart below draws straight from the recorded runs. Two-thread cells were run twice, in separate
   processes; both rounds are drawn, never averaged. Throughput is in millions of records per second (M/s), higher is
-  better, unless a label says ns or µs. All on one Apple M4 Pro, threads not pinned, no hardware performance counters.</p>
+  better, unless a label says ns or µs. On one Apple M4 Pro with threads not pinned, except where a heading says x86 CI;
+  no chart here uses hardware counters.</p>
 
 <div class="r-tip" hidden role="status" aria-live="polite"></div>
 
@@ -3267,7 +3271,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   <ul class="ruled" id="r-ruled"></ul>
   <div class="open">Mechanism. A frontier effect: it shows only where the producer writes and the consumer reads the same
     lines at the same moment, and vanishes when the consumer is held 64 records back. Why a power-of-two stride is slow
-    there is not known. It needs hardware counters, which this machine did not expose. A caller with 64-byte records
+    there is not known, and no counter run has looked at it. A caller with 64-byte records
     should measure, and may pad.</div>
 </div>
 
@@ -4056,13 +4060,15 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
           'drain_up_to may serve a drain from an older observation and read no producer line. Results are identical: the observation lags, it is never extrapolated.',
           'Single thread: push_pop 3.60, 3.73 → 3.98, 3.98 ns (+6.7% to +10.6%) and whole-lap fill_drain 65.0 → 73.2 ns per lap at 64 slots (+12.6%), 0.96 → 1.06 µs at 1024 (+10.4%), in #41\'s first version. Code layout: equal within 0.5% with loop heads pinned (#53).',
           'TypedSlot pop1 at 16384 slots, one line: 46, 47 → 36, 35 M/s (−22% to −26%), in the regime where its 256 KB array spills the 128 KB L1D.',
-          'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.'
+          'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.',
+          'Zen 3 CI runner (EPYC 7763), rebased head: the two-thread one-record hand-off is −41%, −42% and −74% at 64, 1024 and 16384 slots. The loss belongs to a lean consumer: it shrinks with consumer work and is a gain at eight steps. Pinned to SMT siblings and on Zen 5, #41 gains in every swept row (#55, section 6).'
         ] },
       { title: '#38: CopySlot', color: 'var(--c-pr38)',
         get: [
           'An 8-byte record in an 8-byte slot, not 16: 131072 bytes at 16384 slots instead of 262144, inside the 128 KB L1D.',
           'On #41, pop1, two lines: 443, 439 M/s at 1024 slots (TypedSlot 332, 337) and 469, 393 at 16384 (TypedSlot 36, 35).',
-          'Single thread on c28bedb: push_pop 2.97 against 3.81 ns; fill_drain popN at 16384 slots 1004 against 53.1 M/s.'
+          'Single thread on c28bedb: push_pop 2.97 against 3.81 ns; fill_drain popN at 16384 slots 1004 against 53.1 M/s.',
+          'Xeon CI runner, rebased head 4c8ecce, single thread: push_pop 3.3 against 3.5 ns, one-record fill_drain +39%, +21% and +25%, whole-lap +31%, +34% and +33%. The two-thread rows of that run do not read as real (noise caveat above).'
         ],
         pay: [
           'T: Copy + Default.',
@@ -4095,7 +4101,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 
   /* ================= 8. PRs ================= */
   (() => {
-    $('#r-ctx').textContent = `Context: #20 ${D.prs[20]}. #22 ${D.prs[22]}. #23 ${D.prs[23]}.`;
+    $('#r-ctx').textContent = `Context: #20 ${D.prs[20]}. #22 ${D.prs[22]}. #23 ${D.prs[23]}. The commit lists below predate the rebase; the rebased heads measured on CI on 2026-10-12 are #41 at 4e8ddff and #38 at 4c8ecce.`;
     const PR = [
       { n: 41, base: 'on master', commits: [
         ['cf48ade', 'test(ring_spsc): pin the contract a consumer cursor cache must keep', ['ring_spsc/tests/spsc_test.rs']],

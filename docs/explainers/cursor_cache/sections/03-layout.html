@@ -129,10 +129,11 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
 <p>At 0 mod 128 both cursors share a line. Every store by either side takes the one line holding both, and the other
   core's copy is invalidated. At 64 mod 128 they sit on separate lines, which is what the padding was written to
   achieve. It measured slower: the closed PR #23, which padded the cursors to 128 bytes, was 3&ndash;7x slower on pop1
-  without #41. <a href="#sec-regimes">Section 4</a> explains why.</p>
+  without #41. <a href="#sec-regimes">Section 4</a> explains why, and section 5 measures 128 again with #41.</p>
 <p class="measured">In the two-line layout <code>capacity</code> (+128) lands on the consumer cursor's line, and the
   producer loads it on every push. Hoisting it into the producer removed the load from the assembly and left two-line
-  pop1 as slow as before. It breaks the rule that no hot field shares a cursor's line. It is not the regression.</p>
+  pop1 as slow as before. It breaks the rule that no hot field shares a cursor's line. It is not the regression. Tried
+  again on the shipped path on 2026-10-11/12, it cost single-thread time and was dropped (section 6).</p>
 
 <h3>The harness never chose the address</h3>
 <p>The benchmark built the ring as a temporary on the main thread's stack. On macOS the stack pointer at
@@ -261,7 +262,7 @@ pub struct CacheAligned&lt;T&gt;(T);</code></pre>
   against 483 at 72. Stride 128 runs within ~10% of 136.</p>
 <p class="hyp">The 64-byte-stride penalty lives at the frontier, where the producer writes slot i+1 next to the
   slot i the consumer reads; it vanishes when the two are 64 records apart. Why a power-of-two stride is slow there is
-  not known. This machine exposed no PMU counters. Ruled out: 4K aliasing (a same-core effect that would not vanish
+  not known, and no counter run has looked at it. Ruled out: 4K aliasing (a same-core effect that would not vanish
   with lag), more line sharing (72 shares more boundaries yet is faster), and codegen (both store inline, no memcpy).</p>
 
 <h3>The check that never read the middle line</h3>

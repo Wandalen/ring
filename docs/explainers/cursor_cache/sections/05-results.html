@@ -130,7 +130,8 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 <h2>Measurements, trade-offs, what changed</h2>
 <p class="r-lede">Every chart below draws straight from the recorded runs. Two-thread cells were run twice, in separate
   processes; both rounds are drawn, never averaged. Throughput is in millions of records per second (M/s), higher is
-  better, unless a label says ns or µs. All on one Apple M4 Pro, threads not pinned, no hardware performance counters.</p>
+  better, unless a label says ns or µs. On one Apple M4 Pro with threads not pinned, except where a heading says x86 CI;
+  no chart here uses hardware counters.</p>
 
 <div class="r-tip" hidden role="status" aria-live="polite"></div>
 
@@ -299,7 +300,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
   <ul class="ruled" id="r-ruled"></ul>
   <div class="open">Mechanism. A frontier effect: it shows only where the producer writes and the consumer reads the same
     lines at the same moment, and vanishes when the consumer is held 64 records back. Why a power-of-two stride is slow
-    there is not known. It needs hardware counters, which this machine did not expose. A caller with 64-byte records
+    there is not known, and no counter run has looked at it. A caller with 64-byte records
     should measure, and may pad.</div>
 </div>
 
@@ -1088,13 +1089,15 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
           'drain_up_to may serve a drain from an older observation and read no producer line. Results are identical: the observation lags, it is never extrapolated.',
           'Single thread: push_pop 3.60, 3.73 → 3.98, 3.98 ns (+6.7% to +10.6%) and whole-lap fill_drain 65.0 → 73.2 ns per lap at 64 slots (+12.6%), 0.96 → 1.06 µs at 1024 (+10.4%), in #41\'s first version. Code layout: equal within 0.5% with loop heads pinned (#53).',
           'TypedSlot pop1 at 16384 slots, one line: 46, 47 → 36, 35 M/s (−22% to −26%), in the regime where its 256 KB array spills the 128 KB L1D.',
-          'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.'
+          'The cache moves the lockstep threshold; it does not remove it. A consumer slower than its producer still parks the ring at full on pop1. Whole-lap drains remain the answer.',
+          'Zen 3 CI runner (EPYC 7763), rebased head: the two-thread one-record hand-off is −41%, −42% and −74% at 64, 1024 and 16384 slots. The loss belongs to a lean consumer: it shrinks with consumer work and is a gain at eight steps. Pinned to SMT siblings and on Zen 5, #41 gains in every swept row (#55, section 6).'
         ] },
       { title: '#38: CopySlot', color: 'var(--c-pr38)',
         get: [
           'An 8-byte record in an 8-byte slot, not 16: 131072 bytes at 16384 slots instead of 262144, inside the 128 KB L1D.',
           'On #41, pop1, two lines: 443, 439 M/s at 1024 slots (TypedSlot 332, 337) and 469, 393 at 16384 (TypedSlot 36, 35).',
-          'Single thread on c28bedb: push_pop 2.97 against 3.81 ns; fill_drain popN at 16384 slots 1004 against 53.1 M/s.'
+          'Single thread on c28bedb: push_pop 2.97 against 3.81 ns; fill_drain popN at 16384 slots 1004 against 53.1 M/s.',
+          'Xeon CI runner, rebased head 4c8ecce, single thread: push_pop 3.3 against 3.5 ns, one-record fill_drain +39%, +21% and +25%, whole-lap +31%, +34% and +33%. The two-thread rows of that run do not read as real (noise caveat above).'
         ],
         pay: [
           'T: Copy + Default.',
@@ -1127,7 +1130,7 @@ Hover or focus any mark for the exact two-round pair; every chart has a table tw
 
   /* ================= 8. PRs ================= */
   (() => {
-    $('#r-ctx').textContent = `Context: #20 ${D.prs[20]}. #22 ${D.prs[22]}. #23 ${D.prs[23]}.`;
+    $('#r-ctx').textContent = `Context: #20 ${D.prs[20]}. #22 ${D.prs[22]}. #23 ${D.prs[23]}. The commit lists below predate the rebase; the rebased heads measured on CI on 2026-10-12 are #41 at 4e8ddff and #38 at 4c8ecce.`;
     const PR = [
       { n: 41, base: 'on master', commits: [
         ['cf48ade', 'test(ring_spsc): pin the contract a consumer cursor cache must keep', ['ring_spsc/tests/spsc_test.rs']],

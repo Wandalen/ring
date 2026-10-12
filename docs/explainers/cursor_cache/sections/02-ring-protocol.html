@@ -224,8 +224,9 @@ self.cached_tail = seq.next();</code></pre>
   wrote it a moment ago, so its only up-to-date copy sits in the producer core's cache, and the load has to fetch it
   across cores (measured at <span data-out="oneway"></span> ns one way, section 1).</p>
 <p class="hyp">The per-pop cost is that coherence miss, not the Acquire ordering. Evidence: with the load weakened to
-  Relaxed (a plain <code>ldr</code>), the slow cells stayed slow. Confidence high (orderings review, F1). No hardware
-  performance counters were available to observe the miss directly.</p>
+  Relaxed (a plain <code>ldr</code>), the slow cells stayed slow. Confidence high (orderings review, F1). The kperf
+  counters read later (section 6) count L1D misses per record but cannot say which line missed, so this miss is still
+  not observed directly.</p>
 
 <h3>Release and Acquire, one record end to end</h3>
 

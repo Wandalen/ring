@@ -48,8 +48,8 @@
 
 <p>A core never fetches one byte from memory. It fetches a <dfn>cache line</dfn>: a fixed, aligned block of bytes that
 the caches store, copy and track as one unit. Touch one byte and the whole line comes along. The line is 64 bytes on x86
-and most ARM cores. It is 128 bytes on Apple silicon, including the Apple M4 Pro where every number in this explainer
-was measured.</p>
+and most ARM cores. It is 128 bytes on Apple silicon, including the Apple M4 Pro where most numbers in this explainer
+were measured. The rest come from x86 CI runners, and the page says so where they appear.</p>
 
 <h3>The unit the memory system moves</h3>
 <p>The ruler below is 256 bytes of memory, split into 8-byte words (one <code>u64</code> each). Switch the line size and
@@ -180,7 +180,8 @@ consumer stores its own cursor it takes ownership of the whole shared line. The 
 store buffer (a queue of stores not yet visible to other cores) until the line comes back, then land together. The
 consumer then finds several new records per fetch and pops them as local hits. The measurements confirm the trigger:
 placement decides the speed, and caching the producer cursor in the consumer removes that dependence. They do not prove
-this mechanism. This machine had no hardware performance counters, so nobody counted the moves.</p>
+this mechanism. No hardware counters were read in that round. The kperf counters read later (section 6) count misses
+per record, not which line moved, so nobody has counted the moves.</p>
 
 <h3>What to carry into the next sections</h3>
 <ul class="carry">

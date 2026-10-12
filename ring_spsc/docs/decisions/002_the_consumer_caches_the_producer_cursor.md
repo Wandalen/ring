@@ -112,7 +112,8 @@ two. Before is master `9598875`; after is this change. Criterion medians, M reco
   first version) `push1_pop1` measured +27% / +76% / +87% at 64 / 1024 / 16384 slots. On a Zen 3 runner (EPYC 7763),
   first and final version alike, it measured −38…−44% / −33…−38% / −54…−74%, with about one refused push per record:
   the full-ring lockstep, with the consumer as the slow end. Whole-lap there is −22% / −20% / +100%. Why the cache
-  deepens the lockstep on Zen 3 is not established; the CI runners give no hardware counters. Tracked in #55.
+  deepens the lockstep on Zen 3 is not established; the CI runners give no hardware counters. Tracked in #55. The
+  consumer-work run below bounds where it applies: a consumer that does almost nothing per record.
 - **Whole-lap drains at 1024 slots have three regimes, and the slot array's placement picks one** (a 15,000-run
   review): A, producer ahead and the consumer draining whole laps; B, consumer ahead by about 30 records; C, consumer
   polling right behind. Whether the 16 KiB page after a page-aligned array has a translation picks A or B; an array
@@ -150,6 +151,32 @@ heads pinned (`-C llvm-args=-align-loops=16`), to separate the change from the a
   reload, and the observation has always moved, so the cache's compare and field write are pure overhead there. The
   same shape ADR 001 recorded for the producer cache.
 
+### Zen 3 under consumer work (2026-10-12)
+
+Master `ab9b3e4` against this PR's head `4e8ddff`, built in one CI job per runner with a bench-only knob that makes
+the consumer run n dependent multiply-adds on each record's key before taking the next. Two rounds, the variants
+interleaved, `rtrb` in every binary as the control; it stayed within ±5% across variants in all but two cells. Two
+jobs landed on Zen 3 (EPYC 7763) VMs, one on Zen 5 (EPYC 9V45). Change of this PR against master, one-record hand-off,
+the range over 64 slots, 1024 slots and the pair pinned to two cores:
+
+| consumer work, steps | Zen 3, first VM | Zen 3, second VM | Zen 3, SMT siblings | Zen 5, two cores |
+|---|---|---|---|---|
+| 0 | −38 … −41% | −32 … −36% | +40% | +40 … +106% |
+| 1 | −29 … −31% | −32 … −33% | +39 … +41% | +43 … +103% |
+| 2 | −25 … −30% | −27 … −28% | +33 … +34% | +41 … +108% |
+| 4 | −7 … −10% | +5 … +9% | +33% | +30 … +96% |
+| 8 | **+13 … +15%** | **+23 … +26%** | +24 … +25% | +38 … +76% |
+
+- The Zen 3 loss belongs to a consumer that does almost no work per record. It shrinks with every step of consumer
+  work, crosses zero at about four, and turns into a gain at eight. The no-work row reproduces the Bench Compare
+  figures above. On one core's SMT siblings this change wins at every load.
+- The refused pushes follow the same curve: with no consumer work this PR's producer is refused about 1.2 times per
+  record against master's 0.7, and at eight steps the two have traded places (0.7 against 0.8).
+- 128-byte cursor padding, measured in the same jobs, moves neither side on Zen 3 by more than about 10% and
+  changes the sign of no row. On Zen 5 it lifts master by up to 24% with no consumer work; this change still leads in
+  every row.
+- Why a lean consumer deepens the lockstep on Zen 3 is still open; this run bounds the cost, it does not explain it.
+
 ## Consequences
 
 - `Consumer` is one word larger. The ends are still `!Clone` and `!Sync`; no public signature changes.
@@ -163,15 +190,20 @@ heads pinned (`-C llvm-args=-align-loops=16`), to separate the change from the a
   drains are the answer to that, as they were.
 - `ring_align`'s 64-byte padding on a 128-byte-line host put the two cursors in one line or two by accident. With
   this change the two layouts measure the same, so raising `CACHE_LINE` to 128 (closed #23) can be decided on
-  footprint rather than on this hand-off; without this change it measured 3–7x slower on `pop1`.
+  footprint rather than on this hand-off; without this change it measured 3–7x slower on `pop1`. On Zen 3, 128-byte
+  padding moves neither master nor this change by more than about 10%; on Zen 5 it lifts master by up to 24% (the
+  consumer-work run above).
 - Idea #22 in the family's improvement notes, "both ends cache both cursors", is no longer ruled out: its consumer
   half is this ADR. The remaining half of #22, the ends keeping their own position in a field, is not taken here.
 - The two-thread numbers above come from a measurement-only harness patch that places each ring at a chosen byte of
   a 256-byte block. The stock suite still builds rings on the bench thread's stack, so it cannot reproduce them and
   keeps reporting layout-dependent `push1_pop1` cells. The placement harness lands as its own change
   (`bench/perf-aligned-rings`, with the offset switch), and the cells here should be re-run on it once it does.
-- On x86 an empty poll costs more than before (`pop_empty` about 1.9 ns, 33–50% slower on Zen 3), and on a Zen 3 core
-  the two-thread one-record hand-off is slower, in lockstep (#55). The gains this ADR measured are the M4's and a Zen 5
-  core's.
-- Revisit when #55 explains the Zen 3 lockstep, when a workload shows the 16384-slot `pop1` cell (#49), or when the
-  suite decides how to treat loop alignment (#53).
+- On x86 an empty poll costs more than before (`pop_empty` about 1.9 ns, 33–50% slower on Zen 3), and on Zen 3 the
+  two-thread one-record hand-off is slower, in lockstep, when the consumer does almost no work per record and the two
+  threads sit on separate cores (#55): 32–41% at 64 and 1024 slots, 74% at 16384 in Bench Compare. At 64 and 1024
+  slots a few steps of consumer work per record remove the loss and more turn it into a gain; 16384 slots was not
+  swept. On SMT siblings and on Zen 5 this change is faster at every consumer load measured; the M4's figures are in
+  the tables above.
+- Revisit when #55 explains why a lean consumer deepens the Zen 3 lockstep, when a workload shows the 16384-slot
+  `pop1` cell (#49), or when the suite decides how to treat loop alignment (#53).

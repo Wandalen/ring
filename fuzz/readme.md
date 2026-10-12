@@ -2,9 +2,10 @@
 
 `loom` checks thread interleavings; it says nothing about the input space —
 capacity edges, claim/publish sequences that wrap the ring, partial batch
-grants. These targets feed byte streams of ring operations into `ring_spsc`
-and `ring_mpsc` and check every step against a FIFO oracle, so a wrong `Full`,
-a lost record, or a reordered drain fails loudly.
+grants. These targets feed byte streams of ring operations into `ring_spsc`,
+`ring_mpsc` and the composed `ring_core`, and check every step against a
+FIFO oracle, so a wrong `Full`, a lost record, or a reordered drain fails
+loudly.
 
 ## Reviewer quick start
 
@@ -12,7 +13,7 @@ Prerequisites: Linux, the nightly toolchain, `cargo install cargo-fuzz`.
 
 ```sh
 cd fuzz
-cargo fuzz build                       # both targets compile with instrumentation
+cargo fuzz build                       # all three targets compile with instrumentation
 cp seeds/spsc_ops/* corpus/spsc_ops/   # CI does this; local runs need it once
 cargo fuzz run spsc_ops -- -max_total_time=60
 ```

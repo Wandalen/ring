@@ -1,3 +1,7 @@
+# cargo-fuzz's own workspace, excluded from the root one (see the `exclude`
+# in the root manifest): libFuzzer builds with nightly-only flags that must
+# not leak into the main workspace. Path dependencies point at the crates
+# under test; libfuzzer-sys links the engine.
 [package]
 name = "ring-fuzz"
 version = "0.0.0"

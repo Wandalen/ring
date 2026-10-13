@@ -7,16 +7,20 @@ use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::ThreadedGroup;
 use harness::candidates::{
   Candidate,
+  ConcurrentQueue,
   CrossbeamChannel,
   CrossbeamQueue,
   Flume,
   Heapless1024,
   Mpsc,
   MutexDeque,
+  QuetzalMpsc,
+  QuetzalSpsc,
   RingBuf,
   Rtrb,
   Spsc,
   SyncChannel,
+  ThingBuf,
 };
 use harness::driver::{Mode, Shape};
 
@@ -31,10 +35,14 @@ fn batch(c: &mut Criterion) {
     sized::<RingBuf>(&mut group, size);
     sized::<Heapless1024>(&mut group, size);
     sized::<Mpsc>(&mut group, size);
+    sized::<QuetzalSpsc>(&mut group, size);
+    sized::<QuetzalMpsc>(&mut group, size);
     sized::<SyncChannel>(&mut group, size);
     sized::<CrossbeamChannel>(&mut group, size);
     sized::<CrossbeamQueue>(&mut group, size);
+    sized::<ConcurrentQueue>(&mut group, size);
     sized::<Flume>(&mut group, size);
+    sized::<ThingBuf>(&mut group, size);
     sized::<MutexDeque>(&mut group, size);
   }
   group.finish();

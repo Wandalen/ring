@@ -17,6 +17,7 @@ use std::time::Duration;
 
 use harness::candidates::{
   Candidate,
+  ConcurrentQueue,
   CrossbeamChannel,
   CrossbeamQueue,
   Flume,
@@ -27,6 +28,8 @@ use harness::candidates::{
   MpscPlain,
   MpscPrimary,
   MutexDeque,
+  QuetzalMpsc,
+  QuetzalSpsc,
   Record,
   RingBuf,
   Rtrb,
@@ -35,6 +38,7 @@ use harness::candidates::{
   Spsc,
   SpscPlain,
   SyncChannel,
+  ThingBuf,
   Tx,
   Wide,
 };
@@ -130,6 +134,29 @@ fn heapless_passes_validation_at_its_fixed_sizes() {
 }
 
 #[test]
+fn concurrent_queue_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<ConcurrentQueue>(1);
+  every_mode::<ConcurrentQueue>(3);
+}
+
+#[test]
+fn thingbuf_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<ThingBuf>(1);
+  every_mode::<ThingBuf>(3);
+}
+
+#[test]
+fn quetzal_spsc_passes_validation_in_every_mode() {
+  every_mode::<QuetzalSpsc>(1);
+}
+
+#[test]
+fn quetzal_mpsc_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<QuetzalMpsc>(1);
+  every_mode::<QuetzalMpsc>(3);
+}
+
+#[test]
 fn mutex_passes_validation_in_every_mode_and_producer_count() {
   every_mode::<MutexDeque>(1);
   every_mode::<MutexDeque>(3);
@@ -142,6 +169,7 @@ fn wide_records_arrive_whole_through_every_candidate() {
   driver::run::<SpscPlain<Wide<8>>>(&shape);
   driver::run::<Rtrb<Wide<32>>>(&shape);
   driver::run::<RingBuf<Wide<32>>>(&shape);
+  driver::run::<QuetzalSpsc<Wide<32>>>(&shape);
   driver::run::<Heapless<Wide<8>, 65>>(&Shape::new(64, 1, RECORDS, Mode::PUSH1_POPN));
   driver::run::<Mpsc<Wide<8>>>(&Shape {
     producers: 2,
@@ -164,6 +192,18 @@ fn wide_records_arrive_whole_through_every_candidate() {
     ..shape.clone()
   });
   driver::run::<Flume<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<ConcurrentQueue<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<ThingBuf<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<QuetzalMpsc<Wide<8>>>(&Shape {
     producers: 2,
     ..shape.clone()
   });
@@ -245,6 +285,10 @@ fn ping_pong_echoes_through_every_candidate() {
   assert!(latency::ping_pong::<CrossbeamQueue>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<CrossbeamChannel>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Flume>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<ConcurrentQueue>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<ThingBuf>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<QuetzalSpsc>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<QuetzalMpsc>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<MutexDeque>(4, 1_000) > 0.0);
 }
 
@@ -266,12 +310,16 @@ fn an_open_loop_records_every_record_after_the_warm_up() {
     assert!(!latency::open_loop::<Spsc<Stamped>>(&steady).histogram.is_empty());
     assert!(!latency::open_loop::<Rtrb<Stamped>>(&steady).histogram.is_empty());
     assert!(!latency::open_loop::<RingBuf<Stamped>>(&steady).histogram.is_empty());
+    assert!(!latency::open_loop::<QuetzalSpsc<Stamped>>(&steady).histogram.is_empty());
+    assert!(!latency::open_loop::<ConcurrentQueue<Stamped>>(&steady).histogram.is_empty());
     let shared = load(3, 200_000.0, burst);
     assert!(!latency::open_loop::<Mpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<SyncChannel<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<CrossbeamQueue<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<CrossbeamChannel<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<Flume<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<ConcurrentQueue<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<QuetzalMpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<MutexDeque<Stamped>>(&shared).histogram.is_empty());
   }
 }

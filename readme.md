@@ -122,16 +122,18 @@ is a cross-machine baseline.
 | `ring_spsc`: single-record pair | 3.5 ns | rtrb 3.5 (spsc-plain 3.3, heapless 7.1, ringbuf 10.6) | tie† |
 | `ring_mpsc`: batched producers (`push32`), 1–11 producers | **288–203 M/s** | mutex 276–37, ArrayQueue n/a (no batch) | leads its class |
 | `ring_mpsc`: unbatched, 4 producers | 13.6 M/s | ArrayQueue 53.5, crossbeam-channel 44.7, quetzal_mpsc 22.5 | trails — see below |
-| newcomers: best of the new alternatives | — | quetzal_mpsc 58, concurrent_queue 45 (1 producer); flume trails at 6.4→1.6 | context |
+| `ring_mpsc`: unbatched, 1 producer | 26.0 M/s | ArrayQueue 68.8, quetzal_mpsc 57.9, crossbeam-channel 52.8, concurrent_queue 44.6, thingbuf 14.0, flume 6.4 | trails — see below |
 
 † single-record gaps under ~10% sit inside run-to-run spread on a shared
 machine — per [`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
 measurements, unpinned threads swing tens of percent either way.
 
 rtrb still owns the batch-push game (`push32_popN` 648 M/s at 16384 slots)
-and `ArrayQueue` leads `ring_mpsc`'s unbatched path at high producer counts
-on x86 — both reproduced on this box. heapless is the slowest SPSC here but
-plays a different game (statically allocated, no allocator at all). Absolute
+and `ArrayQueue` leads `ring_mpsc`'s unbatched path at one and four producers
+on x86 — both reproduced on this box. Of the new alternatives, `quetzal_mpsc`
+runs closest (58 M/s single-producer, 44 M/s at four); `flume` trails the
+field (6.4→1.6 M/s over 1–11 producers); `heapless` sits mid-pack on speed
+but plays a different game (statically allocated, no allocator at all). Absolute
 numbers are not portable across machines — every comparison above is intra-run.
 
 ## Crates

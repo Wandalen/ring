@@ -107,29 +107,32 @@ The reasoning, its costs, and its removal conditions are recorded in
 
 ## Measured results
 
-Raspberry Pi 5 (aarch64, 4 cores), criterion medians, one run per side.
-Every cell is an intra-run comparison against the row's own alternative
-(rtrb 0.4, `std::sync::mpsc::sync_channel`, `crossbeam_queue::ArrayQueue`,
-`Mutex<VecDeque>`), so no number is a cross-machine baseline.
+Intel i7-10750H (x86_64, 12 logical CPUs), Windows, criterion medians, one
+run per side. Every cell is an intra-run comparison against the row's own
+alternatives (rtrb 0.4, ringbuf 0.4, heapless 0.9, `std::sync::mpsc::sync_channel`,
+crossbeam-channel 0.5, `crossbeam_queue::ArrayQueue`, concurrent-queue 2.5,
+flume 0.11, thingbuf 0.1, quetzalcoatl 0.15, `Mutex<VecDeque>`), so no number
+is a cross-machine baseline.
 
 | Claim | in-house | nearest alternative | Δ |
 |---|---|---:|---:|
-| `ring_spsc`: two-thread throughput, 16384 slots | **334 M/s** | rtrb 244 | **+37%** |
-| `ring_spsc`: two-thread throughput, 1024 slots | **192 M/s** | rtrb 189 | +2%† |
-| `ring_spsc`: 8-byte records, two-thread | **194 M/s** | rtrb 192 | +1%† |
-| `ring_mpsc`: batched producers (`push32`), 1–13 producers | **125–290 M/s** | sync_channel ≤ 55, ArrayQueue ≤ 90, mutex ≤ 274 | leads its class |
-| `ring_mpsc`: primary handle, `push1_popN`, 1024 slots | **16.9 M/s** | ordinary handle 10.9 | **+55%** |
-| `ring_mpsc`: primary handle, single-thread fill/drain | **65.4 M/s** | ordinary handle 46.6 | **+40%** |
+| `ring_spsc`: two-thread throughput, 16384 slots | **381 M/s** | rtrb 208 (ringbuf 112, heapless n/a) | **+83%** |
+| `ring_spsc`: two-thread throughput, 1024 slots | **242 M/s** | rtrb 154 (ringbuf 109, heapless 66) | **+57%** |
+| `ring_spsc`: 8-byte records, two-thread | **275 M/s** | rtrb 167 (ringbuf 110, heapless 67) | **+64%** |
+| `ring_spsc`: single-record pair | 3.5 ns | rtrb 3.5 (spsc-plain 3.3, heapless 7.1, ringbuf 10.6) | tie† |
+| `ring_mpsc`: batched producers (`push32`), 1–11 producers | **288–203 M/s** | mutex 276–37, ArrayQueue n/a (no batch) | leads its class |
+| `ring_mpsc`: unbatched, 4 producers | 13.6 M/s | ArrayQueue 53.5, crossbeam-channel 44.7, quetzal_mpsc 22.5 | trails — see below |
+| newcomers: best of the new alternatives | — | quetzal_mpsc 58, concurrent_queue 45 (1 producer); flume trails at 6.4→1.6 | context |
 
-† no noise floor was established for these rows: per
-[`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
-measurements, unpinned threads swing tens of percent either way, so a
-+1–2% gap sits inside that spread — not a confirmed lead over rtrb.
+† single-record gaps under ~10% sit inside run-to-run spread on a shared
+machine — per [`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
+measurements, unpinned threads swing tens of percent either way.
 
-rtrb still leads the strict single-record pair (3.4–3.6 ns against 13–16)
-and small-capacity two-thread; `ArrayQueue` leads `ring_mpsc`'s unbatched
-path at high producer counts on x86. Absolute numbers are not portable
-across machines — every comparison above is intra-run.
+rtrb still owns the batch-push game (`push32_popN` 648 M/s at 16384 slots)
+and `ArrayQueue` leads `ring_mpsc`'s unbatched path at high producer counts
+on x86 — both reproduced on this box. heapless is the slowest SPSC here but
+plays a different game (statically allocated, no allocator at all). Absolute
+numbers are not portable across machines — every comparison above is intra-run.
 
 ## Crates
 

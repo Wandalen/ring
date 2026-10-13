@@ -91,6 +91,13 @@ pub struct Shape {
   pub cpus: Vec<usize>,
   /// Whether the consumer stamps every receive to find the longest wait between two.
   pub gaps: bool,
+  /// Dependent multiply-add steps the consumer runs on each record's key before taking the next
+  /// one (issue #56). Zero skips the multiply-add chain — close to today's behavior, modulo the
+  /// barrier that keeps the chain from being optimized away — and the worst case. A few
+  /// steps of real per-record work flip two-thread verdicts, so the suite measures 0/2/8 rather
+  /// than the no-work regime only. The work runs on a copy of the key; what the checker sees is
+  /// untouched, so validation still holds.
+  pub work: u64,
 }
 
 impl Shape {
@@ -103,6 +110,7 @@ impl Shape {
       mode,
       cpus: Vec::new(),
       gaps: false,
+      work: 0,
     }
   }
 
@@ -171,9 +179,9 @@ impl<R: Record> Run<R> for Drive<'_> {
         topology::pin(shape.cpus.first().copied());
         start_line(ready, count + 1);
         let consumed = if shape.gaps {
-          consume::<R, X, true>(&mut consumer, &mut check, finished, count, shape.mode)
+          consume::<R, X, true>(&mut consumer, &mut check, finished, count, shape.mode, shape.work)
         } else {
-          consume::<R, X, false>(&mut consumer, &mut check, finished, count, shape.mode)
+          consume::<R, X, false>(&mut consumer, &mut check, finished, count, shape.mode, shape.work)
         };
         (consumer, check, consumed)
       });
@@ -267,9 +275,20 @@ fn consume<R: Record, X: Rx<R>, const GAPS: bool>(
   finished: &AtomicUsize,
   producers: usize,
   mode: Mode,
+  work: u64,
 ) -> Consumed {
   let expected = check.expected;
-  let mut sink = |record: R| check.record(record.key(), record.whole());
+  // `work` dependent multiply-adds on a copy of the key, kept alive with `black_box` so the
+  // optimizer cannot fold the chain away. The recorded key and wholeness are the record's own,
+  // so this costs time without moving the checksum, the order check, or the torn count.
+  let mut sink = |record: R| {
+    let mut x = record.key();
+    for _ in 0..work {
+      x = core::hint::black_box(x.wrapping_mul(0x9e37_79b9_7f4a_7c15).wrapping_add(1));
+    }
+    core::hint::black_box(x);
+    check.record(record.key(), record.whole())
+  };
   let (mut taken, mut empty, mut worst_gap) = (0, 0, Duration::ZERO);
   let start = Instant::now();
   let mut last = start;

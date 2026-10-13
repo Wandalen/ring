@@ -93,5 +93,30 @@ fn pinned(c: &mut Criterion) {
   group.finish();
 }
 
-criterion_group!(benches, capacity, payload, pinned);
+/// `push1_pop1` at 64 and 1024 slots with 0, 2 and 8 dependent multiply-adds of consumer work
+/// per record (issue #56). The no-work cell is a regime of its own — a consumer that does nothing
+/// but update the checker — and two-thread verdicts flip within a few steps of real per-record
+/// work, so the suite measures the work dimension instead of the no-work point only. Rows carry
+/// the work level, columns the capacity; `work0` keeps the worst case.
+fn work(c: &mut Criterion) {
+  let mut group = ThreadedGroup::new(c, "spsc_work");
+  for capacity in [64, 1024] {
+    for work in [0u64, 2, 8] {
+      work_on::<Spsc>(&mut group, capacity, work);
+      work_on::<SpscPlain>(&mut group, capacity, work);
+      work_on::<Rtrb>(&mut group, capacity, work);
+    }
+  }
+  group.finish();
+}
+
+fn work_on<C: Candidate>(group: &mut ThreadedGroup<'_>, capacity: usize, work: u64) {
+  let shape = Shape {
+    work,
+    ..Shape::new(capacity, 1, RECORDS, Mode::PUSH1_POP1)
+  };
+  group.bench::<C>(&format!("{}/work{work}", function::<C>(Mode::PUSH1_POP1)), &shape, capacity);
+}
+
+criterion_group!(benches, capacity, payload, pinned, work);
 criterion_main!(benches);

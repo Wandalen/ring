@@ -23,7 +23,7 @@ use harness::{latency, output};
 use serde_json::Value;
 
 /// Criterion groups in report order, with what each measures.
-const GROUPS: [(&str, &str); 11] = [
+const GROUPS: [(&str, &str); 12] = [
   ("push_pop", "push one record and pop it back, one thread"),
   ("push_full", "push into a full queue, one thread: the price of a refusal"),
   ("pop_empty", "pop from an empty queue, one thread: the price of one look"),
@@ -39,6 +39,10 @@ const GROUPS: [(&str, &str); 11] = [
   (
     "spsc_pinned",
     "one producer, one consumer, 1024 slots, on SMT siblings of one core and on two cores",
+  ),
+  (
+    "spsc_work",
+    "one producer, one consumer, push1_pop1; rows add 0/2/8 dependent multiply-adds of consumer work per record; columns are capacities",
   ),
   ("batch", "one producer pushing that many records per operation, 1024 slots"),
   ("mpsc_producers", "records split over that many producers, 1024 slots"),

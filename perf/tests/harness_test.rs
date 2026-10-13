@@ -156,6 +156,28 @@ fn gaps_are_measured_only_when_asked_for() {
   assert!(driver::run::<Mpsc>(&Shape { gaps: true, ..shape }).worst_gap > Duration::ZERO);
 }
 
+#[test]
+fn consumer_work_costs_time_without_moving_validation() {
+  // Issue #56: the work chain runs on a copy of the key, so everything `verify` judges —
+  // the checksum, the per-producer order and the torn count — is untouched. One small
+  // threaded run per work level the `spsc_work` group measures; a corrupted key would fail
+  // here instead of timing a wrong answer.
+  for work in [0u64, 2, 8] {
+    driver::run::<Spsc>(&Shape {
+      work,
+      ..Shape::new(64, 1, 1_000, Mode::PUSH1_POP1)
+    });
+    driver::run::<SpscPlain>(&Shape {
+      work,
+      ..Shape::new(64, 1, 1_000, Mode::PUSH1_POP1)
+    });
+    driver::run::<Rtrb>(&Shape {
+      work,
+      ..Shape::new(64, 1, 1_000, Mode::PUSH1_POP1)
+    });
+  }
+}
+
 /// Machine-dependent: runs only where sysfs describes the CPUs.
 #[test]
 fn a_pinned_run_passes_validation_where_the_topology_is_known() {

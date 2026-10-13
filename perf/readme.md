@@ -51,6 +51,7 @@ records: `push1` one per push, `push32` 32 per push (only where the crate has a 
 | `spsc`    | `spsc`                | a producer thread and a consumer thread, 2²⁰ records, every mode                                                              | capacity 64 / 1024 / 16384           |
 | `spsc`    | `spsc_payload`        | the same at 1024 slots with wider records: protocol cost against copy cost                                                    | record size 8 / 64 / 256 B           |
 | `spsc`    | `spsc_pinned`         | the same at 1024 slots, both threads on SMT siblings of one core, then on two cores                                           | `siblings` / `cores`                 |
+| `spsc`    | `spsc_work`           | `push1_pop1` at 64 and 1024 slots with 0 / 2 / 8 dependent multiply-adds of consumer work per record: the no-work cell is a regime of its own | capacity 64 / 1024                   |
 | `batch`   | `batch`               | one producer pushing that many records per operation, 1024 slots                                                              | 1 / 8 / 32 / 128                     |
 | `wait`    | `wait_ready`          | one thread: `wait_until` against an immediately-ready predicate — one look plus call overhead                                  | `spin` / `yield` / `park` / `none`   |
 | `wait`    | `wait_exhausted`      | one thread: the full spins budget against a never-ready predicate — pause cost times spins                                    | `spin` / `yield` / `park` / `none`   |

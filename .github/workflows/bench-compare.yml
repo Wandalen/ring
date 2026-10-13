@@ -49,10 +49,25 @@ on:
         required: true
         type: number
       suite:
-        description: verb/bench suite
+        description: 'verb/bench suite: micro is fast, all covers every suite'
         required: false
-        default: all
-        type: string
+        default: micro
+        type: choice
+        # Every suite verb/bench accepts: restricting manual dispatch to a
+        # subset silently removes the rest from the workflow UI. Keep this
+        # list in sync with the `_names` list in verb/bench.
+        options:
+          - comparison
+          - micro
+          - spsc
+          - mpsc
+          - batch
+          - wait
+          - overflow
+          - latency
+          - regression
+          - report
+          - all
 
 permissions:
   pull-requests: write

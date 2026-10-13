@@ -6,7 +6,19 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, cores, function, producer_sweep};
-use harness::candidates::{Candidate, CrossbeamChannel, CrossbeamQueue, Flume, Mpsc, MpscPlain, MutexDeque, SyncChannel};
+use harness::candidates::{
+  Candidate,
+  ConcurrentQueue,
+  CrossbeamChannel,
+  CrossbeamQueue,
+  Flume,
+  Mpsc,
+  MpscPlain,
+  MutexDeque,
+  QuetzalMpsc,
+  SyncChannel,
+  ThingBuf,
+};
 use harness::driver::{Mode, Shape};
 
 /// Records per run, over all producers.
@@ -22,7 +34,10 @@ fn producers(c: &mut Criterion) {
     contended::<SyncChannel>(&mut group, &shape, producers);
     contended::<CrossbeamChannel>(&mut group, &shape, producers);
     contended::<CrossbeamQueue>(&mut group, &shape, producers);
+    contended::<ConcurrentQueue>(&mut group, &shape, producers);
     contended::<Flume>(&mut group, &shape, producers);
+    contended::<ThingBuf>(&mut group, &shape, producers);
+    contended::<QuetzalMpsc>(&mut group, &shape, producers);
     contended::<MutexDeque>(&mut group, &shape, producers);
   }
   group.finish();
@@ -39,7 +54,10 @@ fn capacity(c: &mut Criterion) {
     contended::<SyncChannel>(&mut group, &shape, capacity);
     contended::<CrossbeamChannel>(&mut group, &shape, capacity);
     contended::<CrossbeamQueue>(&mut group, &shape, capacity);
+    contended::<ConcurrentQueue>(&mut group, &shape, capacity);
     contended::<Flume>(&mut group, &shape, capacity);
+    contended::<ThingBuf>(&mut group, &shape, capacity);
+    contended::<QuetzalMpsc>(&mut group, &shape, capacity);
     contended::<MutexDeque>(&mut group, &shape, capacity);
   }
   group.finish();
@@ -60,7 +78,10 @@ fn oversubscribed(c: &mut Criterion) {
   contended::<SyncChannel>(&mut group, &shape, producers);
   contended::<CrossbeamChannel>(&mut group, &shape, producers);
   contended::<CrossbeamQueue>(&mut group, &shape, producers);
+  contended::<ConcurrentQueue>(&mut group, &shape, producers);
   contended::<Flume>(&mut group, &shape, producers);
+  contended::<ThingBuf>(&mut group, &shape, producers);
+  contended::<QuetzalMpsc>(&mut group, &shape, producers);
   contended::<MutexDeque>(&mut group, &shape, producers);
   group.finish();
 }

@@ -961,3 +961,228 @@ impl<R: Record> Rx<R> for HeaplessRx<'_, R> {
     n
   }
 }
+
+/// `concurrent_queue::ConcurrentQueue` bounded — `push`; `pop`. MPMC with a
+/// single shared handle: one `Arc` serves every producer thread.
+#[derive(Debug)]
+pub struct ConcurrentQueue<R = u64>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Candidate for ConcurrentQueue<R> {
+  type Record = R;
+
+  const NAME: &'static str = "concurrent_queue";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Arc::new(concurrent_queue::ConcurrentQueue::bounded(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    // One handle, shared by every producer thread.
+    let producers = (0..producers).map(|_| QueueTx(self.0.clone())).collect();
+    run.run(producers, QueueRx(self.0.clone()))
+  }
+}
+
+#[derive(Clone)]
+struct QueueTx<R>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Tx<R> for QueueTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QueueRx<R>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Rx<R> for QueueRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `thingbuf` MPSC channel — `try_send`; `try_recv`. Static-capable MPSC with
+/// recycled storage; records must be `Default + Clone` for the channel
+/// constructor, which all harness records are.
+#[derive(Debug)]
+pub struct ThingBuf<R = u64>(Option<(thingbuf::mpsc::blocking::Sender<R>, thingbuf::mpsc::blocking::Receiver<R>)>);
+
+impl<R: Record + Default + Sync> Candidate for ThingBuf<R> {
+  type Record = R;
+
+  const NAME: &'static str = "thingbuf";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Some(thingbuf::mpsc::blocking::channel(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let (tx, rx) = self.0.take().expect("split once");
+    let producers = (0..producers).map(|_| ThingBufTx(tx.clone())).collect();
+    run.run(producers, ThingBufRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct ThingBufTx<R>(thingbuf::mpsc::blocking::Sender<R>);
+
+impl<R: Record + Default + Sync> Tx<R> for ThingBufTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_send(record).is_ok()
+  }
+}
+
+struct ThingBufRx<R>(thingbuf::mpsc::blocking::Receiver<R>);
+
+impl<R: Record + Default + Sync> Rx<R> for ThingBufRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.try_recv().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.try_recv() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `quetzalcoatl` SPSC ring — `push`; `pop`. Arc-backed with owned ends.
+#[derive(Debug)]
+pub struct QuetzalSpsc<R = u64> {
+  capacity: usize,
+  record: PhantomData<R>,
+}
+
+impl<R: Record> Candidate for QuetzalSpsc<R> {
+  type Record = R;
+
+  const NAME: &'static str = "quetzal_spsc";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(capacity: usize) -> Self {
+    Self {
+      capacity,
+      record: PhantomData,
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    use quetzalcoatl::capacity::Capacity;
+    assert_eq!(producers, 1, "quetzal_spsc takes one producer");
+    let (tx, rx) = quetzalcoatl::spsc::RingBuffer::new(Capacity::at_least(self.capacity)).split();
+
+    run.run(vec![QuetzalSpscTx(tx)], QuetzalSpscRx(rx))
+  }
+}
+
+struct QuetzalSpscTx<R>(quetzalcoatl::spsc::Producer<R>);
+
+impl<R: Record> Tx<R> for QuetzalSpscTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QuetzalSpscRx<R>(quetzalcoatl::spsc::Consumer<R>);
+
+impl<R: Record> Rx<R> for QuetzalSpscRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `quetzalcoatl` MPSC ring — `push`; `pop`. Cloneable producer handles.
+#[derive(Debug)]
+pub struct QuetzalMpsc<R = u64> {
+  capacity: usize,
+  record: PhantomData<R>,
+}
+
+impl<R: Record> Candidate for QuetzalMpsc<R> {
+  type Record = R;
+
+  const NAME: &'static str = "quetzal_mpsc";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self {
+      capacity,
+      record: PhantomData,
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    use quetzalcoatl::capacity::Capacity;
+    let (tx, rx) = quetzalcoatl::mpsc::RingBuffer::new(Capacity::at_least(self.capacity)).split();
+    let producers = (0..producers).map(|_| QuetzalMpscTx(tx.clone())).collect();
+    run.run(producers, QuetzalMpscRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct QuetzalMpscTx<R>(quetzalcoatl::mpsc::Producer<R>);
+
+impl<R: Record> Tx<R> for QuetzalMpscTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QuetzalMpscRx<R>(quetzalcoatl::mpsc::Consumer<R>);
+
+impl<R: Record> Rx<R> for QuetzalMpscRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}

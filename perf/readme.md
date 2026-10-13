@@ -30,6 +30,10 @@ Not a family crate: bench, example and test targets only, no `src/`. Exempted fr
 | `spsc-plain`   | `ring_spsc` over `ring_slot::CopySlot` | `try_push`; `drain_up_to`, read through `CopySlot::get`: `spsc` without `TypedSlot`'s per-record tag store | 1         |
 | `mpsc-plain`   | `ring_mpsc` over `ring_slot::CopySlot` | `claim` / `claim_batch` and `CopySlot::set`; `drain_up_to`, read through `CopySlot::get`         | any       |
 | `rtrb`         | `rtrb` 0.4                   | `push`, `push_partial_slice`; `pop`, `read_chunk`         | 1         |
+| `quetzal_spsc` | `quetzalcoatl` 0.15 (spsc)   | `push`; `pop` — Arc-backed ring, owned ends | 1 |
+| `concurrent_queue` | `concurrent-queue` 2.5 | `push`; `pop` — MPMC, single shared handle | any |
+| `thingbuf`     | `thingbuf` 0.1 (mpsc)        | `try_send`; `try_recv` — static-capable MPSC, records must be `Default + Clone` | any |
+| `quetzal_mpsc` | `quetzalcoatl` 0.15 (mpsc)   | `push`; `pop` — cloneable producer handles | any |
 | `ringbuf`      | `ringbuf` 0.4                | `try_push`, `push_slice`; `try_pop` — heap SPSC, the closest off-the-shelf shape to ours | 1         |
 | `heapless`     | `heapless` 0.9               | `enqueue`; `dequeue` — statically allocated, no allocator; one candidate per size (`Heapless64`, `Heapless1024`) | 1         |
 | `crossbeam-channel` | `crossbeam-channel` 0.5 | `try_send`; `try_recv` — MPMC with selection machinery, what users reach for over `sync_channel` | any |

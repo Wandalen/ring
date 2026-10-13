@@ -899,8 +899,10 @@ impl<R: Record> Rx<R> for RingBufRx<R> {
 /// `heapless::spsc::Queue` — `enqueue`; `dequeue`. Statically allocated, no
 /// allocator at all: the capacity is a const generic, so each size is its own
 /// candidate and `new` asserts the runtime capacity matches it.
-/// Fixed-size aliases: the `every_candidate!` macro in micro.rs only accepts
-/// plain identifiers, not generic paths, so the sizes used there go by name.
+/// Usable capacity is `N - 1` (one sentinel slot), so the aliases size one
+/// up from the row capacity. Fixed-size aliases: the `every_candidate!`
+/// macro in micro.rs only accepts plain identifiers, not generic paths,
+/// so the sizes used there go by name.
 pub type Heapless64 = Heapless<u64, 65>;
 pub type Heapless1024 = Heapless<u64, 1025>;
 

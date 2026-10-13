@@ -10,6 +10,7 @@ use criterion::{BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_gr
 use harness::candidates::{
   self,
   Candidate,
+  ConcurrentQueue,
   CrossbeamChannel,
   CrossbeamQueue,
   Flume,
@@ -18,6 +19,8 @@ use harness::candidates::{
   MpscPlain,
   MpscPrimary,
   MutexDeque,
+  QuetzalMpsc,
+  QuetzalSpsc,
   RingBuf,
   Rtrb,
   Run,
@@ -25,6 +28,7 @@ use harness::candidates::{
   Spsc,
   SpscPlain,
   SyncChannel,
+  ThingBuf,
   Tx,
 };
 use harness::driver::{Mode, fill, pop};
@@ -37,7 +41,7 @@ const CAPACITY: usize = 1024;
 /// Run `$visitor` on a fresh single-producer queue of every candidate.
 macro_rules! every_candidate {
   ($group:expr, $visitor:ident) => {
-    every_candidate!(@ $group, $visitor, Spsc, SpscPlain, Rtrb, RingBuf, Heapless1024, Mpsc, MpscPlain, MpscPrimary, SyncChannel, CrossbeamChannel, CrossbeamQueue, Flume, MutexDeque)
+    every_candidate!(@ $group, $visitor, Spsc, SpscPlain, Rtrb, RingBuf, Heapless1024, QuetzalSpsc, Mpsc, MpscPlain, MpscPrimary, SyncChannel, CrossbeamChannel, CrossbeamQueue, ConcurrentQueue, Flume, ThingBuf, QuetzalMpsc, MutexDeque)
   };
   (@ $group:expr, $visitor:ident, $($candidate:ident),*) => {
     $(

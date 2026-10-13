@@ -51,7 +51,7 @@ const GROUPS: [(&str, &str); 12] = [
 ];
 
 /// Row order: the in-house rings first, then the references, the baseline last.
-const CANDIDATES: [&str; 11] = [
+const CANDIDATES: [&str; 15] = [
   "spsc",
   "mpsc",
   "mpsc-primary",
@@ -62,6 +62,10 @@ const CANDIDATES: [&str; 11] = [
   "crossbeam_channel",
   "arrayqueue",
   "flume",
+  "concurrent_queue",
+  "thingbuf",
+  "quetzal_spsc",
+  "quetzal_mpsc",
   "mutex",
 ];
 

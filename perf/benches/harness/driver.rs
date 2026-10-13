@@ -92,7 +92,8 @@ pub struct Shape {
   /// Whether the consumer stamps every receive to find the longest wait between two.
   pub gaps: bool,
   /// Dependent multiply-add steps the consumer runs on each record's key before taking the next
-  /// one (issue #56). Zero is the checker alone — today's behavior, and the worst case. A few
+  /// one (issue #56). Zero skips the multiply-add chain — close to today's behavior, modulo the
+  /// barrier that keeps the chain from being optimized away — and the worst case. A few
   /// steps of real per-record work flip two-thread verdicts, so the suite measures 0/2/8 rather
   /// than the no-work regime only. The work runs on a copy of the key; what the checker sees is
   /// untouched, so validation still holds.

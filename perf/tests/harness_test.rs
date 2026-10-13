@@ -17,12 +17,18 @@ use std::time::Duration;
 
 use harness::candidates::{
   Candidate,
+  CrossbeamChannel,
   CrossbeamQueue,
+  Flume,
+  Heapless,
+  Heapless64,
+  Heapless1024,
   Mpsc,
   MpscPlain,
   MpscPrimary,
   MutexDeque,
   Record,
+  RingBuf,
   Rtrb,
   Run,
   Rx,
@@ -97,6 +103,33 @@ fn arrayqueue_passes_validation_in_every_mode_and_producer_count() {
 }
 
 #[test]
+fn ringbuf_passes_validation_in_every_mode() {
+  every_mode::<RingBuf>(1);
+}
+
+#[test]
+fn crossbeam_channel_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<CrossbeamChannel>(1);
+  every_mode::<CrossbeamChannel>(3);
+}
+
+#[test]
+fn flume_passes_validation_in_every_mode_and_producer_count() {
+  every_mode::<Flume>(1);
+  every_mode::<Flume>(3);
+}
+
+#[test]
+fn heapless_passes_validation_at_its_fixed_sizes() {
+  // Heapless capacity is a const generic: one candidate per usable size,
+  // each measured where the runtime capacity matches it.
+  for mode in Mode::of::<Heapless64>() {
+    driver::run::<Heapless64>(&Shape::new(64, 1, RECORDS, mode));
+    driver::run::<Heapless1024>(&Shape::new(1024, 1, RECORDS, mode));
+  }
+}
+
+#[test]
 fn mutex_passes_validation_in_every_mode_and_producer_count() {
   every_mode::<MutexDeque>(1);
   every_mode::<MutexDeque>(3);
@@ -108,6 +141,8 @@ fn wide_records_arrive_whole_through_every_candidate() {
   driver::run::<Spsc<Wide<8>>>(&shape);
   driver::run::<SpscPlain<Wide<8>>>(&shape);
   driver::run::<Rtrb<Wide<32>>>(&shape);
+  driver::run::<RingBuf<Wide<32>>>(&shape);
+  driver::run::<Heapless<Wide<8>, 65>>(&Shape::new(64, 1, RECORDS, Mode::PUSH1_POPN));
   driver::run::<Mpsc<Wide<8>>>(&Shape {
     producers: 2,
     ..shape.clone()
@@ -121,6 +156,14 @@ fn wide_records_arrive_whole_through_every_candidate() {
     ..shape.clone()
   });
   driver::run::<CrossbeamQueue<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<CrossbeamChannel<Wide<8>>>(&Shape {
+    producers: 2,
+    ..shape.clone()
+  });
+  driver::run::<Flume<Wide<8>>>(&Shape {
     producers: 2,
     ..shape.clone()
   });
@@ -195,10 +238,13 @@ fn a_pinned_run_passes_validation_where_the_topology_is_known() {
 fn ping_pong_echoes_through_every_candidate() {
   assert!(latency::ping_pong::<Spsc>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Rtrb>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<RingBuf>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<Mpsc>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<MpscPrimary>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<SyncChannel>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<CrossbeamQueue>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<CrossbeamChannel>(4, 1_000) > 0.0);
+  assert!(latency::ping_pong::<Flume>(4, 1_000) > 0.0);
   assert!(latency::ping_pong::<MutexDeque>(4, 1_000) > 0.0);
 }
 
@@ -219,10 +265,13 @@ fn an_open_loop_records_every_record_after_the_warm_up() {
     let steady = load(1, 200_000.0, burst);
     assert!(!latency::open_loop::<Spsc<Stamped>>(&steady).histogram.is_empty());
     assert!(!latency::open_loop::<Rtrb<Stamped>>(&steady).histogram.is_empty());
+    assert!(!latency::open_loop::<RingBuf<Stamped>>(&steady).histogram.is_empty());
     let shared = load(3, 200_000.0, burst);
     assert!(!latency::open_loop::<Mpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<SyncChannel<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<CrossbeamQueue<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<CrossbeamChannel<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<Flume<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<MutexDeque<Stamped>>(&shared).histogram.is_empty());
   }
 }

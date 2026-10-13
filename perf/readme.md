@@ -30,8 +30,12 @@ Not a family crate: bench, example and test targets only, no `src/`. Exempted fr
 | `spsc-plain`   | `ring_spsc` over `ring_slot::CopySlot` | `try_push`; `drain_up_to`, read through `CopySlot::get`: `spsc` without `TypedSlot`'s per-record tag store | 1         |
 | `mpsc-plain`   | `ring_mpsc` over `ring_slot::CopySlot` | `claim` / `claim_batch` and `CopySlot::set`; `drain_up_to`, read through `CopySlot::get`         | any       |
 | `rtrb`         | `rtrb` 0.4                   | `push`, `push_partial_slice`; `pop`, `read_chunk`         | 1         |
+| `ringbuf`      | `ringbuf` 0.4                | `try_push`, `push_slice`; `try_pop` — heap SPSC, the closest off-the-shelf shape to ours | 1         |
+| `heapless`     | `heapless` 0.9               | `enqueue`; `dequeue` — statically allocated, no allocator; one candidate per size (`Heapless64`, `Heapless1024`) | 1         |
+| `crossbeam-channel` | `crossbeam-channel` 0.5 | `try_send`; `try_recv` — MPMC with selection machinery, what users reach for over `sync_channel` | any |
 | `sync_channel` | `std::sync::mpsc::sync_channel` | `try_send`; `try_recv` — the standard library's bounded channel, crossbeam-channel's algorithm since 1.67, what a user reaches for first | any |
 | `arrayqueue`   | `crossbeam_queue::ArrayQueue` | `push`; `pop` — a bounded MPMC array queue with a stamp per slot: the layout P6 proposes, and `ring_core`'s interim `crossbeam` backend | any |
+| `flume`        | `flume` 0.11                 | `try_send`; `try_recv` — MPMC with adaptive backoff, no async/select features enabled | any |
 | `mutex`        | `Mutex<VecDeque<T>>`         | one lock per push, per pop, or per batch                  | any       |
 
 Every queue gets the same power-of-two capacity and record type.

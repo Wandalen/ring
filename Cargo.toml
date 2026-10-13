@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
 
+# `fuzz/` is cargo-fuzz's own workspace (libfuzzer builds with its own flags
+# and must not join this one).
+exclude = [ "fuzz" ]
+
 members = [
   # Family-neutral validation machinery. It depends on no ring_* crate, so its
   # stage gates run against an empty workspace. ring_bench grades write paths;

@@ -170,6 +170,7 @@ across machines — every comparison above is intra-run.
 | [`ring_testkit/`](ring_testkit/readme.md) | Determinism-test fixtures driving scripted claim and drain sequences |
 | [`ring_bench/`](ring_bench/readme.md) | Comparative write-path measurements of mutex, ring, and thread-local staging |
 | [`perf/`](perf/readme.md) | Benchmark suite — the ring family against off-the-shelf queues, under one driver; not a family crate |
+| [`fuzz/`](fuzz/readme.md) | Fuzz harness — operation sequences for `ring_spsc`/`ring_mpsc` checked against a FIFO oracle; not a family crate |
 
 ## Tooling
 

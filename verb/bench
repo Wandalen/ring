@@ -16,6 +16,27 @@ trap 'echo "verb/bench: FAILED at ${BASH_SOURCE[0]}:${LINENO}: \`$BASH_COMMAND\`
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+# Issue #53: single-thread aarch64 cells follow loop-head alignment, not the
+# code under test. The drain loop's head lands at ≡ 0 or ≡ 4 mod 8 by chance
+# (rustc's apple-m1 tuning aligns functions to 4 bytes, loop heads not at
+# all), swinging whole-lap `fill_drain` ±10% per build; `-align-loops=16`
+# measured base and head equal within 0.5%. Pin it on aarch64/arm64 only, so
+# x86_64 numbers are untouched. Appends to an existing RUSTFLAGS rather than
+# overwriting it; a RUSTFLAGS that already names `align-loops` wins, which is
+# also the opt-out (set your own value, or `=1` to disable). Baselines saved
+# before this change are not comparable to ones saved after it.
+case "$(uname -m 2>/dev/null)" in
+  aarch64|arm64)
+    case "${RUSTFLAGS:-}" in
+      *align-loops*) ;;
+      *)
+        export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C llvm-args=-align-loops=16"
+        echo "verb/bench: aarch64 loop alignment pinned (RUSTFLAGS+='-C llvm-args=-align-loops=16')" >&2
+        ;;
+    esac
+    ;;
+esac
+
 _dry_run=0
 _suite=comparison
 _quick=0

@@ -124,17 +124,28 @@ is a cross-machine baseline.
 | `ring_mpsc`: unbatched, 4 producers | 13.6 M/s | ArrayQueue 53.5, crossbeam-channel 44.7, quetzal_mpsc 22.5 | trails — see below |
 | `ring_mpsc`: unbatched, 1 producer | 26.0 M/s | ArrayQueue 68.8, quetzal_mpsc 57.9, crossbeam-channel 52.8, concurrent_queue 44.6, thingbuf 14.0, flume 6.4 | trails — see below |
 
-† single-record gaps under ~10% sit inside run-to-run spread on a shared
-machine — per [`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
-measurements, unpinned threads swing tens of percent either way.
+† single-record gaps under ~10% sit inside run-to-run spread on a
+shared machine — see "Fair measurements" in
+[`docs/benchmarking_guide.md`](docs/benchmarking_guide.md): unpinned threads
+swing tens of percent either way.
 
-rtrb still owns the batch-push game (`push32_popN` 648 M/s at 16384 slots)
-and `ArrayQueue` leads `ring_mpsc`'s unbatched path at one and four producers
-on x86 — both reproduced on this box. Of the new alternatives, `quetzal_mpsc`
-runs closest (58 M/s single-producer, 44 M/s at four); `flume` trails the
-field (6.4→1.6 M/s over 1–11 producers); `heapless` sits mid-pack on speed
-but plays a different game (statically allocated, no allocator at all). Absolute
-numbers are not portable across machines — every comparison above is intra-run.
+Where the in-house rings lead, they lead by multiples: two-thread SPSC
+throughput at 1024–16384 slots and 8-byte records (+57–83% over the nearest
+alternative), and batched multi-producer paths where the nearest alternative
+is the mutex itself. The single-record pair is a tie at the top (3.5 ns).
+
+The weak spots are the unbatched multi-producer paths: at one producer
+`ArrayQueue` (68.8), `quetzal_mpsc` (57.9) and `crossbeam-channel` (52.8)
+all beat `ring_mpsc` (26.0), and the gap persists at four producers (53.5
+against 13.6). `rtrb` also owns the batch-push game outright (648 M/s at
+16384 slots). These are the rows to watch: any claim of a general MPSC
+lead would have to move them first.
+
+Elsewhere in the field: `quetzal_mpsc` runs closest behind the leaders;
+`flume` trails badly on this machine (6.4→1.6 M/s over 1–11 producers);
+`heapless` sits mid-pack on speed but answers a different question
+(statically allocated, no allocator at all). Absolute numbers are not
+portable across machines — every comparison above is intra-run.
 
 ## Crates
 

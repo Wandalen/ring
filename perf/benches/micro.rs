@@ -10,11 +10,15 @@ use criterion::{BenchmarkGroup, BenchmarkId, Criterion, Throughput, criterion_gr
 use harness::candidates::{
   self,
   Candidate,
+  CrossbeamChannel,
   CrossbeamQueue,
+  Flume,
+  Heapless1024,
   Mpsc,
   MpscPlain,
   MpscPrimary,
   MutexDeque,
+  RingBuf,
   Rtrb,
   Run,
   Rx,
@@ -33,7 +37,7 @@ const CAPACITY: usize = 1024;
 /// Run `$visitor` on a fresh single-producer queue of every candidate.
 macro_rules! every_candidate {
   ($group:expr, $visitor:ident) => {
-    every_candidate!(@ $group, $visitor, Spsc, SpscPlain, Rtrb, Mpsc, MpscPlain, MpscPrimary, SyncChannel, CrossbeamQueue, MutexDeque)
+    every_candidate!(@ $group, $visitor, Spsc, SpscPlain, Rtrb, RingBuf, Heapless1024, Mpsc, MpscPlain, MpscPrimary, SyncChannel, CrossbeamChannel, CrossbeamQueue, Flume, MutexDeque)
   };
   (@ $group:expr, $visitor:ident, $($candidate:ident),*) => {
     $(

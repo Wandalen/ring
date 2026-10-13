@@ -4,7 +4,21 @@ mod harness;
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use harness::bench::{ThreadedGroup, function};
-use harness::candidates::{Candidate, CrossbeamQueue, MpscPrimary, MutexDeque, Rtrb, Spsc, SpscPlain, SyncChannel, Wide};
+use harness::candidates::{
+  Candidate,
+  CrossbeamQueue,
+  Heapless,
+  Heapless64,
+  Heapless1024,
+  MpscPrimary,
+  MutexDeque,
+  RingBuf,
+  Rtrb,
+  Spsc,
+  SpscPlain,
+  SyncChannel,
+  Wide,
+};
 use harness::driver::{Mode, Shape};
 use harness::topology;
 
@@ -19,6 +33,15 @@ fn capacity(c: &mut Criterion) {
     every_mode::<Spsc>(&mut group, capacity);
     every_mode::<SpscPlain>(&mut group, capacity);
     every_mode::<Rtrb>(&mut group, capacity);
+    every_mode::<RingBuf>(&mut group, capacity);
+    if capacity == 64 {
+      // Heapless capacity is fixed at compile time: one candidate per size,
+      // measured where the size matches.
+      every_mode::<Heapless64>(&mut group, capacity);
+    }
+    if capacity == 1024 {
+      every_mode::<Heapless1024>(&mut group, capacity);
+    }
     every_mode::<MutexDeque>(&mut group, capacity);
     every_mode::<SyncChannel>(&mut group, capacity);
     every_mode::<CrossbeamQueue>(&mut group, capacity);
@@ -45,6 +68,12 @@ fn payload(c: &mut Criterion) {
   sized::<Rtrb<u64>>(&mut group);
   sized::<Rtrb<Wide<8>>>(&mut group);
   sized::<Rtrb<Wide<32>>>(&mut group);
+  sized::<RingBuf<u64>>(&mut group);
+  sized::<RingBuf<Wide<8>>>(&mut group);
+  sized::<RingBuf<Wide<32>>>(&mut group);
+  sized::<Heapless1024>(&mut group);
+  sized::<Heapless<Wide<8>, 1025>>(&mut group);
+  sized::<Heapless<Wide<32>, 1025>>(&mut group);
   sized::<SyncChannel<u64>>(&mut group);
   sized::<SyncChannel<Wide<8>>>(&mut group);
   sized::<SyncChannel<Wide<32>>>(&mut group);
@@ -86,6 +115,8 @@ fn pinned(c: &mut Criterion) {
     };
     group.bench::<Spsc>(&function::<Spsc>(shape.mode), &shape, placement);
     group.bench::<Rtrb>(&function::<Rtrb>(shape.mode), &shape, placement);
+    group.bench::<RingBuf>(&function::<RingBuf>(shape.mode), &shape, placement);
+    group.bench::<Heapless1024>(&function::<Heapless1024>(shape.mode), &shape, placement);
     group.bench::<SyncChannel>(&function::<SyncChannel>(shape.mode), &shape, placement);
     group.bench::<CrossbeamQueue>(&function::<CrossbeamQueue>(shape.mode), &shape, placement);
     group.bench::<MutexDeque>(&function::<MutexDeque>(shape.mode), &shape, placement);

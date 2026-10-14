@@ -23,9 +23,10 @@ and `ring_spsc` (`src/lib.rs`) — the invariants and the ordering constants tha
 
 - [ ] Claims stay gated by `slowest consumer + capacity`; the shared claim re-reads the consumer
       cursor on every CAS retry.
-- [ ] A cursor cache (`PrimaryProducer`, both `ring_spsc` ends) only lags the real cursor: it is
-      refreshed at `GATING` and never extrapolated. Staleness may refuse a ring that has room;
-      it never grants a slot the consumer still holds or offers an unpublished record.
+- [ ] A cursor cache (`ring_spsc`: `Producer::cached_head`, `Consumer::cached_produced`;
+      `ring_mpsc`: `PrimaryProducer::cached_head`) only lags the real cursor: it is refreshed at
+      `GATING` and never extrapolated. Staleness may refuse a ring that has room; it never grants
+      a slot the consumer still holds or offers an unpublished record.
 - [ ] Every path from a claim reaches publish. A dropped `Claim` strands its range and stalls
       the consumer forever — look for early returns and `?` between claim and publish.
 - [ ] The slot is written before it is published; nothing reads a slot before its publish

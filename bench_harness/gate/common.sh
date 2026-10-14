@@ -516,7 +516,14 @@ family_smoke() {
 # directory in this repository's own crate roots is free of whitespace and glob
 # metacharacters.
 crate_rs_listing() {
-  ( cd "$1" && find src tests -name '*.rs' -type f 2>/dev/null | sort | xargs -r sha256sum )
+  # `--text`: GNU output (`hash` plus two spaces) is the default there, but
+  # some builds (notably msys) default to binary mode (`hash` plus `*`) for
+  # the same files, which silently changes every digest the gates compute
+  # from this listing. Forcing text mode is a no-op where it already holds
+  # and makes a Windows-recorded digest byte-identical to a Linux one.
+  # Measured, not assumed: without it a Windows sweep records digests its
+  # own CI run then fails, file bytes being equal.
+  ( cd "$1" && find src tests -name '*.rs' -type f 2>/dev/null | sort | xargs -r sha256sum --text )
 }
 
 # Every bin target's source file for the crates in scope, as

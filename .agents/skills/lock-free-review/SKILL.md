@@ -13,8 +13,9 @@ the ordering constants that carry them.
 
 ## Orderings
 
-- [ ] Every ordering is a named constant (`GATING`, `PUBLISH`, `OBSERVE`, `COMMIT`, `HANDOFF`,
-      `OWN`) or carries a comment naming the load/store it pairs with.
+- [ ] Every ordering is a named constant — `GATING` (`ring_cursor`), `PUBLISH`, `OBSERVE`,
+      `COMMIT` (`ring_mpsc`), `HANDOFF` (`ring_spsc`), `OWN` (`ring_spsc`, `ring_mpsc`) — or
+      carries a comment naming the load/store it pairs with.
 - [ ] Each `Release` store has an `Acquire` load of the same atomic that needs it, and vice versa.
 - [ ] `Relaxed` only for a single writer reading back its own value (`OWN`) or for counters.
 - [ ] No `SeqCst` added to make a test pass. x86 hides weak orderings; aarch64 does not.

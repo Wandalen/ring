@@ -32,7 +32,7 @@ Not a family crate: bench, example and test targets only, no `src/`. Exempted fr
 | `rtrb`         | `rtrb` 0.4                   | `push`, `push_partial_slice`; `pop`, `read_chunk`         | 1         |
 | `quetzal_spsc` | `quetzalcoatl` 0.15 (spsc)   | `push`; `pop` — Arc-backed ring, owned ends | 1 |
 | `concurrent_queue` | `concurrent-queue` 2.5 | `push`; `pop` — MPMC, single shared handle | any |
-| `thingbuf`     | `thingbuf` 0.1 (mpsc)        | `try_send`; `try_recv` — static-capable MPSC, records must be `Default + Clone` | any |
+| `thingbuf`     | `thingbuf` 0.1 (mpsc)        | `try_send`; `try_recv` — static-capable MPSC, records must be `Default + Sync` | any |
 | `quetzal_mpsc` | `quetzalcoatl` 0.15 (mpsc)   | `push`; `pop` — cloneable producer handles | any |
 | `ringbuf`      | `ringbuf` 0.4                | `try_push`, `push_slice`; `try_pop` — heap SPSC, the closest off-the-shelf shape to ours | 1         |
 | `heapless`     | `heapless` 0.9               | `enqueue`; `dequeue` — statically allocated, no allocator; one candidate per size (`Heapless64`, `Heapless1024`) | 1         |

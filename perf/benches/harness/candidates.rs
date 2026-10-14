@@ -903,9 +903,12 @@ impl<R: Record> Rx<R> for RingBufRx<R> {
 /// up from the row capacity. Fixed-size aliases: the `every_candidate!`
 /// macro in micro.rs only accepts plain identifiers, not generic paths,
 /// so the sizes used there go by name.
+/// Heapless queue with 64 usable slots.
 pub type Heapless64 = Heapless<u64, 65>;
+/// Heapless queue with 1024 usable slots.
 pub type Heapless1024 = Heapless<u64, 1025>;
 
+/// `heapless::spsc::Queue` — statically allocated, no allocator at all.
 #[derive(Debug)]
 pub struct Heapless<R = u64, const N: usize = 1024> {
   queue: heapless::spsc::Queue<R, N>,
@@ -1018,8 +1021,8 @@ impl<R: Record> Rx<R> for QueueRx<R> {
 }
 
 /// `thingbuf` MPSC channel — `try_send`; `try_recv`. Static-capable MPSC with
-/// recycled storage; records must be `Default + Clone` for the channel
-/// constructor, which all harness records are.
+/// recycled storage; records must be `Default + Sync` for the channel
+/// constructor.
 #[derive(Debug)]
 pub struct ThingBuf<R = u64>(Option<(thingbuf::mpsc::blocking::Sender<R>, thingbuf::mpsc::blocking::Receiver<R>)>);
 

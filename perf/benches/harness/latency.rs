@@ -16,7 +16,7 @@ use super::driver::{self, Check, Mode};
 use super::output::duration;
 
 /// A record stamped with the moment it was meant to be sent, in nanoseconds after the run's epoch.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct Stamped {
   /// Producer and sequence, as in every other record.
   pub key: u64,

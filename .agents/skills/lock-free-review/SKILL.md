@@ -6,9 +6,10 @@ description: Review checklist for ring code that touches atomics, memory orderin
 # Lock-free review
 
 Applies to `ring_atomic`, `ring_cursor`, `ring_gating`, `ring_claim`, `ring_publish`,
-`ring_barrier`, `ring_consume`, `ring_batch`, `ring_store`, `ring_spsc`, `ring_mpsc`, `ring_core`,
-`ring_tls`, `ring_flush`, `ring_shutdown`, `ring_wait`. Background: the module docs of `ring_mpsc`
-and `ring_spsc` (`src/lib.rs`) — the invariants and the ordering constants that carry them.
+`ring_barrier`, `ring_consume`, `ring_batch`, `ring_store`, `ring_slot`, `ring_spsc`,
+`ring_mpsc`, `ring_core`, `ring_handle`, `ring_tls`, `ring_flush`, `ring_shutdown`, `ring_wait`.
+Background: the module docs of `ring_mpsc` and `ring_spsc` (`src/lib.rs`) — the invariants and
+the ordering constants that carry them.
 
 ## Orderings
 

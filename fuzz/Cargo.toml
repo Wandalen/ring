@@ -1,0 +1,55 @@
+# cargo-fuzz's own workspace, excluded from the root one (see the `exclude`
+# in the root manifest): libFuzzer builds with nightly-only flags that must
+# not leak into the main workspace. Path dependencies point at the crates
+# under test; libfuzzer-sys links the engine.
+[package]
+name = "ring-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.ring_config]
+path = "../ring_config"
+
+[dependencies.ring_core]
+path = "../ring_core"
+
+[dependencies.ring_mpsc]
+path = "../ring_mpsc"
+
+[dependencies.ring_slot]
+path = "../ring_slot"
+
+[dependencies.ring_spsc]
+path = "../ring_spsc"
+
+[dependencies.ring_types]
+path = "../ring_types"
+
+[[bin]]
+name = "mpsc_ops"
+path = "fuzz_targets/mpsc_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ring_core_ops"
+path = "fuzz_targets/ring_core_ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "spsc_ops"
+path = "fuzz_targets/spsc_ops.rs"
+test = false
+doc = false
+bench = false
+

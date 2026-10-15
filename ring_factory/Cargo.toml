@@ -1,0 +1,33 @@
+[package]
+name = "ring_factory"
+version = "0.3.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Ring Factory is a lock-free write path that lets many concurrent producer threads submit work to a single ordered consumer without contending on a shared lock, eliminating the lock-convoy jitter that would erode a tight latency budget under load. Its claim, publish, and commit protocol is designed as a reusable foundation for latency-critical, strictly-ordered systems such as order-matching engines, where many concurrent order submissions must funnel into one deterministic, low-latency decision stream."
+publish = true
+
+[features]
+# Forwards to `ring_core`'s optional crossbeam backend, which gates
+# `Factory::build_crossbeam`. The backend is a build-time opt-in, so the door to
+# it is a separate function, not a `RingConfig` field. See the crate docs,
+# "The refusal that carries a route".
+crossbeam = [ "ring_core/crossbeam" ]
+
+[dependencies]
+ring_config = { workspace = true }
+ring_core = { workspace = true }
+ring_registry = { workspace = true }
+# Both are needed to write `build`'s signature. `ring_handle` owns `Split`,
+# which `build` returns, and `ring_types` owns `RingError`, which
+# `BuildError::Unsupported` carries. Reaching `ring_handle` only through
+# `ring_registry` is not enough to name a type.
+ring_handle = { workspace = true }
+ring_types = { workspace = true }
+# No `ring_stats` or `ring_tls` edge. `RingConfig` has no field that would
+# configure counters or staging, so a build has nothing to do with either.
+# Add them together with such config fields, not before.
+
+[lints]
+workspace = true

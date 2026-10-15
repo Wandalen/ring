@@ -1,0 +1,31 @@
+[package]
+name = "ring_mpsc"
+version = "0.3.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Multi-producer single-consumer ring API"
+publish = true
+
+# No `ring_publish` or `ring_consume`. Publication here is a per-slot stamp this
+# crate owns, so there is no published cursor for either to act on.
+[dependencies]
+ring_atomic = { workspace = true }
+ring_store = { workspace = true }
+ring_claim = { workspace = true }
+ring_config = { workspace = true }
+ring_cursor = { workspace = true }
+ring_gating = { workspace = true }
+ring_slot = { workspace = true }
+ring_types = { workspace = true }
+
+# Used by `tests/mpsc_test.rs`'s `exhaustive` module, and only under
+# `RUSTFLAGS="--cfg loom"`. `ring_atomic` swaps `AtomicSeq` for an instrumented one under the same
+# cfg, so what loom explores is this crate's own stamp protocol rather than a
+# re-implementation of it.
+[target.'cfg(loom)'.dev-dependencies]
+loom = { workspace = true }
+
+[lints]
+workspace = true

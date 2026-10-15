@@ -1,0 +1,21 @@
+[package]
+name = "ring_shutdown"
+version = "0.3.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Publisher stop, drain, and waiter join"
+publish = true
+
+[dependencies]
+ring_cursor = { workspace = true }
+ring_wait = { workspace = true }
+ring_core = { workspace = true }
+ring_types = { workspace = true }
+
+[dev-dependencies]
+ring_config = { workspace = true }
+
+[lints]
+workspace = true

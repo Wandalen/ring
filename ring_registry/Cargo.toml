@@ -1,0 +1,23 @@
+[package]
+name = "ring_registry"
+version = "0.3.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Named ring registry"
+publish = true
+
+# One edge. A registry stores `Split< T >` and never looks inside it. `T` is
+# opaque here, so `ring_types`' vocabulary never appears, and `ring_core::Ring`
+# is only ever seen wrapped. `ring_core` and `ring_config` are dev-dependencies,
+# because building a ring to register is what a test does.
+[dependencies]
+ring_handle = { workspace = true }
+
+[dev-dependencies]
+ring_config = { workspace = true }
+ring_core = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,142 @@
+# Fast verification on master pushes and PRs.
+#
+# Mirrors `verb/test` levels 1-3 (nextest, doctests, clippy) plus
+# `cargo doc` and the repo's own nightly-rustfmt check (`verb/fmt check::1`).
+# Slow jobs (full gate suite, loom) live in `gates.yml` / `loom.yml` and run
+# on `master` + nightly instead of blocking every push.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  test:
+    name: nextest + doctests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # The trybuild fixtures' .stderr files were blessed on a host whose
+      # toolchain can read the sysroot sources, so their diagnostics render
+      # code snippets for $RUST/... spans. Without `rust-src` a Linux runner
+      # renders those spans bare and the fixtures mismatch.
+      - uses: dtolnay/rust-toolchain@1.98.0
+        with:
+          components: rust-src
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+      - name: nextest (verb/test level 1)
+        run: cargo nextest run --workspace --all-features
+      - name: doctests (verb/test level 2)
+        run: RUSTDOCFLAGS="-D warnings" cargo test --doc --workspace --all-features
+
+  clippy:
+    name: clippy -D warnings
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: clippy (verb/lint)
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  doc:
+    name: cargo doc --no-deps
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.98.0
+      - uses: Swatinem/rust-cache@v2
+      - name: rustdoc, warnings denied
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --workspace --all-features
+
+  fmt:
+    name: nightly rustfmt --check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-09-29
+          components: rustfmt
+      - name: fmt check (verb/fmt check::1)
+        run: cargo +nightly-2026-09-29 fmt --all -- --check
+
+  bench-guard:
+    name: bench guard (shellcheck + bash 3.2 empty-array)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: shellcheck verbs
+        run: |
+          command -v shellcheck >/dev/null || sudo apt-get install -y shellcheck
+          shellcheck -S warning verb/bench verb/gate
+      - name: no unguarded empty-array expansion (bash 3.2 set -u)
+        # Regression guard for the macOS bash-3.2 failure: an empty
+        # `"${arr[@]}"` under `set -u` aborts there. Every `--` + options
+        # append must go through the `_maybe_add_opts` / `_cmd` guard, never
+        # as a direct `_run ... -- "${array[@]}"` expansion.
+        run: |
+          if grep -nE '_run .*-- "\$\{' verb/bench; then
+            echo "verb/bench: unguarded array expansion — route -- plus options through _maybe_add_opts" >&2
+            exit 1
+          fi
+      - name: guarded branches run with empty arrays (dry::1)
+        run: |
+          bash verb/bench suite::latency dry::1
+          bash verb/bench suite::report dry::1
+          bash verb/bench suite::micro dry::1
+      - name: verb/verbs lists a headerless verb instead of aborting (pipefail)
+        # Regression guard for the set -euo pipefail abort this PR fixed in
+        # verb/verbs: grep exits 1 on no match, so without the `||` fallback
+        # the whole listing dies on the first headerless executable. The
+        # fixture copies the verb into a temp dir (it lists its own
+        # directory) next to one headerless executable, then asserts exit 0
+        # and the fallback row. Shellcheck cannot cover this — it has no rule
+        # for grep's exit status under pipefail — so this behavior step is the
+        # coverage, not the shellcheck list above.
+        run: |
+          tmpdir="$(mktemp -d)"
+          trap 'rm -rf "$tmpdir"' EXIT
+          cp verb/verbs "$tmpdir"/verbs
+          chmod +x "$tmpdir"/verbs
+          printf '#!/usr/bin/env bash\necho hi\n' > "$tmpdir"/headerless
+          chmod +x "$tmpdir"/headerless
+          out="$(bash "$tmpdir"/verbs)"
+          echo "$out" | grep -q '^headerless' || { echo "$out"; echo 'verb/verbs: headerless fixture missing from listing' >&2; exit 1; }
+          echo "$out" | grep -qF '(no #@ purpose: header)' || { echo "$out"; echo 'verb/verbs: fallback text missing for headerless fixture' >&2; exit 1; }
+      - name: bench-compare options match verb/bench suite names
+        # The dispatch dropdown must offer exactly the suites verb/bench
+        # accepts: fewer hides suites from manual runs, more fails them at
+        # dispatch with "is not one of". Both lists live in different files
+        # with only a comment linking them, so drift is silent without this.
+        run: |
+          lists_match() { [ "$1" = "$2" ]; }
+          opts="$(sed -n '/^ *options:$/,/^[^[:space:]]/p' .github/workflows/bench-compare.yml | grep -oE '^ +- [A-Za-z0-9_-]+' | awk '{print $2}' | sort)"
+          names="$(grep -oE "^_names='[^']*'" verb/bench | sed "s/^_names='//; s/'$//; s/, /\n/g" | sort)"
+          lists_match "$opts" "$names" || { echo "--- workflow options: ---"; echo "$opts"; echo "--- verb/bench _names: ---"; echo "$names"; echo 'bench-compare options: diverged from verb/bench suite names' >&2; exit 1; }
+          # Self-test the guard above: a deliberately diverged pair must not
+          # match, so the failure path is exercised on every run, not just
+          # when the real lists drift. Single-line printf fixtures: raw
+          # newlines inside this YAML block scalar would dedent and end it.
+          if lists_match "$(printf 'all\nmicro')" "$(printf 'all\nmicro\nspsc')"; then
+            echo 'sync-check self-test: diverged fixture reported as matching' >&2
+            exit 1
+          fi

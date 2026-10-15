@@ -1,0 +1,29 @@
+# Feature ids owned by the ring family, one per line.
+#
+# Was FEATURE_LO=167 / FEATURE_HI=188 hardcoded in common.sh. A range cannot
+# express a family whose ids are not contiguous, and the two constants lived in
+# code shared by every family, so a second family could not be declared without
+# editing the code the first family runs on.
+
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188

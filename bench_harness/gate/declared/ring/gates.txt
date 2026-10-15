@@ -1,0 +1,48 @@
+# Gates that apply to the ring family.
+#
+# G7 (determinism) and G8 (oracle form) were added later, for gates this
+# family's plan never committed to, and are deliberately absent here. This
+# family has no smoke binary for G7 to diff, and its reached-tests were written
+# before G8's oracle rule existed. Listing them here would make the ring family
+# report NOT REACHED for gates its plan never committed to. That is a yardstick
+# applied backwards.
+#
+# The file must be non-empty and every run prints the gates it loaded, so a
+# gate silently dropped from a family is visible in that family's own output.
+#
+# G12 (mutation) is declared here and nowhere else, which inverts the pattern
+# above. It is this family's own next constraint turned into a gate, not a later
+# family's yardstick applied backwards. G1 grades which lines ran, never which
+# values were checked: `ring_bench` once had full line coverage while its own
+# headline defect could be reinstated without a single test noticing. G12
+# replays recorded defects, which turns what manual rounds found from a human
+# habit into a verdict.
+#
+# A family with no recorded historical defects to replay would leave this gate
+# absent for the ordinary reason that a mutation probe over an empty set is the
+# vacuous pass the gate's own non-vacuity rules exist to refuse.
+#
+# G13 (survey freshness) is declared here for the same reason G12 is. G12 and
+# `accepted/` between them settle every survivor a sweep finds, but both are
+# claims about a crate at the moment it was swept, and nothing on the board
+# noticed when that moment passed. Re-sweeping after tests changed shape used to
+# happen only when a person remembered to do it.
+#
+# A family that has never been swept at all would leave this gate absent for the
+# same ordinary reason. It would report NOT REACHED for every crate about a
+# survey its plan never committed to running. That is the same yardstick applied
+# backwards that keeps G7 and G8 out of this file.
+
+# The doc-corpus gates (G14-G17, G20, G21) are not declared. They grade a
+# per-crate docs/ corpus that quoted the source line by line and went stale on
+# every refactor faster than corrections landed. That corpus is replaced by
+# code comments and short per-crate ADRs, which no gate needs to re-run.
+
+g1
+g2
+g3
+g4
+g5
+g6
+g12
+g13

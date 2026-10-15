@@ -1,0 +1,10 @@
+error[E0382]: borrow of moved value: `ring`
+  --> tests/ui/ring_used_after_split.rs:21:19
+   |
+18 |   let ring : Ring< u32 > = Ring::new( &RingConfig::new( 8 ).unwrap() ).unwrap();
+   |       ---- move occurs because `ring` has type `Ring<u32>`, which does not implement the `Copy` trait
+19 |   let _split = Split::new( ring );
+   |                            ---- value moved here
+20 |
+21 |   let _capacity = ring.capacity();
+   |                   ^^^^ value borrowed here after move

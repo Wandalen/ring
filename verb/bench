@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+#@ purpose: Run the benchmarks and print the comparison. suite::<name>, default comparison:
+#@          comparison (ring_bench's example), micro / spsc / mpsc / batch (perf, criterion),
+#@          latency (perf, percentiles), report (markdown tables of the last results), all.
+#@          quick::1 runs every perf case once to validate it, no numbers; filter::<text> narrows;
+#@          save::<name> / baseline::<name> save or compare a criterion baseline; out::<file>
+#@          writes the report to a file.
+#@ tags: verb, bench
+set -euo pipefail
+
+# Self-descriptive failure: with `set -e` GitHub only shows "exit code 1".
+# Print what failed and where, with the bash version that matters for the
+# known empty-array pitfall (bash 3.2 on macos-14 expands empty "${arr[@]}"
+# as unbound variable, newer bash does not).
+trap 'echo "verb/bench: FAILED at ${BASH_SOURCE[0]}:${LINENO}: \`$BASH_COMMAND\` (suite=${_s:-?}, suite_arg=${_suite:-?}, bash=$BASH_VERSION)" >&2' ERR
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+
+# Issue #53: single-thread aarch64 cells follow loop-head alignment, not the
+# code under test. The drain loop's head lands at ≡ 0 or ≡ 4 mod 8 by chance
+# (rustc's apple-m1 tuning aligns functions to 4 bytes, loop heads not at
+# all), swinging whole-lap `fill_drain` ±10% per build; `-align-loops=16`
+# measured base and head equal within 0.5%. Pin it on aarch64/arm64 only, so
+# x86_64 numbers are untouched. Appends to an existing RUSTFLAGS rather than
+# overwriting it; a RUSTFLAGS that already names `align-loops` wins, which is
+# also the opt-out (set your own value, or `=1` to disable). Baselines saved
+# before this change are not comparable to ones saved after it.
+case "$(uname -m 2>/dev/null)" in
+  aarch64|arm64)
+    case "${RUSTFLAGS:-}" in
+      *align-loops*) ;;
+      *)
+        export RUSTFLAGS="${RUSTFLAGS:+$RUSTFLAGS }-C llvm-args=-align-loops=16"
+        echo "verb/bench: aarch64 loop alignment pinned (RUSTFLAGS+='-C llvm-args=-align-loops=16')" >&2
+        ;;
+    esac
+    ;;
+esac
+
+_dry_run=0
+_suite=comparison
+_quick=0
+_filter=
+_save=
+_baseline=
+_out=
+for _arg in "$@"; do
+  case "$_arg" in
+    dry::1)       _dry_run=1 ;;
+    quick::1)     _quick=1 ;;
+    suite::*)     _suite="${_arg#suite::}" ;;
+    filter::*)    _filter="${_arg#filter::}" ;;
+    save::*)      _save="${_arg#save::}" ;;
+    baseline::*)  _baseline="${_arg#baseline::}" ;;
+    out::*)       _out="${_arg#out::}" ;;
+    *)
+      echo "verb/bench: unrecognized parameter '$_arg' — expected suite::<name>, quick::1, filter::<text>, save::<name>, baseline::<name>, out::<file> or dry::1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+_names='comparison, micro, spsc, mpsc, batch, wait, stages, overflow, latency, regression, report, all'
+case "$_suite" in
+  comparison|micro|spsc|mpsc|batch|wait|stages|overflow|latency|regression|report) _suites=( "$_suite" ) ;;
+  # `regression` stays out of `all` on purpose: it is a pass/fail gate, not a
+  # measurement, so it must never flow through criterion's save/baseline
+  # machinery (a suite the base branch lacks aborts the head comparison —
+  # this is what turned Bench Compare red on the gate's own PR). It runs
+  # standalone via regression.yml.
+  # `overflow` stays out for the same mechanical reason until a
+  # default-branch run saves its first baseline: it is new in this PR, so
+  # the base commit has no `overflow` baseline to compare against. Add it
+  # back to `all` once that baseline exists; until then it runs standalone
+  # as `suite::overflow`.
+  all) _suites=( comparison micro spsc mpsc batch wait stages latency report ) ;;
+  *)
+    echo "verb/bench: suite::$_suite is not one of $_names" >&2
+    exit 2
+    ;;
+esac
+
+# What each kind of target takes after `--`.
+_criterion=() _latency=() _report=()
+if (( _quick )); then
+  _criterion+=( --test )
+  _latency+=( --test )
+fi
+[ -n "$_save" ] && _criterion+=( --save-baseline "$_save" )
+# The comparison is the report's, not criterion's. Criterion's own `--baseline`
+# panics on the first benchmark id the saved baseline has no entry for, which
+# is every PR that adds a candidate or a cell (#38's bench-compare went red on
+# `push_pop/spsc-plain`). The report reads the same saved directory and leaves
+# a cell without a baseline uncompared.
+[ -n "$_baseline" ] && _report+=( --baseline "$_baseline" )
+[ -n "$_out" ] && _report+=( --out "$_out" )
+if [ -n "$_filter" ]; then
+  _criterion+=( "$_filter" )
+  _latency+=( "$_filter" )
+  _report+=( "$_filter" )
+fi
+
+_run() {
+  if (( _dry_run )); then
+    printf '%s\n' "$*"
+  else
+    echo "verb/bench: + $*" >&2
+    "$@" || {
+      local rc=$?
+      echo "verb/bench: command failed with $rc: $* (suite=${_s:-?}, quick=${_quick:-?})" >&2
+      return $rc
+    }
+  fi
+}
+
+# The option arrays above stay empty on a plain run (CI's default), and an
+# empty `"${arr[@]}"` under `set -u` is an unbound-variable error on bash 3.2 —
+# still the default `bash` on the macOS runners — while newer bash expands it
+# to nothing, which is why only the macOS job failed. So each command is built
+# first and `--` plus the options are appended only when there are any, the
+# same guard `verb/gate` uses. `_cmd` itself is never empty, so running it is
+# safe on every bash.
+#
+# The guard lives here, once, instead of inline at each call site: every
+# branch passes its option array *by name* so an empty array is never expanded.
+# `eval` (not `local -n`) keeps this working on bash 3.2, which has no namerefs.
+_maybe_add_opts() {
+  local _arr_name="$1"
+  local _n
+  eval "_n=\${#${_arr_name}[@]}"
+  if (( _n > 0 )); then
+    eval "_cmd+=( -- \"\${${_arr_name}[@]}\" )"
+  fi
+}
+for _s in "${_suites[@]}"; do
+  echo "verb/bench: === suite $_s ===" >&2
+  case "$_s" in
+    comparison) _run cargo run --release -p ring_bench --all-features --example comparison ;;
+    latency)
+      _cmd=( cargo bench -p perf --bench latency )
+      _maybe_add_opts _latency
+      _run "${_cmd[@]}"
+      ;;
+    # A quick run saves nothing, so there would be nothing new to report.
+    report)
+      if ! (( _quick )); then
+        _cmd=( cargo run -q -p perf --example report )
+        _maybe_add_opts _report
+        _run "${_cmd[@]}"
+      fi
+      ;;
+    *)
+      _cmd=( cargo bench -p perf --bench "$_s" )
+      _maybe_add_opts _criterion
+      _run "${_cmd[@]}"
+      ;;
+  esac
+done

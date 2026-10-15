@@ -1,0 +1,68 @@
+# B5. The `reported`-vs-`received` counter mapping, which `ring_bench`'s own
+# pitfall/003 calls the crate's most expensive lesson.
+#
+# The original defect fed workload totals through the slot-lifecycle counters,
+# so 240 refused records read as 240 leaked slots on a 16-slot ring.
+#
+# This is the mutant the whole gate exists for. When the round first reinstated
+# it, **every test passed**. The crate had 100% line coverage over 298 lines and
+# zero defence against its own headline defect, for two reasons. The test named
+# after the job runs a candidate whose `reported` and `received` are equal, so
+# the mapping is invisible to it. And the one test using the candidate where
+# they differ asserted on `Outcome`'s fields rather than on `outcome.stats()`.
+# Both mutated lines executed in both tests. Neither test looked at the number
+# they produced.
+#
+# `a_dropnewest_ring_reports_successes_it_did_not_keep` was then given the four
+# counter assertions and `in_flight()` on `ContractRing`, and the re-probe went
+# red with exactly one failure. That fix is what this mutant now guards. It is
+# the only entry here whose green result was ever the true one, which is
+# precisely why leaving it to a human habit was this family's own closing
+# constraint.
+
+id: B5
+crate: ring_bench
+file: src/lib.rs
+round: 2026-08-28
+round-failures: 1
+detector: a_dropnewest_ring_reports_successes_it_did_not_keep
+
+--- from
+  stats.record_claim(received as u64);
+  stats.record_publish(received as u64);
+  stats.record_consume(received as u64);
+  // Fix(record_drop_input_was_unguarded): this feeds `record_drop` from the
+  // same `offered - received` subtraction as `Outcome::dropped`, but runs
+  // before `Outcome` exists. The guard on `Outcome` sits on the two accessor
+  // methods that expose the subtraction afterward, and cannot cover a
+  // computation that happens earlier on the same values. Unguarded, a violation
+  // here would silently wrap to a near-`u64::MAX` stat instead of panicking,
+  // which is the failure mode the accessor guards fixed one call site over.
+  //
+  // Root cause: the guard was added to the two accessors that expose the
+  // subtraction, not to the earlier internal computation that performs the
+  // identical subtraction first.
+  // Pitfall: guarding a derived accessor does not guard every computation
+  // that shares its expression. Each call site needs its own assertion.
+  assert!(received <= offered, "received exceeded offered");
+  stats.record_drop(workload.config().overflow(), (offered - received) as u64);
+--- to
+  stats.record_claim(reported as u64); // PROBE ONLY — G12, was `received`
+  stats.record_publish(reported as u64);
+  stats.record_consume(reported as u64);
+  // Fix(record_drop_input_was_unguarded): this feeds `record_drop` from the
+  // same `offered - received` subtraction as `Outcome::dropped`, but runs
+  // before `Outcome` exists. The guard on `Outcome` sits on the two accessor
+  // methods that expose the subtraction afterward, and cannot cover a
+  // computation that happens earlier on the same values. Unguarded, a violation
+  // here would silently wrap to a near-`u64::MAX` stat instead of panicking,
+  // which is the failure mode the accessor guards fixed one call site over.
+  //
+  // Root cause: the guard was added to the two accessors that expose the
+  // subtraction, not to the earlier internal computation that performs the
+  // identical subtraction first.
+  // Pitfall: guarding a derived accessor does not guard every computation
+  // that shares its expression. Each call site needs its own assertion.
+  assert!(received <= offered, "received exceeded offered");
+  stats.record_drop(workload.config().overflow(), (offered - reported) as u64);
+--- end

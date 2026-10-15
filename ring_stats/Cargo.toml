@@ -1,0 +1,15 @@
+[package]
+name = "ring_stats"
+version = "0.2.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Ring counters"
+publish = true
+
+[dependencies]
+ring_types = { workspace = true }
+
+[lints]
+workspace = true

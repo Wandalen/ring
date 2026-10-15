@@ -1,0 +1,37 @@
+# The alignment canary, across two allocations rather than one struct.
+#
+# `Producer::on_distinct_lines` is the only one of the three that computes the
+# comparison itself, because its two cursors are not fields of a shared parent:
+# one lives in the ring's gating set, the other in the claimer. Its own doc says
+# so, and says why it checks at all. A sibling change that dropped the padding
+# would cost this crate a contended line on its hottest path and break nothing
+# that compiles.
+#
+# Separate allocations do not weaken the conclusion. Both are `PaddedCursor`,
+# both are 64-byte aligned, and two distinct addresses that are each a multiple
+# of 64 differ by at least 64 wherever they were allocated. The method is
+# unconditionally true, and unkillable while `align_of::< PaddedCursor >()` is
+# what its own crate asserts it to be.
+#
+# See accepted/readme.md, "The alignment canaries".
+#
+# NOT accepted, and deliberately absent: this crate's `Consumer::is_empty` and
+# `Ring::committed`, both real one-polarity defects found in the same sweep and
+# both now held by `mutant/S4` and `mutant/S11`.
+
+ring_mpsc/src/lib.rs:1038:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
+
+# `ReservedBatch::is_empty` returning `false` unconditionally, which it already
+# does.
+#
+# `Producer::claim_batch` is the only way to get a `ReservedBatch`, and it wraps
+# whatever `ring_claim::Claimer::claim_up_to` grants. That grant is at least one
+# sequence: a headroom or a `max` of zero exits to `Full` instead of granting
+# nothing. So every `ReservedBatch` that can exist is non-empty, and a mutant
+# returning `false` returns the same answer. An equivalent mutant, the same kind
+# as `ring_store`'s `Buffer::is_empty`.
+#
+# The other polarity, returning `true`, is a real defect and is killed by
+# `a_batch_claim_grants_what_headroom_allows_rather_than_the_full_ask`.
+
+ring_mpsc/src/lib.rs:1283:5: replace ReservedBatch<'_, S>::is_empty -> bool with false

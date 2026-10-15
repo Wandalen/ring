@@ -1,0 +1,6 @@
+# Written by mutant_survey.sh on a clean run — never edited by hand.
+# Regenerate by re-surveying the crate; G13 reads `digest` and fails
+# once it stops matching the crate on disk.
+crate: ring_consume
+swept: 2026-10-07
+digest: 1a7e84e9079e6105871d0e710517dd9c5b66e05f0a091f3d8fce5d9b8f166cfa

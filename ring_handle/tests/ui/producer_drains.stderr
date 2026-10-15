@@ -1,0 +1,5 @@
+error[E0599]: no method named `try_recv` found for struct `ring_handle::Producer<'a, T>` in the current scope
+  --> tests/ui/producer_drains.rs:19:27
+   |
+19 |   let _drained = producer.try_recv();
+   |                           ^^^^^^^^ method not found in `ring_handle::Producer<'_, u32>`

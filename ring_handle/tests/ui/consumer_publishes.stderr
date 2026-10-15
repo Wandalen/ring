@@ -1,0 +1,5 @@
+error[E0599]: no method named `try_push` found for struct `ring_handle::Consumer<'a, T>` in the current scope
+  --> tests/ui/consumer_publishes.rs:17:29
+   |
+17 |   let _published = consumer.try_push( 1u32 );
+   |                             ^^^^^^^^ method not found in `ring_handle::Consumer<'_, u32>`

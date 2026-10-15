@@ -1,0 +1,28 @@
+[package]
+name = "ring_publish"
+version = "0.2.1"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "readme.md"
+description = "Publication of claimed slots to consumers"
+publish = true
+
+[dependencies]
+ring_types = { workspace = true }
+ring_cursor = { workspace = true }
+
+# Tests only. `tests/handshake_test.rs` runs the whole four-operation handshake,
+# so it needs the other three operations' crates. None of them depends on this
+# one, so the graph stays acyclic.
+[dev-dependencies]
+ring_claim = { workspace = true }
+ring_consume = { workspace = true }
+ring_barrier = { workspace = true }
+ring_gating = { workspace = true }
+
+[target.'cfg(loom)'.dev-dependencies]
+loom = { workspace = true }
+
+[lints]
+workspace = true

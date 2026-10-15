@@ -1,0 +1,30 @@
+# `push_batch_within`'s budget bound, spending one attempt more than it should.
+#
+# The whole `ring_poll` retry loop looks untestable from a single thread.
+# Nothing changes between attempts, so a repeated attempt can only find the same
+# answer. That is true of `push_within` and `recv_within`, whose survivors are
+# in ../accepted/ for exactly that reason. It is false here, and the difference
+# is what this declaration exists to hold.
+#
+# One attempt here is a whole `try_push_batch`, which stops at the first `None`
+# its iterator yields. `Iterator` allows a `Some` after a `None`, so a source
+# that yields a burst, then `None` once, then the next burst makes each attempt
+# move exactly one burst, and the published count is the number of attempts.
+# Against a ring with room, one attempt too many is one burst too many.
+
+id: S7
+crate: ring_poll
+file: src/lib.rs
+round: 2026-10-01
+round-failures: 1
+detector: push_batch_within_spends_its_whole_budget_while_attempts_keep_moving_records
+
+--- from
+  let mut held = None;
+  let mut attempt = 0;
+  while attempt < budget.attempts() {
+--- to
+  let mut held = None;
+  let mut attempt = 0;
+  while attempt <= budget.attempts() {   // PROBE ONLY — G12, was `<`
+--- end

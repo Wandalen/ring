@@ -1,4 +1,4 @@
-# ring_stats — manual testing plan
+# ring_stats manual testing plan
 
 `tests/stats_test.rs` asserts the counters count. This plan covers the two
 claims the crate makes that no assertion can reach: that the counters are cheap
@@ -7,7 +7,7 @@ stated consequence rather than the default someone reached for.
 
 Run from the workspace root.
 
-## M1 — every counter is `Relaxed`, with the reason stated
+## M1. Every counter is `Relaxed`, with the reason stated
 
 A statistics counter must not introduce ordering the algorithm did not already
 need. If one counter quietly uses `SeqCst`, it puts a fence on the hot path of
@@ -27,7 +27,7 @@ grep -n -i "relaxed\|ordering\|diagnostic" ring_stats/src/lib.rs | head
 **Expected:** the module doc says a stats read is a diagnostic, never a
 synchronisation point.
 
-## M2 — the tests claim only what `Relaxed` actually guarantees
+## M2. The tests claim only what `Relaxed` guarantees
 
 This is the check most likely to find something. `Relaxed` guarantees each
 counter's own atomicity and monotonicity; it does **not** guarantee a coherent
@@ -35,10 +35,10 @@ snapshot across two counters mid-run. A test asserting `published == consumed`
 while writers run would be asserting something `Relaxed` does not provide, and
 would pass on x86 and fail on ARM.
 
-List the concurrent tests, then read each one — this is a judgement about where
+List the concurrent tests, then read each one. This is a judgement about where
 an assertion sits relative to a scope boundary, and no grep decides it. A range
 expression like `awk '/thread::scope/,/^}/'` looks like it would, but its end
-pattern matches the first closing brace at column 0 and then restarts, so it
+pattern matches the first closing brace at column 0 and then restarts. So it
 silently mixes in-scope and post-scope assertions and reports them as if they
 were all inside.
 
@@ -53,7 +53,7 @@ counter only. Cross-counter assertions (`in_flight`, `dropped_total`) appear
 only after `thread::scope` returns, where the join has established
 happens-before for every write.
 
-## M3 — the per-policy breakdown cannot be collapsed by accident
+## M3. The per-policy breakdown cannot be collapsed by accident
 
 The module doc's argument is that a single `dropped` counter cannot distinguish
 a ring dropping newest from one evicting oldest. That argument only holds if the
@@ -63,11 +63,10 @@ breakdown is structurally enforced.
 grep -nE -A 10 "pub fn record_drop" ring_stats/src/lib.rs
 ```
 
-**Expected:** the policy selects the counter by `match`, exhaustively — so
-adding a fourth policy is a compile error here rather than a silently
-uncounted drop.
+**Expected:** the policy selects the counter by an exhaustive `match`. Adding a
+fourth policy is then a compile error here, not a silently uncounted drop.
 
-## M4 — `dropped_total` and the breakdown cannot drift
+## M4. `dropped_total` and the breakdown cannot drift
 
 ```bash
 grep -nE -A 6 "pub fn dropped_total" ring_stats/src/lib.rs
@@ -77,7 +76,7 @@ grep -nE -A 6 "pub fn dropped_total" ring_stats/src/lib.rs
 maintained as a separate counter. A separate counter is one more thing to forget
 to increment.
 
-## M5 — the doc examples are the API's first reader
+## M5. The doc examples are the API's first reader
 
 ```bash
 cd ring_stats && cargo test --doc
@@ -90,7 +89,7 @@ cd ring_stats && cargo test --doc
 | Date | Check | Result | Note |
 | ---- | ----- | ------ | ---- |
 | 2026-08-28 | M1 | ✅ | 11 `Ordering::` occurrences, all `Relaxed`, none else. Module doc lines 13–14 state the reason: "a stats read is a diagnostic, never a synchronisation point". |
-| 2026-08-28 | M2 | ✅ | Three tests use `thread::scope`. The only assertion *inside* a scope is `now >= last` in `each_counter_is_monotone_while_writers_run` — single-counter monotonicity, exactly what `Relaxed` provides. Every cross-counter read (`in_flight`, `dropped_total`) sits after the scope returns. The check's original `awk` range was unsound and is replaced above with "list, then read" — it had reported post-scope assertions as if they were inside. |
+| 2026-08-28 | M2 | ✅ | Three tests use `thread::scope`. The only assertion *inside* a scope is `now >= last` in `each_counter_is_monotone_while_writers_run`. That is single-counter monotonicity, exactly what `Relaxed` provides. Every cross-counter read (`in_flight`, `dropped_total`) sits after the scope returns. The check's original `awk` range was unsound. It had reported post-scope assertions as if they were inside, and the check above now uses "list, then read" instead. |
 | 2026-08-28 | M3 | ✅ | `record_drop` selects by exhaustive `match` on `OverflowPolicy`; a fourth policy would be a compile error here, not an uncounted drop. |
-| 2026-08-28 | M4 | ✅ | `dropped_total` sums over `OverflowPolicy::ALL` — derived, not a fourth stored counter. |
+| 2026-08-28 | M4 | ✅ | `dropped_total` sums over `OverflowPolicy::ALL`, so it is derived, not a fourth stored counter. |
 | 2026-08-28 | M5 | ✅ | 10 doc tests pass. |

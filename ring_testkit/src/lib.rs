@@ -1,13 +1,13 @@
 //! Determinism-test fixtures driving scripted claim and drain sequences.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What it is
 //!
 //! A [`Script`] is a list of [`Step`]s. Running it against a ring produces an
 //! [`Outcome`], and the same script against an equivalent ring produces an
-//! equal `Outcome` every time. That is the whole fixture: a concurrency test
-//! that can be re-run and compared rather than watched.
+//! equal `Outcome` every time. The whole fixture is a concurrency test that can
+//! be re-run and compared rather than watched.
 //!
 //! ```
 //! use ring_config::RingConfig;
@@ -29,8 +29,8 @@
 //! # The measurement it exists for
 //!
 //! `ring_core`'s `try_push` reports `Ok` on a full ring under
-//! `OverflowPolicy::DropNewest` — the record is discarded inside the call and
-//! the caller is told it succeeded. Run one script over two rings differing
+//! `OverflowPolicy::DropNewest`. It discards the record inside the call and
+//! tells the caller it succeeded. Run one script over two rings differing
 //! only in that policy, capacity 4, eight records pushed and everything
 //! drained:
 //!
@@ -40,7 +40,7 @@
 //! ```
 //!
 //! **Neither half of that is sufficient on its own, and the half that fails is
-//! the one you would reach for.** The delivered records are *identical* — a
+//! the one you would reach for.** The delivered records are *identical*. A
 //! fixture that recorded only what came out would call the two rings
 //! equivalent, because both delivered exactly `[0,1,2,3]`. The counts do
 //! separate them, but they separate them into `accepted=4` and `accepted=8`,
@@ -49,40 +49,33 @@
 //!
 //! [`Outcome::vanished`] is the two together: accepted, minus delivered, minus
 //! still held. Four records went in, were reported accepted, and are nowhere.
-//! → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md`.
 //!
 //! # What it does not do
 //!
 //! It does not contain a model checker. `loom` is the family's model checker
 //! and it is already a `cfg(loom)` dev-dependency of `ring_atomic`,
 //! `ring_publish`, `ring_spsc` and `ring_mpsc`. What this crate contributes to
-//! that half of feature 188 is [`leak`], which is the one line every loom test
-//! over a borrow-based ring has to write, and [`audit_received`], which is the
+//! model checking is [`leak`], which is the one line every loom test over a
+//! borrow-based ring has to write, and [`audit_received`], which is the
 //! assertion worth making inside `loom::model`.
-//! → `docs/integration/001_the_three_edges_and_the_one_that_is_missing.md`.
 //!
 //! # Under `--cfg loom`
 //!
-//! This crate declares no `cfg` of its own, and that is a decision rather than
-//! an omission. `ring_atomic` owns the family's only `--cfg loom` switch and
-//! states that "no other crate needs to know the seam exists"; a `cfg`
-//! attribute here would be a fifth place to keep that switch in sync. The
-//! consequence is inherited all the same: the seam arrives through `ring_core`
-//! → `ring_mpsc`/`ring_spsc` → `ring_atomic`, four crates down, and under the
-//! cfg loom's atomics panic when touched outside a `loom::model` — so
-//! [`Script::run`] panics on a ring built anywhere else, from a crate that
-//! mentions neither loom nor the cfg.
-//! → `docs/non_functional_requirement/002_what_a_fixture_owes_its_consumers.md`
-//!   TK36.
+//! This crate deliberately declares no `cfg` of its own. `ring_atomic` owns the
+//! family's only `--cfg loom` switch and states that "no other crate needs to
+//! know the seam exists". A `cfg` attribute here would be a fifth place to keep
+//! that switch in sync. This crate inherits the consequence all the same. The
+//! switch reaches it through `ring_core` → `ring_mpsc`/`ring_spsc` →
+//! `ring_atomic`, four crates down. Under the cfg, loom's atomics panic when
+//! touched outside a `loom::model`, so [`Script::run`] panics on a ring built
+//! anywhere else, from a crate that mentions neither loom nor the cfg.
 //!
-//! The doc examples in this crate are the visible edge of that. Three of the
+//! The doc examples in this crate are where that becomes visible. Three of the
 //! five construct a `ring_core::Ring` outside a model, so under the cfg they
-//! would panic — and a doc example cannot carry `#![ cfg( not( loom ) ) ]`,
-//! which is how the 24 test files in the family facing the same problem opt
-//! out.
-//! Nothing checks it either: the one stage that sets the cfg runs clippy, and
-//! clippy does not run doctests.
-//! → `docs/decisions/002_the_model_lives_in_tests.md` TK16.
+//! would panic. A doc example cannot carry `#![ cfg( not( loom ) ) ]`, which is
+//! how the 24 test files in the family facing the same problem opt out.
+//! Nothing checks it either, because the one stage that sets the cfg runs
+//! clippy, and clippy does not run doctests.
 
 #![deny(missing_docs)]
 
@@ -92,7 +85,7 @@ use ring_tls::TlsBuffer;
 
 /// One operation in a [`Script`].
 ///
-/// Every variant that creates a record *mints* it: records are consecutive
+/// Every variant that creates a record *mints* it. Records are consecutive
 /// `u32`s from `0`, so a script needs no input data and two runs of it mint the
 /// same values. That is what makes an [`Outcome`] comparable between runs
 /// rather than merely similar.
@@ -100,13 +93,12 @@ use ring_tls::TlsBuffer;
 /// # The `Many` counts carry no ceiling
 ///
 /// `PushMany`, `RecvMany` and `StageMany` hold a bare `usize`, and
-/// [`Script::run`] applies no `min`, clamp or assertion to it. The termination
-/// argument in `docs/algorithm/` calls each step "bounded by a constant in the
-/// step itself"; that constant is whichever number the caller wrote, so
-/// `PushMany( usize::MAX )` mints for as long as the process lives. Only
-/// `RecvMany` stops early, and only because an empty ring ends its loop — the
-/// other two run their count out against a ring that refuses every record.
-/// → `docs/data_structure/001_the_script_as_a_flat_step_list.md` TK10.
+/// [`Script::run`] applies no `min`, clamp or assertion to it. Each step is
+/// bounded by a constant in the step itself, and that constant is whichever
+/// number the caller wrote, so `PushMany( usize::MAX )` mints for as long as
+/// the process lives. Only `RecvMany` stops early, and only because an empty
+/// ring ends its loop. The other two run their count out against a ring that
+/// refuses every record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
   /// Mint one record and offer it to the ring.
@@ -119,7 +111,7 @@ pub enum Step {
   RecvMany(usize),
   /// Mint one record into the thread-local staging buffer.
   Stage,
-  /// Mint `n` records into the staging buffer, stopping at nothing — a full
+  /// Mint `n` records into the staging buffer, never stopping early. A full
   /// buffer refuses each remaining record individually.
   StageMany(usize),
   /// Offer everything staged to the ring, one record at a time, emptying the
@@ -131,9 +123,9 @@ pub enum Step {
   ///
   /// **This closes first.** `Stopped::reopen` consumes the token that proves
   /// the ring closed, and `Shutdown::close` is the only thing that produces
-  /// one — so reopening an *open* ring closes and reopens it. Invisible in a
-  /// single-threaded script; a refusal window in a concurrent one.
-  /// → `docs/pitfall/002_reopening_closes_first.md`.
+  /// one. So reopening an *open* ring closes and reopens it. The close is
+  /// invisible in a single-threaded script and a refusal window in a concurrent
+  /// one.
   Reopen,
   /// Close, then take every record still in the ring.
   DrainAll,
@@ -141,8 +133,8 @@ pub enum Step {
 
 /// What running a [`Script`] produced.
 ///
-/// Every field is a count or a list, and none of them is a timing — two runs of
-/// the same script on equivalent rings compare equal.
+/// Every field is a count or a list, and none of them is a timing, so two runs
+/// of the same script on equivalent rings compare equal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Outcome {
   /// How many records the script created.
@@ -159,13 +151,13 @@ pub struct Outcome {
   pub refused_staging: usize,
   /// The records that came back out, in the order they came out.
   pub received: Vec<u32>,
-  /// Records the ring accepted, in the order they were actually offered to
-  /// it — not the order they were minted in.
+  /// Records the ring accepted, in the order they were offered to it, not the
+  /// order they were minted in.
   ///
   /// The two orders coincide for a `Push`-only script, which is why every
   /// prior test never needed this field to distinguish them. They diverge
   /// the moment a `Push`/`PushMany` lands between a `Stage`/`StageMany` and
-  /// the `Flush` that empties it: the staged record keeps the lower value it
+  /// the `Flush` that empties it. The staged record keeps the lower value it
   /// was minted with, but does not reach the ring until `Flush` runs, after
   /// the interceding push already landed. [`Outcome::audit`] checks
   /// `received` against this list rather than against raw ascending mint
@@ -186,42 +178,40 @@ impl Outcome {
   /// under `DropNewest`, where a full ring answers `Ok` and discards.
   ///
   /// This is the reading that says *records were destroyed*. `accepted` alone
-  /// says the opposite — `DropNewest` accepts strictly more — and `received`
+  /// says the opposite, since `DropNewest` accepts strictly more. `received`
   /// alone says nothing at all, because both policies deliver the same records
-  /// in the same order. Measured, and the measurement contradicted the
-  /// prediction that produced this method: `tests/manual/readme.md` M1.
+  /// in the same order. This was measured, and the measurement contradicted the
+  /// prediction that produced this method. See `tests/manual/readme.md` M1.
   ///
   /// # `0` Is Two Different Answers
   ///
   /// The subtraction saturates, and delivered-plus-held can exceed `accepted`
   /// two established ways: one script run twice against one ring, and an
-  /// `Outcome` built by hand. Both clamp to `0` — the healthy reading — for a
-  /// state no single run can produce. [`Outcome::audit`] is what separates
-  /// them: it answers [`Anomaly::Overdelivered`] for exactly that case, so
+  /// `Outcome` built by hand. Both clamp to `0`, the healthy reading, for a
+  /// state no single run can produce. [`Outcome::audit`] separates them. It
+  /// answers [`Anomaly::Overdelivered`] for exactly that case, so
   /// `vanished() == 0` means "nothing was destroyed" only for an `Outcome`
   /// that audits clean.
-  /// → `docs/data_structure/002_nine_counters_and_a_number_that_is_two_things.md`
-  ///   TK11.
   #[must_use]
   pub fn vanished(&self) -> usize {
     self.accepted.saturating_sub(self.received.len() + self.in_ring_at_end)
   }
 
-  /// Check every property a run should hold, and name the first that does not —
-  /// first in the fixed pass order the checks run in, not first by position in
-  /// the record list.
+  /// Check every property a run should hold, and name the first that does not.
+  ///
+  /// "First" means first in the fixed pass order the checks run in, not first by
+  /// position in the record list.
   ///
   /// # What it does not check
   ///
-  /// [`Outcome::vanished`]. A destroyed record is still *placed*: `accepted`
+  /// [`Outcome::vanished`]. A destroyed record is still *placed*. `accepted`
   /// counts the offer the ring answered `Ok` to, whether or not it kept what
   /// was offered, so a `DropNewest` run that discarded half its input audits
-  /// clean. That is deliberate — vanishing is what `DropNewest` is for, and an
+  /// clean. That is deliberate. Vanishing is what `DropNewest` is for, and an
   /// audit that failed on it could not be run across both policies. It also
-  /// means the packaged verdict is not the whole reading: a caller who takes
-  /// `audit()` and never calls `vanished()` is told nothing about the records
+  /// means the packaged verdict is not the whole reading. A caller who takes
+  /// `audit()` and never calls `vanished()` learns nothing about the records
   /// the ring destroyed.
-  /// → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md` TK41.
   ///
   /// # Errors
   ///
@@ -233,26 +223,26 @@ impl Outcome {
   // Fix(audit_assumed_mint_order_is_push_order): was
   //   `audit_received( &self.received, self.minted )`, which reports
   //   `Anomaly::OutOfOrder` whenever `received` fails to ascend by raw mint
-  //   value — correct only when push order equals mint order. A script that
-  //   lets a `Push`/`PushMany` land between a `Stage`/`StageMany` and the
-  //   `Flush` that empties it breaks that equality on purpose: the staged
+  //   value. That is correct only when push order equals mint order. A script
+  //   that lets a `Push`/`PushMany` land between a `Stage`/`StageMany` and the
+  //   `Flush` that empties it breaks that equality on purpose. The staged
   //   record keeps its lower mint value but reaches the ring only when
-  //   `Flush` runs, after the interceding push already landed. A perfectly
-  //   correct FIFO delivery then came back reporting an anomaly for a run
-  //   that did nothing wrong.
+  //   `Flush` runs, after the interceding push already landed. A correct
+  //   FIFO delivery then came back reporting an anomaly for a run that did
+  //   nothing wrong.
   // Root cause: `audit_received` was written for, and only ever exercised
   //   by, scripts where minting and publishing happen in the same
   //   statement. Every existing test either pushed directly or staged then
   //   flushed with no push in between, so mint order and push order always
-  //   coincided by construction and the two were never distinguished in the
-  //   data `Outcome` carried.
+  //   coincided by construction, and the data `Outcome` carried never
+  //   distinguished the two.
   // Pitfall: do not restore a direct call to
-  //   `audit_received( &self.received, self.minted )` here — it silently
+  //   `audit_received( &self.received, self.minted )` here. It silently
   //   reintroduces the false `OutOfOrder` the moment a script interleaves a
   //   `Push`/`PushMany` with a pending `Stage`/`Flush`. `audit_received`
   //   itself is unchanged and stays correct for its own documented callers
   //   (a `Push`-only script, the loom model's direct `try_push`), where mint
-  //   order and push order are the same thing by construction — this fix
+  //   order and push order are the same thing by construction. This fix
   //   only changes what `Outcome::audit` checks `received` against.
   pub fn audit(&self) -> Result<(), Anomaly> {
     let placed = self.accepted + self.refused_full + self.refused_closed + self.refused_staging + self.staged_at_end;
@@ -280,13 +270,11 @@ impl Outcome {
 /// # Not Exhaustive
 ///
 /// A run has more properties than this enum has variants, and the fourth
-/// arrived after the first three: `Overdelivered` came from
-/// `docs/data_structure/002` TK11, which found that [`Outcome::vanished`]
-/// answers `0` — the healthy reading — for the one state that makes it
-/// meaningless. Adding it was a breaking change to any exhaustive `match`,
-/// which is the cost `docs/item/002` TK27 predicted while this enum had no
-/// room attribute. The attribute is here so the next one is additive.
-/// → `docs/item/002_what_the_crate_does_not_declare.md` TK27.
+/// arrived after the first three. `Overdelivered` came from the finding that
+/// [`Outcome::vanished`] answers `0`, the healthy reading, for the one state
+/// that makes it meaningless. Adding it was a breaking change to any
+/// exhaustive `match`, which is the cost predicted while this enum had no room
+/// attribute. The attribute is here so the next one is additive.
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Anomaly {
@@ -306,10 +294,10 @@ pub enum Anomaly {
   },
   /// More records left the ring than the ring ever accepted.
   ///
-  /// Impossible within one run under every policy: a record cannot be
+  /// Impossible within one run under every policy, because a record cannot be
   /// delivered or still held without first having been accepted. Reaching it
-  /// means the `Outcome` describes two runs rather than one — a script run
-  /// twice against a single ring — or was built by hand, and it is exactly the
+  /// means the `Outcome` was built by hand or describes two runs rather than
+  /// one, as when a script runs twice against a single ring. It is exactly the
   /// state in which [`Outcome::vanished`]'s saturating subtraction answers `0`.
   Overdelivered {
     /// How many offers the ring answered with `Ok`.
@@ -319,7 +307,7 @@ pub enum Anomaly {
   },
   /// Two records came out in the wrong order, or the same one came out twice.
   ///
-  /// One variant for both, because the check is `then > previous` — a
+  /// One variant for both, because the check is `then > previous`. A
   /// duplicate is the equality case of an ordering failure, and splitting them
   /// would mean two checks where the ring only ever breaks one property.
   OutOfOrder {
@@ -348,12 +336,12 @@ impl core::error::Error for Anomaly {}
 ///
 /// [`audit_received`] assumes mint order and push order coincide, which holds
 /// for a `Push`-only script but not for one where a `Push`/`PushMany` lands
-/// between a `Stage`/`StageMany` and the `Flush` that empties it — see
+/// between a `Stage`/`StageMany` and the `Flush` that empties it. See
 /// [`Outcome::published`]. This walks `received` against `published` instead
-/// of against raw values, so a record is judged by where it was actually
-/// offered rather than by the number stamped on it at mint time. R2
-/// (provenance) is unchanged from [`audit_received`]; only R3 (ascent) is
-/// re-based onto `published`.
+/// of against raw values, so it judges a record by where it was actually
+/// offered rather than by the number stamped on it at mint time. The
+/// provenance check is unchanged from [`audit_received`]; only the ascent
+/// check is re-based onto `published`.
 fn audit_delivery_order(received: &[u32], minted: u32, published: &[u32]) -> Result<(), Anomaly> {
   for &value in received {
     if value >= minted {
@@ -378,7 +366,7 @@ fn audit_delivery_order(received: &[u32], minted: u32, published: &[u32]) -> Res
 /// Check a list of received records against the number minted.
 ///
 /// Separate from [`Outcome::audit`] because the list a concurrent test collects
-/// does not come from an `Outcome` — under `loom::model` there is no single
+/// does not come from an `Outcome`. Under `loom::model` there is no single
 /// script and no accounting, only the records a consumer thread saw.
 ///
 /// # Single-producer
@@ -387,16 +375,15 @@ fn audit_delivery_order(received: &[u32], minted: u32, published: &[u32]) -> Res
 /// before it, and that is a property of one producer minting alone. Two
 /// producers minting independently interleave in claim order, so
 /// `[ 0, 100, 1 ]` is a correct delivery that this function reports as
-/// [`Anomaly::OutOfOrder`] — inside the one function whose reason for existing
-/// is the concurrent case. Use [`audit_received_unordered`] for a model with
+/// [`Anomaly::OutOfOrder`]. That happens inside the one function whose reason
+/// for existing is the concurrent case. Use [`audit_received_unordered`] for a model with
 /// more than one producer; it keeps the two checks a ring can actually fail
 /// and drops the one only a single producer guarantees.
-/// → `docs/algorithm/002_the_four_passes_of_an_audit.md` TK3.
 ///
 /// # Errors
 ///
 /// [`Anomaly::Unminted`] for a value no producer could have created,
-/// [`Anomaly::OutOfOrder`] for a pair that did not ascend — which covers
+/// [`Anomaly::OutOfOrder`] for a pair that did not ascend. That covers
 /// duplicates, since a repeat is the equality case.
 ///
 /// ```
@@ -430,7 +417,7 @@ pub fn audit_received(received: &[u32], minted: u32) -> Result<(), Anomaly> {
 ///
 /// The multi-producer form of [`audit_received`]. Two producers minting
 /// independently interleave in claim order, so ascent is not a property of a
-/// correct delivery — but *nothing unminted* and *nothing twice* still are,
+/// correct delivery. But *nothing unminted* and *nothing twice* still are,
 /// and those are the two failures a ring can actually produce. Sorting a copy
 /// rather than tracking a set keeps the check allocation-proportional to the
 /// list a consumer thread already collected.
@@ -439,8 +426,8 @@ pub fn audit_received(received: &[u32], minted: u32) -> Result<(), Anomaly> {
 ///
 /// [`Anomaly::Unminted`] for a value no producer could have created, and
 /// [`Anomaly::OutOfOrder`] with `previous == then` for a record delivered
-/// twice — the same variant [`audit_received`] uses for its equality case,
-/// because a duplicate is a duplicate whichever pass finds it.
+/// twice. That is the same variant [`audit_received`] uses for its equality
+/// case, because a duplicate is a duplicate whichever pass finds it.
 ///
 /// ```
 /// use ring_testkit::{ Anomaly, audit_received, audit_received_unordered };
@@ -486,7 +473,7 @@ pub fn audit_received_unordered(received: &[u32], minted: u32) -> Result<(), Ano
 /// `loom::thread::spawn` takes `'static` closures and loom has no scoped
 /// threads, so the two ends of a ring cannot be moved onto loom threads while
 /// the ring is a local. Leaking one ring per model execution is the least
-/// contrived way to get the lifetime: a loom model runs a deliberately tiny
+/// contrived way to get the lifetime. A loom model runs a deliberately tiny
 /// ring, and loom's own per-execution bookkeeping dwarfs it.
 ///
 /// **Only for tests, and only for tiny rings.** Nothing frees this. The
@@ -508,19 +495,19 @@ pub fn leak<T: Send>(ring: Ring<T>) -> &'static mut Ring<T> {
 
 /// The two ends of a ring, both `'static`.
 ///
-/// [`leak`] alone is not enough to reach a loom thread: `Ring::ends` returns an
+/// [`leak`] alone is not enough to reach a loom thread. `Ring::ends` returns an
 /// [`Ends`] that `split` then borrows, so a `Producer` from a leaked ring is
 /// still bounded by whatever local the `Ends` was bound to. **Two leaks are
 /// needed, not one**, and forgetting the second produces a borrow error whose
 /// message points at the local rather than at the missing leak.
 ///
-/// **This, not [`leak`], is what every loom model in this crate actually
-/// calls.** Each call strands three heap blocks, not one: the boxed `Ring`,
-/// the `Storage` it owns, and the boxed `Ends` this function leaks on top —
-/// [`leak`]'s own cost sentence ("one ring per model execution") undercounts
-/// by describing a function no loom test in this crate invokes.
+/// **This, not [`leak`], is what every loom model in this crate calls.** Each
+/// call strands three heap blocks, not one: the boxed `Ring`, the `Storage` it
+/// owns, and the boxed `Ends` this function leaks on top. [`leak`]'s own cost
+/// sentence ("one ring per model execution") undercounts, because it describes
+/// a function no loom test in this crate invokes.
 ///
-/// Same caveat as [`leak`], twice over: nothing frees either allocation.
+/// Same caveat as [`leak`], twice over. Nothing frees either allocation.
 ///
 /// ```
 /// use ring_config::RingConfig;
@@ -550,7 +537,7 @@ pub struct Script {
 impl Script {
   /// An empty script whose staging buffer holds `stage_limit` records.
   ///
-  /// The limit is required rather than defaulted: it decides how many
+  /// The limit is required rather than defaulted, because it decides how many
   /// [`Step::Stage`]s are refused, so a hidden default would put a number
   /// nobody chose into the `refused_staging` count.
   #[must_use]
@@ -582,20 +569,19 @@ impl Script {
 
   /// Drive `ring` through every step and report what happened.
   ///
-  /// The ring is left in whatever state the last step put it in — a caller
+  /// `run` leaves the ring in whatever state the last step put it in. A caller
   /// comparing two runs must supply two rings, not run twice on one.
   ///
   /// # Backend-blind
   ///
   /// `run` never asks which implementation is under the ring. `Ring::new` and
   /// `Ring::new_crossbeam` produce the same type, and the second accepts
-  /// `OverflowPolicy::DropOldest` where the first refuses it — so this
+  /// `OverflowPolicy::DropOldest` where the first refuses it. So this
   /// fixture's exclusion of `DropOldest` is not a property of the fixture. It
   /// holds because `new_crossbeam` sits behind `ring_core`'s `crossbeam`
   /// feature, which this crate neither enables nor names in its manifest. A
   /// caller who enables it can hand `run` an evicting ring and get an
   /// `Outcome` shaped like any other.
-  /// → `docs/pitfall/001_neither_the_count_nor_the_list_alone.md` TK42.
   #[must_use = "the Outcome is the measurement — `script.run( &mut ring );` as a statement drives the ring and discards everything it observed"]
   #[allow(
     clippy::too_many_lines,
@@ -657,11 +643,11 @@ impl Script {
         }
 
         Step::Flush => {
-          // `TlsBuffer::flush_into` is the amortised path — one `fetch_add` for
-          // the whole batch — and it cannot be used here: it claims against a
+          // `TlsBuffer::flush_into` is the amortised path, with one `fetch_add`
+          // for the whole batch, and it cannot be used here. It claims against a
           // `SeqCell`, and a `ring_core::Ring` exposes no cursor at all. So the
           // staged records go in one at a time, which is the only join the two
-          // crates have. → `docs/pitfall/003_the_amortised_flush_has_no_ring.md`.
+          // crates have.
           //
           // Collected first because `drain()` borrows `staging` for the loop,
           // and the guard's push cannot run while that borrow is live.

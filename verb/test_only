@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Filtered nextest run — filter::<substring> and/or crate::<name>. Ordinary
+#@ purpose: Filtered nextest run by filter::<substring> and/or crate::<name>. Ordinary
 #@          verification during active development only; use test for the full gate.
 #@ tags: verb, test_only
 set -euo pipefail

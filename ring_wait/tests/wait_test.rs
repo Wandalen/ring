@@ -1,18 +1,17 @@
-//! `ring_wait` — the four wait strategies and the one loop they share.
+//! The four `ring_wait` strategies and the one loop they share.
 //!
 //! This file carries the reached-test for
-//! `docs/feature/173_wait_kind_and_strategies.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as three
-//! clauses: `WaitKind` has exactly the four discriminants `Spin`, `Yield`,
-//! `Park`, `None` in `ring_types`; this crate supplies one handler per
-//! discriminant; and `WaitKind::None` returns without blocking when the ring is
-//! empty, asserted by a bounded-time test.
+//! `docs/feature/173_wait_kind_and_strategies.md`, stated as three clauses:
+//! `WaitKind` has exactly the four discriminants `Spin`, `Yield`, `Park`,
+//! `None` in `ring_types`; this crate supplies one handler per discriminant;
+//! and `WaitKind::None` returns without blocking when the ring is empty,
+//! asserted by a bounded-time test.
 //!
 //! ## The first clause is asserted here as well as in `ring_types`
 //!
-//! Deliberately, and it is not duplication. `ring_types/tests/types_test.rs`
+//! This is deliberate, and it is not duplication. `ring_types/tests/types_test.rs`
 //! asserts the enum's shape as a fact about that crate. This file asserts it as
-//! a *precondition of the second clause*: "one handler per discriminant" is
+//! a *precondition of the second clause*, because "one handler per discriminant" is
 //! meaningless without knowing how many discriminants there are, and a fifth
 //! variant added later would leave this crate silently one handler short. The
 //! two assertions would survive each other's deletion and mean different
@@ -22,13 +21,13 @@
 //!
 //! The third clause is the only one with a stopwatch in it, and a stopwatch in
 //! a test is usually a flake waiting for a loaded CI box. It is used here
-//! because the property genuinely is temporal — `None` must not block — and
-//! because the bound is chosen to be absurd rather than tight: a whole second
-//! for an operation whose honest cost is a single predicate evaluation. A run
-//! that exceeds it has not been slow, it has blocked.
+//! because `None` must not block, which is a temporal property, and because
+//! the bound is chosen to be absurd rather than tight: a whole second for an
+//! operation whose honest cost is a single predicate evaluation. A run that
+//! exceeds it has blocked, not run slowly.
 //!
 //! The non-temporal half of the same property is asserted alongside it, and is
-//! the assertion that would actually catch a regression: `None` evaluates the
+//! the assertion that would catch a regression: `None` evaluates the
 //! predicate **exactly once**. A `None` that looped 1024 times before giving up
 //! would still finish inside a second on any machine, and only the count says
 //! so.
@@ -36,7 +35,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -51,7 +50,7 @@ fn cap(slots: usize) -> Capacity {
   Capacity::new(slots).expect("test capacities are powers of two")
 }
 
-// ── feature 173, clause 1: the discriminant set ────────────────────────────
+// ── clause 1: the discriminant set ─────────────────────────────────────────
 
 #[test]
 fn there_are_exactly_four_wait_kinds() {
@@ -63,13 +62,13 @@ fn there_are_exactly_four_wait_kinds() {
   );
 }
 
-// ── feature 173, clause 2: one handler per discriminant ────────────────────
+// ── clause 2: one handler per discriminant ─────────────────────────────────
 
 #[test]
 fn every_discriminant_has_a_handler_that_runs() {
   // The handler set is `pause`'s match. An unhandled variant is a compile
   // error there, so what this asserts is the weaker but non-trivial claim
-  // that each arm actually returns rather than diverging.
+  // that each arm returns rather than diverging.
   for kind in WaitKind::ALL {
     let keep_going = pause(kind, 0);
     assert_eq!(
@@ -101,7 +100,7 @@ fn exactly_one_discriminant_is_non_blocking() {
   assert_eq!(non_blocking, vec![WaitKind::None], "the tick path has exactly one option");
 }
 
-// ── feature 173, clause 3: None does not block ─────────────────────────────
+// ── clause 3: None does not block ──────────────────────────────────────────
 
 #[test]
 fn none_returns_immediately_from_an_empty_ring() {
@@ -120,7 +119,7 @@ fn none_returns_immediately_from_an_empty_ring() {
 
 #[test]
 fn none_evaluates_the_predicate_exactly_once() {
-  // The assertion that would actually catch a regression. A `None` that spun
+  // The assertion that would catch a regression. A `None` that spun
   // the full DEFAULT_SPINS budget before giving up still finishes instantly
   // and passes the stopwatch above; only the count distinguishes "did not
   // block" from "looped fast".
@@ -189,7 +188,7 @@ fn a_wait_stops_asking_the_moment_it_is_ready() {
 #[test]
 fn a_zero_budget_still_looks_once() {
   // A budget of zero is a caller bug, and the useful behaviour is one look
-  // rather than an unconditional failure — the alternative reports "not
+  // rather than an unconditional failure. The alternative reports "not
   // ready" about a ring nobody ever asked.
   let mut looks = 0;
   let outcome = wait_until(WaitKind::Spin, 0, || {
@@ -230,7 +229,7 @@ fn the_default_budget_is_the_documented_constant() {
 
 #[test]
 fn space_and_data_fail_with_different_errors() {
-  // The one place the two wrappers differ, and it matters: a producer handed
+  // The one place the two wrappers differ, and it matters. A producer handed
   // `Empty` reads it as "nothing to do" rather than "back-pressure", and
   // stops producing.
   let pair = CursorPair::new(cap(2));
@@ -274,7 +273,7 @@ fn for_space_tracks_the_consumer_as_well_as_the_producer() {
 
 #[test]
 fn a_blocking_wait_succeeds_when_another_thread_publishes() {
-  // The shape the strategies exist for. Not a timing assertion: the waiter's
+  // The shape the strategies exist for, and not a timing assertion. The waiter's
   // budget is large enough that only a genuinely broken loop fails it.
   let pair = CursorPair::new(cap(8));
 
@@ -303,7 +302,7 @@ fn escalation_walks_from_cheapest_latency_to_cheapest_cpu() {
 #[test]
 fn none_never_escalates() {
   // Escalating out of `None` would put a blocking strategy on the tick path,
-  // which is the one thing feature 173 names `None` to prevent.
+  // which is the one thing the feature names `None` to prevent.
   assert_eq!(escalation_hint(WaitKind::None), None);
 }
 
@@ -326,7 +325,7 @@ fn escalation_terminates_from_every_starting_point() {
 #[test]
 fn the_spin_pause_varies_with_the_attempt_and_always_continues() {
   // The attempt index feeds a backoff. What must hold regardless is that spin
-  // never reports "stop" — only `None` does that.
+  // never reports "stop". Only `None` does that.
   for attempt in 0..32 {
     assert!(pause(WaitKind::Spin, attempt), "spin stopped at attempt {attempt}");
   }
@@ -344,9 +343,9 @@ fn a_zero_count_is_already_satisfied_and_spends_no_attempt() {
   // `for_data`'s predicate is `pending() >= count` over a `u64`, so a count of
   // zero is a tautology rather than a wait. It is the one input where
   // `for_data` cannot fail: the same empty ring that answers `Err( Empty )` for
-  // one item answers `Ok( 0 )` for none. The zero inside `Ok` is the
-  // load-bearing part — it is the attempt count, so it says the predicate was
-  // satisfied before any strategy got to pause.
+  // one item answers `Ok( 0 )` for none. The zero inside `Ok` is the part that
+  // matters. It is the attempt count, so it says the predicate was satisfied
+  // before any strategy got to pause.
   let empty = CursorPair::new(cap(8));
 
   assert_eq!(

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G4 — every crate carries tests/manual/readme.md with an executed run record.
+# G4. Every crate carries tests/manual/readme.md with an executed run record.
 #
 # "Manually tested" is only a claim until someone records the run. The gate
 # requires a `## Run Record` section carrying an ISO date, so an empty plan
@@ -9,39 +9,40 @@ GATE=G4
 source "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
 assert_declared_crates_exist
 
-# Extract the Run Record section's own body: from its heading to the next
-# heading at the same or shallower level, or EOF. Emitted so the caller can
-# grep *this* text for a date rather than the whole file.
+# Extract the Run Record section's own body, from its heading to the next
+# heading at the same or shallower level, or EOF. The function prints it so the
+# caller can grep *this* text for a date, not the whole file.
 #
-# The date check used to run against the whole file, not this section, so a
-# heading-only stub ("## Run Record" with nothing under it yet) would still
-# pass as long as some unrelated ISO-shaped date sat anywhere else in the
-# document — a plan with a "Created 2026-01-01" line but no executed run
-# would satisfy both independent greps without the date ever describing a
-# run. Real manual readmes routinely nest `###`-level detail under Run
-# Record (e.g. "### Defect found by M1"), so the boundary has to compare
-# heading depth rather than stop at the next `#` line of any level, or a
-# dated sub-section would be sheared off along with a genuine record.
-# Latent, not exploited: checked against all 127 live manual readmes and
-# none currently relies on a date outside its own Run Record section.
+# The date check used to run against the whole file, not this section. A
+# heading-only stub ("## Run Record" with nothing under it yet) would still pass
+# as long as some unrelated ISO-shaped date sat anywhere else in the document. A
+# plan with a "Created 2026-01-01" line but no executed run would satisfy both
+# independent greps without the date ever describing a run. Real manual readmes
+# routinely nest `###`-level detail under Run Record (e.g.
+# "### Defect found by M1"). So the boundary has to compare heading depth, not
+# stop at the next `#` line of any level, or a dated sub-section would be cut
+# off along with a genuine record. Latent, not exploited: checked against all
+# 127 live manual readmes and none currently relies on a date outside its own
+# Run Record section.
 #
-# Fix(g4_open_heading_matched_by_prefix_not_equality): the open pattern used
-# to be `/^##+ Run Record/` with no trailing anchor — a match for any heading
-# STARTING WITH "Run Record", not only a heading that IS "Run Record". A
-# crate whose manual readme ever headed a section "## Run Record Draft" or
-# "## Run Recorded By Hand" ahead of its real "## Run Record" would have that
-# earlier heading silently become the one this function reads, swallowing
-# everything up to the real heading (which the close check then reads as
-# ending the wrong section) as the recorded run's own body. Root cause: same
-# bug class as `corpus_lib.py`'s `a_deeper_heading_is_not_a_boundary` and
-# `g12_mutation.sh`'s `g12_block_markers_matched_by_prefix_not_equality` —
-# open and close boundaries both need "is this the one heading," and a
-# prefix test answers a different question. Pitfall: zero live trigger —
-# measured directly, not assumed: every "## Run Record"-
-# shaped heading across every live `tests/manual/readme.md` under any crate
-# root is exactly hash-run-space-"Run Record" with
-# nothing trailing (no extra words, no trailing whitespace, no CR), so
-# anchoring the pattern changes which lines it matches for zero files today.
+# Fix(g4_open_heading_matched_by_prefix_not_equality): the open pattern used to
+# be `/^##+ Run Record/` with no trailing anchor. It matched any heading
+# STARTING WITH "Run Record", not only a heading that IS "Run Record". Suppose a
+# crate's manual readme headed a section "## Run Record Draft" or
+# "## Run Recorded By Hand" ahead of its real "## Run Record". That earlier
+# heading would become the one this function reads, with no warning. It would
+# take everything up to the real heading as the recorded run's own body, and the
+# close check would then read the real heading as ending the wrong section.
+# Root cause: same bug class as `corpus_lib.py`'s
+# `a_deeper_heading_is_not_a_boundary` and `g12_mutation.sh`'s
+# `g12_block_markers_matched_by_prefix_not_equality`. The open and close
+# boundaries both need "is this the one heading," and a prefix test answers a
+# different question. Pitfall: zero live trigger, measured directly, not
+# assumed. Every "## Run Record"-shaped heading across every live
+# `tests/manual/readme.md` under any crate root is exactly
+# hash-run-space-"Run Record" with nothing trailing (no extra words, no trailing
+# whitespace, no CR). So anchoring the pattern changes which lines it matches
+# for zero files today.
 run_record_section() {
   awk '
     /^##+ Run Record$/ && !found {

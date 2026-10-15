@@ -1,14 +1,14 @@
 # No rustfmt option matches this codebase's own-line braces (nightly-only
 # `brace_style`, verified inert on stable 1.9.0) or its delimiter spacing
-# (`Vec< T >`, `fn foo( x : i32 )` — no option exists, stable or nightly).
-# `cargo fmt` will still rewrite both regardless of this file.
+# (`Vec< T >`, `fn foo( x : i32 )`), which no option covers, stable or
+# nightly. `cargo fmt` still rewrites both regardless of this file.
 tab_spaces = 2
 hard_tabs = false
 newline_style = "Unix"
 max_width = 130
 
-# Nightly-only: warn-and-noop under plain `cargo fmt` (stable), take effect
-# only under `cargo +nightly fmt`. Already matches this codebase's
+# Nightly-only. Plain `cargo fmt` (stable) warns and ignores these; they take
+# effect only under `cargo +nightly fmt`. They already match this codebase's
 # hand-applied import style (see ring_factory/src/lib.rs).
 unstable_features = true
 group_imports = "StdExternalCrate"

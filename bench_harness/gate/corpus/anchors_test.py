@@ -20,7 +20,7 @@ import anchors
 
 
 # The revision immediately before the readme's awk recipe was repaired to
-# track a doc-comment reworded in an earlier commit — see the module docstring.
+# track a doc-comment reworded in an earlier commit. See the module docstring.
 _PRE_REPAIR_REV = '5b281d8f'
 _LIB_PATH = 'module/ring_slot/src/lib.rs'
 _README_PATH = 'module/ring_slot/docs/pitfall/readme.md'
@@ -51,12 +51,12 @@ class DeadClauseDetectionTest( unittest.TestCase ):
     assert cls.repo_root is not None, 'could not locate the repo root from this test file'
     readme = _git_show( cls.repo_root, _PRE_REPAIR_REV, _README_PATH )
     cls.lib_rs = _git_show( cls.repo_root, _PRE_REPAIR_REV, _LIB_PATH )
-    # The one awk line, lifted unmodified from the historical readme. The
-    # surrounding `cd` and grep lines are dropped deliberately: the historical
-    # `cd` names this machine's *live* tree, which no longer has anything
-    # under `module/ring_slot` (the family moved to `ring/` since this
-    # revision) — carried along, it would misreport a moved target as a dead
-    # anchor instead of exercising the one clause this test is actually about.
+    # The one awk line, lifted unmodified from the historical readme. The test
+    # drops the surrounding `cd` and grep lines deliberately. The historical
+    # `cd` names this machine's *live* tree, which no longer has anything under
+    # `module/ring_slot` (the family moved to `ring/` since this revision).
+    # Carried along, it would misreport a moved target as a dead anchor instead
+    # of exercising the one clause this test is about.
     lines = [ l for l in readme.splitlines() if l.startswith( "awk '" ) ]
     assert len( lines ) == 1, f'expected exactly one awk line, found {len( lines )}'
     cls.awk_line = lines[ 0 ]

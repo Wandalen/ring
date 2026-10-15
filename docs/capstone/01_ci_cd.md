@@ -32,7 +32,7 @@ remembers to run it locally. A regression can sit unnoticed indefinitely.
 ## Why this crate family in particular
 
 The project's own culture is "a gate that can fail, not a claim that
-sounds true" (see `../../bench_harness/docs/invariant/001_gate_non_vacuity.md`).
+sounds true" (see `../../bench_harness/docs/decisions/001_a_gate_counts_only_after_failing_for_its_own_reason.md`).
 Right now every one of those gates can still fail — just not automatically,
 and not on every change. This topic is the one that makes every other
 topic's gate actually mean something going forward.

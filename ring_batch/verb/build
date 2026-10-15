@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-#@ purpose: ring_batch-scoped build. Thin wrapper — see verb/readme.md at the workspace root.
+#@ purpose: ring_batch-scoped build. Thin wrapper. See verb/readme.md at the workspace root.
 #@ tags: verb, build
 exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/verb/_crate_dispatch" build ring_batch "$@"

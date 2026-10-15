@@ -6,13 +6,13 @@
 //! drain reads them in issue order."
 //!
 //! All three clauses are asserted literally below, the first against
-//! `ring_atomic::CountingSeq` — the counting ordering shim the criterion names.
-//! It is not a mock: the same real `AtomicU64` performs the same real
+//! `ring_atomic::CountingSeq`, the counting ordering shim the criterion names.
+//! It is not a mock. The same real `AtomicU64` performs the same real
 //! operation, with a `Relaxed` counter alongside. An assertion made against it
 //! is therefore a statement about the code under test rather than about a
 //! substitute for it.
 //!
-//! The fourth thing tested here is not in the criterion and matters as much:
+//! The fourth thing tested here is not in the criterion and matters as much.
 //! `claim_gated` must distinguish "ask for less" from "wait". Collapsing both
 //! into `Full` would make an impossible request look transient, and a caller's
 //! retry loop would spin forever on it.
@@ -20,7 +20,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure, so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -51,7 +51,7 @@ fn a_claim_of_sixty_four_issues_one_operation_not_sixty_four() {
 
 #[test]
 fn the_cost_of_a_claim_does_not_depend_on_its_size() {
-  // The stronger form: not "64 costs 1" but "every size costs 1". A loop that
+  // The stronger form is "every size costs 1", not only "64 costs 1". A loop that
   // advanced one at a time would pass the 64 case only by accident of the
   // assertion's shape.
   for count in [0usize, 1, 2, 7, 64, 1024] {
@@ -128,8 +128,8 @@ fn a_claim_reports_its_own_extent() {
 
 #[test]
 fn an_empty_claim_is_a_success_not_a_failure() {
-  // A flush of an empty thread-local buffer takes the same path as a full one;
-  // that only works if claiming nothing succeeds.
+  // A flush of an empty thread-local buffer takes the same path as a full one.
+  // That only works if claiming nothing succeeds.
   let batch = BatchClaim::new(Seq(4), 0);
 
   assert!(batch.is_empty());
@@ -222,8 +222,8 @@ fn a_full_ring_refuses_with_full_and_advances_nothing() {
 
 #[test]
 fn an_oversized_request_is_a_configuration_error_not_back_pressure() {
-  // The distinction the caller's retry loop depends on: `Full` clears when a
-  // consumer moves, `BatchTooLarge` never clears at all.
+  // This is the distinction the caller's retry loop depends on. `Full` clears
+  // when a consumer moves, and `BatchTooLarge` never clears at all.
   let capacity = cap(8);
   let producer = AtomicSeq::default();
   let consumer = AtomicSeq::default();
@@ -245,7 +245,7 @@ fn an_oversized_request_is_a_configuration_error_not_back_pressure() {
 
 #[test]
 fn an_oversized_request_is_refused_before_the_ring_is_even_consulted() {
-  // Ordering matters: checking capacity first means an impossible request on an
+  // Ordering matters. Checking capacity first means an impossible request on an
   // empty ring still reports BatchTooLarge rather than succeeding by accident.
   let capacity = cap(4);
   let producer = CountingSeq::default();
@@ -297,13 +297,13 @@ fn a_gated_claim_of_zero_always_succeeds_even_on_a_full_ring() {
 
 #[test]
 fn concurrent_batch_claims_never_overlap() {
-  // Disjointness of returned sequences — real, and free of charge from
-  // fetch_add's own atomicity, but blind to this crate's actual race: a
-  // claim can be disjoint from every other claim and still point at a slot
-  // the consumer has not released yet (-> BA23, pitfall/001). Every claim
-  // taken by every thread is collected and checked pairwise-disjoint by
-  // sequence, which is stronger than checking the claims' ranges: it
-  // catches an off-by-one at either end.
+  // Disjointness of returned sequences is real, and free of charge from
+  // fetch_add's own atomicity, but it is blind to this crate's actual race. A
+  // claim can be disjoint from every other claim and still point at a slot the
+  // consumer has not released yet. Every claim taken by every thread is
+  // collected and checked pairwise-disjoint by sequence. That is stronger than
+  // checking the claims' ranges, because it catches an off-by-one at either
+  // end.
   const THREADS: usize = 4;
   const BATCHES: usize = 500;
   const SIZE: usize = 8;
@@ -343,8 +343,8 @@ fn concurrent_batch_claims_never_overlap() {
 
 #[test]
 fn a_threads_own_batches_stay_in_its_issue_order() {
-  // Hard problem 118's requirement: whatever the interleaving between threads,
-  // one thread's own claims come back ascending.
+  // A system's own writes must survive the merge in order. Whatever the
+  // interleaving between threads, one thread's own claims come back ascending.
   const THREADS: usize = 4;
   const BATCHES: usize = 250;
 

@@ -36,13 +36,13 @@ import addressing
 _PACKAGE_NAME = re.compile( r'^\s*name\s*=\s*"([^"]+)"', re.M )
 
 # Crates whose manifest name differs from their directory name. `crate_src_lib`
-# matches the directory, so any such crate would resolve to None — see its own
+# matches the directory, so any such crate would resolve to None. See its own
 # Finding(crate_src_lib_matches_directory_name_not_package_name). Pinned as an
-# exact set rather than skipped as a class: an entry is a new instance of the
-# same silent-None shape and must fail here, not be absorbed. Empty in this
-# repo — none of its 34 crates diverge — but kept as a set, not removed, so a
-# future divergence is caught by `test_name_differs_from_dir_set_has_not_grown`
-# rather than silently passing the class check below.
+# exact set rather than skipped as a class, because an entry is a new instance
+# of the same silent-None shape and must fail here, not be absorbed. Empty in
+# this repo, since none of its 34 crates diverge, but kept as a set rather than
+# removed. That way `test_name_differs_from_dir_set_has_not_grown` catches a
+# future divergence instead of letting it silently pass the class check below.
 _NAME_DIFFERS_FROM_DIR = set()
 
 

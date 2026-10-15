@@ -1,8 +1,7 @@
-//! `ring_barrier` — the consumer half of the sequence barrier.
+//! Tests for `ring_barrier`, the consumer half of the sequence barrier.
 //!
 //! This file carries half the reached-test for
-//! `docs/feature/178_sequence_barrier_and_gating_set.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as:
+//! `docs/feature/178_sequence_barrier_and_gating_set.md`, which states that
 //! `ring_barrier` returns the minimum across a gating set of 1, 2 and 3
 //! cursors. (`ring_gating`'s own file carries the refuses-a-claim and
 //! stalled-consumer halves.)
@@ -21,16 +20,16 @@
 //!
 //! An empty gating set means *unbounded* for a producer and *nothing readable*
 //! for a consumer. The two crates give opposite answers to the same-shaped
-//! question, which reads like an inconsistency until the reason is stated —
-//! so `an_empty_barrier_and_an_empty_gating_set_answer_oppositely` states it as
+//! question, which reads like an inconsistency until the reason is stated.
+//! So `an_empty_barrier_and_an_empty_gating_set_answer_oppositely` states it as
 //! an assertion rather than leaving it to the prose.
 //!
 //! ## Why `ring_gating` is a dev-dependency and not a dependency
 //!
-//! `ring_barrier` itself does not depend on `ring_gating` — a barrier is over a
-//! slice of cursors from wherever they live. Three tests here nonetheless need
-//! a real `GatingSet`, because what they assert is precisely the relationship
-//! between the two crates' answers: that the same cursors read from both sides
+//! `ring_barrier` itself does not depend on `ring_gating`. A barrier is over a
+//! slice of cursors from wherever they live. Three tests here still need a
+//! real `GatingSet`, because what they assert is the relationship between the
+//! two crates' answers: that the same cursors read from both sides
 //! give opposite answers on an empty set, and differently-clamped answers on a
 //! full one. Asserting that against a hand-rolled stand-in would be asserting
 //! it against nothing.
@@ -38,7 +37,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -64,7 +63,7 @@ fn deps_zeroed(count: usize) -> Vec<PaddedCursor> {
   deps_at(&vec![0u64; count])
 }
 
-// ── feature 178: the minimum across 1, 2 and 3 cursors ─────────────────────
+// ── the minimum across 1, 2 and 3 cursors ──────────────────────────────────
 
 #[test]
 fn the_frontier_of_one_cursor_is_that_cursor() {
@@ -155,7 +154,7 @@ fn available_counts_the_sequences_between_here_and_the_frontier() {
 #[test]
 fn available_is_zero_at_and_past_the_frontier() {
   // Past the frontier is a state a correct consumer never reaches, but the
-  // arithmetic must saturate rather than wrap into a huge count — a consumer
+  // arithmetic must saturate rather than wrap into a huge count. A consumer
   // acting on a wrapped count reads slots that were never published.
   let deps = deps_at(&[6]);
   let barrier = Barrier::over(&deps);
@@ -168,7 +167,7 @@ fn available_is_zero_at_and_past_the_frontier() {
 #[test]
 fn available_ignores_capacity_entirely() {
   // The distinction the module documentation argues, read off one set of
-  // cursors from both sides at once: a gating answer is clamped by capacity, a
+  // cursors from both sides at once. A gating answer is clamped by capacity, a
   // barrier answer is not. Same cursor, same position, two answers.
   let set = GatingSet::new(cap(4), 1);
   set.cursor(0).unwrap().store(Seq(1_000), Ordering::Release);
@@ -227,10 +226,10 @@ fn an_empty_barrier_has_no_frontier_and_nothing_available() {
 
 #[test]
 fn an_empty_barrier_and_an_empty_gating_set_answer_oppositely() {
-  // Stated as an assertion because it reads like an inconsistency: the same
+  // Stated as an assertion because it reads like an inconsistency. The same
   // empty set means "unbounded" to a producer and "nothing readable" to a
   // consumer. Both are "no constraint from dependencies" resolved to what a
-  // dependency-free participant actually has.
+  // dependency-free participant has.
   let empty = GatingSet::new(cap(8), 0);
 
   assert_eq!(empty.headroom(Seq(8)), 8, "a producer with nobody behind it may write");
@@ -252,11 +251,11 @@ fn waiting_on_an_empty_barrier_fails_rather_than_hanging() {
 #[test]
 fn admits_a_zero_request_but_still_refuses_to_wait_for_it_when_empty() {
   // Stated as an assertion for the same reason as the gating-set asymmetry
-  // above: on its own this reads like a bug. `admits` is a pure bool and
+  // above. On its own this reads like a bug. `admits` is a pure bool and
   // answers `true` for a zero-length request even with no dependencies at
   // all (`a_request_for_zero_is_always_admitted`), but `wait_for` promises a
-  // frontier on success, and an empty barrier never has one to give —
-  // regardless of how trivially satisfied the count was.
+  // frontier on success, and an empty barrier never has one to give,
+  // however trivially satisfied the count was.
   let empty = Barrier::over(&[]);
   assert!(empty.admits(Seq::ZERO, 0), "a zero-length request is trivially satisfied");
   assert_eq!(
@@ -265,8 +264,8 @@ fn admits_a_zero_request_but_still_refuses_to_wait_for_it_when_empty() {
     "admitted, but there is still no frontier to report"
   );
 
-  // Confirms the fallback that was *not* taken is not a missed generalization:
-  // a non-empty barrier reports its true frontier at count == 0 too, never
+  // Confirms the fallback that was *not* taken is not a missed generalization.
+  // A non-empty barrier reports its true frontier at count == 0 too, never
   // `from`, so returning `from` for the empty case would be a different,
   // fabricated rule rather than the same one extended to an edge.
   let published = deps_at(&[100]);
@@ -304,7 +303,7 @@ fn a_non_blocking_wait_looks_exactly_once() {
   assert!(barrier.wait_for(Seq::ZERO, 1, WaitKind::None, usize::MAX).is_err());
 
   // The budget is `usize::MAX`; only the non-blocking contract stops this.
-  // The bound is deliberately absurd rather than tight — a tight bound is a
+  // The bound is deliberately absurd rather than tight. A tight bound is a
   // flaky test, and anything under a second proves the loop did not run.
   assert!(started.elapsed() < std::time::Duration::from_secs(1));
 }
@@ -336,7 +335,7 @@ fn a_consumer_waiting_on_a_producer_thread_makes_progress() {
 
 #[test]
 fn a_barrier_never_reports_a_frontier_a_dependency_has_not_reached() {
-  // The safety property, under concurrency: whatever the barrier reports, the
+  // The safety property, under concurrency. Whatever the barrier reports, the
   // dependency was at least there. A `Relaxed` read could report a position
   // the consumer has no happens-before edge to.
   const TOTAL: u64 = 2_000;
@@ -392,7 +391,7 @@ fn a_barrier_exposes_the_same_cursors_it_was_given() {
 
 #[test]
 fn a_barrier_over_a_gating_set_reads_that_set_and_not_a_copy() {
-  // The composition that makes a chained consumer possible: the cursors a
+  // This composition makes a chained consumer possible. The cursors a
   // producer gates on are the same objects a downstream barrier waits on.
   let set = GatingSet::new(cap(8), 2);
   let barrier = Barrier::over(set.cursors());

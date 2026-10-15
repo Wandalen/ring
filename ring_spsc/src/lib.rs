@@ -1,21 +1,19 @@
 //! Single-producer single-consumer ring API.
 //!
-//! One of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_store`, `ring_config`, `ring_cursor`, `ring_slot`,
-//! `ring_types`.
+//! Part of the ring family's concurrency write path.
 //!
 //! # What single-producer buys, stated as a dependency list
 //!
 //! `ring_gating`, `ring_claim`, `ring_publish` and `ring_consume` are all
-//! absent, and that absence *is* the crate's thesis rather than an omission.
-//! Each of those exists to answer a question that only has an answer worth
+//! absent. The absence is the crate's thesis, not an omission. Each of those
+//! crates exists to answer a question that only has an answer worth
 //! computing when producers can overtake one another:
 //!
 //! - `ring_gating` takes the minimum over a set of consumer cursors. At one
 //!   consumer the minimum over one value is that value.
 //! - `ring_claim` moves the producer cursor by compare-exchange, because two
 //!   producers may race for the same range. At one producer nothing races, so
-//!   the cursor is moved by a plain store.
+//!   a plain store moves the cursor.
 //! - `ring_publish` spins until the frontier reaches this range's start,
 //!   because producer B may finish before producer A. At one producer, the
 //!   frontier is always already there.
@@ -23,53 +21,92 @@
 //!   depended on. At one consumer that barrier has one member, and it is this
 //!   end's own cursor.
 //!
-//! What is left is two cursors and an array
-//! (→ `docs/data_structure/001_two_cursor_ring.md`). No per-slot stamp, no
+//! What is left is two cursors and an array. No per-slot stamp, no
 //! read-modify-write on any path, no loop that can spin on another thread's
 //! progress.
 //!
 //! # Orderings, and why they are not uniform
 //!
-//! Each cursor has exactly one writer. That is what lets an end read **its
-//! own** cursor at [`OWN`] (`Relaxed`) — this thread performed the store it is
-//! reading back, and program order already sequences the load after it — while
-//! reading the **other** end's cursor at [`ring_cursor::GATING`] (`Acquire`),
-//! which is what makes the peer's slot writes visible.
+//! Each cursor has exactly one writer. That is why an end can read **its
+//! own** cursor at [`OWN`] (`Relaxed`). This thread performed the store it is
+//! reading back, and program order already sequences the load after it. The
+//! end reads the **other** end's cursor at [`ring_cursor::GATING`]
+//! (`Acquire`), and that load is what makes the peer's slot writes visible.
 //!
 //! [`ring_cursor::CursorPair`] offers `free_slots`, `pending` and `may_claim`
-//! over the same two cursors, and this crate deliberately does not call them in
-//! the hot path: they read *both* cursors at `Acquire`, correctly, because a
-//! `CursorPair` does not know which end is asking. Here every caller does know,
-//! so the asymmetric form is available and the symmetric one would pay for a
-//! fence the single-writer property already provides.
+//! over the same two cursors, and this crate chooses not to call them in the
+//! hot path. They read *both* cursors at `Acquire`, which is correct for them
+//! because a `CursorPair` does not know which end is asking. Here every caller
+//! does know, so the asymmetric form is available, and the symmetric one
+//! would pay for a fence the single-writer property already provides.
+//!
+//! # The producer's cursor cache
+//!
+//! `claim`'s fast path loads nothing. The producer keeps the next sequence to
+//! claim and its latest observation of the consumer cursor in its own fields —
+//! lawful because the end is `&mut`-exclusive — and grants from the two cached
+//! values. The observation can only lag the real cursor: the consumer's cursor
+//! is monotone and the cache is refreshed to it, never extrapolated past it. A
+//! claim is granted only when the lagged value itself proves the slot consumed
+//! (`cached_head > seq − capacity`), so staleness can refuse a ring that has
+//! room, and never overwrite a record the consumer has not taken.
+//!
+//! When the cache says full, one [`GATING`] load refreshes it — the single
+//! consumer-line read the fast path exists to avoid — and that load is also
+//! the edge that orders the consumer's take of the old record before the
+//! producer's overwrite of the slot: the take precedes the consumer's commit
+//! store, the refresh observes that store, and the write follows the refresh.
+//! Every claim of a lapped slot is therefore backed by an observation, never
+//! by hope. The load's `Acquire` is soundness-required, and it is the one part
+//! of the protocol the loom models cannot check: loom linearises each step, so
+//! a relaxed refresh that returns the committed value is indistinguishable
+//! from an acquired one there, while on hardware without the edge the
+//! overwrite and the take can race.
+//!
+//! # The consumer's cursor cache
+//!
+//! The consumer keeps its latest observation of the producer cursor in the
+//! same way, and a drain reloads it only when the records it already knows of
+//! are fewer than the drain asks for. The observation can only lag: the
+//! producer cursor is monotone and the cache is refreshed to it, never
+//! extrapolated past it, so a stale value under-reports a ring that has more
+//! and never offers a record that is not published. Every record the cache
+//! does offer was published before a [`GATING`] load this end made, on this
+//! drain or an earlier one, and program order carries that edge forward to
+//! the slot read.
+//!
+//! What this buys is the two-thread hand-off: without it the consumer read the
+//! producer's line on every drain, so a one-record-per-pop consumer paid a
+//! cross-core transfer per record whenever the producer was the faster end.
+//! `available` and `is_empty` keep reading the shared cursor, so no query
+//! answers from the cache; only `Debug` prints it.
 //!
 //! # The unsafe, and where its argument lives
 //!
 //! The producer writes slots while the consumer reads slots, through shared
 //! references to one allocation. That is interior mutability across a thread
-//! boundary, and `unsafe` is the only way to express it —
-//! [decision 123](../../../docs/decision/123_ring_shared_slot_storage_unsafe_sited.md)
-//! rules that it belongs here rather than in `ring_store` or `ring_slot`,
-//! because the invariant making it sound is stated entirely in terms of
-//! cursors that those crates do not hold. The argument is in
-//! `Ring::slot`'s and `Ring::slot_mut`'s safety sections, and the shape it
-//! rests on is asserted rather than only described — partly by
-//! `tests/spsc_test.rs`, and partly by the four cases below.
+//! boundary, and `unsafe` is the only way to express it.
+//! `docs/workaround/readme.md` records that it belongs here, not in
+//! `ring_store` or `ring_slot`, because the invariant that makes it sound is
+//! stated entirely in terms of cursors those crates do not hold. The argument
+//! is in `Ring::slot`'s and `Ring::slot_mut`'s safety sections. The shape it
+//! rests on is asserted as well as described, partly by `tests/spsc_test.rs`
+//! and partly by the four cases below.
 //!
 //! # What the type system refuses
 //!
 //! `slot_mut`'s safety section says "the caller must be the producer end", and
 //! that is worth nothing if a second producer is constructible. The properties
-//! that make one unrepresentable are all *negative* — an absent `Clone`, an
-//! absent `Sync`, a borrow that outlives nothing — so none of them can be
-//! asserted at runtime. They are checked here instead, as `compile_fail` doc
-//! tests, which is the only executable form a negative has.
+//! that make one unrepresentable are all *negative*: an absent `Clone`, an
+//! absent `Sync`, a borrow that outlives nothing. None of them can be asserted
+//! at runtime, so this crate checks them here as `compile_fail` doc tests,
+//! the only executable form a negative has.
 //!
-//! These live in the library rather than in `tests/spsc_test.rs` because
-//! rustdoc collects doc tests from the library target only: the same five
-//! blocks written in an integration test file are never compiled, and would be
-//! five checks that silently check nothing. That is not a hypothetical — they
-//! were written there first, and the doc test count did not move.
+//! These live in the library, not in `tests/spsc_test.rs`, because rustdoc
+//! collects doc tests from the library target only. The same five blocks
+//! written in an integration test file are never compiled, and would be five
+//! checks that silently check nothing. This is not hypothetical. They were
+//! written there first, and the doc test count did not move.
 //!
 //! A second producer cannot be made by cloning the first:
 //!
@@ -83,8 +120,8 @@
 //! let _second = producer.clone();
 //! ```
 //!
-//! Nor by splitting twice while the first pair is still live — the pair borrows
-//! the ring for as long as either end is used:
+//! Nor by splitting twice while the first pair is still live, because the pair
+//! borrows the ring for as long as either end is used:
 //!
 //! ```compile_fail
 //! use ring_slot::TypedSlot;
@@ -97,9 +134,9 @@
 //! producer.try_push( 1 ).unwrap();
 //! ```
 //!
-//! Nor by sharing one end with a second thread — `!Sync` is what stops it,
-//! stated as the bound itself rather than as a `thread::spawn` that would
-//! demonstrate it:
+//! Nor by sharing one end with a second thread. `!Sync` is what stops it, and
+//! these two blocks state the bound itself instead of a `thread::spawn` that
+//! would demonstrate it:
 //!
 //! ```compile_fail
 //! use ring_slot::TypedSlot;
@@ -118,8 +155,7 @@
 //! ```
 //!
 //! And a drained record cannot outlive the commit that frees the slot it points
-//! into — the property that makes the borrowed batch sound rather than merely
-//! convenient:
+//! into. That property makes the borrowed batch sound, not only convenient:
 //!
 //! ```compile_fail
 //! use ring_slot::TypedSlot;
@@ -152,17 +188,31 @@
 //! assert_eq!( batch.get( 0 ).and_then( TypedSlot::get ), Some( &1 ) );
 //! ```
 //!
-//! Acceptance is binary and lives in a test, not here: feature 171 is Reached
-//! when `tests/spsc_test.rs` exchanges 100 000 items with byte-parity, in
-//! order, zero loss, and no lock in the path — and cites `docs/feature/171_`
-//! textually, which is the only crate→feature edge the family records.
+//! Acceptance is binary and lives in a test, not here. The crate's feature is
+//! Reached when `tests/spsc_test.rs` exchanges 100 000 items with byte-parity,
+//! in order, with zero loss and no lock in the path, and cites the feature
+//! textually. That citation is the only crate→feature edge the family records.
 //!
-//! Reasoning honed on this crate is conservative in `ring_mpsc`, not the
-//! reverse: a habit formed here — treating the producer cursor as a frontier,
-//! or a claim as impossible to overtake — is unsafe carried into `ring_mpsc`,
-//! where more than one producer can be racing the same claim. The type
-//! system stops the opposite mistake (a `ring_mpsc` shape will not compile
-//! here); it stops nothing in this direction.
+//! # Pitfall: what holds here does not carry over to `ring_mpsc`
+//!
+//! **Trap.** Carrying a property of this crate into `ring_mpsc`, where more than
+//! one producer can be racing the same claim. The producer cursor as the
+//! published frontier, a claim that cannot be overtaken, a binding
+//! [`Producer::free_capacity`], and a claim that finishes in a bounded number of
+//! steps all hold here only because there is one producer. None holds there,
+//! and `ring_mpsc`'s module documentation explains why its claim is lock-free
+//! and not wait-free.
+//!
+//! **Failure.** Each one breaks only with more than one producer, so a test run
+//! with one passes. The two crates hand out their ends differently (`split`
+//! here, `ends` then `split` there), so moved code does not compile unchanged,
+//! but moved reasoning raises no error.
+//!
+//! **Mitigation.** Code meant for both rings treats
+//! [`Producer::free_capacity`] as a hint, handles [`RingError::Full`] on every
+//! push, learns what is published from what a drain returns, and does not
+//! assume a push takes a bounded number of steps. The reverse direction is
+//! safe. Reasoning honed on `ring_mpsc` is conservative in this crate.
 
 #![deny(missing_docs)]
 #![allow(unsafe_code)]
@@ -174,20 +224,27 @@ use core::sync::atomic::Ordering;
 
 use ring_config::RingConfig;
 use ring_cursor::{CursorPair, GATING, SeqCell};
-use ring_slot::{Slot, TypedSlot};
+use ring_slot::{CopySlot, Slot, TypedSlot};
 use ring_store::Buffer;
 use ring_types::{Capacity, RingError, Seq};
 
 /// The ordering an end reads **its own** cursor with.
 ///
-/// `Relaxed` is sound because each cursor has exactly one writer: the thread
+/// `Relaxed` is sound because each cursor has exactly one writer. The thread
 /// performing this load is the thread that performed the store it is reading
 /// back, and program order already sequences the two. No inter-thread edge is
 /// being established, so none needs to be paid for.
 ///
-/// Contrast [`ring_cursor::GATING`], which is what the *other* end's cursor is
-/// read with — there the load is exactly what makes the peer's slot writes
-/// visible, and `Acquire` is load-bearing.
+/// An end moved to another thread breaks the second sentence above. The
+/// loading thread is then not the one that stored. It stays sound because each
+/// end is `Send` and not `Sync`, so the move is the only way to hand it over,
+/// and every safe way to move a value between threads (spawning, joining, a
+/// channel, a mutex) carries the happens-before edge this crate does not
+/// supply.
+///
+/// Contrast [`ring_cursor::GATING`], the ordering an end reads the *other*
+/// end's cursor with. There the load is what makes the peer's slot writes
+/// visible, so `Acquire` cannot be weakened.
 ///
 /// ```
 /// use core::sync::atomic::Ordering;
@@ -200,9 +257,9 @@ pub const OWN: Ordering = Ordering::Relaxed;
 /// The ordering a publication and a commit are made visible with.
 ///
 /// One release store ends every producer operation and every consumer batch.
-/// It is the only synchronization either path performs, and it is what pairs
-/// with the peer's [`ring_cursor::GATING`] load: everything this thread wrote
-/// to slots before the store is visible to a peer that observes the new cursor
+/// It is the only synchronization either path performs, and it pairs with
+/// the peer's [`ring_cursor::GATING`] load. Everything this thread wrote to
+/// slots before the store is visible to a peer that observes the new cursor
 /// value.
 ///
 /// ```
@@ -216,16 +273,46 @@ pub const HANDOFF: Ordering = Ordering::Release;
 ///
 /// Three fields' worth of state in two: the slot array, and a
 /// [`CursorPair`] holding the producer and consumer cursors on separate cache
-/// lines. Everything else the ring needs — occupancy, free capacity, the slot
-/// a sequence maps to — is derived rather than stored
-/// (→ `docs/data_structure/001_two_cursor_ring.md`).
+/// lines. The ring derives everything else it needs instead of storing it:
+/// occupancy, free capacity, and the slot a sequence maps to.
 ///
-/// The ring owns the storage; the two ends [`split`] hands out borrow it. It
-/// is deliberately not itself an API for pushing or draining: doing so would
-/// mean a `&Ring` from which a second producer could be made, and one producer
-/// is the whole precondition.
+/// The ring owns the storage; the two ends [`split`] hands out borrow it. The
+/// ring itself deliberately has no push or drain methods. Those would mean a
+/// `&Ring` from which a second producer could be made, and one producer is the
+/// whole precondition.
 ///
 /// [`split`]: Self::split
+///
+/// # Lifecycle: one allocation, derived slot states, and teardown
+///
+/// The slot array is allocated once, in [`new`](Self::new). Nothing a producer
+/// or consumer does allocates, so a long-running ring's memory stays flat and a
+/// borrowed [`Batch`] can never be invalidated by the ring growing.
+///
+/// A slot's state is never stored either. Free, published and drained follow
+/// from comparing a sequence with the two cursors, and claimed means a live
+/// [`Reservation`] holds it. The sequence, not the slot, says which lap a
+/// record belongs to. A slot is writable again the moment the consumer's
+/// commit passes it, with no write to the slot. A reset step there would cost a
+/// store and open a window in which the slot is in neither state.
+///
+/// Neither end has a destructor and neither owns the storage. The ring releases
+/// it when it goes out of scope, which the borrow checker places after both
+/// ends, so the order the ends go out of scope in cannot matter. Dropping one
+/// end leaves the other usable. A consumer whose producer is gone can still
+/// drain everything that was published.
+///
+/// Records still in the ring are dropped with it, on whichever thread drops the
+/// ring. A record left in a slot otherwise goes when a later lap's write
+/// replaces it. [`TypedSlot::set`] hands it back, and [`Producer::try_push`]
+/// drops it there. Leaking them instead would skip the destructor of every
+/// record still in a slot at each teardown, and refusing to drop a non-empty
+/// ring would mean a panic in a destructor.
+///
+/// `every_record_written_is_dropped_exactly_once`,
+/// `the_ends_going_out_of_scope_in_either_order_releases_the_storage_once` and
+/// `a_departed_producer_leaves_the_published_tail_drainable` in
+/// `tests/spsc_test.rs` check the teardown.
 ///
 /// ```
 /// use ring_slot::BytesSlot;
@@ -243,45 +330,58 @@ pub struct Ring<S> {
   /// The cell is on each slot, not around the whole `Buffer`.
   ///
   /// It wrapped the buffer until `Buffer::new` was bounded on `Default` rather
-  /// than `Slot`, which was the only thing making `Buffer< UnsafeCell< S > >`
-  /// unconstructible. The outer form was unsound: reaching a slot through
-  /// `( *cell.get() ).at_mut( seq )` materialises `&mut Buffer< S >`, an
-  /// exclusive claim over the *entire* allocation, so a producer writing one
-  /// slot and a consumer reading a different one aliased the whole buffer.
-  /// Miri's data-race detector reports it as a retag conflict on `Buffer< S >`
-  /// itself rather than on any slot — the two threads never touched the same
-  /// record. A per-slot cell claims exactly the slot being touched, which is
-  /// what the cursor invariant below actually guarantees to be disjoint.
+  /// than `Slot`; the `Slot` bound was the only thing making
+  /// `Buffer< UnsafeCell< S > >` unconstructible. The outer form was unsound.
+  /// Reaching a slot through `( *cell.get() ).at_mut( seq )` materialises
+  /// `&mut Buffer< S >`, an exclusive claim over the *entire* allocation, so a
+  /// producer writing one slot and a consumer reading a different one aliased
+  /// the whole buffer. Miri's data-race detector reports it as a retag
+  /// conflict on `Buffer< S >` itself, not on any slot. The two threads never
+  /// touched the same record. A per-slot cell claims exactly the slot being
+  /// touched, and the cursor invariant below guarantees the touched slots are
+  /// disjoint.
   ///
-  /// `ring_store` still knows nothing of this crate: it stores whatever
-  /// element type it is given, and every `unsafe` stays here, which is
-  /// decision 123's whole point.
+  /// `ring_store` still knows nothing of this crate. It stores whatever
+  /// element type it is given, and every `unsafe` stays here, which is the
+  /// whole point of the opt-out in `docs/workaround/readme.md`.
   slots: Buffer<UnsafeCell<S>>,
   cursors: CursorPair,
 }
 
 // SAFETY: `Ring` is only ever shared between exactly two threads, and only as
-// the `&Ring` held by a `Producer` and a `Consumer` — `split` takes `&mut
+// the `&Ring` held by a `Producer` and a `Consumer`. `split` takes `&mut
 // self`, so no second pair can exist while a first is alive, and neither end is
 // `Clone` or `Sync`. Those two threads touch disjoint slots at every instant:
 // the producer only writes the slot for the sequence it has claimed and not yet
 // published, the consumer only reads slots that are published and not yet
 // committed, and a published-not-committed sequence is by construction below
-// the producer's current position. The cursors are atomics and carry the
+// the producer's current position. The claim's capacity decision runs on the
+// producer's cached cursors, whose soundness is the monotonicity recorded on
+// the `cached_head` field: the cache can only lag the consumer cursor, and a
+// lapped claim is granted only when the cached observation itself proves the
+// record consumed, at the `GATING` load that orders the consumer's take before
+// the producer's overwrite. The drain's length runs on the consumer's cached
+// observation of the producer cursor, by the same argument mirrored: it can only
+// lag, so a drain is offered only slots a `GATING` load already saw published,
+// and the edge that load carried reaches every later read on the same thread.
+// The cursors are atomics and carry the
 // happens-before edge (`HANDOFF` store, `GATING` load) that makes each side's
 // slot writes visible to the other before the other may touch that slot.
 // `S : Send` is required because a record is written on the producer's thread
 // and read on the consumer's.
 //
-// `ring_mpsc` declares this identical line under a different justification —
-// many producers on disjoint slots, not exactly two threads — so the hazard
-// is reading one crate's SAFETY comment while editing the other's
-// (→ `docs/workaround/002_an_unsafe_impl_sync_on_a_type_whose_ends_are_not_sync.md`
-// SP52).
+// `ring_mpsc` declares this identical line, but justifies it by many producers
+// on disjoint slots, not by exactly two threads. The hazard is reading one
+// crate's SAFETY comment while editing the other's
+// (→ `docs/workaround/readme.md`).
 unsafe impl<S: Send> Sync for Ring<S> {}
 
 impl<S: Slot + Default> Ring<S> {
   /// Allocate a ring of `capacity` slots, with both cursors at zero.
+  ///
+  /// Sequence zero, which is also `Seq::default()`, is therefore the first real
+  /// record, not a sentinel for "no sequence". Code that needs "no sequence"
+  /// says `Option<Seq>`.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -301,10 +401,9 @@ impl<S: Slot + Default> Ring<S> {
 
   /// Allocate a ring sized by a [`RingConfig`].
   ///
-  /// Only the capacity is read here. A config's wait strategy and overflow
+  /// This reads only the capacity. A config's wait strategy and overflow
   /// policy describe what a *caller* does when the ring is full or empty, and
-  /// this crate never waits and never drops — it reports
-  /// (→ `docs/api/001_producer_surface.md`).
+  /// this crate never waits and never drops. It only reports.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -360,10 +459,14 @@ impl<S> Ring<S> {
   ///
   /// **`&mut self` is what enforces the cardinality.** The returned ends borrow
   /// the ring for as long as they live, so a second call cannot happen while a
-  /// first pair exists — there is no moment at which two `Producer` values name
-  /// one ring. Neither end is `Clone` and neither is `Sync`, so neither can be
-  /// shared with a second thread after the split either
-  /// (→ `docs/lifecycle/002_producer_consumer_pairing.md`).
+  /// first pair exists. At no moment do two `Producer` values name one ring.
+  /// Neither end is `Clone` and neither is `Sync`, so neither can be
+  /// shared with a second thread after the split either.
+  ///
+  /// Once the first pair is gone the ring may be split again, and the cursors
+  /// carry over. The second pair continues where the first stopped, not at zero,
+  /// as `a_second_pair_may_be_split_once_the_first_is_gone` in
+  /// `tests/spsc_test.rs` checks.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -386,13 +489,22 @@ impl<S> Ring<S> {
   pub fn split(&mut self) -> (Producer<'_, S>, Consumer<'_, S>) {
     let shared: &Self = self;
 
+    // The tail cache must start at the shared cursor's actual value: on a ring
+    // split a second time it carries over, and a cache that restarted at zero
+    // would re-grant sequences the first generation published. The head cache
+    // starts at zero on purpose — it can only lag a nonzero consumer cursor,
+    // and the first full ring refreshes it. The consumer's observation starts
+    // at its own position: it knows of nothing, so the first drain reloads.
     (
       Producer {
         ring: shared,
+        cached_tail: shared.cursors.producer().load(OWN),
+        cached_head: Seq::ZERO,
         _one_thread: PhantomData,
       },
       Consumer {
         ring: shared,
+        cached_produced: shared.cursors.consumer().load(OWN),
         _one_thread: PhantomData,
       },
     )
@@ -403,8 +515,8 @@ impl<S> Ring<S> {
   /// # Safety
   ///
   /// The caller must be the consumer end, and `seq` must be **published and not
-  /// yet committed** — at or after this end's own cursor and strictly before
-  /// the producer's, as read at [`GATING`]. Those two bounds are what place the
+  /// yet committed**, meaning at or after this end's own cursor and strictly
+  /// before the producer's, as read at [`GATING`]. Those two bounds place the
   /// slot outside the producer's writable set: the producer writes only at its
   /// own cursor position, which is at or above the exclusive upper bound here.
   ///
@@ -413,7 +525,7 @@ impl<S> Ring<S> {
   /// bound obtained any other way is a data race even if the arithmetic holds.
   unsafe fn slot(&self, seq: Seq) -> &S {
     // SAFETY: the caller guarantees `seq` is published and not committed, so no
-    // `&mut` to this slot exists — the producer's only outstanding `&mut` is to
+    // `&mut` to this slot exists. The producer's only outstanding `&mut` is to
     // its own claimed sequence, which is at or above the published frontier.
     // `at` yields `&UnsafeCell< S >`, a shared borrow of one slot rather than
     // of the buffer, so the producer's concurrent write to a different slot is
@@ -426,29 +538,30 @@ impl<S> Ring<S> {
   /// # Safety
   ///
   /// The caller must be the slot's sole owner for the returned reference's
-  /// whole life — no other `&S`/`&mut S` to the same slot may be live at the
-  /// same time. Two call sites establish that, on their own terms, and a
-  /// finding recorded while auditing this function is that a reader who stops
-  /// at the first is left thinking the second one violates this doc:
+  /// whole life, meaning no other `&S`/`&mut S` to the same slot may be live at
+  /// the same time. Two call sites establish that, each on its own terms. An
+  /// audit of this function recorded the finding that a reader who stops at
+  /// the first is left thinking the second one violates this doc. The two are:
   ///
-  /// - **The producer end, on a claimed-not-yet-published `seq`** — equal to
-  ///   this end's own cursor, which the producer has not yet advanced. That
-  ///   places the slot outside the consumer's readable set, whose exclusive
-  ///   upper bound is that same cursor value. It must additionally be free: at
-  ///   least one lap behind the consumer's cursor as read at [`GATING`], or the
-  ///   slot still holds a record the consumer has not read. `Producer::claim`
-  ///   is the only such caller and checks exactly that before constructing the
-  ///   [`Reservation`] this is reached through.
-  /// - **The consumer end, on a published-not-yet-committed `seq`** — reached
-  ///   through [`Batch::get_mut`], between `drain`/`drain_up_to` and the
-  ///   batch's `Drop`. Publication is the producer cursor advancing past
+  /// - **The producer end, on a claimed-not-yet-published `seq`.** The `seq`
+  ///   equals this end's own cursor, which the producer has not yet advanced.
+  ///   That places the slot outside the consumer's readable set, whose
+  ///   exclusive upper bound is that same cursor value. The slot must also be
+  ///   free, meaning at least one lap behind the consumer's cursor; `claim`
+  ///   is the only such caller, and it checks that through its cached
+  ///   observation of the consumer cursor, whose value was read at [`GATING`]
+  ///   and can only lag the real one — so a granted claim never overwrites a
+  ///   record the consumer has not taken.
+  /// - **The consumer end, on a published-not-yet-committed `seq`.** It is
+  ///   reached through [`Batch::get_mut`], between `drain`/`drain_up_to` and
+  ///   the batch's `Drop`. Publication is the producer cursor advancing past
   ///   `seq`, which is also the producer releasing its own claim on it, and the
   ///   producer cannot lap back onto `seq` until this batch's `Drop` advances
   ///   the consumer cursor past it in turn.
   ///
   /// Returning `&mut S` from `&self` is the one place the two-thread design is
-  /// not expressible in safe Rust, and it is why decision 123 sites the opt-out
-  /// in this crate.
+  /// not expressible in safe Rust, and it is why `docs/workaround/readme.md`
+  /// places the opt-out in this crate.
   #[allow(clippy::mut_from_ref)]
   unsafe fn slot_mut(&self, seq: Seq) -> &mut S {
     // SAFETY: the caller is the slot's sole owner under one of the two regimes
@@ -463,7 +576,7 @@ impl<S> Ring<S> {
 }
 
 impl<S> core::fmt::Debug for Ring<S> {
-  /// Cursor positions and capacity — never slot contents.
+  /// Cursor positions and capacity, never slot contents.
   ///
   /// Formatting the slots would read every one of them, including the ones the
   /// producer may be writing this instant, which is the data race the whole
@@ -481,18 +594,29 @@ impl<S> core::fmt::Debug for Ring<S> {
 /// The writing end.
 ///
 /// Not `Clone` and not `Sync`, which is what makes "exactly one producer" a
-/// fact about the program rather than a documented precondition
-/// (→ `docs/invariant/001_exactly_one_producer_one_consumer.md`). `Send`, so it
+/// fact about the program rather than a documented precondition. `Send`, so it
 /// can be moved onto a thread.
 ///
-/// This declaration's exact text is pinned outside this crate: a `ring_handle`
+/// This declaration's exact text is pinned outside this crate. A `ring_handle`
 /// trybuild fixture (`tests/ui/producer_shared_across_threads.stderr`) expects
-/// this line verbatim in a compiler error, with no dependency edge recording
-/// why (→ `docs/decisions/001_the_switching_cost_argument_undercounts_its_own_blast_radius.md`
-/// SP13).
+/// this line verbatim in a compiler error, and no dependency edge records
+/// why.
 #[derive(Debug)]
 pub struct Producer<'a, S> {
   ring: &'a Ring<S>,
+  /// The next sequence this end will claim — the producer cursor's private
+  /// mirror. Advanced by [`claim`](Self::claim), published to the shared
+  /// cursor by `Reservation::drop`, and equal to that cursor's value whenever
+  /// no reservation is live. Being a plain field is what makes the fast path
+  /// load-free: the end is `&mut`-exclusive, so nothing else reads or writes
+  /// it.
+  cached_tail: Seq,
+  /// This end's latest observation of the consumer cursor, taken at
+  /// [`GATING`]. Monotone and conservative: it is only ever set to a value the
+  /// consumer's cursor actually held, so it can lag that cursor but never run
+  /// ahead of it, and a claim granted on it can never overwrite a record the
+  /// consumer has not taken.
+  cached_head: Seq,
   /// `Cell` is `Send` and not `Sync`, so this marker makes the end movable to a
   /// thread and unshareable between two. Without it the end would inherit
   /// `Sync` from `&Ring`, and two threads holding `&Producer` could each claim
@@ -526,7 +650,7 @@ impl<S> Producer<'_, S> {
   /// producer nothing can take the reported space between the check and the
   /// push, so a reported `n` guarantees the next `n` claims succeed. The same
   /// call on a multi-producer ring is a hint
-  /// (→ `docs/pitfall/001_spsc_correctness_does_not_transfer.md`).
+  /// (→ `ring_core/docs/decisions/001_free_capacity_keeps_one_signature_across_backends.md`).
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -541,27 +665,26 @@ impl<S> Producer<'_, S> {
   /// assert_eq!( producer.free_capacity(), 3 );
   /// ```
   ///
-  /// Fix(free_capacity_underflow_on_a_precondition_violation): this
-  /// subtraction used to be `self.ring.capacity().get() - self.occupancy() as
-  /// usize`, unguarded — `ring_debug/docs/invariant/002` DB35 and
-  /// `ring_debug/docs/pattern/001`'s family-wide census both name it as one of
-  /// eight unguarded subtractions left in `ring/ring_*/src`. `occupancy()`
-  /// cannot itself underflow (`Seq::distance_to` is `saturating_sub`), but if
-  /// occupancy ever exceeds capacity — the D2 state `docs/invariant/001`
-  /// describes as an unenforceable-at-runtime consequence of a caller
-  /// violating the single-producer precondition, not something this crate can
-  /// check — this line panicked in a dev build and wrapped to a
-  /// near-`usize::MAX` value in release (the workspace sets no
-  /// `overflow-checks` anywhere). Root cause: the guard that would make the
-  /// subtraction sound (`occupancy() <= capacity`) is structural, enforced by
-  /// `ring_handle`'s non-`Clone` handles above this crate rather than checked
-  /// at this call site, so nothing here stood between the precondition's
-  /// absence and the arithmetic. Pitfall: a subtraction guarded only by a
-  /// precondition the crate cannot itself verify is indistinguishable, at the
-  /// call site, from one that is always safe — `saturating_sub` makes the D2
-  /// case return `0` (still an accurate answer: zero slots are safely
-  /// claimable) instead of panicking or lying, at zero behavioural cost for
-  /// every contract-respecting caller, matching the convention
+  /// Fix(free_capacity_underflow_on_a_precondition_violation): this subtraction
+  /// used to be `self.ring.capacity().get() - self.occupancy() as usize`,
+  /// unguarded. It was one of eight unguarded subtractions left in
+  /// `ring/ring_*/src`. `occupancy()` cannot itself underflow
+  /// (`Seq::distance_to` is `saturating_sub`), but occupancy can exceed
+  /// capacity once the producer laps the consumer. That lapped state is an
+  /// unenforceable-at-runtime consequence of a caller violating the
+  /// single-producer precondition, not something this crate can check. In that
+  /// state this line panicked in a dev build and wrapped to a near-`usize::MAX`
+  /// value in release (the workspace sets no `overflow-checks` anywhere).
+  /// Root cause: the guard that would make the subtraction sound
+  /// (`occupancy() <= capacity`) is structural, enforced by `ring_handle`'s
+  /// non-`Clone` handles above this crate rather than checked at this call
+  /// site, so nothing here stood between the precondition's absence and the
+  /// arithmetic. Pitfall: a subtraction guarded only by a precondition the
+  /// crate cannot itself verify is indistinguishable, at the call site, from
+  /// one that is always safe. `saturating_sub` makes the lapped case return `0`
+  /// (still an accurate answer, since zero slots are safely claimable) instead
+  /// of panicking or lying. That has zero behavioural cost for every
+  /// contract-respecting caller, and matches the convention
   /// `ring_seqno::free_slots` already uses for the same computation.
   #[must_use]
   pub fn free_capacity(&self) -> usize {
@@ -569,6 +692,12 @@ impl<S> Producer<'_, S> {
   }
 
   /// Whether the next claim would fail.
+  ///
+  /// The check reads the real cursors, not this end's cached observation. The
+  /// two can disagree while the cache is stale; `claim` resolves that by
+  /// refreshing before it refuses, so both answers of this check hold — a
+  /// full report means the next claim fails, and a not-full report means it
+  /// succeeds, possibly after the refresh.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -588,7 +717,7 @@ impl<S> Producer<'_, S> {
     self.occupancy() as usize == self.ring.capacity().get()
   }
 
-  /// Published minus committed — how many slots are currently spoken for.
+  /// Published minus committed, which is how many slots are spoken for.
   ///
   /// The one place the asymmetric orderings are spelled out: this end's own
   /// cursor at [`OWN`], the consumer's at [`GATING`].
@@ -601,11 +730,19 @@ impl<S> Producer<'_, S> {
 
   /// Take the next slot, to be published when the returned value is dropped.
   ///
-  /// The guard shape rather than a bare `claim`/`publish` pair, because an
-  /// early return between the two wedges the ring permanently and no runtime
+  /// This returns a guard instead of a bare `claim`/`publish` pair, because an
+  /// early return between the two stalls the ring permanently and no runtime
   /// check can distinguish "claimed and about to publish" from "claimed and
-  /// abandoned" (→ `docs/lifecycle/002_producer_consumer_pairing.md`). Making
-  /// the publish the drop makes the case unreachable, including on unwind.
+  /// abandoned". Making the publish the drop makes the case unreachable,
+  /// including on unwind.
+  ///
+  /// The capacity decision runs on this end's cached cursors, and the fast
+  /// path performs no atomic load: the cached tail is this end's own
+  /// bookkeeping, and a cached head that lags the consumer can only make the
+  /// cache report less room than there is. When the cache reports full, one
+  /// [`GATING`] load of the consumer cursor refreshes it — the single read of
+  /// the consumer's line on this path — and the refreshed observation decides
+  /// honestly. A refused claim moves nothing, cached or shared.
   ///
   /// # Errors
   ///
@@ -626,11 +763,23 @@ impl<S> Producer<'_, S> {
   /// assert_eq!( consumer.drain().get( 0 ).map( BytesSlot::read ), Some( &b"hi"[ .. ] ) );
   /// ```
   pub fn claim(&mut self) -> Result<Reservation<'_, S>, RingError> {
-    if self.is_full() {
-      return Err(RingError::Full);
+    let capacity = self.ring.capacity().get() as u64;
+
+    if self.cached_head.distance_to(self.cached_tail) >= capacity {
+      // The cache says full. The cache can only lag the consumer, so the ring
+      // may still have room: refresh the observation once, at the one
+      // `Acquire` load the fast path exists to avoid. This load is also the
+      // edge that orders the consumer's take of the lapped record before this
+      // end's overwrite of its slot.
+      self.cached_head = self.ring.cursors.consumer().load(GATING);
+
+      if self.cached_head.distance_to(self.cached_tail) >= capacity {
+        return Err(RingError::Full);
+      }
     }
 
-    let seq = self.ring.cursors.producer().load(OWN);
+    let seq = self.cached_tail;
+    self.cached_tail = seq.next();
 
     Ok(Reservation { ring: self.ring, seq })
   }
@@ -645,7 +794,7 @@ impl<S> Producer<'_, S> {
   ///
   /// # Errors
   ///
-  /// [`RingError::Full`] — and `write` is not called, so a caller can retry
+  /// [`RingError::Full`], and `write` is not called, so a caller can retry
   /// without having consumed anything.
   ///
   /// ```
@@ -670,15 +819,15 @@ impl<T: Send> Producer<'_, TypedSlot<T>> {
   /// Put one record into the ring.
   ///
   /// The fused shape, available where the slot type has a by-value setter. It
-  /// is built *over* [`claim`] rather than under it: the guard is the
-  /// primitive, so this convenience cannot introduce an abandonment case the
-  /// primitive rules out.
+  /// is built *over* [`claim`], not under it. The guard is the lower-level
+  /// operation, so this convenience cannot introduce an abandonment case the
+  /// guard rules out.
   ///
   /// [`claim`]: Producer::claim
   ///
   /// # Errors
   ///
-  /// [`RingError::Full`], with `record` returned to the caller — a push that
+  /// [`RingError::Full`], with `record` returned to the caller. A push that
   /// fails must not swallow the record, or a caller applying backpressure has
   /// nothing left to retry with.
   ///
@@ -706,12 +855,59 @@ impl<T: Send> Producer<'_, TypedSlot<T>> {
   }
 }
 
+impl<T: Copy + Send> Producer<'_, CopySlot<T>> {
+  /// Put one record into the ring, stored bare: no tag beside it.
+  ///
+  /// The same fused shape as the [`TypedSlot`] `try_push`, over [`claim`].
+  /// It always writes the slot it claims, with no early return or panic
+  /// point between the claim and the publish, which is what keeps
+  /// [`CopySlot`]'s pitfall out of reach here. [`claim`] and
+  /// [`push_with`](Producer::push_with) still reach it: a guard dropped
+  /// unwritten, or a closure that returns early or panics, publishes the
+  /// previous lap's record.
+  ///
+  /// [`claim`]: Producer::claim
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::Full`], with `record` returned to the caller.
+  ///
+  /// ```
+  /// use ring_slot::CopySlot;
+  /// use ring_spsc::Ring;
+  /// use ring_types::Capacity;
+  ///
+  /// let mut ring : Ring< CopySlot< u64 > > = Ring::new( Capacity::new( 1 ).unwrap() );
+  /// let ( mut producer, mut consumer ) = ring.split();
+  ///
+  /// assert_eq!( producer.try_push( 7 ), Ok( () ) );
+  /// assert_eq!( producer.try_push( 8 ), Err( 8 ), "full, and the record comes back" );
+  /// assert_eq!( consumer.drain().iter().map( CopySlot::get ).collect::< Vec< _ > >(), [ 7 ] );
+  /// ```
+  pub fn try_push(&mut self, record: T) -> Result<(), T> {
+    let Ok(mut reservation) = self.claim() else {
+      return Err(record);
+    };
+    reservation.set(record);
+
+    Ok(())
+  }
+}
+
 /// A claimed slot, published when dropped.
 ///
-/// Derefs to the slot, so the payload is written in place rather than moved
-/// through a temporary. The publish is the drop, which is what makes an
-/// abandoned claim unrepresentable — an early return, a `?`, or an unwind all
-/// publish rather than wedge the ring.
+/// Derefs to the slot, so the caller writes the payload in place instead of
+/// moving it through a temporary. The publish is the drop, which makes an
+/// abandoned claim unrepresentable. An early return, a `?`, or an unwind all
+/// publish instead of stalling the ring.
+///
+/// The one way to keep a claim unpublished is `mem::forget`. That is a caller
+/// precondition violation either way, and the failure shape differs between
+/// this crate's cached and uncached bookkeeping: the shared cursor stays
+/// behind the producer's cached tail, so the next publish jumps over the
+/// leaked sequence instead of re-granting it, and the consumer receives an
+/// empty or stale record at that position rather than the ring stalling. No
+/// slot ends up with two live owners in either case.
 #[must_use = "a reservation publishes on drop; dropping it immediately publishes an unwritten slot"]
 #[derive(Debug)]
 pub struct Reservation<'a, S> {
@@ -743,16 +939,17 @@ impl<S> Deref for Reservation<'_, S> {
   type Target = S;
 
   fn deref(&self) -> &S {
-    // SAFETY: `slot_mut`'s precondition holds — see `deref_mut`. A shared
-    // reference is strictly weaker than the `&mut` that call is entitled to,
-    // and it is derived from the same claimed-not-published sequence.
+    // SAFETY: `slot_mut`'s precondition holds, as argued in `deref_mut`. A
+    // shared reference is strictly weaker than the `&mut` that call is
+    // entitled to, and it is derived from the same claimed-not-published
+    // sequence.
     unsafe { self.ring.slot_mut(self.seq) }
   }
 }
 
 impl<S> DerefMut for Reservation<'_, S> {
   fn deref_mut(&mut self) -> &mut S {
-    // SAFETY: `self.seq` is claimed and not published — it is the producer
+    // SAFETY: `self.seq` is claimed and not published. It is the producer
     // cursor's current value, which `Drop` has not yet advanced, so it is at or
     // above the consumer's exclusive readable bound. `claim` checked it is also
     // at least one lap behind the consumer, so no unread record is being
@@ -772,11 +969,15 @@ impl<S> Drop for Reservation<'_, S> {
 
 /// The reading end.
 ///
-/// Not `Clone` and not `Sync`, for the same reason as [`Producer`] — a second
-/// consumer does not duplicate records, it silently divides them.
+/// Not `Clone` and not `Sync`, for the same reason as [`Producer`]. A second
+/// consumer would silently divide the records instead of duplicating them.
 #[derive(Debug)]
 pub struct Consumer<'a, S> {
   ring: &'a Ring<S>,
+  /// The latest [`GATING`] observation of the producer cursor. A drain
+  /// reloads it only when this end knows of fewer records than the drain
+  /// asks for. It can only lag the real cursor, never lead it.
+  cached_produced: Seq,
   /// See [`Producer`]'s field of the same name.
   _one_thread: PhantomData<Cell<()>>,
 }
@@ -804,13 +1005,26 @@ impl<S> Consumer<'_, S> {
 
   /// How many published records have not been drained.
   ///
-  /// Costs exactly what [`drain`]'s bound computation costs — one `GATING`
+  /// Costs exactly what [`drain`]'s bound computation costs: one `GATING`
   /// load and a subtraction. A caller polling this before deciding whether to
   /// drain has paid for the drain's expensive step twice; [`is_empty`] is the
   /// cheap poll for a tick loop.
   ///
   /// [`drain`]: Self::drain
   /// [`is_empty`]: Self::is_empty
+  ///
+  /// # Invariant: the reading is a lower bound until this end drains
+  ///
+  /// Only this end lowers the count, and only when a drained batch is dropped.
+  /// The producer only adds to it. A reported `n` therefore stays true until
+  /// this end's next drain, and the real count may already be higher. It
+  /// mirrors [`Producer::free_capacity`], which is binding for the same reason.
+  ///
+  /// **Excluded.** An empty reading, from this or from [`is_empty`], promises
+  /// nothing. The producer can publish the moment after.
+  ///
+  /// **Enforced by.** The structure alone. Each cursor has one writer that
+  /// only moves it forward, and no test exercises the concurrent case.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -860,12 +1074,11 @@ impl<S> Consumer<'_, S> {
   /// Take everything published since the last drain.
   ///
   /// Batch-shaped because the commit is one release store however many records
-  /// it covers; an item-at-a-time primitive would pay per record for
-  /// synchronization this pays once
-  /// (→ `docs/algorithm/002_single_consumer_drain.md`).
+  /// it covers; an item-at-a-time API would pay per record for
+  /// synchronization this pays once.
   ///
   /// The returned batch commits on drop, and that is what makes the borrow
-  /// sound: the slots become reusable at the commit, so a borrow that could
+  /// sound. The slots become reusable at the commit, so a borrow that could
   /// outlive it would point at memory the producer may already be overwriting.
   ///
   /// ```
@@ -884,7 +1097,7 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain(&mut self) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    let produced = self.observe_produced();
 
     Batch {
       ring: self.ring,
@@ -896,8 +1109,12 @@ impl<S> Consumer<'_, S> {
   /// Take at most `max` published records.
   ///
   /// The bounded form, for a caller that must not spend an unbounded amount of
-  /// time in one drain — a frame budget, say. What is left over stays
-  /// published and is returned by the next drain.
+  /// time in one drain, such as one working to a frame budget. What is left
+  /// over stays published, and the next drain returns it.
+  ///
+  /// The producer cursor is reloaded only when this end knows of fewer than
+  /// `max` records; a drain that can be satisfied from what an earlier drain
+  /// observed reads no line the producer writes.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -915,22 +1132,52 @@ impl<S> Consumer<'_, S> {
   /// ```
   pub fn drain_up_to(&mut self, max: usize) -> Batch<'_, S> {
     let start = self.ring.cursors.consumer().load(OWN);
-    let produced = self.ring.cursors.producer().load(GATING);
+    // What the consumer already knows of. When it covers the request the
+    // batch is `max`, and LLVM sees that through the `min`: a one-record drain
+    // served from the cache has a constant length, and the caller's loop over
+    // the batch folds away. The `min` stays so that a wrong comparison here
+    // can only under-report, never hand out a record nobody observed.
+    let known = start.distance_to(self.cached_produced) as usize;
+    let len = if known >= max {
+      max.min(known)
+    } else {
+      max.min(start.distance_to(self.observe_produced()) as usize)
+    };
 
     Batch {
       ring: self.ring,
       start,
-      len: max.min(start.distance_to(produced) as usize),
+      len,
     }
+  }
+
+  /// The producer cursor, reloaded, and kept as this end's observation: the
+  /// one read of the producer's line on the drain path.
+  ///
+  /// Its [`GATING`] order pairs with the producer's [`HANDOFF`] publish, so every
+  /// record below the returned value carries the write that preceded its
+  /// publish — and a value kept from an earlier drain carries the same
+  /// guarantee by program order. [`Self::drain`] reloads on every call: a
+  /// cache it trusted would make an unbounded drain report less than
+  /// `available`.
+  fn observe_produced(&mut self) -> Seq {
+    let produced = self.ring.cursors.producer().load(GATING);
+    // Written only when it moved: a consumer polling an empty ring would
+    // otherwise store the same value every poll and read it back the next.
+    if produced != self.cached_produced {
+      self.cached_produced = produced;
+    }
+    // The field, equal to `produced` here: read back, it lets a poll that found
+    // nothing new reuse the distance the caller already computed.
+    self.cached_produced
   }
 }
 
 /// A run of published records, committed when dropped.
 ///
-/// Borrowed rather than copied out: the records stay in the slots, and the
-/// commit that frees those slots is this value's drop. That pairing is the only
-/// shape that is both zero-copy and sound
-/// (→ `docs/api/002_consumer_surface.md`) — a bare `&[ S ]` returned from a
+/// Borrowed, not copied out. The records stay in the slots, and the commit
+/// that frees those slots is this value's drop. That pairing is the only
+/// shape that is both zero-copy and sound. A bare `&[ S ]` returned from a
 /// drain that had already committed would point at memory the producer is free
 /// to overwrite.
 #[must_use = "a batch commits on drop; dropping it immediately discards the records it covers"]
@@ -968,7 +1215,7 @@ impl<S> Batch<'_, S> {
     self.len
   }
 
-  /// Whether the batch covers nothing — the drain found an empty ring.
+  /// Whether the batch covers nothing, meaning the drain found an empty ring.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -1008,42 +1255,43 @@ impl<S> Batch<'_, S> {
     }
 
     // SAFETY: `offset < self.len`, and the batch's whole range was published
-    // and not committed when `drain` computed it — its upper bound came from a
-    // `GATING` load of the producer cursor, and its lower bound is this end's
-    // own cursor, which only this value's `Drop` will advance.
+    // and not committed when the drain computed it. Its upper bound came from a
+    // `GATING` load of the producer cursor, on this drain or on an earlier one
+    // whose observation the consumer cached: the producer cursor is monotone, so
+    // an older observation only under-reports, and program order carries the
+    // load's edge from that drain to this read. Its lower bound is this end's own
+    // cursor, which only this value's `Drop` will advance.
     Some(unsafe { self.ring.slot(self.start.advanced_by(offset as u64)) })
   }
 
   /// The record `offset` places into the batch, mutably, or `None` past its end.
   ///
   /// **This is the only way to move a record out of a batch**, because taking a
-  /// value from a slot needs `&mut` — [`TypedSlot::take`] cannot be reached
+  /// value from a slot needs `&mut`, and [`TypedSlot::take`] cannot be reached
   /// through [`get`]. A consumer that reads without consuming uses [`get`]; one
   /// that owns what it drained needs this.
   ///
-  /// It was added for `ring_core`, whose uniform surface hands the caller a
-  /// `T` rather than a `&T` and so cannot be built on [`get`] alone. That the
-  /// gap surfaced only at the composition point, and only for this crate —
-  /// `ring_mpsc`'s batch has always had its counterpart — is recorded in
-  /// `tests/manual/readme.md` S10.
+  /// It was added for `ring_core`, whose uniform API hands the caller a `T`
+  /// rather than a `&T` and so cannot be built on [`get`] alone.
+  /// `tests/manual/readme.md` S10 records that the gap appeared only at the
+  /// composition point, and only for this crate. `ring_mpsc`'s batch has
+  /// always had its counterpart.
   ///
   /// [`get`]: Self::get
   ///
   /// Fix(ring_core_citation_pointed_at_docsrs_not_a_real_page): this line used
-  /// to read `` `ring_core`: <https://docs.rs/ring_core> `` — a CommonMark
-  /// autolink, dead by construction, since `publish = false` means this crate
-  /// is never on docs.rs and the address would never resolve to `ring_core`'s
-  /// documentation even if it existed. Root cause: it was left over from a
-  /// draft reference-style link that never got the rest of its syntax
-  /// (`[ring_core]: ...` with a matching `[ring_core]` consumer elsewhere in
-  /// the comment); nothing in this comment ever consumed it, and the
-  /// paragraph two lines up already cites `ring_core` correctly as plain
-  /// backtick text, so the line was pure dead weight rendered as a live link.
+  /// to read `` `ring_core`: <https://docs.rs/ring_core> ``, a CommonMark
+  /// autolink to an external page. docs.rs hosts a crate only once a version of
+  /// it is published to crates.io, and rustdoc never checks an external URL, so
+  /// nothing in the build said whether the page existed. Root cause: it was left
+  /// over from a draft reference-style link that never got the rest of its
+  /// syntax (`[ring_core]: ...` with a matching `[ring_core]` consumer
+  /// elsewhere in the comment). Nothing in this comment ever consumed it, and
+  /// the paragraph two lines up already cites `ring_core` correctly as plain
+  /// backtick text, so the line was dead weight rendered as a live link.
   /// Pitfall: a doc-comment line shaped like a citation reads as
-  /// already-verified and gets checked far less than prose does; `ring_core`'s
-  /// own module documentation carries the identical pattern for an unrelated
-  /// citation (fixed there by citing the target as plain backtick text
-  /// instead of a link), which is the family's actual convention.
+  /// already-verified and gets checked far less than prose does. The family
+  /// cites a target as plain backtick text instead of a link.
   ///
   /// ```
   /// use ring_slot::TypedSlot;
@@ -1066,7 +1314,7 @@ impl<S> Batch<'_, S> {
       return None;
     }
 
-    // SAFETY: as `get`, plus exclusivity — `&mut self` on the batch is the
+    // SAFETY: as `get`, plus exclusivity. `&mut self` on the batch is the
     // consumer's own exclusive borrow, and the producer cannot reach this range
     // until this batch's `Drop` advances the consumer cursor past it.
     Some(unsafe { self.ring.slot_mut(self.start.advanced_by(offset as u64)) })
@@ -1095,8 +1343,12 @@ impl<S> Batch<'_, S> {
 
 impl<S> Drop for Batch<'_, S> {
   /// Commit, with the one release store that is the consumer path's entire
-  /// synchronization — one store for the whole batch, which is why the surface
-  /// is batch-shaped.
+  /// synchronization. It is one store for the whole batch, which is why the
+  /// API is batch-shaped.
+  ///
+  /// The producer sees the whole batch freed at once. A full ring drained in
+  /// one batch goes from full to empty in a single step, and anything watching
+  /// [`Producer::free_capacity`] never sees the space come back gradually.
   fn drop(&mut self) {
     self
       .ring

@@ -1,9 +1,9 @@
 //! A ring's slot count, validated to a power of two at construction.
 //!
-//! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md` requires
-//! the constraint so that sequence→slot conversion is a bitmask rather than a
-//! division. Enforcing it in a type means the mask is always valid wherever a
-//! `Capacity` is in scope, so `ring_index` needs no runtime check of its own.
+//! The family requires the constraint so that sequence→slot conversion is a
+//! bitmask rather than a division. Enforcing it in a type means the mask is
+//! always valid wherever a `Capacity` is in scope, so `ring_index` needs no
+//! runtime check of its own.
 
 use crate::RingError;
 
@@ -57,8 +57,8 @@ impl Capacity {
     self.0
   }
 
-  /// The bitmask that folds a sequence into a slot index — always
-  /// `capacity - 1`, and always valid because the constructor rejected every
+  /// The bitmask that folds a sequence into a slot index, always
+  /// `capacity - 1`. It is always valid because the constructor rejected every
   /// value for which it would not be.
   ///
   /// ```

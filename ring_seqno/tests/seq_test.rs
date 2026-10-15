@@ -1,8 +1,8 @@
-//! Tests for `ring_seqno` — comparison and span arithmetic over unfolded
+//! Tests for `ring_seqno`'s comparison and span arithmetic over unfolded
 //! sequences.
 //!
 //! Claims the never-wraps half of
-//! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`: the
+//! `docs/feature/167_sequence_slot_index_and_power_of_two_capacity.md`. The
 //! sequence is what a gate compares across laps, so every function here must
 //! stay correct when the two positions are more than one capacity apart. That
 //! is exactly the case a folded position cannot express, and is why the crate
@@ -31,8 +31,8 @@ fn laps_count_whole_capacities() {
   assert_eq!(laps_between(Seq(0), Seq(16), c), 2);
 }
 
-/// Laps are measured from wherever the pair starts, not from zero — the case
-/// that matters, since a long-lived ring's cursors are never near zero.
+/// Laps are measured from wherever the pair starts, not from zero. That is the
+/// case that matters, since a long-lived ring's cursors are never near zero.
 #[test]
 fn laps_are_relative_not_absolute() {
   let c = cap(8);
@@ -40,11 +40,10 @@ fn laps_are_relative_not_absolute() {
   assert_eq!(laps_between(Seq(1_000_001), Seq(1_000_008), c), 0);
 }
 
-/// A backward pair reads zero rather than an enormous number — but that zero
-/// is not an obviously-wrong value: it is the same reading `may_claim` treats
-/// as "room to publish" (see `docs/decisions/002_saturating_rather_than_signed.md`),
-/// so a caller that swapped its arguments here gets a plausible, permissive
-/// answer, not a visibly broken one.
+/// A backward pair reads zero rather than an enormous number. But that zero
+/// is not an obviously-wrong value. It is the same reading `may_claim` treats
+/// as "room to publish", so a caller that swapped its arguments here gets a
+/// plausible, permissive answer, not a visibly broken one.
 #[test]
 fn laps_backward_read_zero() {
   assert_eq!(laps_between(Seq(100), Seq(4), cap(8)), 0);
@@ -64,7 +63,7 @@ fn claim_boundary_is_exclusive_at_exactly_one_lap() {
 }
 
 /// Free slots and the claim predicate agree at every position across two full
-/// laps — the invariant that stops the two readings drifting apart.
+/// laps. This invariant stops the two readings drifting apart.
 #[test]
 fn free_slots_agrees_with_may_claim_across_two_laps() {
   let c = cap(8);
@@ -101,7 +100,7 @@ fn pending_counts_unread() {
 }
 
 /// The slowest cursor bounds the producer, whichever position it holds in the
-/// set — a minimum, not a first or last.
+/// set. It is a minimum, not a first or last.
 #[test]
 fn slowest_is_the_minimum_wherever_it_sits() {
   assert_eq!(slowest(&[Seq(4)]), Some(Seq(4)));
@@ -126,7 +125,7 @@ fn positions_many_laps_apart_stay_comparable() {
   let c = cap(8);
   let consumer = Seq(8);
   let producer = Seq(800);
-  // Folded, both are slot 0 — identical, and the gate would see "caught up".
+  // Folded, both are slot 0. They are identical, and the gate would see "caught up".
   assert_eq!(producer.0 % 8, consumer.0 % 8);
   // Unfolded, the producer is 99 laps ahead and must be refused.
   assert_eq!(laps_between(consumer, producer, c), 99);
@@ -134,10 +133,10 @@ fn positions_many_laps_apart_stay_comparable() {
   assert_eq!(free_slots(producer, consumer, c), 0);
 }
 
-/// SQ2: the one edge the boundary lattice left unpinned — `may_claim` against
-/// `laps_between == 0` — swept across the same positions as
+/// The one edge the boundary lattice left unpinned, `may_claim` against
+/// `laps_between == 0`. It is swept across the same positions as
 /// `free_slots_agrees_with_may_claim_across_two_laps`, in the argument order a
-/// caller actually has to reverse to state it (`algorithm/001` SQ2).
+/// caller has to reverse to state it.
 #[test]
 fn laps_between_zero_agrees_with_may_claim_across_two_laps() {
   let c = cap(8);

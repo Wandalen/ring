@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#@ purpose: Static analysis — clippy, warnings as errors. crate::<name> narrows to one package.
+#@ purpose: Static analysis with clippy, warnings as errors. crate::<name> narrows to one package.
 #@ tags: verb, lint
 set -euo pipefail
 

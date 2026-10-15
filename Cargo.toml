@@ -1,19 +1,19 @@
 [workspace]
 resolver = "3"
 
+# `fuzz/` is cargo-fuzz's own workspace (libfuzzer builds with its own flags
+# and must not join this one).
+exclude = [ "fuzz" ]
+
 members = [
-  # Family-neutral validation machinery: it depends on no ring_* crate, so its
-  # stage gates run against an empty workspace. ring_bench (tier 12) grades
-  # write paths; this grades the family. Also grades other families in the
-  # tree (see gate/declared/) — a shared-infrastructure crate that lives here
-  # rather than at the repository root, kept alongside the family it was
-  # built to grade first.
+  # Family-neutral validation machinery. It depends on no ring_* crate, so its
+  # stage gates run against an empty workspace. ring_bench grades write paths;
+  # this grades the family. It lives here, next to the family it was built to
+  # grade first.
   "bench_harness",
 
-  # The 33-crate ring_* forest, in dependency order: every crate's
-  # dependencies appear above it, so the forest is acyclic by inspection.
-  # ring_mpsc and ring_tls were mpsc_ring and bump_log before the family
-  # adopted one prefix.
+  # The ring_* crates in dependency order. Every crate's dependencies appear
+  # above it, so the forest is acyclic by inspection.
   "ring_types",
   "ring_seqno",
   "ring_index",
@@ -47,6 +47,10 @@ members = [
   "ring_debug",
   "ring_testkit",
   "ring_bench",
+
+  # The benchmark suite (perf/readme.md). Outside the family: exempted from G18, allowed past G5
+  # by bench_harness/gate/declared/ring/internal_consumers.txt.
+  "perf",
 ]
 
 [workspace.package]
@@ -60,39 +64,58 @@ repository = "https://github.com/Wandalen/ring"
 # (0.1 -> 0.2) updates both `[workspace.package] version` and these. `publish = false`
 # crates are left out so a published crate cannot depend on them.
 [workspace.dependencies]
-ring_align = { path = "ring_align", version = "0.1.0" }
-ring_atomic = { path = "ring_atomic", version = "0.1.0" }
-ring_barrier = { path = "ring_barrier", version = "0.1.0" }
-ring_batch = { path = "ring_batch", version = "0.1.0" }
-ring_claim = { path = "ring_claim", version = "0.1.0" }
-ring_config = { path = "ring_config", version = "0.1.0" }
-ring_consume = { path = "ring_consume", version = "0.1.0" }
-ring_core = { path = "ring_core", version = "0.1.0" }
-ring_cursor = { path = "ring_cursor", version = "0.1.0" }
-ring_event = { path = "ring_event", version = "0.1.0" }
-ring_factory = { path = "ring_factory", version = "0.1.0" }
-ring_flush = { path = "ring_flush", version = "0.1.0" }
-ring_gating = { path = "ring_gating", version = "0.1.0" }
-ring_handle = { path = "ring_handle", version = "0.1.0" }
-ring_index = { path = "ring_index", version = "0.1.0" }
-ring_mpsc = { path = "ring_mpsc", version = "0.1.0" }
-ring_overflow = { path = "ring_overflow", version = "0.1.0" }
-ring_poll = { path = "ring_poll", version = "0.1.0" }
-ring_publish = { path = "ring_publish", version = "0.1.0" }
-ring_registry = { path = "ring_registry", version = "0.1.0" }
-ring_seqno = { path = "ring_seqno", version = "0.1.0" }
-ring_shutdown = { path = "ring_shutdown", version = "0.1.0" }
-ring_slot = { path = "ring_slot", version = "0.1.0" }
-ring_spsc = { path = "ring_spsc", version = "0.1.0" }
-ring_stats = { path = "ring_stats", version = "0.1.0" }
-ring_store = { path = "ring_store", version = "0.1.0" }
-ring_tls = { path = "ring_tls", version = "0.1.0" }
-ring_types = { path = "ring_types", version = "0.1.0" }
-ring_wait = { path = "ring_wait", version = "0.1.0" }
+ring_align = { path = "ring_align", version = "0.2.1" }
+ring_atomic = { path = "ring_atomic", version = "0.2.1" }
+ring_barrier = { path = "ring_barrier", version = "0.2.1" }
+ring_batch = { path = "ring_batch", version = "0.2.1" }
+ring_claim = { path = "ring_claim", version = "0.2.1" }
+ring_config = { path = "ring_config", version = "0.2.1" }
+ring_consume = { path = "ring_consume", version = "0.2.1" }
+ring_core = { path = "ring_core", version = "0.3.1" }
+ring_cursor = { path = "ring_cursor", version = "0.2.1" }
+ring_event = { path = "ring_event", version = "0.3.1" }
+ring_factory = { path = "ring_factory", version = "0.3.1" }
+ring_flush = { path = "ring_flush", version = "0.3.1" }
+ring_gating = { path = "ring_gating", version = "0.2.1" }
+ring_handle = { path = "ring_handle", version = "0.3.1" }
+ring_index = { path = "ring_index", version = "0.2.1" }
+ring_mpsc = { path = "ring_mpsc", version = "0.3.1" }
+ring_overflow = { path = "ring_overflow", version = "0.2.1" }
+ring_poll = { path = "ring_poll", version = "0.3.1" }
+ring_publish = { path = "ring_publish", version = "0.2.1" }
+ring_registry = { path = "ring_registry", version = "0.3.1" }
+ring_seqno = { path = "ring_seqno", version = "0.2.1" }
+ring_shutdown = { path = "ring_shutdown", version = "0.3.1" }
+ring_slot = { path = "ring_slot", version = "0.3.1" }
+ring_spsc = { path = "ring_spsc", version = "0.3.1" }
+ring_stats = { path = "ring_stats", version = "0.2.1" }
+ring_store = { path = "ring_store", version = "0.3.1" }
+ring_tls = { path = "ring_tls", version = "0.2.1" }
+ring_types = { path = "ring_types", version = "0.2.1" }
+ring_wait = { path = "ring_wait", version = "0.2.1" }
 
+core_affinity = "0.8"
+criterion = { version = "0.8", default-features = false, features = [ "cargo_bench_support", "html_reports", "plotters" ] }
+concurrent-queue = "2"
+crossbeam-channel = "0.5"
 crossbeam-queue = { version = "0.3", default-features = false, features = [ "alloc" ] }
+flume = { version = "0.11", default-features = false }
+hdrhistogram = { version = "7.5", default-features = false }
+heapless = "0.9"
 loom = "0.7"
+quetzalcoatl = "0.15"
+ringbuf = "0.4"
+rtrb = "0.4"
+thingbuf = "0.1"
+serde_json = "1.0"
 trybuild = "1.0"
+
+# `cargo bench` only; `release` keeps cargo's defaults. Fat LTO so the family's non-generic,
+# un-`#[inline]` helpers inline across crates the way the comparison crates' do.
+[profile.bench]
+lto = "fat"
+codegen-units = 1
+debug = "line-tables-only"
 
 [workspace.lints.rust]
 rust_2018_idioms = { level = "warn", priority = -1 }
@@ -100,11 +123,10 @@ future_incompatible = { level = "warn", priority = -1 }
 missing_docs = "warn"
 missing_debug_implementations = "warn"
 unsafe-code = "deny"
-# `loom` is set by RUSTFLAGS, not by any feature, so rustc has no other way to
-# learn it is a real cfg. Declared once here rather than per crate: the lints
-# table is inherited workspace-wide, and a crate cannot both inherit it and add
-# its own. Only ring_atomic, ring_cursor and ring_publish read the cfg — see
-# ring_atomic's module documentation on the seam.
+# RUSTFLAGS sets `loom`, not any feature, so rustc has no other way to learn
+# it is a real cfg. It is declared once here, not per crate, because the lints
+# table is inherited workspace-wide and a crate cannot both inherit it and add
+# its own. See ring_atomic's module documentation on the `loom` switch.
 unexpected_cfgs = { level = "warn", check-cfg = [ 'cfg(loom)' ] }
 
 [workspace.lints.clippy]

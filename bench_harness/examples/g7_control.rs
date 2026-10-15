@@ -1,14 +1,14 @@
-//! Control fixture for G7 — one binary that can produce each defect G7 claims to detect.
+//! Control fixture for G7, one binary that can produce each defect G7 claims to detect.
 //!
-//! G7's fourth comparison is a *must-differ* check: a smoke binary's output has
-//! to move when its input moves before byte-identity across runs, opt-levels and
-//! targets counts as evidence. A must-differ check that is never observed
+//! G7's fourth comparison is a *must-differ* check. Byte-identity across runs,
+//! opt-levels and targets counts as evidence only once a smoke binary's output
+//! moves when its input moves. A must-differ check that is never observed
 //! differing is exactly the unfalsifiable shape it was added to close, one level
 //! up. So this fixture exists to be failed, deliberately, on demand.
 //!
-//! Selected by `--mode`, seeded by `--seed`. One mode per row of task 153's Test
-//! Matrix, and each mode breaks exactly one property so the gate's message can be
-//! checked against a known cause rather than against whatever it happens to say:
+//! Selected by `--mode`, seeded by `--seed`. Each mode breaks exactly one
+//! property so the gate's message can be checked against a known cause rather
+//! than against whatever it happens to say:
 //!
 //! | mode      | varies with seed | stable run to run | debug == release | native == musl |
 //! |-----------|------------------|-------------------|------------------|----------------|
@@ -26,7 +26,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// Which property this run breaks.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
-  /// Prints the same bytes whatever the seed — the vacuity G7 must now reject.
+  /// Prints the same bytes whatever the seed, the vacuity G7 must now reject.
   Constant,
   /// Seed-dependent and stable on every other axis. The one reaching mode.
   Varying,
@@ -54,9 +54,9 @@ impl Mode {
   }
 }
 
-/// A seed-derived digest. Deliberately a plain integer mix rather than a hash
-/// crate: this fixture must not acquire a dependency whose own determinism the
-/// gate would then be measuring instead of its own.
+/// A seed-derived digest. It is a plain integer mix rather than a hash crate on
+/// purpose, because this fixture must not acquire a dependency whose own
+/// determinism the gate would then be measuring instead of its own.
 fn digest(seed: u64) -> u64 {
   let mut value = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15);
   value ^= value >> 31;
@@ -101,8 +101,8 @@ fn report(mode: Mode, seed: u64) -> String {
       format!("clock {now:09}")
     }
     Mode::OptLevel => {
-      // Resolved at compile time, so the two profiles genuinely emit different
-      // bytes rather than branching on something the optimiser could fold away.
+      // Resolved at compile time, so the two profiles emit different bytes
+      // rather than branching on something the optimiser could fold away.
       if cfg!(debug_assertions) {
         "profile debug".to_string()
       } else {
@@ -124,16 +124,16 @@ fn report(mode: Mode, seed: u64) -> String {
 fn main() -> std::process::ExitCode {
   // Fix(g7_control_argv_invalid_utf8_panics_before_parse_args): CLI argv
   // reaches `std::env::args()`, whose contract is to panic during iteration on
-  // the first argument that is not valid Unicode -- so a non-UTF-8 argument
-  // (e.g. from a calling script or a stray glob expansion) aborts the process
-  // before `parse_args`'s own `Result`-based refusal, which already handles
-  // every other kind of bad argument gracefully, ever runs. Fixed by
-  // collecting through `args_os()` and converting each argument with
+  // the first argument that is not valid Unicode. A non-UTF-8 argument (e.g.
+  // from a calling script or a stray glob expansion) therefore aborts the
+  // process before `parse_args` ever runs. `parse_args`'s own `Result`-based
+  // refusal already handles every other kind of bad argument gracefully. Fixed
+  // by collecting through `args_os()` and converting each argument with
   // `to_string_lossy()`, so a non-UTF-8 argument becomes a
   // replacement-character-bearing `String` that reaches `parse_args` instead
   // of crashing first.
   // Pitfall: a parser returning `Result<_, String>` for every bad value it can
-  // see is not automatically panic-free -- `std::env::args()` itself can
+  // see is not automatically panic-free. `std::env::args()` itself can
   // panic before `parse_args` ever runs, and no in-process test built from a
   // `Vec<String>` can construct the input that reaches it.
   let args: Vec<String> = std::env::args_os()

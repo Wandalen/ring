@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #@ purpose: Shared implementation behind every per-crate verb/<name> wrapper. One
 #@          script, so the 34 crates' wrappers can never drift out of sync with each
-#@          other. Not a verb itself — never invoke directly; run a crate's own
+#@          other. Not a verb itself. Never invoke it directly; run a crate's own
 #@          verb/test / verb/test_only / verb/lint / verb/build instead.
 #@ tags: verb, internal
 set -euo pipefail

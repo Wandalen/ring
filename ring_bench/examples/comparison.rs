@@ -5,12 +5,12 @@
 //! ```
 //!
 //! This is the one place the family's measurement is shown to a human. The
-//! library deliberately prints nothing — every quantity is a field with an
-//! accessor, so the suite can assert on values rather than on captured stdout
-//! (`docs/pattern/001`). That leaves the report exercised only by substring
-//! assertions, and the first time it was read end-to-end it exposed four
-//! documentation errors (`tests/manual/readme.md` B1). This example exists so
-//! that reading is a command rather than a throwaway probe.
+//! library deliberately prints nothing. Every quantity is a field with an
+//! accessor, so the suite can assert on values rather than on captured stdout.
+//! That leaves the report exercised only by substring assertions, and the first
+//! time someone read it end-to-end it exposed documentation errors
+//! (`tests/manual/readme.md` B1, the stage that reads the report). This example
+//! exists so that reading is a command rather than a throwaway probe.
 //!
 //! Without `--all-features` the off-the-shelf candidate is absent and the
 //! comparison has five rows instead of six.
@@ -28,7 +28,7 @@ fn main() {
     .unwrap();
 
   // 16 slots for 256 records. Every candidate loses, and they lose in three
-  // different ways — which is the point of the row.
+  // different ways. That is the point of the row.
   let cramped = Workload::new(RingConfig::new(16).unwrap())
     .with_records_per_producer(256)
     .unwrap()

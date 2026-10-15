@@ -1,16 +1,15 @@
 //! The claim → publish → available → commit handshake, end to end.
 //!
 //! This is the reached-test for
-//! `docs/feature/170_claim_publish_available_commit_handshake.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as: a
+//! `docs/feature/170_claim_publish_available_commit_handshake.md`, stated as: a
 //! slot claimed but not published is never returned by `available()`; after
 //! publish it is; `commit()` advances the consumer cursor and never past
-//! `available()` — asserted over every interleaving of one claim and one drain
+//! `available()`, asserted over every interleaving of one claim and one drain
 //! under `loom`.
 //!
 //! It lives in `ring_publish` rather than in any of the other three crates
 //! because publication is the moment the other three become observable
-//! together: before it, a claim is invisible; after it, the consumer's whole
+//! together. Before it, a claim is invisible; after it, the consumer's whole
 //! contract is decided.
 //!
 //! ## Why the wiring below is the test, as much as the assertions are
@@ -25,23 +24,23 @@
 //! - the ring's own capacity is in that same set
 //!
 //! A wiring that gives the consumer a private cursor compiles, runs, and passes
-//! every single-threaded test — and gates nothing, because the producer is
+//! every single-threaded test. It also gates nothing, because the producer is
 //! reading a cursor nobody advances. `the_consumer_position_the_producer_gates_on_is_the_one_commit_moves`
 //! asserts the wiring itself rather than trusting it.
 //!
-//! ## Two harnesses, and why both
+//! ## Two test suites, and why both
 //!
 //! Under `--cfg loom` this file is the loom model and nothing else; otherwise it
 //! is a set of ordinary threaded tests. They are not redundant.
 //!
 //! Real threads run the true code on the true hardware, at sizes loom could
-//! never enumerate (thousands of items, several producers) — but they only ever
+//! never enumerate (thousands of items, several producers). But they only
 //! sample the interleavings the scheduler happens to pick, and on x86 the
 //! hardware supplies orderings the code failed to ask for. `loom` runs a
-//! deliberately tiny case — one claim, one drain — and checks *every*
+//! deliberately tiny case, one claim and one drain, and checks *every*
 //! interleaving of it against a memory model weaker than any real machine, so
 //! it catches the missing `Release` that x86 would hide. Neither subsumes the
-//! other: one has scale without coverage, the other coverage without scale.
+//! other. Threads have scale without coverage; loom has coverage without scale.
 //!
 //! Run the second explicitly:
 //!
@@ -54,9 +53,9 @@
 /// The `loom` model named by the acceptance criterion.
 ///
 /// `loom` replaces `ring_atomic`'s atomics with instrumented ones (see that
-/// crate's module documentation on the seam) and re-runs the closure once per
-/// distinct interleaving, so an assertion inside it is an assertion about all
-/// of them rather than about the one the scheduler picked.
+/// crate's module documentation on how `loom` is swapped in) and re-runs the
+/// closure once per distinct interleaving, so an assertion inside it is an
+/// assertion about all of them rather than about the one the scheduler picked.
 #[cfg(loom)]
 mod exhaustive {
   use loom::sync::Arc;
@@ -150,7 +149,7 @@ mod exhaustive {
       let fresh = ring_cursor::PaddedCursor::default();
       assert_eq!(Consumer::new(&fresh, barrier).available().len(), 1);
 
-      // And the drain either took it or did not — never anything else.
+      // And the drain either took it or did not. Nothing else is possible.
       let position = consumers.cursor(0).expect("one consumer").load(Ordering::Acquire);
       assert!(position == Seq::ZERO || position == Seq(1), "the drain ended at {position:?}");
     });
@@ -158,9 +157,9 @@ mod exhaustive {
 
   #[test]
   fn a_full_ring_stops_the_producer_over_every_interleaving() {
-    // The other side of the same handshake: the consumer's commit is what
+    // The other side of the same handshake. The consumer's commit is what
     // creates room. With capacity 1, the producer's second claim can only
-    // succeed after the drain has committed the first — in every interleaving
+    // succeed after the drain has committed the first, in every interleaving
     // where it succeeds at all.
     loom::model(|| {
       let capacity = Capacity::new(2).expect("a power of two");
@@ -182,7 +181,7 @@ mod exhaustive {
         let publisher = Arc::clone(&publisher);
         move || {
           // The whole producer side in one thread, because a `Claimer` owns the
-          // claimed cursor — a second one built elsewhere would start from zero
+          // claimed cursor. A second one built elsewhere would start from zero
           // and hand out sequences the first had already given away.
           let claimer = Claimer::new(&consumers);
 
@@ -192,7 +191,7 @@ mod exhaustive {
 
           match claimer.claim(1) {
             // Granted, so the drain must already have released a slot. Read the
-            // consumer position *after* the grant: it only ever rises, so a
+            // consumer position *after* the grant. It only ever rises, so a
             // correct grant can never trip this, and an incorrect one always
             // does. Reading before would fail whenever the drain moved in
             // between, which is not a bug.
@@ -235,8 +234,8 @@ mod threaded {
 
   /// A ring's worth of slots, written by the producer and read by the consumer.
   ///
-  /// Sequence numbers alone would let a broken `available` pass: the consumer
-  /// would be handed a range of integers and check integers. Real slots make
+  /// Sequence numbers alone would let a broken `available` pass, because the
+  /// consumer would be handed a range of integers and check integers. Real slots make
   /// "was this written before it was offered" answerable.
   fn slots(capacity: Capacity) -> Vec<AtomicU64> {
     (0..capacity.get()).map(|_| AtomicU64::new(u64::MAX)).collect()
@@ -244,9 +243,9 @@ mod threaded {
 
   /// What a producer writes into the slot for sequence `seq`.
   ///
-  /// Not `seq` itself: a slot that still holds its previous lap's value would
-  /// then be indistinguishable from one correctly rewritten, and lapping is the
-  /// exact failure a gating bug produces.
+  /// Not `seq` itself, because a slot that still holds its previous lap's value
+  /// would then be indistinguishable from one correctly rewritten. Lapping is
+  /// the exact failure a gating bug produces.
   fn payload(seq: u64) -> u64 {
     seq.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ 0x5DEE_CE66
   }
@@ -378,7 +377,7 @@ mod threaded {
 
   #[test]
   fn a_stalled_consumer_stops_the_producer_after_exactly_one_lap() {
-    // Feature 170's half of what 178 asserts from the gating side: with the
+    // The handshake's half of what the gating side asserts. With the
     // handshake wired, back-pressure is a property of the whole loop rather
     // than of `GatingSet` alone.
     let capacity = cap(8);
@@ -406,7 +405,7 @@ mod threaded {
   fn a_slow_consumer_and_a_fast_producer_never_lose_or_duplicate_an_item() {
     // A capacity far smaller than the item count, so the ring laps many times
     // and the gate is the only thing preventing an overwrite. The payload check
-    // is what turns a lost gate into a failure rather than a shrug.
+    // is what turns a lost gate into a failure rather than a silent pass.
     const TOTAL: u64 = 8_000;
     let capacity = cap(4);
 
@@ -459,9 +458,9 @@ mod threaded {
 
   #[test]
   fn several_producers_and_one_drain_agree_on_every_sequence() {
-    // `publish` rather than `try_publish`: with several producers the claims
-    // complete out of order, and each waits for its predecessor. That wait is
-    // what keeps the frontier from passing an unwritten slot.
+    // `publish` rather than `try_publish`, because with several producers the
+    // claims complete out of order, and each waits for its predecessor. That
+    // wait is what keeps the frontier from passing an unwritten slot.
     const PRODUCERS: u64 = 3;
     const PER_PRODUCER: u64 = 3_000;
     const TOTAL: u64 = PRODUCERS * PER_PRODUCER;
@@ -516,9 +515,9 @@ mod threaded {
 
   #[test]
   fn a_consumer_that_never_commits_leaves_the_producer_exactly_one_lap_ahead() {
-    // The dangerous window the split between `available` and `commit` exists to
-    // create, held open: the consumer has read nothing, so the producer must
-    // stop at one lap and stay there however long it tries.
+    // This holds open the dangerous window that the split between `available`
+    // and `commit` exists to create. The consumer has read nothing, so the
+    // producer must stop at one lap and stay there however long it tries.
     let capacity = cap(4);
     let consumers = GatingSet::new(capacity, 1);
     let publisher = Publisher::new();
@@ -549,14 +548,13 @@ mod threaded {
   /// One dropped claim kills the ring, and every signal keeps reporting health
   /// until the terminal state is an ordinary-looking `Full`.
   ///
-  /// CL44 in `ring_claim/docs/pitfall/001_dropping_a_claim.md` describes this
-  /// and could not host a reproduction: `ring_claim` has no dependency, normal
-  /// or dev, on `ring_publish`, so its suite can never observe a publication
-  /// that fails to arrive. This file can — `ring_claim` is one of its four
-  /// dev-dependencies for exactly that reason — and the assertions below are
-  /// that finding's table, row for row.
+  /// `ring_claim` cannot host a reproduction of this. It has no dependency,
+  /// normal or dev, on `ring_publish`, so its suite can never observe a
+  /// publication that fails to arrive. This file can, and `ring_claim` is one
+  /// of its four dev-dependencies for that reason. The assertions below walk
+  /// through it row by row.
   ///
-  /// Note what is *not* asserted: nothing here is a defect in either crate.
+  /// Note what is *not* asserted. Nothing here is a defect in either crate.
   /// Every call answers correctly for its own question. The finding is that no
   /// question anyone asks has "the ring is dead" as its answer.
   #[test]
@@ -572,17 +570,17 @@ mod threaded {
       assert_eq!(stranded.start(), Seq::ZERO);
     }
 
-    // Row 1 — `claim` reports Ok. The ring is already dead.
+    // Row 1: `claim` reports Ok. The ring is already dead.
     let next = claimer.claim(4).expect("claiming is unaffected");
     assert_eq!(next.start(), Seq(1), "granted past a sequence nobody will publish");
 
-    // Row 2 — `claimed()` advances, healthily, past exactly that sequence.
+    // Row 2: `claimed()` advances, healthily, past exactly that sequence.
     assert_eq!(claimer.claimed(), Seq(5));
 
-    // Row 3 — `headroom()` reports three slots that can never be freed.
+    // Row 3: `headroom()` reports three slots that can never be freed.
     assert_eq!(claimer.headroom(), 3);
 
-    // Row 4 — the producer that claimed correctly and wrote correctly is the
+    // Row 4: the producer that claimed correctly and wrote correctly is the
     // one that cannot proceed, and the error names a sequence it never touched.
     assert_eq!(
       publisher.try_publish(next.start(), next.len()),
@@ -593,8 +591,8 @@ mod threaded {
 
     // And then it stops even looking like a hang. Once the ring fills behind
     // the strand, the symptom is the error documented as retryable
-    // back-pressure — byte-identical to healthy contention, and the retry it
-    // recommends is the action that never terminates.
+    // back-pressure. It is byte-identical to healthy contention, and the retry
+    // it recommends is the action that never terminates.
     let _rest = claimer.claim(3).expect("the last three slots");
     assert_eq!(claimer.headroom(), 0);
     assert_eq!(claimer.claim(1), Err(RingError::Full));

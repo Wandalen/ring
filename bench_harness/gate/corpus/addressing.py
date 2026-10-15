@@ -62,37 +62,37 @@ import corpus_lib
 import recipes
 
 
-# `sed -n '210,222p' ring/ring_core/src/lib.rs` — an absolute line address
-# into a named file. The quotes are part of the corpus' own idiom and are
-# required here so a `sed -n "$range"p` built at runtime is not matched blind.
+# `sed -n '210,222p' ring/ring_core/src/lib.rs`: an absolute line address into a
+# named file. The quotes are part of the corpus' own idiom, and the pattern
+# requires them so a `sed -n "$range"p` built at runtime is not matched blind.
 #
 # **A target is required, and it must look like a file.** `... | sed -n '1,4p'`
-# pages a pipeline — it is `head -4` spelled differently, addressing a stream
+# pages a pipeline. It is `head -4` spelled differently: it addresses a stream
 # this recipe produced a line earlier, not a source file whose numbering some
-# future edit will shift. Seven of those exist in the family and flagging them
-# was this gate's own first defect: the rule is about citing source by line, and
+# future edit will shift. Seven of those exist in the family, and flagging them
+# was this gate's own first defect. The rule is about citing source by line, and
 # a pager cites nothing. The separator is `[ \t]` rather than `\s` for the same
-# reason — `\s` crosses a newline and swallows the next command's first word as
+# reason. `\s` crosses a newline and swallows the next command's first word as
 # though it were a filename.
 #
 # **This gate's third defect, and it is the second one repeated.** The first
-# version of this pattern ended at `p'` — a closing quote immediately after the
-# command letter — so it saw `sed -n '210,222p' f` and nothing else. A sed
-# program holds any number of commands separated by `;`, and
-# `sed -n '161,166p;177,182p;199,204p' f` has a semicolon where the pattern
-# demanded a quote, so it matched none of them. The family carried **148 such
-# addresses across 15 crates** while this gate reported REACHED for all 33 and
-# the `awk` half below was doing every bit of the work. That is the identical
-# failure the `awk` comment describes — a rule stated in prose and implemented
-# as one syntax — occurring inside the very tool written to stop it. So the
-# program is parsed now rather than pattern-matched.
+# version of this pattern ended at `p'`, a closing quote immediately after the
+# command letter, so it saw `sed -n '210,222p' f` and nothing else. A sed
+# program holds any number of commands separated by `;`, and `sed -n
+# '161,166p;177,182p;199,204p' f` has a semicolon where the pattern demanded a
+# quote, so it matched none of them. The family carried **148 such addresses
+# across 15 crates** while this gate reported REACHED for all 33, and the `awk`
+# half below was doing all of the work. That is the same failure the `awk`
+# comment describes, a rule stated in prose and implemented as one syntax,
+# occurring inside the tool written to stop it. So the code now parses the
+# program instead of pattern-matching it.
 SED_CALL = re.compile( r"sed -n +('[^']*'|\"[^\"]*\")[ \t]+(\S+)" )
 
 # What an address is made of, once the parts that cannot hold a line number are
 # folded away. A `/regex/` and a `$(( ... ))` each collapse to one opaque
-# character, leaving only literal digits behind — and the placeholder is `%`/`&`
+# character, leaving only literal digits behind. The placeholder is `%`/`&`
 # rather than a letter because an address ends where its command letter begins,
-# so a letter placeholder truncates it. That truncation was not hypothetical:
+# so a letter placeholder truncates it. That truncation happened:
 # `R` for regex turned `1,/^### FC13 /p` into the address `1,`, which reads as a
 # bare literal and flagged a recipe that runs from the top of a file to a match.
 REGEX_PART = re.compile( r'\\?/(?:\\.|[^/\\])*/' )
@@ -125,56 +125,56 @@ def sed_addresses( program ):
     out.append( address )
   return out
 
-# `awk 'NR >= 619 && NR <= 627 { ... }' ring/ring_flush/src/lib.rs` — the same
+# `awk 'NR >= 619 && NR <= 627 { ... }' ring/ring_flush/src/lib.rs`: the same
 # absolute address in the other spelling this corpus writes it in.
 #
 # **This is the gate's second defect, and it is the more instructive one.** The
-# first version knew only `sed`, reported the family clean, and was believed. The
-# 28 `awk NR` addresses it could not see surfaced a day later out of G15 instead:
-# four recipes had slid onto different code and were still exiting zero. A gate
-# that names its rule in prose — *address the content, never the line* — and then
-# implements one syntax for it does not enforce the rule, it enforces the syntax,
-# and the difference is invisible from a clean report.
+# first version knew only `sed`, reported the family clean, and was believed.
+# The 28 `awk NR` addresses it could not see showed up a day later through G15
+# instead: four recipes had slid onto different code and were still exiting
+# zero. A gate that names its rule in prose, *address the content, never the
+# line*, and then implements one syntax for it enforces the syntax, not the
+# rule. The difference is invisible from a clean report.
 #
-# `NR` must be compared against a literal for the address to be absolute.
-# `awk '/must_use/{ m = NR } m && NR > m && NR <= m + 3'` is content-anchored:
-# every bound is relative to a line found by matching, so the whole window moves
-# with the thing it names. That is the form the rule wants, not the form it bans.
-# awk invocations are found by tokenising rather than by matching `awk '`
+# `NR` must be compared against a literal for the address to be absolute. `awk
+# '/must_use/{ m = NR } m && NR > m && NR <= m + 3'` is content-anchored. Every
+# bound is relative to a line found by matching, so the whole window moves with
+# the thing it names. That is the form the rule wants, not the form it bans. The
+# code finds awk invocations by tokenising rather than by matching `awk '`
 # directly, because the program is not always the first argument. A converted
 # recipe reads `awk -v n1="$( ... )" 'NR >= n1 && NR <= 930' T`, and a pattern
-# anchored on the quote right after `awk` skips the whole call — so the `930`
+# anchored on the quote right after `awk` skips the whole call. So the `930`
 # still sitting in it became invisible to this gate at the moment it was
 # converted. A checker made blind by the fix for what it checks is worse than no
 # checker, since the clean report is what gets believed.
 #
 # **The digits must be a whole literal, not the tail of a name.** Converting the
-# 148 `sed` addresses above produced the form this rule asks for —
-# `/^pub fn set/{ n1 = NR } n1 && NR == n1 + 3 { print }`, every bound computed
-# from a line found by matching — and this pattern flagged 69 of them. The
-# unanchored `\d+` was matching the `1` inside the variable name `n1`, with
-# `= NR` right after it, so the very shape the rule prescribes read as the shape
-# it bans. A gate that rejects its own remedy pushes the corpus back toward what
-# it was written to remove, which is worse than a gate that misses: a false
-# REACHED is believed once, a false NOT REACHED is argued with every time.
+# 148 `sed` addresses above produced the form this rule asks for, with every
+# bound computed from a line found by matching: `/^pub fn set/{ n1 = NR } n1 &&
+# NR == n1 + 3 { print }`. This pattern flagged 69 of them. The unanchored `\d+`
+# was matching the `1` inside the variable name `n1`, with `= NR` right after
+# it, so the shape the rule prescribes read as the shape it bans. A gate that
+# rejects its own remedy pushes the corpus back toward what it was written to
+# remove, which is worse than a gate that misses. A false REACHED is believed
+# once, and a false NOT REACHED is argued with every time.
 AWK_OPT_WITH_VALUE = ( '-v', '-f', '-F' )
 NR_LITERAL = re.compile( r'\bNR\b[ \t]*[<>!=]=?[ \t]*\d+\b|\b\d+[ \t]*[<>!=]=?[ \t]*\bNR\b' )
 
-# `grep -n pat ring/ring_cursor/src/lib.rs` — the third spelling, and the one
-# the family actually writes most. Options taking a separate value are stepped
-# over so their argument is not mistaken for the pattern or a target; a cluster
-# is only a numbering request if the `n` is in a single-dash cluster, since
-# `--include=*.rs` carries an `n` that means nothing of the sort. That is not a
-# hypothetical: a first census of this construct used `-[a-zA-Z]*n` and counted
-# `--include` as a hit, inflating the family's exposure by three quarters.
+# `grep -n pat ring/ring_cursor/src/lib.rs`: the third spelling, and the one the
+# family writes most. The scan steps over options that take a separate value, so
+# their argument is not mistaken for the pattern or a target. A cluster is only
+# a numbering request if the `n` is in a single-dash cluster, since
+# `--include=*.rs` carries an `n` that means nothing of the sort. This happened.
+# A first census of this construct used `-[a-zA-Z]*n` and counted `--include` as
+# a hit, inflating the family's exposure by three quarters.
 GREP_OPT_WITH_VALUE = ( '-e', '-f', '-m', '-A', '-B', '-C', '-d', '--include',
                         '--exclude', '--exclude-dir', '--color' )
 PIPE_TOKENS = ( '|', ';', '&&', '||', '>', '>>' )
 
 # What counts as a file: a path, or a variable holding one. A bare word is a
 # command that followed the pager, not its target. `*` and `?` belong in the
-# segment class because `ring_*/src/*.rs` is how this corpus greps a family —
-# without them the commonest multi-crate recipe in the family reads as having
+# segment class because `ring_*/src/*.rs` is how this corpus greps a family.
+# Without them, the commonest multi-crate recipe in the family reads as having
 # no target at all.
 FILE_TARGET = re.compile( r'^(\$|["\']?[.~/]|[\w.*?-]+/)' )
 
@@ -207,10 +207,10 @@ def program_args( toks ):
 # mine.** The separator was `:` alone, on the stated ground that "`grep -n -A6`
 # marks context lines with `-` rather than `:`, but the matched line always
 # carries the colon, so requiring it costs no detection." The premise is true
-# and the conclusion does not follow: the matched line carries the colon only
+# and the conclusion does not follow. The matched line carries the colon only
 # while it is still in the output. `ring_bench/docs/item/001` runs
 # `grep -nB1 '^pub enum RunError' … | grep derive`, whose second stage keeps the
-# `-B1` context and discards the match — so every line reaching the page is
+# `-B1` context and discards the match. So every line reaching the page is
 # `638-#[ derive( … ) ]`, a volatile number with a hyphen after it, and the rule
 # waved all five through. A rule about the number, implemented as one of the two
 # syntaxes it appears in. That is the same mistake as the `grep -n` exemption
@@ -225,33 +225,33 @@ def program_args( toks ):
 # zero*. Recipes routinely close with `sed 's|^|    |'` to set their output off
 # from the surrounding prose, and that purely cosmetic indent moved every
 # address they publish out of the anchor's reach. Twenty-six recipes were
-# invisible for no reason but four spaces — `grep_calls` had already found the
-# `-n` and the file it read, and only this test stood between them and a
-# report. Each of the twenty-six was then checked the hard way, by taking the
-# published number and the text beside it and asking the cited file whether that
-# text is genuinely on that line: twenty confirmed outright, and the six the
-# check could not resolve were truncated by a `cut -c` or rewrapped by a `fold`
-# in the recipe itself, not absent.
+# invisible for no reason but four spaces. `grep_calls` had already found the
+# `-n` and the file it read, and only this test stood between them and a report.
+# Each of the twenty-six was then checked the hard way, by taking the published
+# number and the text beside it and asking the cited file whether that text is
+# on that line. Twenty confirmed outright. The six the check could not resolve
+# were truncated by a `cut -c` or rewrapped by a `fold` in the recipe itself,
+# not absent.
 NUMBERED_LINE = re.compile( r'^[ \t]*(?:[^\s:]+:)?\d+[:-](?!\d{2}-\d{2})', re.M )
 
-# `CursorPair::capacity (line 324) ... ok` — rustdoc names every doctest by the
+# `CursorPair::capacity (line 324) ... ok`. Rustdoc names every doctest by the
 # line its fence opens on, so a recipe that runs `cargo test --doc` and quotes
 # the result publishes one absolute source citation per doctest, and they all
 # shift together the moment anyone inserts a line above them.
 #
-# **This is what the rule is actually about, arriving without a tool.** The
-# three detectors above each find a *command that addresses by line* — `sed -n`,
-# `awk NR`, `grep -n`. Not one of them is present here: the recipe asks for a
-# test run and prints what came back. Written as "find the addressing command",
-# the rule had no way to see it; written as "find the published line address",
-# it is the same violation in a different coat.
+# **This is what the rule is about, arriving without a tool.** The three
+# detectors above each find a *command that addresses by line*: `sed -n`, `awk
+# NR`, `grep -n`. Not one of them is present here. The recipe asks for a test
+# run and prints what came back. Written as "find the addressing command", the
+# rule had no way to see it. Written as "find the published line address", it is
+# the same violation in a different form.
 #
 # That framing error is this gate's founding defect, and this is the sixth time
-# it has surfaced — after the pager case, the `sed`-semicolon case, the `grep -n`
+# it has appeared, after the pager case, the `sed`-semicolon case, the `grep -n`
 # exemption, and `NUMBERED_LINE`'s own colon-only separator. Every one of them
 # was a rule about *the number* implemented as *one syntax the number is written
 # in*. `ring_cursor/docs/decisions/002` publishes fourteen of these at once,
-# under prose whose claim is "fourteen doctests, one per public item" — a
+# under prose whose claim is "fourteen doctests, one per public item". That is a
 # sentence about the count, evidenced by a block that is mostly line numbers.
 #
 # The recipe's own author already knew: the same pipeline carries
@@ -341,9 +341,9 @@ def grep_calls( text ):
   except ValueError:
     return []
   # Every file the recipe reads, for the fallback below. The argument of a `cd`
-  # is not one of them: every recipe in this corpus opens by cd-ing to the
+  # is not one of them. Every recipe in this corpus opens by cd-ing to the
   # repository root, so taking it would name that path as the cited file in
-  # every single message.
+  # every message.
   programs = program_args( toks )
   files = [ t for ( k, t ) in enumerate( toks )
             if not t.startswith( '-' ) and t not in PIPE_TOKENS
@@ -365,7 +365,7 @@ def grep_calls( text ):
     j += 1                                        # the pattern
     # Stop at the next `grep` as well as at a pipe. `shlex` flattens newlines,
     # so a recipe running two greps on two lines has no separator between them
-    # at all — scanning only to the next pipe swallows the second call whole.
+    # at all. Scanning only to the next pipe swallows the second call whole.
     # That cost 28 detections when this loop was first written without it, all
     # of them in the corpus' most ordinary shape: one grep per line.
     own = None
@@ -380,15 +380,15 @@ def grep_calls( text ):
 
 
 # `module/` was this family's only crate root until the ring crates moved to
-# `ring/`, and a doctest citation names its package, never its path — so the
-# root has to be found rather than assumed. Assumed, the gate still fires (a
-# `<word>/...` target matches `FILE_TARGET` whichever root it names) but prints
-# a file that no longer exists — a stale citation, minted by the gate written
-# to grade them.
+# `ring/`, and a doctest citation names its package, never its path. So the code
+# has to find the root rather than assume it. With the root assumed, the gate
+# still fires (a `<word>/...` target matches `FILE_TARGET` whichever root it
+# names) but prints a file that no longer exists. That is a stale citation,
+# minted by the gate written to grade them.
 #
 # The four roots and the depth walk below are `common.sh`'s `crate_dir()`
-# written in Python, deliberately: one resolver disagreeing with the other about
-# where a crate lives is how a gate grades a tree nobody occupies.
+# written in Python, deliberately. One resolver disagreeing with the other about
+# where a crate lives is how a gate ends up grading a tree nobody occupies.
 CRATE_ROOTS = ( 'module', 'ring', 'substrate', 'spike' )
 REPO_ROOT = pathlib.Path( __file__ ).resolve().parents[ 4 ]
 
@@ -529,9 +529,9 @@ def check( docs ):
   root = pathlib.Path( docs )
   problems = []
   for path in docs_files( docs ):
-    # `recipes.blocks` rather than a regex over the text: fence parsing here has
+    # `recipes.blocks` rather than a regex over the text. Fence parsing here has
     # to be line-anchored, because this corpus publishes recipes that grep for
-    # fence markers and a non-anchored `.*?` closes the block on a pattern
+    # fence markers, and a non-anchored `.*?` closes the block on a pattern
     # inside it. Reusing G15's parser also means both gates agree on what a
     # recipe is and on which output belongs to it, which is the whole basis for
     # the `grep -n` rule below.

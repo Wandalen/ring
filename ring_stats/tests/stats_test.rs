@@ -1,16 +1,15 @@
-//! Tests for `ring_stats` — the counters a run is judged by.
+//! Tests for `ring_stats`, the counters a run is judged by.
 //!
-//! Claims `docs/feature/185_ring_stats.md`. Its acceptance criterion, filed at
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`, is that a
-//! drop is *counted*, not silently absorbed — a benchmark whose throughput number
+//! Claims `docs/feature/185_ring_stats.md`. Its acceptance criterion is that a
+//! drop is *counted*, not silently absorbed. A benchmark whose throughput number
 //! came partly from discarded work is a wrong number, and the only way to tell
 //! the two apart afterwards is a counter incremented at the moment of the drop.
 //!
 //! Every counter is `Relaxed`, which is deliberate and is the thing tested
-//! hardest below: a statistics counter must never introduce ordering the
+//! hardest below. A statistics counter must never introduce ordering the
 //! algorithm did not already need. So these tests assert only what `Relaxed`
-//! actually guarantees — per-counter monotonicity, and exact totals once all
-//! writers have joined — never a coherent cross-counter snapshot mid-run.
+//! guarantees: per-counter monotonicity, and exact totals once all writers have
+//! joined. They never assert a coherent cross-counter snapshot mid-run.
 
 use ring_stats::RingStats;
 use ring_types::OverflowPolicy;
@@ -31,7 +30,7 @@ fn a_fresh_set_is_all_zero() {
   }
 }
 
-/// Each recorder moves exactly its own counter — the property that makes a
+/// Each recorder moves exactly its own counter, the property that makes a
 /// per-policy drop breakdown meaningful rather than a single opaque total.
 #[test]
 fn each_recorder_moves_exactly_one_counter() {
@@ -59,9 +58,9 @@ fn each_recorder_moves_exactly_one_counter() {
   assert_eq!(stats.dropped_total(), 0);
 }
 
-/// A drop lands under the policy that caused it and under no other — the
-/// distinction the crate exists to preserve, since a ring dropping newest and
-/// one evicting oldest are in completely different trouble.
+/// A drop lands under the policy that caused it and under no other; the crate
+/// exists to preserve that distinction, since a ring dropping newest and one
+/// evicting oldest are in different trouble.
 #[test]
 fn a_drop_lands_under_its_own_policy_only() {
   for recorded in OverflowPolicy::ALL {
@@ -95,23 +94,23 @@ fn the_drop_total_is_the_sum_over_every_policy() {
 }
 
 /// `dropped_total` and `snapshot`'s `dropped_total` field must never wrap past
-/// `u64::MAX` — the sum saturates instead, so an enormous real loss is never
+/// `u64::MAX`; the sum saturates instead, so an enormous real loss is never
 /// misreported as a small or nonexistent one.
 ///
 /// Root Cause: `dropped_total` folded the three per-policy counters with
 /// `Iterator::sum`, and `snapshot`'s `dropped_total` field used plain `+` on
-/// the same three values — both ordinary `u64` addition. `record_drop` takes
+/// the same three values. Both are ordinary `u64` addition. `record_drop` takes
 /// an unbounded `n : u64` with no upper-bound check, so two calls whose counts
 /// add past `u64::MAX` (`u64::MAX` then `1`) made the sum panic in a debug
-/// build and silently wrap to a small number in release — in this exact case,
-/// to `0`, which a caller reads as "nothing was ever dropped".
+/// build and silently wrap to a small number in release. In this exact case it
+/// wrapped to `0`, which a caller reads as "nothing was ever dropped".
 ///
 /// Why Not Caught: every existing test recorded small literal counts (`5`,
 /// `3`, `2`, or `1` repeated in a loop), and the crate's own concurrency tests
 /// drive the counters from real per-thread loops bounded by ordinary test
 /// sizes (tens of thousands), never from a single call passing a value near
 /// `u64::MAX`. `record_drop`'s doc states no bound on `n`, so a single direct
-/// call is enough — no sustained traffic or contention is needed to reach it.
+/// call is enough. Reaching it needs no sustained traffic or contention.
 ///
 /// Fix Applied: `dropped_total` now folds with `u64::saturating_add` instead
 /// of `Iterator::sum`, and `snapshot`'s `dropped_total` field is built from
@@ -119,15 +118,15 @@ fn the_drop_total_is_the_sum_over_every_policy() {
 /// `u64::MAX` rather than panicking or wrapping.
 ///
 /// Prevention: a diagnostic counter's whole purpose is staying readable under
-/// conditions the counted system itself may never reach validly — it must
+/// conditions the counted system itself may never reach validly. It must
 /// saturate rather than wrap or panic on its own derived readings, matching
 /// `in_flight`'s already-established `saturating_sub` choice in this same
 /// file.
 ///
 /// Pitfall: an unbounded `record_*( n : u64 )` parameter puts every downstream
-/// sum of that counter outside any bound the crate can assume — audit every
-/// place counters written through such a method are later combined, not just
-/// the individual `fetch_add` call sites.
+/// sum of that counter outside any bound the crate can assume. Audit every
+/// place where counters written through such a method are later combined, not
+/// just the individual `fetch_add` call sites.
 #[test]
 fn dropped_total_saturates_instead_of_overflowing() {
   let stats = RingStats::new();
@@ -138,7 +137,7 @@ fn dropped_total_saturates_instead_of_overflowing() {
   assert_eq!(stats.snapshot().dropped_total, u64::MAX, "snapshot's field must saturate too");
 }
 
-/// `Fail` is counted even though it loses nothing: how often a `Fail` ring
+/// `Fail` is counted even though it loses nothing; how often a `Fail` ring
 /// handed the decision back is its pressure signal, and an uncounted refusal
 /// would make a saturated ring look idle.
 #[test]
@@ -176,7 +175,7 @@ fn a_drop_is_counted_not_absorbed() {
   assert_eq!(clean.dropped_total(), 0);
 }
 
-/// Recording a batch is one call, and equals the same count recorded singly —
+/// Recording a batch is one call, and equals the same count recorded singly,
 /// so a batched publisher and an item-at-a-time one produce comparable numbers.
 #[test]
 fn batched_and_single_recording_agree() {
@@ -215,7 +214,7 @@ fn recording_zero_changes_nothing() {
   assert_eq!(stats.in_flight(), 0);
 }
 
-/// In-flight is claimed minus published — a nonzero reading at rest means a
+/// In-flight is claimed minus published; a nonzero reading at rest means a
 /// producer took a slot and abandoned it, which leaks ring capacity.
 #[test]
 fn in_flight_is_claimed_minus_published() {
@@ -233,9 +232,9 @@ fn in_flight_is_claimed_minus_published() {
 /// In-flight floors at zero rather than wrapping. Publishing more than was
 /// claimed is a caller bug, and `u64` subtraction would turn it into an
 /// 18-quintillion-slot reading that looks like catastrophic leakage. The floor
-/// is not only a backstop for that bug: on a busy, correct ring it also
+/// is not only a backstop for that bug. On a busy, correct ring it also
 /// absorbs the ordinary read-order race between the two loads, one to two
-/// percent of the time — without it, a healthy ring would report the same
+/// percent of the time. Without it, a healthy ring would report the same
 /// catastrophic reading this test builds by hand.
 #[test]
 fn in_flight_saturates_rather_than_wrapping() {
@@ -249,7 +248,7 @@ fn in_flight_saturates_rather_than_wrapping() {
   assert_eq!(never_claimed.in_flight(), 0);
 }
 
-/// Consuming does not affect in-flight: the reading is about the *claim*
+/// Consuming does not affect in-flight, because the reading is about the *claim*
 /// handshake, not about how far a reader has got.
 #[test]
 fn consuming_does_not_affect_in_flight() {
@@ -265,8 +264,8 @@ fn consuming_does_not_affect_in_flight() {
 }
 
 /// Reset returns every counter to the fresh state, so a recycled ring does not
-/// carry the previous world's numbers — the property `ring_shutdown`'s reset
-/// depends on, per `docs/feature/184_close_reset_and_drain_all.md`.
+/// carry the previous world's numbers; `ring_shutdown`'s reset depends on that
+/// property, per `docs/feature/184_close_reset_and_drain_all.md`.
 #[test]
 fn reset_returns_every_counter_to_the_fresh_state() {
   let stats = RingStats::new();
@@ -294,7 +293,7 @@ fn reset_returns_every_counter_to_the_fresh_state() {
   }
 }
 
-/// A set stays usable after a reset — it is a rewind, not a poison.
+/// A set stays usable after a reset, which rewinds it rather than poisoning it.
 #[test]
 fn a_reset_set_counts_again() {
   let stats = RingStats::new();
@@ -304,8 +303,8 @@ fn a_reset_set_counts_again() {
   assert_eq!(stats.published(), 2);
 }
 
-/// Recording takes `&self`, so a shared reference suffices — the property that
-/// lets every producer thread count without the set becoming a lock.
+/// Recording takes `&self`, so a shared reference suffices; that property lets
+/// every producer thread count without the set becoming a lock.
 #[test]
 fn recording_needs_only_a_shared_reference() {
   let stats = RingStats::new();
@@ -316,8 +315,8 @@ fn recording_needs_only_a_shared_reference() {
 }
 
 /// Totals are exact under real contention: four threads counting 25_000 items
-/// each must read 100_000, no more and no less. `Relaxed` suffices — a
-/// `fetch_add` is atomic regardless of ordering; ordering governs only what
+/// each must read 100_000, no more and no less. `Relaxed` suffices, because a
+/// `fetch_add` is atomic regardless of ordering. Ordering governs only what
 /// *other* memory a reader may observe alongside it.
 #[test]
 fn counts_are_exact_under_contention() {
@@ -342,7 +341,7 @@ fn counts_are_exact_under_contention() {
   assert_eq!(stats.in_flight(), 0, "every claim was published");
 }
 
-/// Distinct policy counters do not interfere under contention — a lost update
+/// Distinct policy counters do not interfere under contention; a lost update
 /// across counters would show up as a short total.
 #[test]
 fn distinct_policy_counters_do_not_interfere_under_contention() {
@@ -350,7 +349,7 @@ fn distinct_policy_counters_do_not_interfere_under_contention() {
 
   let stats = RingStats::new();
   // A shared reference, so each `move` closure copies the borrow rather than
-  // taking the set itself — which is the whole point of `&self` recording.
+  // taking the set itself. That is the whole point of `&self` recording.
   let stats = &stats;
 
   std::thread::scope(|scope| {
@@ -369,9 +368,9 @@ fn distinct_policy_counters_do_not_interfere_under_contention() {
   assert_eq!(stats.dropped_total() as usize, OverflowPolicy::ALL.len() * PER_THREAD);
 }
 
-/// Every counter is monotone while writers run: a reader sampling twice never
+/// Every counter is monotone while writers run; a reader sampling twice never
 /// sees the second reading below the first. This is the strongest statement
-/// `Relaxed` supports per counter — it covers a display of claimed, published
+/// `Relaxed` supports per counter. It covers a display of claimed, published
 /// or dropped, but not the derived `in_flight` gauge, whose subtraction moves
 /// in both directions under this same kind of concurrent sampling.
 #[test]
@@ -403,8 +402,8 @@ fn each_counter_is_monotone_while_writers_run() {
 ///
 /// `dropped_total()` and the three `dropped()` calls a reader would check beside
 /// it are four independent loads at four moments, so under traffic the total
-/// need not be the sum of the breakdown printed with it — measured at three to
-/// five percent of breakdowns showing a spread the ring never held, the widest
+/// need not be the sum of the breakdown printed with it. Measured, three to five
+/// percent of breakdowns showed a spread the ring never held, the widest
 /// running to 3,325 on counters kept within one of each other. `snapshot` loads
 /// each counter once and derives from those same locals, so the relation holds
 /// by construction. This test is what stops that derivation from quietly
@@ -459,8 +458,8 @@ fn a_snapshot_agrees_with_itself_while_writers_run() {
 /// The caller bug and a balanced ring are one reading through `in_flight` and
 /// two through `checked_in_flight`.
 ///
-/// `saturating_sub` floors `published > claimed` — which no correct caller
-/// produces — onto zero, the value a healthy ring gives. `checked_sub` is one
+/// No correct caller produces `published > claimed`, and `saturating_sub` floors
+/// it onto zero, the value a healthy ring gives. `checked_sub` is one
 /// word different and keeps them apart, which is the whole reason the checked
 /// form exists.
 #[test]
@@ -492,8 +491,8 @@ fn checked_in_flight_tells_a_caller_bug_from_a_balanced_ring() {
 ///
 /// `RingStats::COUNTERS` and the compile-time size assertion beside it are what
 /// stop an eighth counter being added to the struct and forgotten by `reset`.
-/// This is the runtime half: that the seven which exist are each reached,
-/// individually, by both paths. The final comparison is against the whole
+/// This is the runtime half. It checks that the seven which exist are each
+/// reached, individually, by both paths. The final comparison is against the whole
 /// default value rather than seven hand-written assertions, so a counter `reset`
 /// misses cannot be missed here too.
 #[test]
@@ -526,8 +525,8 @@ fn a_snapshot_reaches_every_counter_and_a_reset_clears_every_one() {
   assert_eq!(stats.snapshot(), Default::default(), "a reset leaves the fresh value");
 }
 
-/// A reader running beside a reset sees only values the writer wrote — the
-/// crate's first look at the reset window from a second thread.
+/// A reader running beside a reset sees only values the writer wrote; this is
+/// the crate's first look at the reset window from a second thread.
 ///
 /// `reset` is `COUNTERS` separate stores, not one operation, so a reader can land
 /// inside it and see some counters cleared and others not. That much is
@@ -570,8 +569,8 @@ fn a_reader_beside_a_reset_sees_only_values_the_writer_wrote() {
         caught_the_reset_window |= claimed == 0 && wait_nanos == FILL;
       }
 
-      // Deliberately not asserted. The window is real — 5 to 101 hits per two
-      // million paired reads across six runs — but far too rare to require here
+      // Deliberately not asserted. The window is real, at 5 to 101 hits per two
+      // million paired reads across six runs, but far too rare to require here
       // without making the suite flaky. What is asserted above is the property
       // that must hold on every read regardless of where it lands.
       let _ = caught_the_reset_window;

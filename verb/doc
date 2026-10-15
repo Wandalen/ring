@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-#@ purpose: Rebuild rustdoc from a clean slate. Always rm -rf target/doc first —
-#@          incremental `cargo doc` silently skips re-checking unchanged crates, which
+#@ purpose: Rebuild rustdoc from a clean slate. Always rm -rf target/doc first.
+#@          Incremental `cargo doc` silently skips re-checking unchanged crates, which
 #@          hides broken intra-doc links there (see reference_cargo_doc_incremental_hides_errors).
 #@ tags: verb, doc
 set -euo pipefail

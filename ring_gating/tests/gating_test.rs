@@ -1,36 +1,35 @@
-//! `ring_gating` — the producer half of the sequence barrier.
+//! `ring_gating` tests for the producer half of the sequence barrier.
 //!
 //! This file carries half the reached-test for
-//! `docs/feature/178_sequence_barrier_and_gating_set.md`, stated in
-//! `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md` as:
-//! `ring_gating` refuses a claim that would advance past the gating minimum,
-//! and a producer never overwrites an uncommitted slot — asserted over a full
-//! lap with a deliberately stalled consumer. (`ring_barrier`'s own file carries
-//! the minimum-across-a-set half.)
+//! `docs/feature/178_sequence_barrier_and_gating_set.md`. The half asserted
+//! here is that `ring_gating` refuses a claim that would advance past the
+//! gating minimum, and a producer never overwrites an uncommitted slot, over a
+//! full lap with a deliberately stalled consumer. (`ring_barrier`'s own file
+//! carries the minimum-across-a-set half.)
 //!
 //! ## The stalled consumer is the test, not the setup
 //!
-//! A gate that is never under pressure is a gate that never gates. Every
-//! sequential test below can be passed by a `headroom` that returns `capacity`
-//! unconditionally — an empty ring has room for anything, and most tests start
-//! with an empty ring. `a_stalled_consumer_stops_the_producer_at_exactly_one_lap`
-//! is the one that cannot: it holds one consumer still while the producer runs
-//! a full lap, and asserts the producer stops on the boundary rather than one
-//! slot past it.
+//! A gate that is never under pressure is a gate that never gates. A `headroom`
+//! that returns `capacity` unconditionally passes every sequential test below,
+//! because an empty ring has room for anything and most tests start with an
+//! empty ring. `a_stalled_consumer_stops_the_producer_at_exactly_one_lap`
+//! is the one it cannot pass. That test holds one consumer still while the
+//! producer runs a full lap, and asserts the producer stops on the boundary
+//! rather than one slot past it.
 //!
 //! ## Why the off-by-one gets its own tests
 //!
-//! The lap boundary is exclusive: at a distance of exactly `capacity` the next
-//! claim lands on the slot the slowest consumer is currently reading. Both
-//! adjacent cases are asserted explicitly, in both directions, because an
+//! The lap boundary is exclusive. At a distance of exactly `capacity` the next
+//! claim lands on the slot the slowest consumer is currently reading. The tests
+//! assert both adjacent cases explicitly, in both directions, because an
 //! inclusive boundary passes every "the ring fills up" test and corrupts
-//! exactly one slot per lap under load — the failure that is hardest to
-//! reproduce and easiest to write.
+//! exactly one slot per lap under load. That failure is the hardest to
+//! reproduce and the easiest to write.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -54,7 +53,7 @@ fn set_at(capacity: usize, positions: &[u64]) -> GatingSet {
   set
 }
 
-// ── feature 178: refusing a claim past the minimum ─────────────────────────
+// ── refusing a claim past the minimum ──────────────────────────────────────
 
 #[test]
 fn a_stalled_consumer_stops_the_producer_at_exactly_one_lap() {
@@ -126,8 +125,8 @@ fn a_producer_never_passes_the_limit_over_a_full_lap_with_batches() {
 
 #[test]
 fn the_slowest_consumer_sets_the_bound_regardless_of_position_in_the_set() {
-  // The minimum must not depend on which index the slow consumer occupies —
-  // an implementation reading `cursors[0]` passes half these cases.
+  // The minimum must not depend on which index the slow consumer occupies.
+  // An implementation reading `cursors[0]` passes half these cases.
   for slow_index in 0..3 {
     let mut positions = [100u64; 3];
     positions[slow_index] = 2;
@@ -180,7 +179,7 @@ fn headroom_never_goes_negative_or_wraps() {
 
 #[test]
 fn an_ungated_ring_has_a_full_capacity_of_headroom() {
-  // The distinction the module documentation argues: an empty gating set is
+  // The module documentation argues this distinction. An empty gating set is
   // not a consumer at zero. Were it one, this would read 0 after a lap and
   // every ungated ring would deadlock.
   let ungated = GatingSet::new(cap(4), 0);
@@ -242,9 +241,9 @@ fn a_claim_that_merely_does_not_fit_yet_is_back_pressure() {
 
 #[test]
 fn the_two_failures_are_distinguished_at_the_boundary() {
-  // A claim of exactly `capacity` on a full ring is `Full`, not
-  // `BatchTooLarge` — it would fit if the consumer caught up. Getting this
-  // backwards makes a legitimate retry loop give up.
+  // A claim of exactly `capacity` on a full ring is `Full`, not `BatchTooLarge`,
+  // because it would fit if the consumer caught up. Getting this backwards makes
+  // a legitimate retry loop give up.
   let set = set_at(4, &[0]);
 
   assert_eq!(set.check(Seq(4), 4), Err(RingError::Full));
@@ -296,8 +295,8 @@ fn the_limit_is_one_lap_past_the_slowest_consumer() {
 #[test]
 fn the_limit_is_exactly_where_headroom_reaches_zero() {
   // The two readings must describe the same boundary. A diagnostic that
-  // reported a different blocking point than the gate actually enforces is
-  // worse than no diagnostic.
+  // reported a different blocking point than the gate enforces is worse than
+  // no diagnostic.
   let set = set_at(8, &[3]);
   let limit = set.limit().unwrap();
 
@@ -332,8 +331,8 @@ fn every_cursor_starts_at_zero() {
 #[test]
 fn the_cursors_in_a_set_are_cache_line_separated() {
   // A `GatingSet` is where several consumers' cursors are most likely to end
-  // up adjacent, so it is where false sharing would actually bite. The `Vec`
-  // gives each element a full stride because `PaddedCursor` is a whole line.
+  // up adjacent, so it is where false sharing would bite. The `Vec` gives each
+  // element a full stride because `PaddedCursor` is a whole line.
   let set = GatingSet::new(cap(4), 4);
 
   for window in set.cursors().windows(2) {
@@ -347,27 +346,26 @@ fn the_set_remembers_its_capacity() {
 }
 
 /// Root Cause: The original assertion `headroom <= CAPACITY` is true by
-/// construction for every possible return value of `headroom` — both the
+/// construction for every possible return value of `headroom`. Both the
 /// empty-set arm (`map_or`'s default, `self.capacity.get()`) and the
 /// `free_slots` arm (`saturating_sub` against `capacity`) are bounded by
 /// `capacity` regardless of what the consumer thread does. The race was real;
-/// the assertion was not load-bearing (`docs/non_functional_requirement/002`
-/// GT40).
+/// the assertion could not fail.
 ///
 /// Why Not Caught: The test's name and its own doc comment state the real
 /// property ("must never report more room than existed"), so it reads as
 /// covering it. A tautological assertion passes exactly as loudly whether the
-/// implementation is correct or badly broken — an inclusive-boundary bug that
+/// implementation is correct or badly broken. An inclusive-boundary bug that
 /// reports `CAPACITY` itself still satisfies `<=`, and a swapped argument or a
 /// `Relaxed` read that reports a stale-but-still-in-bounds value passes too.
 ///
-/// Fix Applied: Added the two assertions `docs/non_functional_requirement/002`
-/// itself names as closing the gap. (1) `<=` tightened to `<`: this producer
-/// never reaches `CAPACITY`, so the inclusive-boundary bug is now caught
-/// deterministically. (2) A property assertion comparing the gate's reading
-/// against a cursor load taken immediately after it: consumers only advance,
-/// so `headroom` must never exceed the position the cursor has reached by the
-/// time it is re-read — the actual over-report check the name promised.
+/// Fix Applied: Added the two assertions that close the gap. (1) `<=` tightened
+/// to `<`. This producer never reaches `CAPACITY`, so the inclusive-boundary
+/// bug is now caught deterministically. (2) A property assertion comparing the
+/// gate's reading against a cursor load taken immediately after it. Consumers
+/// only advance, so `headroom` must never exceed the position the cursor has
+/// reached by the time it is re-read. This is the over-report check the name
+/// promised.
 ///
 /// Prevention: When a concurrent test's only assertion is a static bound
 /// derivable from the callee's own signature (a `usize` capped by the
@@ -377,13 +375,13 @@ fn the_set_remembers_its_capacity() {
 /// pass it.
 ///
 /// Pitfall: A test whose name and comment describe the right property can
-/// still assert a strictly weaker one — the mismatch is invisible until
+/// still assert a strictly weaker one. The mismatch is invisible until
 /// someone asks what the assertion would need to look like to fail.
 #[test]
 fn a_gate_read_concurrently_with_a_consumer_never_over_reports_room() {
-  // The gate is read by a producer while consumers advance. It may under-report
-  // headroom — a consumer that moved after the read is simply not yet seen —
-  // but it must never report more room than existed at the moment it looked,
+  // A producer reads the gate while consumers advance. It may under-report
+  // headroom, because a consumer that moved after the read is not yet seen.
+  // But it must never report more room than existed at the moment it looked,
   // because that is the reading a producer overwrites a live slot on.
   const CAPACITY: usize = 64;
   let set = GatingSet::new(cap(CAPACITY), 1);
@@ -410,15 +408,15 @@ fn a_gate_read_concurrently_with_a_consumer_never_over_reports_room() {
   });
 }
 
-/// GT26: `docs/invariant/002`'s manual check M2 is the only thing that would
-/// notice a future direct cursor read naming an ordering here — and being
-/// manual, it only fires if someone remembers to run it. This automates M2's
+/// The manual check M2 in `tests/manual/readme.md` is the only thing that would
+/// notice a future direct cursor read naming an ordering here. Being manual,
+/// it only fires if someone remembers to run it. This automates M2's
 /// own recipe (`grep -vE "^[[:space:]]*(///|//!)" src/lib.rs | grep -oE
 /// "Ordering::[A-Za-z]+|GATING|SeqCell"`) as a `#[ test ]`, so the same
 /// omission fails `cargo test` instead of waiting on a human to grep for it.
-/// Doc-comment lines are excluded exactly as M2 excludes them: five doctest
-/// lines legitimately write `Ordering::Release` to drive a cursor, and a scan
-/// that counted those would reject correct code.
+/// This test excludes doc-comment lines exactly as M2 excludes them. Five
+/// doctest lines legitimately write `Ordering::Release` to drive a cursor, and
+/// a scan that counted those would reject correct code.
 #[test]
 fn crate_names_no_ordering_in_any_non_doc_line() {
   let source = include_str!("../src/lib.rs");
@@ -439,6 +437,6 @@ fn crate_names_no_ordering_in_any_non_doc_line() {
   assert!(
     hits.is_empty(),
     "ring_gating names an ordering or the family's gating-ordering constant in \
-     a non-doc line: {hits:?} — see docs/invariant/002_this_crate_names_no_ordering.md"
+     a non-doc line: {hits:?}. See the crate's \"names no memory ordering\" invariant in src/lib.rs"
   );
 }

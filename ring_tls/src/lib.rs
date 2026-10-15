@@ -1,40 +1,39 @@
 //! Per-thread, bump-allocated, zero-lock append log.
 //!
-//! Tier 2 of the ring family's 33 crates — the concurrency write-path implementation.
-//! Depends on `ring_types`, `ring_atomic` and `ring_batch`.
+//! Part of the ring family's concurrency write path.
 //!
 //! Every thread owns its own buffer and appends to it with no atomics and no
 //! mutexes; a single consolidation step later moves each thread's buffer into
-//! the ring. The thread-local-buffer half of a mechanism more than one
-//! independent consumer needs, factored out to its payload-agnostic append
-//! discipline alone — never the payload vocabulary either consumer encodes
-//! into it.
+//! the ring. This crate is the thread-local-buffer half of a mechanism more
+//! than one independent consumer needs, factored out to its payload-agnostic
+//! append discipline alone, without the payload vocabulary either consumer
+//! encodes into it.
 //!
-//! `docs/feature/175_thread_local_buffer_and_flush_into.md` states the claim in
-//! two halves, and the second is what makes the first worth anything:
+//! The thread-local-buffer feature states the claim in two halves, and the
+//! second is what makes the first worth anything:
 //!
 //! 1. **Accumulation is free.** [`TlsBuffer::push`] performs *zero* atomic
-//!    operations. Not "few" — zero, asserted against `ring_atomic`'s
+//!    operations, not "few". The count is asserted against `ring_atomic`'s
 //!    [`CountingSeq`](ring_atomic::CountingSeq).
 //! 2. **The landing is one operation.** [`TlsBuffer::flush_into`] moves all `N`
 //!    accumulated items into the ring as a **single contiguous claim**, so `N`
 //!    items cost one `fetch_add` between them.
 //!
 //! Half 1 alone would be satisfied by a buffer that then flushed item by item,
-//! paying `N` atomics at the end instead of during — the same total traffic,
-//! moved rather than removed. Half 2 is what actually removes it, and it is
-//! `ring_batch`'s contiguous claim that supplies it.
+//! paying `N` atomics at the end instead of during. That is the same total
+//! traffic, moved rather than removed. Half 2 is what removes it, and
+//! `ring_batch`'s contiguous claim is what supplies it.
 //!
 //! ## What this crate deliberately does not do
 //!
 //! It does not write to the ring. [`TlsBuffer::flush_into`] takes a cursor and
-//! returns the claimed sequences paired with the items — where those items land
+//! returns the claimed sequences paired with the items. Where those items land
 //! is `ring_store`'s and `ring_event`'s business. A `TlsBuffer` that knew how
-//! to write a slot would be a second write path, and feature 182 asks for
+//! to write a slot would be a second write path, and the slot feature asks for
 //! exactly one.
 //!
 //! It also does not decide *when* to flush. The buffer reports full and refuses
-//! the push; the policy that reacts is `ring_flush`'s (feature 176).
+//! the push; the policy that reacts is `ring_flush`'s.
 
 #![deny(missing_docs)]
 
@@ -46,7 +45,7 @@ use ring_types::{RingError, Seq};
 
 /// A thread's private staging area: append cheaply, land once.
 ///
-/// Owned by one thread and never shared — there is no interior mutability and
+/// Owned by one thread and never shared. There is no interior mutability and
 /// no `Sync` requirement on `T`, because the type's whole reason to exist is
 /// that nothing crosses a thread boundary until [`TlsBuffer::flush_into`] runs.
 ///
@@ -101,15 +100,15 @@ impl<T> TlsBuffer<T> {
   /// # Errors
   ///
   /// [`RingError::Full`] when the buffer already holds `capacity()` items. The
-  /// refused item is not returned to the caller: `item` is moved into this
+  /// refused item is not returned to the caller. `item` is moved into this
   /// function, and on the refusal path it is bound, never read, and dropped
-  /// when the function returns — the same as any other value that goes out of
+  /// when the function returns, the same as any other value that goes out of
   /// scope. Callers holding a `T` that owns a resource should check
   /// [`Self::is_full`] before calling.
   ///
   /// This is the sole insertion point into `items`. The zero-allocation
-  /// guarantee — `with_capacity` allocates once and nothing after it grows —
-  /// rests entirely on the `>=` check above running before every insertion; a
+  /// guarantee says `with_capacity` allocates once and nothing grows after it.
+  /// It rests entirely on the `>=` check above running before every insertion. A
   /// second path into `items` that skipped it would silently restore the
   /// growth this type exists to forbid, since nothing else in the crate
   /// checks for one.
@@ -175,7 +174,7 @@ impl<T> TlsBuffer<T> {
   ///
   /// The shutdown path: a thread going away with staged items has no ring to
   /// land them in. Distinct from a flush precisely because it advances no
-  /// cursor — sequences claimed for items nobody writes would leave a
+  /// cursor. Sequences claimed for items nobody writes would leave a
   /// permanent hole a consumer would wait on forever.
   ///
   /// ```
@@ -191,21 +190,19 @@ impl<T> TlsBuffer<T> {
 
   /// Take everything staged, in staging order, claiming no sequences.
   ///
-  /// The `drain` primitive of the three
-  /// [`docs/api/002_consolidator_read_surface.md`](../docs/api/002_consolidator_read_surface.md)
-  /// specifies. [`TlsBuffer::flush_into`] is claim-and-drain fused, which is
+  /// The `drain` operation of the consolidator's three read operations.
+  /// [`TlsBuffer::flush_into`] is claim-and-drain fused, which is
   /// the right shape when the destination is a sequenced ring; it is the wrong
   /// shape when the destination decides for itself whether it can accept the
   /// batch, because the claim is unconditional and the buffer is emptied
   /// whether the records land or not.
   ///
-  /// `ring_flush` is the caller that needs the split: it checks the ring's free
+  /// `ring_flush` is the caller that needs the split. It checks the ring's free
   /// capacity *before* touching the buffer, so that a refusal leaves the
-  /// records staged and retryable rather than claimed and stranded
-  /// (`ring_flush/docs/algorithm/002_sequencing_seal_drain_reset.md`'s O3/O4).
+  /// records staged and retryable rather than claimed and stranded.
   ///
-  /// **The buffer empties when the returned iterator drops, consumed or not** —
-  /// `Vec::Drain`'s own contract, and the reason a caller that might not accept
+  /// **The buffer empties when the returned iterator drops, consumed or not.**
+  /// That is `Vec::Drain`'s own contract, and the reason a caller that might not accept
   /// every record must decide before calling rather than after.
   ///
   /// ```
@@ -225,20 +222,20 @@ impl<T> TlsBuffer<T> {
   /// Claim one contiguous run for everything staged, and hand back the items
   /// paired with the sequences they now own.
   ///
-  /// One `fetch_add` regardless of how many items are staged — the amortisation
-  /// feature 175 is about. The buffer is left empty whether or not the returned
-  /// [`Flush`] is fully consumed, because the sequences are already claimed:
-  /// abandoning items mid-drain would leave sequences owned by nothing.
+  /// One `fetch_add` regardless of how many items are staged, which is the amortisation
+  /// this crate is about. The buffer is left empty whether or not the returned
+  /// [`Flush`] is fully consumed, because the sequences are already claimed,
+  /// and abandoning items mid-drain would leave sequences owned by nothing.
   ///
-  /// Flushing an empty buffer is legal and claims nothing — a zero-length
+  /// Flushing an empty buffer is legal and claims nothing. A zero-length
   /// `fetch_add` still costs one atomic, which is why a caller in a hot loop
   /// should check [`TlsBuffer::is_empty`] first. This function does not check
-  /// on the caller's behalf: a silent skip would make the operation count
+  /// on the caller's behalf, because a silent skip would make the operation count
   /// depend on the data, and the whole point of the counting shim is that it
   /// does not.
   ///
-  /// `order` must include release semantics — `Release`, `AcqRel`, or
-  /// `SeqCst` — or the claim still lands correct, non-overlapping sequences
+  /// `order` must include release semantics: `Release`, `AcqRel`, or
+  /// `SeqCst`. Otherwise the claim still lands correct, non-overlapping sequences
   /// but the items behind them are never made visible to a consumer reading
   /// the cursor. `Relaxed` and `Acquire` compile and return a valid-looking
   /// [`Flush`]; the failure then surfaces downstream, in `ring_flush` or
@@ -279,8 +276,8 @@ impl<T> TlsBuffer<T> {
 /// The staged items, each paired with the sequence it landed on.
 ///
 /// Yields in staging order against ascending sequences, which is what preserves
-/// a thread's own ordering through the merge — hard problem 118's requirement
-/// that a system's writes survive consolidation in the order it made them.
+/// a thread's own ordering through the merge. That is the requirement that a
+/// system's writes survive consolidation in the order it made them.
 ///
 /// Dropping this without consuming it still empties the buffer and still leaves
 /// the cursor advanced; see [`TlsBuffer::flush_into`].
@@ -294,8 +291,8 @@ pub struct Flush<'a, T> {
 impl<T> Flush<'_, T> {
   /// The sequence range this flush claimed.
   ///
-  /// Available before consuming the iterator, so a caller can gate on the range
-  /// — check it against a consumer barrier, say — before it starts writing.
+  /// Available before consuming the iterator, so a caller can gate on the range,
+  /// for example by checking it against a consumer barrier, before it starts writing.
   #[must_use]
   pub const fn claim(&self) -> BatchClaim {
     self.claim

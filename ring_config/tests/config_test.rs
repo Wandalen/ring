@@ -1,13 +1,13 @@
-//! Tests for `ring_config` — the record every ring is built from.
+//! Tests for `ring_config`, the record every ring is built from.
 //!
 //! Claims the configuration half of
 //! `docs/feature/180_ring_config_and_factory.md`. Its acceptance criterion is
 //! that `RingConfig` carries capacity, wait kind, overflow policy, producer
-//! count and batch size, and that each field is *observable* one at a time —
-//! the factory half, which asserts a built ring's behaviour matches each field,
-//! is `ring_factory`'s and lands at stage S7.
+//! count and batch size, and that each field is *observable* one at a time.
+//! The factory half, which asserts a built ring's behaviour matches each field,
+//! is `ring_factory`'s.
 //!
-//! The clamping behaviour below is the part worth testing hardest: a builder
+//! The clamping behaviour below is the part worth testing hardest. A builder
 //! that silently corrects an impossible value is only safe if the correction is
 //! specified, because a caller cannot tell a clamped value from an honoured one
 //! by reading its own code.
@@ -53,8 +53,8 @@ fn capacity_is_validated_at_construction() {
   assert!(RingConfig::new(65_536).is_ok());
 }
 
-/// Each setter changes exactly its own field and leaves the other four alone —
-/// the property that makes a builder chain readable in any order.
+/// Each setter changes exactly its own field and leaves the other four alone.
+/// That property makes a builder chain readable in any order.
 #[test]
 fn each_setter_is_independent() {
   let base = RingConfig::new(16).unwrap();
@@ -100,12 +100,13 @@ fn setters_commute() {
 }
 
 /// `setters_commute` above proves order-independence only where neither clamp
-/// fires — `docs/invariant/002` (RC24) names that as the easy half, since the
-/// one setter with a cross-field read (`with_batch`, against `capacity`) is
-/// exercised only on the path where that read has no visible effect. This is
-/// the interesting half: every one of the 4! = 24 orderings of the four
-/// setters, with `with_producers` and `with_batch` both given values that
-/// actually clamp, must still land on the same record.
+/// fires.
+///
+/// That is the easy half, since it exercises the one setter with a cross-field
+/// read (`with_batch`, against `capacity`) only on the path where that read has
+/// no visible effect. This is the interesting half. Every one of the 4! = 24
+/// orderings of the four setters, with `with_producers` and `with_batch` both
+/// given values that actually clamp, must still land on the same record.
 #[test]
 fn setters_commute_when_both_clamps_fire() {
   #[derive(Clone, Copy)]
@@ -175,9 +176,9 @@ fn zero_producers_clamps_to_one() {
   assert!(!RingConfig::new(8).unwrap().with_producers(0).is_multi_producer());
 }
 
-/// A batch is clamped into `1..=capacity` at both ends: zero would publish
-/// nothing, and larger than the ring can never be served however much draining
-/// happens.
+/// A batch is clamped into `1..=capacity` at both ends. Zero would publish
+/// nothing, and a batch larger than the ring can never be served however much
+/// draining happens.
 #[test]
 fn batch_clamps_into_one_through_capacity() {
   let cfg = RingConfig::new(16).unwrap();
@@ -191,9 +192,9 @@ fn batch_clamps_into_one_through_capacity() {
   assert_eq!(RingConfig::new(2).unwrap().with_batch(999).batch(), 2);
 }
 
-/// `with_batch` and `with_producers` are infallible and silent — the only way
-/// a caller learns a clamp fired is exactly this: keep the value asked for and
-/// compare it to what came back.
+/// `with_batch` and `with_producers` are infallible and silent. The only way a
+/// caller learns a clamp fired is to keep the value asked for and compare it to
+/// what came back.
 #[test]
 fn a_caller_can_detect_a_clamp_by_comparing_what_they_asked_for() {
   let requested_batch = 999;
@@ -207,7 +208,7 @@ fn a_caller_can_detect_a_clamp_by_comparing_what_they_asked_for() {
   assert_eq!(cfg.producers(), 1);
 }
 
-/// The one derived reading a factory branches on: a single-producer ring must
+/// The one derived reading a factory branches on. A single-producer ring must
 /// not pay for the contended claim it does not need.
 #[test]
 fn multi_producer_is_derived_from_the_count() {
@@ -218,7 +219,7 @@ fn multi_producer_is_derived_from_the_count() {
   assert!(cfg.with_producers(64).is_multi_producer());
 }
 
-/// Tick-safety is exactly non-blocking waiting — the constraint feature 183
+/// Tick-safety is exactly non-blocking waiting, the constraint the tick path
 /// puts on what a system may reach.
 #[test]
 fn tick_safety_is_exactly_non_blocking_waiting() {

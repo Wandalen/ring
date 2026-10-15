@@ -1,38 +1,37 @@
-//! C2 of `docs/non_functional_requirement/002_the_decision_costs_nothing_on_the_append_path.md`
-//! — as close to "the append path allocates nothing" as this crate can get.
+//! As close a test of "the append path allocates nothing" as this crate can
+//! get.
 //!
 //! # Why this is a proxy and not the measurement
 //!
-//! C2 as specified wants a counting global allocator. That is not available
-//! here, and the obstacle is structural rather than incidental: `GlobalAlloc`
-//! is an unsafe trait, the workspace sets `unsafe-code = "deny"`, and gate G6
-//! confines the opt-out to three declared crates — `ring_spsc`, `ring_mpsc`,
-//! `ring_core` — each justifying it in its own
-//! `docs/workaround/readme.md`.
+//! The requirement as specified wants a counting global allocator. That is
+//! not available here, and the obstacle is structural rather than incidental:
+//! `GlobalAlloc` is an unsafe trait, the workspace sets `unsafe-code = "deny"`,
+//! and gate G6 confines the opt-out to the crates declared in
+//! `bench_harness/gate/declared/ring/unsafe_allowlist.txt`, each of which must
+//! justify it in its own `docs/workaround/readme.md`.
 //!
 //! **G6 scans `src/` only, so an `#![allow(unsafe_code)]` in this file would
-//! pass the gate.** It would also defeat the gate's stated purpose — keeping
-//! the escape hatch enumerated rather than letting it spread crate by crate —
+//! pass the gate.** It would also defeat the gate's stated purpose of keeping
+//! the escape hatch enumerated rather than letting it spread crate by crate,
 //! and a measurement bought that way is worth less than the gate it cost. Not
 //! done.
 //!
 //! So what is asserted here is the strongest *safe* proxy: the staging buffer's
 //! capacity does not change across `N` appends. A `Vec` that did not grow did
-//! not reallocate, and growth is the realistic defect — a buffer that silently
+//! not reallocate, and growth is the realistic defect. A buffer that silently
 //! expands instead of refusing turns a bounded stage into an unbounded one and
 //! puts an amortised allocation on the hot path.
 //!
 //! | Defect | Caught here |
 //! |---|---|
-//! | The staging buffer grows instead of refusing | **Yes** — capacity changes |
-//! | `append` allocates per record (boxing, a temporary `Vec`) | **No** — needs the real allocator |
-//! | An unobserved driver allocates for its absent log | Partly — via the absence of growth, not directly |
+//! | The staging buffer grows instead of refusing | **Yes**, capacity changes |
+//! | `append` allocates per record (boxing, a temporary `Vec`) | **No**, needs the real allocator |
+//! | An unobserved driver allocates for its absent log | Partly, via the absence of growth, not directly |
 //!
-//! Recorded as a proxy in the instance rather than as a discharge of C2. The
-//! real measurement belongs in `ring_testkit` (feature 188), which is the one
-//! place a counting allocator could be justified once for every crate that
-//! needs one — option three of the instance's own table, and now forced by G6
-//! rather than merely preferred.
+//! This is a proxy rather than a discharge of the requirement. The real
+//! measurement belongs in `ring_testkit`, which is the one place a counting
+//! allocator could be justified once for every crate that needs one. G6 now
+//! forces that choice rather than merely preferring it.
 //!
 //! # What this file *does* discharge outright
 //!
@@ -43,7 +42,7 @@
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure. Without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -61,15 +60,15 @@ fn ring(slots: usize) -> Ring<u32> {
 
 /// The staging buffer does not grow across `N` appends, for any policy.
 ///
-/// The proxy for C2. Capacity is read before and after; a `Vec` that did not
-/// reallocate reports the same number.
+/// The proxy for the allocation requirement. Capacity is read before and
+/// after; a `Vec` that did not reallocate reports the same number.
 #[test]
 fn appending_never_grows_the_staging_buffer() {
   const N: u32 = 512;
 
-  // `OnBatch( N )` rather than anything larger: N2 caps the batch size at the
+  // `OnBatch( N )` rather than anything larger, because validation caps the batch size at the
   // buffer's capacity, so `OnBatch( 600 )` against a 512-record buffer is
-  // rejected at binding — correctly, and it is `an_unusable_batch_size_is_refused_at_binding`'s
+  // rejected at binding. That is correct, and it is `an_unusable_batch_size_is_refused_at_binding`'s
   // job to say so. The batch still never fires here, because nothing drives.
   for policy in [FlushPolicy::OnBarrier, FlushPolicy::OnFull, FlushPolicy::OnBatch(N as usize)] {
     let mut r = ring(1024);
@@ -95,9 +94,9 @@ fn appending_never_grows_the_staging_buffer() {
 
 /// A full staging buffer refuses rather than growing.
 ///
-/// The other half of the proxy, and the one that would actually fail first if
-/// the refusal were ever removed: capacity staying constant is only meaningful
-/// if the buffer is genuinely driven to its limit.
+/// The other half of the proxy, and the one that would fail first if the
+/// refusal were ever removed. Capacity staying constant is only meaningful if
+/// the buffer is driven to its limit.
 #[test]
 fn a_full_staging_buffer_refuses_and_keeps_its_capacity() {
   let mut r = ring(1024);
@@ -145,9 +144,8 @@ fn a_drive_that_does_not_fire_changes_nothing() {
 
 /// A driver given no log never acquires one, however much it flushes.
 ///
-/// [`docs/decisions/readme.md`]'s Pending 2 as an assertion rather than as
-/// prose: the claim that dissolved the pending decision is that an unobserved
-/// driver pays nothing for the instrument it was not given. Exact — `log()`
+/// The claim that an unobserved driver pays nothing for the instrument it was
+/// not given, as an assertion rather than as prose. Exact, because `log()`
 /// returning `None` is not a proxy for anything.
 #[test]
 fn an_unobserved_driver_never_acquires_a_log() {

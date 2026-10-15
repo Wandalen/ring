@@ -1,77 +1,54 @@
-# workaround
+# `ring_store` opts out of the workspace unsafe-code deny for two unchecked index expressions
 
-A crate this small has room for exactly one workaround, and it turns out to be
-the whole crate. `Buffer::new` is three lines that look like they could be one,
-and the storage they build is a heap allocation in a data structure normally
-chosen for not making any. Both are routes around constraints that cannot be
-removed, and neither says so where it is.
+Status: Accepted
 
-The two instances take the constraints in the order a reader meets them: first
-the pair that shapes the three lines — no `unsafe`, and no `Clone` bound to
-spend — then the one that shapes the type itself, which is that a ring's
-capacity has to survive coming from a config file. What comes out is a crate
-whose every apparent redundancy is load-bearing and whose every load-bearing
-line is unexplained.
+## Context
 
-### Overview Table
+The workspace sets `unsafe-code = "deny"` and `undocumented_unsafe_blocks = "deny"`.
+`ring_store::Buffer` owns the slot allocation both rings index into. Two hot
+indexing sites — `Buffer::at`/`at_mut` (slot by masked sequence) — paid a bounds
+check per access that the compiler cannot remove: it cannot see that `mask() + 1`
+equals the allocation length. The `stages` benchmarks measured the check at ~10%
+on slot-heavy paths (fused push, batch claim), flat where atomics dominate. A
+length-masked safe spelling was benched first and keeps the check; only the
+unchecked form measures faster.
 
-| ID | Name | Covers |
-|----|------|--------|
-| 001 | [Three Steps to Avoid Two Bounds](001_three_steps_to_avoid_two_bounds.md) | BF50, BF51 — what each construction step buys, and what a drifting argument would cost |
-| 002 | [Capacity Is a Value, Width Is a Type](002_capacity_is_a_value_width_is_a_type.md) | BF52, BF53 — the heap as the price of a configurable capacity, and the opposite choice next to it |
+`bench_harness/gate/declared/ring/unsafe_allowlist.txt` names this crate, and
+gate G6 requires this file to justify the opt-out.
 
-### The Constraints and What Routes Around Them
+## Decision
 
-| Constraint | Where it is set | The route | What the route costs |
-|------------|-----------------|-----------|---------------------|
-| No `unsafe` | `Cargo.toml:227` | Build a `Vec`, freeze it | An intermediate `Vec` and a length that must match |
-| No `Clone` on `Slot` | `ring_slot/src/lib.rs:41` — no supertraits | `resize_with( n, S::default )` | Three lines instead of `vec![ .. ; n ]` |
-| Capacity must be runtime | `ring_config/src/lib.rs:65` — `new( slots : usize )` | `Box< [ S ] >` rather than `[ S; CAP ]` | One heap allocation per ring |
+`ring_store` carries `#![allow(unsafe_code)]`, and its unsafe code is confined
+to these two expressions:
 
-Each row's route is correct, each is the best available, and none of the three
-is named at the code that takes it. That is the pattern this definition records:
-the crate is not doing anything clever, it is doing the only remaining thing, and
-the difference is invisible from the source.
+- `Buffer::at` / `Buffer::at_mut`: `get_unchecked` on a mask-folded index.
 
-### The One That Could Silently Break
+These rules bound it:
 
-Only `workaround/001`'s second finding describes a live edit hazard. The two
-arguments to `Vec::with_capacity` and `Vec::resize_with` must be equal, they are
-the same expression written twice, and if they ever stop agreeing the
-`into_boxed_slice` shrink adds a reallocation — measured, silent, and caught by
-no test. The other constraints fail loudly: removing `resize_with` in favour of
-`vec!` does not compile, and reaching for an array capacity would break
-`ring_config`'s signature immediately.
+- No unsafe API is public and no aliasing is involved. Both functions return
+  shared or exclusive borrows the borrow checker already tracks; the unchecked
+  access removes only the range check, and the range is provable from fields
+  this crate owns: `of()` folds through `capacity.mask()`, and `Buffer::new`
+  allocates exactly `capacity` slots with no reallocation path. This is
+  deliberately narrower than the aliasing unsafe the family ruled `ring_store`
+  cannot encapsulate (see the allowlist's own history): that verdict is about
+  shared `&mut` across threads, which needs cursor knowledge this crate does
+  not hold. A range proof needs only the allocation this crate does hold.
+- The arbitrary-index `Buffer::get` / `get_mut` stay checked, with their
+  documented panic contract unchanged. Only the mask-folded path skips the
+  check, and only that path can prove it sound.
+- Every block carries a `// SAFETY:` comment naming the two facts above.
 
-### Regenerate
+## Alternatives considered
 
-```sh
-cd "$(git rev-parse --show-toplevel)"
-
-# the three steps, whole
-command grep -m1 -B1 -A5 -F '  pub fn new( capacity : Capacity ) -> Self' ring_store/src/lib.rs
-
-# the constraints they route around
-grep -n 'unsafe-code' Cargo.toml
-grep -n 'pub trait Slot' ring_slot/src/lib.rs
-command grep -m1 -A7 -F '  pub fn new( slots : usize ) -> Result< Self, RingError >' ring_config/src/lib.rs
-
-# both size parameters on one line
-command grep -m1 -F '  /// let buffer : Buffer< BytesSlot< 8 > > = Buffer::new( Capacity::new( 16 ).unwrap() );' ring_store/src/lib.rs
-
-# every library construction of a Buffer
-grep -rn 'Buffer::new' ring_*/src/*.rs | grep -vE ':[[:space:]]*(///|//!|//)' | sort
-```
-
-Allocation and reallocation counts for the four candidate constructions come
-from a release probe under a counting global allocator; the `Clone` rejection
-comes from a `rustc` compile probe. Both are quoted in `workaround/001`.
-
-### Findings Recorded Here
-
-| ID | Subject | Tier | Finding |
-|----|---------|------|---------|
-| BF50 | `ring_store` | n/a — doc gap | `new`'s three steps are the intersection of the workspace `unsafe` denial and a `Clone` bound the `Slot` trait does not carry — `vec![ S::default(); n ]` fails to compile under `new`'s `S : Default` and would propagate `Clone` to the payload if the bound were added — and neither constraint is named at the call site |
-| BF51 | `ring_store` | n/a — coverage | The two `capacity.get()` arguments must stay equal or `into_boxed_slice` shrinks and reallocates, measured at 1 alloc + 1 realloc, breaking the allocate-once property silently with no test asserting it; `with_capacity` is measurably redundant today but is the only form the API guarantees |
-| BF52 | `ring_store` | n/a — doc gap | The heap allocation is the price of keeping capacity a runtime value, and `ring_config::new( slots : usize ) -> Result` is the concrete signature that makes a const-generic capacity impossible — a whole design was traded here and nothing in either crate records it |
-| BF53 | `ring_store` | n/a — observation | Slot width is a const generic and slot count is a runtime value, meeting on one line of this crate's own doc example, under a coherent rule — a size that changes the type is a type parameter, a size that changes only the count is a value — that appears in neither crate |
+- **Keep the check.** Costs ~10% on the slot-heavy paths for a condition that
+  is provably always true. The check guards against a caller mixing two rings'
+  capacities — but that caller reaches this code only through `at`, which
+  folds with this buffer's own capacity, so the guarded case cannot arise here.
+- **Mask by the slice's own length (safe).** Benched on `write`, `fused` and
+  `claim/mpsc_batch32`: within noise of the checked baseline, well short of
+  the unchecked form. The compiler does not remove the check in this call
+  shape, so the safe spelling pays for safety it cannot deliver.
+- **Move the unchecked fold into the rings.** Duplicates the one fold
+  `ring_index` exists to be the only one of, and still needs buffer internals
+  the rings cannot reach without breaking the crate boundary.

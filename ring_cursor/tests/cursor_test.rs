@@ -1,8 +1,7 @@
-//! `ring_cursor` — the padded cursor and the pair it comes in.
+//! `ring_cursor`'s padded cursor and the pair it comes in.
 //!
 //! This file carries the reached-test for `docs/feature/169_padded_cursor.md`,
-//! stated in `ring/bench_harness/docs/acceptance/001_feature_reached_tests.md`
-//! as three clauses: `align_of::<PaddedCursor>() == 64`,
+//! which has three clauses: `align_of::<PaddedCursor>() == 64`,
 //! `size_of::<PaddedCursor>() == 64`, and two `PaddedCursor` values in one
 //! struct sitting at least 64 bytes apart.
 //!
@@ -11,7 +10,7 @@
 //! Each of the first two is satisfiable while the feature fails.
 //!
 //! A type of size 8 with `align_of == 64` satisfies the first clause and packs
-//! two neighbours 8 bytes apart in an array — alignment says where a value may
+//! two neighbours 8 bytes apart in an array, because alignment says where a value may
 //! start, not how much room it occupies. A type of size 64 with `align_of == 8`
 //! satisfies the second and can start at offset 8, straddling two lines and
 //! sharing both. Only the conjunction says "one per line".
@@ -23,17 +22,17 @@
 //!
 //! ## What is not asserted here, and why
 //!
-//! That the padding *makes anything faster*. That is feature 186's job and
-//! `ring_bench`'s file: a padded-versus-unpadded verdict is a measurement under
-//! contention, not a unit test, and asserting a timing here would produce a
-//! test that fails on a loaded CI box for reasons that have nothing to do with
-//! the code. What this file establishes is that the layout the measurement will
-//! be taken on is actually the layout claimed.
+//! That the padding *makes anything faster*. That is `ring_bench`'s job. A
+//! padded-versus-unpadded verdict is a measurement under contention, not a unit
+//! test, and asserting a timing here would produce a test that fails on a
+//! loaded CI box for reasons that have nothing to do with the code. What this
+//! file establishes is that the layout the measurement will be taken on is the
+//! layout claimed.
 
 // Ordinary tests, compiled out under `--cfg loom`. That cfg swaps
 // `ring_atomic`'s atomics for loom's instrumented ones across the whole
 // family, and those panic the moment they are touched outside a
-// `loom::model` closure — so without this gate a family-wide loom run dies
+// `loom::model` closure, so without this gate a family-wide loom run dies
 // here instead of reaching the models in `ring_spsc`, `ring_mpsc`,
 // `ring_publish` and `ring_testkit`.
 #![cfg(not(loom))]
@@ -49,7 +48,7 @@ fn cap(slots: usize) -> Capacity {
   Capacity::new(slots).expect("test capacities are powers of two")
 }
 
-// ── feature 169: the three-clause reached-test ─────────────────────────────
+// ── the three-clause reached-test ──────────────────────────────────────────
 
 #[test]
 fn a_padded_cursor_occupies_exactly_one_cache_line() {
@@ -88,7 +87,7 @@ fn two_cursors_in_one_struct_are_at_least_a_line_apart() {
 #[test]
 fn the_gap_survives_the_pair_being_moved() {
   // A struct's field offsets are fixed at compile time, so this cannot fail
-  // for a live `CursorPair` — which is the point. The assertion exists to
+  // for a live `CursorPair`, and that is the point. The assertion exists to
   // catch a future layout where the two cursors stop being separate fields.
   let pair = CursorPair::new(cap(2));
   let boxed = Box::new(pair);
@@ -107,8 +106,8 @@ fn every_cursor_starts_on_a_line_boundary() {
 
 #[test]
 fn an_array_of_cursors_gives_each_its_own_line() {
-  // The array case is where alignment-without-size would fail: `align_of`
-  // constrains only the first element's address, `size_of` constrains the
+  // The array case is where alignment-without-size would fail. `align_of`
+  // constrains only the first element's address; `size_of` constrains the
   // stride between all of them.
   let cursors: [PaddedCursor; 4] = Default::default();
 
@@ -190,8 +189,9 @@ fn free_slots_falls_as_the_producer_advances() {
 
 #[test]
 fn exactly_one_lap_ahead_is_full_and_one_less_is_not() {
-  // The off-by-one feature 178 calls a lap bug: at a distance of exactly
-  // `capacity` the next claim lands on the slot the consumer is currently on.
+  // The off-by-one the sequence-barrier feature calls a lap bug. At a distance
+  // of exactly `capacity` the next claim lands on the slot the consumer is
+  // currently on.
   let pair = CursorPair::new(cap(4));
 
   pair.producer().store(Seq(3), Ordering::Release);
@@ -248,7 +248,7 @@ fn pending_is_the_distance_the_consumer_still_has_to_travel() {
 #[test]
 fn pending_ignores_capacity_and_free_slots_does_not() {
   // `pending` counts unread publications, which can exceed a ring's capacity
-  // only if the producer overran — a state the gating exists to prevent. The
+  // only if the producer overran, a state the gating exists to prevent. The
   // two readings answer different questions and must not be conflated.
   let small = CursorPair::new(cap(2));
   let large = CursorPair::new(cap(64));
@@ -263,8 +263,8 @@ fn pending_ignores_capacity_and_free_slots_does_not() {
 
 #[test]
 fn a_capacity_of_one_still_has_room_for_one() {
-  // The smallest legal ring. `Capacity::new(1)` is valid — one is a power of
-  // two — and the boundary arithmetic must not treat it as degenerate.
+  // The smallest legal ring. `Capacity::new(1)` is valid, since one is a power
+  // of two, and the boundary arithmetic must not treat it as degenerate.
   let pair = CursorPair::new(cap(1));
 
   assert_eq!(pair.free_slots(), 1);
@@ -281,6 +281,9 @@ fn the_pair_reads_both_cursors_for_every_reading() {
   // a consumer at zero and the wrong one for every other consumer. Moving only
   // the consumer must change all three readings.
   let pair = CursorPair::new(cap(8));
+  // Exactly one lap ahead, so `may_claim` is false here and flips once the
+  // consumer moves. A smaller value leaves it true on both sides and fails the
+  // third assertion on correct code.
   pair.producer().store(Seq(8), Ordering::Release);
 
   let (free, pending, claimable) = (pair.free_slots(), pair.pending(), pair.may_claim());
@@ -291,7 +294,7 @@ fn the_pair_reads_both_cursors_for_every_reading() {
   assert_ne!(pair.may_claim(), claimable);
 }
 
-// ── the two cursors are genuinely independent ──────────────────────────────
+// ── the two cursors are independent ────────────────────────────────────────
 
 #[test]
 fn writing_one_cursor_leaves_the_other_alone() {
@@ -310,7 +313,7 @@ fn writing_one_cursor_leaves_the_other_alone() {
 #[test]
 fn two_threads_advancing_two_cursors_do_not_lose_writes() {
   // The shape the padding is for: one thread on each cursor, concurrently.
-  // The assertion is correctness, not speed — every increment must land.
+  // The assertion is about correctness, not speed. Every increment must land.
   const PER_THREAD: u64 = 10_000;
 
   let pair = CursorPair::new(cap(1024));
@@ -318,15 +321,17 @@ fn two_threads_advancing_two_cursors_do_not_lose_writes() {
   std::thread::scope(|scope| {
     scope.spawn(|| {
       for _ in 0..PER_THREAD {
-        // Fix(AT5): the claim is deliberately discarded — this loop counts advances,
-        // it does not consume the ranges they hand out.
+        // Fix(counting_loops_discard_their_claims): the claim is deliberately
+        // discarded. This loop counts advances and does not consume the ranges they
+        // hand out.
         let _ = pair.producer().fetch_add(1, Ordering::AcqRel);
       }
     });
     scope.spawn(|| {
       for _ in 0..PER_THREAD {
-        // Fix(AT5): the claim is deliberately discarded — this loop counts advances,
-        // it does not consume the ranges they hand out.
+        // Fix(counting_loops_discard_their_claims): the claim is deliberately
+        // discarded. This loop counts advances and does not consume the ranges they
+        // hand out.
         let _ = pair.consumer().fetch_add(1, Ordering::AcqRel);
       }
     });
@@ -348,8 +353,9 @@ fn many_producers_on_one_cursor_lose_nothing() {
     for _ in 0..THREADS {
       scope.spawn(|| {
         for _ in 0..PER_THREAD {
-          // Fix(AT5): the claim is deliberately discarded — this loop counts advances,
-          // it does not consume the ranges they hand out.
+          // Fix(counting_loops_discard_their_claims): the claim is deliberately
+          // discarded. This loop counts advances and does not consume the ranges they
+          // hand out.
           let _ = cursor.fetch_add(1, Ordering::AcqRel);
         }
       });
@@ -364,8 +370,8 @@ fn many_producers_on_one_cursor_lose_nothing() {
 #[test]
 fn a_padded_cursor_is_its_atomic_and_nothing_else() {
   // 64 bytes of which 8 carry a sequence. If the type ever grows a field, the
-  // size stops being CACHE_LINE and the first test catches it — but this one
-  // says why that would be wrong: the padding is meant to be empty, not to be
+  // size stops being CACHE_LINE and the first test catches it. This one says
+  // why that would be wrong. The padding is meant to be empty, not to be
   // budget for state that belongs elsewhere.
   assert_eq!(core::mem::size_of::<PaddedCursor>(), CACHE_LINE);
   assert_eq!(core::mem::size_of::<core::sync::atomic::AtomicU64>(), 8);
@@ -373,7 +379,7 @@ fn a_padded_cursor_is_its_atomic_and_nothing_else() {
 
 #[test]
 fn a_pair_is_two_lines_plus_its_capacity() {
-  // Not pinned to an exact number: the capacity's own placement within the
+  // Not pinned to an exact number, because the capacity's own placement within the
   // struct's trailing padding is the compiler's business. What must hold is
   // that the pair is at least its two cursors, and that adding the capacity
   // did not cost a third line of padding.

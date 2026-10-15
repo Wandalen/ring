@@ -1,18 +1,17 @@
-# ring_trace — manual testing plan
+# ring_trace manual testing plan
 
-`tests/trace_test.rs` asserts the two numbers
-`docs/feature/185_ring_stats.md` names for this crate: one entry per operation
-when enabled, zero when not. A test can count entries. It cannot check the
-thing that actually matters about the disabled path — that it **returns before
-touching the lock** — because a disabled trace that took and released the mutex
-on every call would record zero entries and pass every assertion, while putting
-a contended lock on the exact path this family exists to measure.
+`tests/trace_test.rs` asserts one entry per operation when the trace is enabled
+and zero when it is not. A test can count entries. It cannot check what
+matters about the disabled path, that it **returns before touching the lock**.
+A disabled trace that took and released the mutex on every call would record
+zero entries and pass every assertion, while putting a contended lock on the
+exact path this family exists to measure.
 
 That is a source property, so this plan reads the source.
 
 Run from the workspace root.
 
-## M1 — the disabled path returns before the lock
+## M1. The disabled path returns before the lock
 
 ```bash
 sed -n '/  pub fn record(/,/^  }/p' ring_trace/src/lib.rs
@@ -22,11 +21,15 @@ sed -n '/  pub fn record(/,/^  }/p' ring_trace/src/lib.rs
 any mutex access. A trace switched off must cost a predictable-branch read of a
 `bool` and nothing more.
 
-## M2 — every lock access goes through one place
+## M2. Every lock access goes through one place
 
-Four read methods and one write method all touch the same mutex. If each
+Every method that reads or writes the log touches the same mutex. If each
 handles a poisoned lock its own way, they will disagree about what a poisoned
-trace means, and the disagreement will surface as a diagnostic that lies.
+trace means, and the disagreement will surface as a diagnostic that lies. A
+site that panics on poison kills the producer thread the trace was added to
+observe. A site that reports `0` makes "nothing happened" and "the log broke"
+read the same. No test can poison the lock, so only reading the call sites side
+by side finds this.
 
 ```bash
 grep -nE "\.lock\(\)|entries_guard" ring_trace/src/lib.rs
@@ -35,7 +38,7 @@ grep -nE "\.lock\(\)|entries_guard" ring_trace/src/lib.rs
 **Expected:** exactly one `.lock()` call in the whole file, inside
 `entries_guard`, and every other site calling `entries_guard()`.
 
-## M3 — poisoning is recovered, and the choice is argued
+## M3. Poisoning is recovered, and the choice is argued
 
 ```bash
 grep -n -B 4 -A 4 "unwrap_or_else" ring_trace/src/lib.rs
@@ -43,16 +46,17 @@ grep -n -A 10 "Every access recovers from poisoning" ring_trace/src/lib.rs
 ```
 
 **Expected:** `PoisonError::into_inner` recovery, and a written argument for why
-recovery is right *here* — that a `Vec<TraceEntry>` has no invariant a panic
-could half-establish, so there is nothing for poisoning to protect.
+recovery is right *here*. The argument is that a `Vec<TraceEntry>` has no
+invariant a panic could half-establish, so there is nothing for poisoning to
+protect.
 
 Note the reachability limit, which is the reason this is a manual check and not
-a test: no public method can poison the lock, because every guard is held across
+a test. No public method can poison the lock, because every guard is held across
 code that cannot unwind. The recovery is a defensive property, verified by
 reading, and a test asserting it would have to reach into the private mutex to
 create the condition.
 
-## M4 — the enabled flag cannot be flipped after construction
+## M4. The enabled flag cannot be flipped after construction
 
 A trace switched on mid-run produces a log with a silent hole at the front,
 which reads exactly like a run where nothing happened early.
@@ -66,26 +70,26 @@ grep -nE "enabled" ring_trace/src/lib.rs \
 `record` and `is_enabled`, and never assigned anywhere else. No `set_enabled`,
 no `&mut self` toggle, no `AtomicBool`.
 
-## M5 — the default is off
+## M5. The default is off
 
 ```bash
 grep -n -A 6 "impl Default for Trace" ring_trace/src/lib.rs
 ```
 
-**Expected:** `Self::disabled()`, with a doc line saying why — a ring nobody
+**Expected:** `Self::disabled()`, with a doc line saying why. A ring nobody
 asked to trace must not be tracing.
 
-## M6 — a batch is one entry, and the reason is written down
+## M6. A batch is one entry, and the reason is written down
 
 ```bash
 grep -n -B 8 "pub struct TraceEntry" ring_trace/src/lib.rs
 ```
 
 **Expected:** `count` is documented as the thing that keeps a batch claim one
-entry rather than 64, because expanding it would contradict feature 177's own
-claim that it *was* one operation.
+entry rather than 64, because the claim *was* one operation and expanding it
+would contradict that.
 
-## M7 — the doc examples are the API's first reader
+## M7. The doc examples are the API's first reader
 
 ```bash
 cargo test -p ring_trace --doc
@@ -105,11 +109,3 @@ disabled cases side by side, since the pair is the feature.
 | 2026-08-28 | M5 | ✅ | `Self::disabled()`, documented as "the state a ring that was never asked to trace must be in". |
 | 2026-08-28 | M6 | ✅ | `count`'s field doc and the struct doc both state it; the struct doc names feature 177 explicitly. |
 | 2026-08-28 | M7 | ✅ | 9 doc tests pass. |
-
-M2 is the check that earned this plan, and the defect it found is worse than it
-looks in the table. A poisoned trace would have **panicked the producer thread**
-on the write path — a diagnostic killing the thread it was added to observe —
-while simultaneously reporting `0` entries to whoever read it, making "nothing
-happened" and "the log broke" indistinguishable. Every test in `trace_test.rs`
-passed throughout, because no test can poison the lock. The only instrument that
-finds this is a person reading five call sites next to each other.

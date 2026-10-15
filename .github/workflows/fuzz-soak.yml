@@ -1,0 +1,56 @@
+# Fuzz operation sequences, long nightly soak.
+#
+# Same targets and oracle as `fuzz.yml`; longer budget. Kept in its own
+# workflow because it never runs on pull requests (nightly schedule and
+# manual dispatch only): sharing a file with the PR job made every pull
+# request display a check that could only ever read SKIPPED, which confused
+# three consecutive review rounds. Job names are unchanged, so dashboards
+# and history stay continuous.
+
+name: Fuzz soak
+
+on:
+  schedule:
+    # An hour after the benchmarks ("0 4 * * *"), clear of gates/loom ("0 3 * * *").
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+    inputs:
+      seconds:
+        description: seconds per target
+        required: false
+        default: "600"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  soak:
+    name: fuzz 600s per target
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      # Same binary cache as fuzz.yml; the key is shared on purpose.
+      - name: cache cargo-fuzz binary
+        id: cache-fuzz
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-fuzz
+          key: cargo-fuzz-0.13.2-${{ runner.os }}
+      - name: install cargo-fuzz
+        if: steps.cache-fuzz.outputs.cache-hit != 'true'
+        run: cargo install cargo-fuzz --version 0.13.2 --locked
+      - name: seed the corpus
+        run: |
+          for target in spsc_ops mpsc_ops ring_core_ops; do
+            mkdir -p fuzz/corpus/"$target"
+            cp fuzz/seeds/"$target"/* fuzz/corpus/"$target"/
+          done
+      - name: fuzz spsc_ops
+        run: cd fuzz && cargo +nightly fuzz run spsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}
+      - name: fuzz mpsc_ops
+        run: cd fuzz && cargo +nightly fuzz run mpsc_ops -- -max_total_time=${{ inputs.seconds || '600' }}
+      - name: fuzz ring_core_ops
+        run: cd fuzz && cargo +nightly fuzz run ring_core_ops -- -max_total_time=${{ inputs.seconds || '600' }}

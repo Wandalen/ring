@@ -13,18 +13,25 @@ publish = false
 # (`bench_harness/gate/declared/exempt.txt`).
 [dev-dependencies]
 core_affinity = { workspace = true }
+concurrent-queue = { workspace = true }
 criterion = { workspace = true }
+crossbeam-channel = { workspace = true }
 crossbeam-queue = { workspace = true }
+flume = { workspace = true }
 hdrhistogram = { workspace = true }
+heapless = { workspace = true }
+quetzalcoatl = { workspace = true }
 ring_config = { workspace = true }
 ring_core = { workspace = true }
 ring_cursor = { workspace = true }
 ring_mpsc = { workspace = true }
+ringbuf = { workspace = true }
 ring_slot = { workspace = true }
 ring_spsc = { workspace = true }
 ring_types = { workspace = true }
 ring_wait = { workspace = true }
 rtrb = { workspace = true }
+thingbuf = { workspace = true }
 serde_json = { workspace = true }
 
 [[bench]]

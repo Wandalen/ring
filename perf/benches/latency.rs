@@ -7,7 +7,24 @@ mod harness;
 use std::time::Duration;
 
 use harness::bench::cores;
-use harness::candidates::{Candidate, CrossbeamQueue, Mpsc, MutexDeque, Rtrb, Spsc, SyncChannel};
+use harness::candidates::{
+  Candidate,
+  ConcurrentQueue,
+  CrossbeamChannel,
+  CrossbeamQueue,
+  Flume,
+  Heapless,
+  Heapless1024,
+  Mpsc,
+  MutexDeque,
+  QuetzalMpsc,
+  QuetzalSpsc,
+  RingBuf,
+  Rtrb,
+  Spsc,
+  SyncChannel,
+  ThingBuf,
+};
 use harness::latency::{self, Load, Stamped};
 use harness::output;
 use serde_json::Value;
@@ -75,9 +92,17 @@ fn main() {
   let (runs, round_trips) = if settings.quick { (1, 1_000) } else { (5, 200_000) };
   ping::<Spsc>(&settings, &mut rows, runs, round_trips);
   ping::<Rtrb>(&settings, &mut rows, runs, round_trips);
+  ping::<RingBuf>(&settings, &mut rows, runs, round_trips);
+  ping::<Heapless1024>(&settings, &mut rows, runs, round_trips);
   ping::<Mpsc>(&settings, &mut rows, runs, round_trips);
   ping::<SyncChannel>(&settings, &mut rows, runs, round_trips);
+  ping::<CrossbeamChannel>(&settings, &mut rows, runs, round_trips);
   ping::<CrossbeamQueue>(&settings, &mut rows, runs, round_trips);
+  ping::<ConcurrentQueue>(&settings, &mut rows, runs, round_trips);
+  ping::<ThingBuf>(&settings, &mut rows, runs, round_trips);
+  ping::<QuetzalSpsc>(&settings, &mut rows, runs, round_trips);
+  ping::<QuetzalMpsc>(&settings, &mut rows, runs, round_trips);
+  ping::<Flume>(&settings, &mut rows, runs, round_trips);
   ping::<MutexDeque>(&settings, &mut rows, runs, round_trips);
 
   let spare = cores().saturating_sub(1).max(1);
@@ -118,9 +143,16 @@ fn ping<C: Candidate<Record = u64>>(settings: &Settings, rows: &mut Vec<Value>, 
 fn every_candidate(settings: &Settings, rows: &mut Vec<Value>, test: &str, load: &Load) {
   offer::<Spsc<Stamped>>(settings, rows, test, load);
   offer::<Rtrb<Stamped>>(settings, rows, test, load);
+  offer::<RingBuf<Stamped>>(settings, rows, test, load);
+  offer::<Heapless<Stamped, 1025>>(settings, rows, test, load);
   offer::<Mpsc<Stamped>>(settings, rows, test, load);
   offer::<SyncChannel<Stamped>>(settings, rows, test, load);
+  offer::<CrossbeamChannel<Stamped>>(settings, rows, test, load);
   offer::<CrossbeamQueue<Stamped>>(settings, rows, test, load);
+  offer::<ConcurrentQueue<Stamped>>(settings, rows, test, load);
+  offer::<QuetzalSpsc<Stamped>>(settings, rows, test, load);
+  offer::<QuetzalMpsc<Stamped>>(settings, rows, test, load);
+  offer::<Flume<Stamped>>(settings, rows, test, load);
   offer::<MutexDeque<Stamped>>(settings, rows, test, load);
 }
 

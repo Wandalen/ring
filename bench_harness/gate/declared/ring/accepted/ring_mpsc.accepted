@@ -19,7 +19,7 @@
 # `Ring::committed`, both real one-polarity defects found in the same sweep and
 # both now held by `mutant/S4` and `mutant/S11`.
 
-ring_mpsc/src/lib.rs:1034:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
+ring_mpsc/src/lib.rs:1038:5: replace Producer<'a, S>::on_distinct_lines -> bool with true
 
 # `ReservedBatch::is_empty` returning `false` unconditionally, which it already
 # does.
@@ -34,4 +34,4 @@ ring_mpsc/src/lib.rs:1034:5: replace Producer<'a, S>::on_distinct_lines -> bool 
 # The other polarity, returning `true`, is a real defect and is killed by
 # `a_batch_claim_grants_what_headroom_allows_rather_than_the_full_ask`.
 
-ring_mpsc/src/lib.rs:1279:5: replace ReservedBatch<'_, S>::is_empty -> bool with false
+ring_mpsc/src/lib.rs:1283:5: replace ReservedBatch<'_, S>::is_empty -> bool with false

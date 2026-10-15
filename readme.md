@@ -107,29 +107,45 @@ The reasoning, its costs, and its removal conditions are recorded in
 
 ## Measured results
 
-Raspberry Pi 5 (aarch64, 4 cores), criterion medians, one run per side.
-Every cell is an intra-run comparison against the row's own alternative
-(rtrb 0.4, `std::sync::mpsc::sync_channel`, `crossbeam_queue::ArrayQueue`,
-`Mutex<VecDeque>`), so no number is a cross-machine baseline.
+Intel i7-10750H (x86_64, 12 logical CPUs), Windows, criterion medians, one
+run per side. Every cell is an intra-run comparison against the row's own
+alternatives (rtrb 0.4, ringbuf 0.4, heapless 0.9, `std::sync::mpsc::sync_channel`,
+crossbeam-channel 0.5, `crossbeam_queue::ArrayQueue`, concurrent-queue 2.5,
+flume 0.11, thingbuf 0.1, quetzalcoatl 0.15, `Mutex<VecDeque>`), so no number
+is a cross-machine baseline.
 
 | Claim | in-house | nearest alternative | Δ |
 |---|---|---:|---:|
-| `ring_spsc`: two-thread throughput, 16384 slots | **334 M/s** | rtrb 244 | **+37%** |
-| `ring_spsc`: two-thread throughput, 1024 slots | **192 M/s** | rtrb 189 | +2%† |
-| `ring_spsc`: 8-byte records, two-thread | **194 M/s** | rtrb 192 | +1%† |
-| `ring_mpsc`: batched producers (`push32`), 1–13 producers | **125–290 M/s** | sync_channel ≤ 55, ArrayQueue ≤ 90, mutex ≤ 274 | leads its class |
-| `ring_mpsc`: primary handle, `push1_popN`, 1024 slots | **16.9 M/s** | ordinary handle 10.9 | **+55%** |
-| `ring_mpsc`: primary handle, single-thread fill/drain | **65.4 M/s** | ordinary handle 46.6 | **+40%** |
+| `ring_spsc`: two-thread throughput, 16384 slots | **381 M/s** | rtrb 208 (ringbuf 112, heapless n/a) | **+83%** |
+| `ring_spsc`: two-thread throughput, 1024 slots | **242 M/s** | rtrb 154 (ringbuf 109, heapless 66) | **+57%** |
+| `ring_spsc`: 8-byte records, two-thread | **275 M/s** | rtrb 167 (ringbuf 110, heapless 67) | **+64%** |
+| `ring_spsc`: single-record pair | 3.5 ns | rtrb 3.5 (spsc-plain 3.3, heapless 7.1, ringbuf 10.6) | tie† |
+| `ring_mpsc`: batched producers (`push32`), 1–11 producers | **288–203 M/s** | mutex 276–37, ArrayQueue n/a (no batch) | leads its class |
+| `ring_mpsc`: unbatched, 4 producers | 13.6 M/s | ArrayQueue 53.5, crossbeam-channel 44.7, quetzal_mpsc 22.5 | trails — see below |
+| `ring_mpsc`: unbatched, 1 producer | 26.0 M/s | ArrayQueue 68.8, quetzal_mpsc 57.9, crossbeam-channel 52.8, concurrent_queue 44.6, thingbuf 14.0, flume 6.4 | trails — see below |
 
-† no noise floor was established for these rows: per
-[`docs/benchmarking_guide.md`](docs/benchmarking_guide.md) § Fair
-measurements, unpinned threads swing tens of percent either way, so a
-+1–2% gap sits inside that spread — not a confirmed lead over rtrb.
+† single-record gaps under ~10% sit inside run-to-run spread on a
+shared machine — see "Fair measurements" in
+[`docs/benchmarking_guide.md`](docs/benchmarking_guide.md): unpinned threads
+swing tens of percent either way.
 
-rtrb still leads the strict single-record pair (3.4–3.6 ns against 13–16)
-and small-capacity two-thread; `ArrayQueue` leads `ring_mpsc`'s unbatched
-path at high producer counts on x86. Absolute numbers are not portable
-across machines — every comparison above is intra-run.
+Where the in-house rings lead, they lead by multiples: two-thread SPSC
+throughput at 1024–16384 slots and 8-byte records (+57–83% over the nearest
+alternative), and batched multi-producer paths where the nearest alternative
+is the mutex itself. The single-record pair is a tie at the top (3.5 ns).
+
+The weak spots are the unbatched multi-producer paths: at one producer
+`ArrayQueue` (68.8), `quetzal_mpsc` (57.9) and `crossbeam-channel` (52.8)
+all beat `ring_mpsc` (26.0), and the gap persists at four producers (53.5
+against 13.6). `rtrb` also owns the batch-push game outright (648 M/s at
+16384 slots). These are the rows to watch: any claim of a general MPSC
+lead would have to move them first.
+
+Elsewhere in the field: `quetzal_mpsc` runs closest behind the leaders;
+`flume` trails badly on this machine (6.4→1.6 M/s over 1–11 producers);
+`heapless` sits mid-pack on speed but answers a different question
+(statically allocated, no allocator at all). Absolute numbers are not
+portable across machines — every comparison above is intra-run.
 
 ## Crates
 

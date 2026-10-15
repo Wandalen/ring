@@ -719,3 +719,475 @@ impl<R: Record> Rx<R> for CrossbeamRx<R> {
     n
   }
 }
+
+/// `crossbeam-channel` bounded — `try_send`; `try_recv`. What users reach for
+/// when they need MPMC rather than our MPSC: the same algorithm family as
+/// `sync_channel` above plus the multi-consumer and selection machinery.
+#[derive(Debug)]
+pub struct CrossbeamChannel<R = u64>(Option<(crossbeam_channel::Sender<R>, crossbeam_channel::Receiver<R>)>);
+
+impl<R: Record> Candidate for CrossbeamChannel<R> {
+  type Record = R;
+
+  const NAME: &'static str = "crossbeam_channel";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Some(crossbeam_channel::bounded(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let (tx, rx) = self.0.take().expect("split once");
+    // `Sender: Clone`, one handle per producer thread.
+    let producers = (0..producers).map(|_| ChannelTx(tx.clone())).collect();
+    run.run(producers, ChannelRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct ChannelTx<R>(crossbeam_channel::Sender<R>);
+
+impl<R: Record> Tx<R> for ChannelTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_send(record).is_ok()
+  }
+}
+
+struct ChannelRx<R>(crossbeam_channel::Receiver<R>);
+
+impl<R: Record> Rx<R> for ChannelRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.try_recv().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.try_recv() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `flume` bounded — `try_send`; `try_recv`. An MPMC channel with its own
+/// adaptive backoff, no allocators beyond the queue itself at these features.
+#[derive(Debug)]
+pub struct Flume<R = u64>(Option<(flume::Sender<R>, flume::Receiver<R>)>);
+
+impl<R: Record> Candidate for Flume<R> {
+  type Record = R;
+
+  const NAME: &'static str = "flume";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Some(flume::bounded(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let (tx, rx) = self.0.take().expect("split once");
+    let producers = (0..producers).map(|_| FlumeTx(tx.clone())).collect();
+    run.run(producers, FlumeRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct FlumeTx<R>(flume::Sender<R>);
+
+impl<R: Record> Tx<R> for FlumeTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_send(record).is_ok()
+  }
+}
+
+struct FlumeRx<R>(flume::Receiver<R>);
+
+impl<R: Record> Rx<R> for FlumeRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.try_recv().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.try_recv() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `ringbuf::HeapRb` — `try_push`; `try_pop`. A heap SPSC ring with a runtime
+/// capacity, the closest off-the-shelf shape to ours.
+#[derive(Debug)]
+pub struct RingBuf<R = u64> {
+  capacity: usize,
+  record: PhantomData<R>,
+}
+
+impl<R: Record> Candidate for RingBuf<R> {
+  type Record = R;
+
+  const NAME: &'static str = "ringbuf";
+  const PUSH_BATCH: bool = true;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(capacity: usize) -> Self {
+    Self {
+      capacity,
+      record: PhantomData,
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    use ringbuf::traits::Split;
+    assert_eq!(producers, 1, "ringbuf takes one producer");
+    let (tx, rx) = ringbuf::HeapRb::new(self.capacity).split();
+
+    run.run(vec![RingBufTx(tx)], RingBufRx(rx))
+  }
+}
+
+struct RingBufTx<R>(<ringbuf::HeapRb<R> as ringbuf::traits::Split>::Prod);
+
+impl<R: Record> Tx<R> for RingBufTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    use ringbuf::traits::Producer;
+    self.0.try_push(record).is_ok()
+  }
+
+  fn push_batch(&mut self, records: &[R]) -> usize {
+    use ringbuf::traits::Producer;
+    self.0.push_slice(records)
+  }
+}
+
+struct RingBufRx<R>(<ringbuf::HeapRb<R> as ringbuf::traits::Split>::Cons);
+
+impl<R: Record> Rx<R> for RingBufRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    use ringbuf::traits::Consumer;
+    self.0.try_pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    use ringbuf::traits::Consumer;
+    let mut n = 0;
+    while n < max {
+      match self.0.try_pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `heapless::spsc::Queue` — `enqueue`; `dequeue`. Statically allocated, no
+/// allocator at all: the capacity is a const generic, so each size is its own
+/// candidate and `new` asserts the runtime capacity matches it.
+/// Usable capacity is `N - 1` (one sentinel slot), so the aliases size one
+/// up from the row capacity. Fixed-size aliases: the `every_candidate!`
+/// macro in micro.rs only accepts plain identifiers, not generic paths,
+/// so the sizes used there go by name.
+/// Heapless queue with 64 usable slots.
+pub type Heapless64 = Heapless<u64, 65>;
+/// Heapless queue with 1024 usable slots.
+pub type Heapless1024 = Heapless<u64, 1025>;
+
+/// `heapless::spsc::Queue` — statically allocated, no allocator at all.
+#[derive(Debug)]
+pub struct Heapless<R = u64, const N: usize = 1024> {
+  queue: heapless::spsc::Queue<R, N>,
+}
+
+impl<R: Record, const N: usize> Candidate for Heapless<R, N> {
+  type Record = R;
+
+  const NAME: &'static str = "heapless";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(capacity: usize) -> Self {
+    assert_eq!(capacity + 1, N, "heapless holds N - 1: size one up from the row capacity");
+    Self {
+      queue: heapless::spsc::Queue::new(),
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    assert_eq!(producers, 1, "heapless takes one producer");
+    // Borrowed ends, not owned: heapless hands out handles into the queue,
+    // so they borrow the candidate for the run's duration (which outlives it).
+    let (tx, rx) = self.queue.split();
+
+    run.run(vec![HeaplessTx(tx)], HeaplessRx(rx))
+  }
+}
+
+struct HeaplessTx<'a, R>(heapless::spsc::Producer<'a, R>);
+
+impl<R: Record> Tx<R> for HeaplessTx<'_, R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.enqueue(record).is_ok()
+  }
+}
+
+struct HeaplessRx<'a, R>(heapless::spsc::Consumer<'a, R>);
+
+impl<R: Record> Rx<R> for HeaplessRx<'_, R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.dequeue().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.dequeue() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `concurrent_queue::ConcurrentQueue` bounded — `push`; `pop`. MPMC with a
+/// single shared handle: one `Arc` serves every producer thread.
+#[derive(Debug)]
+pub struct ConcurrentQueue<R = u64>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Candidate for ConcurrentQueue<R> {
+  type Record = R;
+
+  const NAME: &'static str = "concurrent_queue";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Arc::new(concurrent_queue::ConcurrentQueue::bounded(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    // One handle, shared by every producer thread.
+    let producers = (0..producers).map(|_| QueueTx(self.0.clone())).collect();
+    run.run(producers, QueueRx(self.0.clone()))
+  }
+}
+
+#[derive(Clone)]
+struct QueueTx<R>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Tx<R> for QueueTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QueueRx<R>(Arc<concurrent_queue::ConcurrentQueue<R>>);
+
+impl<R: Record> Rx<R> for QueueRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `thingbuf` MPSC channel — `try_send`; `try_recv`. Static-capable MPSC with
+/// recycled storage; records must be `Default + Sync` for the channel
+/// constructor.
+#[derive(Debug)]
+pub struct ThingBuf<R = u64>(Option<(thingbuf::mpsc::blocking::Sender<R>, thingbuf::mpsc::blocking::Receiver<R>)>);
+
+impl<R: Record + Default + Sync> Candidate for ThingBuf<R> {
+  type Record = R;
+
+  const NAME: &'static str = "thingbuf";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self(Some(thingbuf::mpsc::blocking::channel(capacity)))
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    let (tx, rx) = self.0.take().expect("split once");
+    let producers = (0..producers).map(|_| ThingBufTx(tx.clone())).collect();
+    run.run(producers, ThingBufRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct ThingBufTx<R>(thingbuf::mpsc::blocking::Sender<R>);
+
+impl<R: Record + Default + Sync> Tx<R> for ThingBufTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.try_send(record).is_ok()
+  }
+}
+
+struct ThingBufRx<R>(thingbuf::mpsc::blocking::Receiver<R>);
+
+impl<R: Record + Default + Sync> Rx<R> for ThingBufRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.try_recv().map(sink).is_ok()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.try_recv() {
+        Ok(record) => sink(record),
+        Err(_) => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `quetzalcoatl` SPSC ring — `push`; `pop`. Arc-backed with owned ends.
+#[derive(Debug)]
+pub struct QuetzalSpsc<R = u64> {
+  capacity: usize,
+  record: PhantomData<R>,
+}
+
+impl<R: Record> Candidate for QuetzalSpsc<R> {
+  type Record = R;
+
+  const NAME: &'static str = "quetzal_spsc";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = 1;
+
+  fn new(capacity: usize) -> Self {
+    Self {
+      capacity,
+      record: PhantomData,
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    use quetzalcoatl::capacity::Capacity;
+    assert_eq!(producers, 1, "quetzal_spsc takes one producer");
+    let (tx, rx) = quetzalcoatl::spsc::RingBuffer::new(Capacity::at_least(self.capacity)).split();
+
+    run.run(vec![QuetzalSpscTx(tx)], QuetzalSpscRx(rx))
+  }
+}
+
+struct QuetzalSpscTx<R>(quetzalcoatl::spsc::Producer<R>);
+
+impl<R: Record> Tx<R> for QuetzalSpscTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QuetzalSpscRx<R>(quetzalcoatl::spsc::Consumer<R>);
+
+impl<R: Record> Rx<R> for QuetzalSpscRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}
+
+/// `quetzalcoatl` MPSC ring — `push`; `pop`. Cloneable producer handles.
+#[derive(Debug)]
+pub struct QuetzalMpsc<R = u64> {
+  capacity: usize,
+  record: PhantomData<R>,
+}
+
+impl<R: Record> Candidate for QuetzalMpsc<R> {
+  type Record = R;
+
+  const NAME: &'static str = "quetzal_mpsc";
+  const PUSH_BATCH: bool = false;
+  const MAX_PRODUCERS: usize = usize::MAX;
+
+  fn new(capacity: usize) -> Self {
+    Self {
+      capacity,
+      record: PhantomData,
+    }
+  }
+
+  fn split<V: Run<R>>(&mut self, producers: usize, run: V) -> V::Output {
+    use quetzalcoatl::capacity::Capacity;
+    let (tx, rx) = quetzalcoatl::mpsc::RingBuffer::new(Capacity::at_least(self.capacity)).split();
+    let producers = (0..producers).map(|_| QuetzalMpscTx(tx.clone())).collect();
+    run.run(producers, QuetzalMpscRx(rx))
+  }
+}
+
+#[derive(Clone)]
+struct QuetzalMpscTx<R>(quetzalcoatl::mpsc::Producer<R>);
+
+impl<R: Record> Tx<R> for QuetzalMpscTx<R> {
+  fn try_push(&mut self, record: R) -> bool {
+    self.0.push(record).is_ok()
+  }
+}
+
+struct QuetzalMpscRx<R>(quetzalcoatl::mpsc::Consumer<R>);
+
+impl<R: Record> Rx<R> for QuetzalMpscRx<R> {
+  fn try_pop(&mut self, sink: &mut impl FnMut(R)) -> bool {
+    self.0.pop().map(sink).is_some()
+  }
+
+  fn pop_batch(&mut self, max: usize, sink: &mut impl FnMut(R)) -> usize {
+    let mut n = 0;
+    while n < max {
+      match self.0.pop() {
+        Some(record) => sink(record),
+        None => return n,
+      }
+      n += 1;
+    }
+
+    n
+  }
+}

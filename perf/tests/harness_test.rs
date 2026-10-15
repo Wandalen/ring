@@ -313,6 +313,7 @@ fn an_open_loop_records_every_record_after_the_warm_up() {
     assert!(!latency::open_loop::<QuetzalSpsc<Stamped>>(&steady).histogram.is_empty());
     assert!(!latency::open_loop::<ConcurrentQueue<Stamped>>(&steady).histogram.is_empty());
     assert!(!latency::open_loop::<Heapless<Stamped, 1025>>(&steady).histogram.is_empty());
+    assert!(!latency::open_loop::<ThingBuf<Stamped>>(&steady).histogram.is_empty());
     let shared = load(3, 200_000.0, burst);
     assert!(!latency::open_loop::<Mpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<SyncChannel<Stamped>>(&shared).histogram.is_empty());
@@ -320,8 +321,8 @@ fn an_open_loop_records_every_record_after_the_warm_up() {
     assert!(!latency::open_loop::<CrossbeamChannel<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<Flume<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<ConcurrentQueue<Stamped>>(&shared).histogram.is_empty());
-    assert!(!latency::open_loop::<QuetzalMpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<ThingBuf<Stamped>>(&shared).histogram.is_empty());
+    assert!(!latency::open_loop::<QuetzalMpsc<Stamped>>(&shared).histogram.is_empty());
     assert!(!latency::open_loop::<MutexDeque<Stamped>>(&shared).histogram.is_empty());
   }
 }

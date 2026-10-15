@@ -903,13 +903,14 @@ impl<R: Record> Rx<R> for RingBufRx<R> {
 /// up from the row capacity. Fixed-size aliases: the `every_candidate!`
 /// macro in micro.rs only accepts plain identifiers, not generic paths,
 /// so the sizes used there go by name.
+/// Heapless queue with 64 usable slots.
 pub type Heapless64 = Heapless<u64, 65>;
 /// Fixed 1024 usable slots for the suites that run one size: `spsc` payload
 /// and pinned rows, micro rows, latency rows.
 pub type Heapless1024 = Heapless<u64, 1025>;
 
-#[derive(Debug)]
 /// Statically allocated SPSC queue behind a const-generic capacity.
+#[derive(Debug)]
 pub struct Heapless<R = u64, const N: usize = 1024> {
   queue: heapless::spsc::Queue<R, N>,
 }

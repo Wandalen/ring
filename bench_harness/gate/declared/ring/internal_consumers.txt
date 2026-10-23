@@ -8,3 +8,4 @@
 
 perf  benchmark suite: measures ring_spsc and ring_mpsc directly, below the export surface, next to off-the-shelf queues
 fuzz  fuzz workspace: exercises ring_spsc and ring_mpsc operation sequences against an oracle, below the export surface
+deck_engine  presentation deck: drives ring_mpsc's claim, publish and drain one step at a time in wasm, below the export surface

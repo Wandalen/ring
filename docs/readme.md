@@ -10,6 +10,7 @@ and any benchmark records in its own `docs/benchmarks/`, and
 | [`benchmarking_guide.md`](benchmarking_guide.md) | How to run the benchmark suite (`perf`): quick check, full runs, comparison tables, baselines, Windows notes |
 | [`capstone/`](capstone/readme.md) | Rust bootcamp capstone assignment. Production-readiness topics, one file per topic |
 | [`crates_overview.md`](crates_overview.md) | Family-level crate guide. What each crate does, with usage and a plain-words explanation |
+| [`presentation/`](presentation/readme.md) | The 4-minute Ukrainian capstone deck, its rings and sandbox run by `ring_mpsc` built to wasm |
 
 ## Where a crate's design knowledge lives
 

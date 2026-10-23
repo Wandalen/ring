@@ -281,8 +281,8 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
       <div class="title-grid">
         <div>
           <h1 class="wordmark">ring<span class="tick">.</span>_</h1>
-          <div class="title-sub">у реальному рушії: споживач, порівняння, програвання</div>
-          <p class="title-thesis">Історія lock-free (без блокування) кілець, розказана через реального споживача — біржовий рушій <a href="https://github.com/Wandalen/exchange">exchange_</a>.</p>
+          <div class="title-sub">як мої кільця порахували перші заявки</div>
+          <p class="title-thesis">Я писав ці lock-free (без блокування) кільця не «в повітрі», а під живого споживача — біржовий рушій <a href="https://github.com/Wandalen/exchange">exchange_</a>. Те, що побачите далі, — саме та історія.</p>
           <div class="facts">
             <div class="fact"><b>+37%</b><span>ring_spsc проти rtrb · 16 384 слоти</span></div>
             <div class="fact"><b>2</b><span>release-записи на весь обмін</span></div>
@@ -291,15 +291,15 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
           <div class="title-meta"><span>github.com/Wandalen/ring</span><span>споживач: github.com/Wandalen/exchange</span></div>
         </div>
         <div class="card">
-          <h3>План</h3>
+          <h3>Про що я розповім</h3>
           <ul>
-            <li><b>Споживач:</b> заявки з багатьох потоків → один записувач</li>
-            <li><b>Порівняння:</b> готові черги проти вимог</li>
-            <li><b>Виміряно:</b> SPSC проти rtrb</li>
-            <li><b>Програвання:</b> кільце до відмови і злив</li>
-            <li><b>Протокол:</b> claim / publish / commit</li>
+            <li><b>Хто мене кличе:</b> заявки з багатьох потоків, а рішення приймає один записувач</li>
+            <li><b>Де я дав маху:</b> чесний розбір із готовими чергами</li>
+            <li><b>Чим доводжу:</b> не словами, а виміряним SPSC-прогоном</li>
+            <li><b>Побачите наживо:</b> як кільце заповнюється до відмови і вливається в порядку входу</li>
+            <li><b>Під капотом:</b> протокол claim / publish / commit</li>
           </ul>
-          <p>Кільця — це не «ще одна черга». Це слоти з відтворюваним тотальним порядком і доставкою «лише один раз».</p>
+          <p>Мої кільця — не «ще одна черга». Це слоти, у яких порядок можна відтворити до останнього байта, і кожен елемент приходить у споживача рівно один раз.</p>
         </div>
       </div>
     </div>
@@ -308,21 +308,21 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
   <!-- 2 -->
   <section class="slide" data-sec="Споживач">
     <div class="inner">
-      <div class="eyebrow">хто використовує</div>
+      <div class="eyebrow">хто мене кличе</div>
       <h2 class="h-slide">Багато потоків — один записувач</h2>
-      <p class="lede">exchange_ збирає заявки з багатьох потоків, а стан біржі змінює ровно один записувач — як у справжніх рушіях.</p>
+      <p class="lede">exchange_ попросив мене про просту річ: нехай заявки прилітають звідусіль, але щоб стан біржі міняв ровно один записувач — так, як у справжніх рушіях. Я ними й переміряв кожне своє рішення.</p>
       <div class="arch">
         <div class="arch-box">
           <div class="arch-cap">потоки-виробники</div>
           <div class="lane"><span class="thr">потік 1</span><span class="rg">ring_spsc</span></div>
           <div class="lane"><span class="thr">потік 2</span><span class="rg">ring_spsc</span></div>
           <div class="lane"><span class="thr">потік N</span><span class="rg">ring_spsc</span></div>
-          <p class="arch-note">Кожен виробник має своє lock-free кільце: без мʼютексів і без read-modify-write.</p>
+          <p class="arch-note">Кожному потокові я дав власне lock-free (без блокування) кільце: так я прибрав і мʼютекси, і спільні лічильники read-modify-write, які самі по собі скачуть.</p>
         </div>
         <div class="arch-arrow">→</div>
         <div class="arch-box core">
           <div class="arch-cap">exchange_step · один записувач</div>
-          <p class="arch-note">Зливає кільця в наперед заданому порядку. Номер заявки й час прибуття ставить рушій, а не клієнт.</p>
+          <p class="arch-note">Кільця я зливаю в наперед заданому порядку. Номер заявки й час прибуття ставить рушій, а не клієнт — тому день можна перепрограти двічі й отримати той самий хеш.</p>
           <div class="arch-steps">
             <div class="st"><b>Перевірка</b><code>exchange_spec</code></div>
             <div class="st"><b>Блокування</b><code>exchange_escrow</code></div>
@@ -340,10 +340,10 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
         </div>
       </div>
       <div class="arch-facts">
-        <div><b>2</b><span>release-записи на весь обмін у SPSC-кільці; курсори на окремих 64-байтних кеш-лініях</span></div>
+        <div><b>2</b><span>release-записи на весь обмін у SPSC-кільці; курсори я розводжу на різні 64-байтні кеш-лінії</span></div>
         <div><b>+37%</b><span>ring_spsc проти rtrb: 334 проти 244 млн записів/с (Raspberry Pi 5, 16 384 слоти)</span></div>
-        <div><b>loom</b><span>перебирає всі переплетення потоків, а не сподівається на вдалий прогін</span></div>
-        <div><b>0,9 мс</b><span>прохід по 40 000 рівнів стакану на VecDeque; на Vec — 452 мс</span></div>
+        <div><b>loom</b><span>перебирає всі переплетення потоків — я не сподіваюся на «вдалий прогін»</span></div>
+        <div><b>0,9 мс</b><span>прохід по 40 000 рівнів стакану на VecDeque; на Vec це було 452 мс</span></div>
       </div>
     </div>
   </section>
@@ -351,9 +351,9 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
   <!-- 3 -->
   <section class="slide" data-sec="Порівняння">
     <div class="inner">
-      <div class="eyebrow">порівняння · чому не взяли готове</div>
+      <div class="eyebrow">перш ніж писати — чесний огляд ринку</div>
       <h2 class="h-slide">Готові черги проти вимог споживача</h2>
-      <p class="lede">Вимоги exchange_: тотальний порядок, lock-free (без блокування) шлях запису, явна політика переповнення, shutdown з зливом.</p>
+      <p class="lede">Мені аж ніяк не хотілося писати своє. Спершу я чесно розклав вимоги exchange_ й випробував кожну з готових черг на відповідність.</p>
       <div class="why-grid">
         <div class="card">
           <div class="cmp-wrap">
@@ -367,17 +367,17 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
               <tr><td>Shutdown + drain_all</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
             </table>
           </div>
-          <p class="src">Жодне готове рішення не дає всіх вимог одночасно; частини залишаються еталонами й бекендами.</p>
+          <p class="src">Жодна з них не дала всіх вимог одразу — тому я й написав своє, а готові цінні як еталони й бекенди.</p>
         </div>
         <div class="card">
-          <h3>Чесність</h3>
+          <h3>Скажу чесно, де я дав маху</h3>
           <ul>
-            <li><b>rtrb лідирує</b> на строгій парі одиночних записів: 3.4–3.6 нс проти наших 13–16 нс.</li>
-            <li><b>ArrayQueue лідирує</b> на непакетному MPSC-шляху при високих кількостях продюсерів.</li>
-            <li><b>Але:</b> потрібне поєднання — пакетування, стейджинг, політики, зупинка — і ніде цього набору немає.</li>
+            <li><b>rtrb попереду:</b> на одиничних записах у строгій парі — 3.4–3.6 нс проти моїх 13–16 нс.</li>
+            <li><b>ArrayQueue попереду:</b> на непакетному MPSC-шляху, коли продюсерів уже багато.</li>
+            <li><b>Але:</b> споживачу потрібне все разом — пакетування, TLS (thread-local staging), політика переповнення, спокійна зупинка. Для нього такого набору я не знайшов.</li>
           </ul>
-          <p class="src">crossbeam-queue — свідомий тимчасовий бекенд у ring_core за фіче-флагом.</p>
-          <p>Мʼютексова черга під навантаженням — це джитер у грошах: очікування на лок-і серіалізує потоки.</p>
+          <p class="src">crossbeam-queue — мій свідомий тимчасовий бекенд у ring_core за фіче-флагом.</p>
+          <p>Мʼютексова черга під навантаженням — джитер у грошах: потоки вишиковуються в чергу за лок-ом, і саме це очікування ламає передбачуваність.</p>
         </div>
       </div>
     </div>
@@ -388,7 +388,7 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
     <div class="inner">
       <div class="eyebrow">виміряно, не аргументовано</div>
       <h2 class="h-slide">SPSC проти rtrb</h2>
-      <p class="lede">ring_spsc проти rtrb — еталона однопродюсерного випадку. Порівняти можна лише всередині одного запуску.</p>
+      <p class="lede">У нас у проєкті правило — «виміряно, не арґументовано», і це мої улюблені ворота. Ось числа для SPSC — лише читайте рядок, а не машину.</p>
       <div class="why-grid">
         <div class="card">
           <h3>Пропускна здатність двох потоків, M/с</h3>
@@ -396,14 +396,14 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
           <p class="src">Raspberry Pi 5 · 16 384 слоти · медіани criterion</p>
         </div>
         <div class="card">
-          <h3>Як читати чесно</h3>
+          <h3>Те, що я називаю з обох сторін</h3>
           <ul>
-            <li><b>Виграємо:</b> 334 проти 244 млн записів/с (+37%) на 16 384 слотах.</li>
-            <li><b>Нічия:</b> на 1024 слотах і 8-байтових записах різниця +1–2% — у межах шуму.</li>
-            <li><b>Програємо:</b> rtrb лідирує на одиночних записах (3.4–3.6 нс проти 13–16 нс).</li>
-            <li><b>Лінія, не машина:</b> абсолютні числа не переносяться; важлива лише різниця в одному рядку.</li>
+            <li><b>Де я попереду:</b> 334 проти 244 млн записів/с (+37%) на 16 384 слотах.</li>
+            <li><b>Де нічия:</b> на 1024 слотах і 8-байтових записах різниця +1–2% — це шум, і я не кричу «перемога», коли її немає.</li>
+            <li><b>Де я позаду:</b> на одиночних записах rtrb швидший — 3.4–3.6 нс проти 13–16 нс.</li>
+            <li><b>Довіряти можна:</b> лише різниці в одному рядку — абсолютні числа між машинами не переносяться.</li>
           </ul>
-          <p class="src">exchange_ взяв ring_spsc саме через виміряну перевагу на робочих місткостях.</p>
+          <p class="src">exchange_ взяв ring_spsc саме за цю виміряну перевагу на своїх робочих місткостях.</p>
         </div>
       </div>
     </div>
@@ -414,7 +414,7 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
     <div class="inner">
       <div class="eyebrow">програвання</div>
       <h2 class="h-slide">Заповнення кільця заявками</h2>
-      <p class="lede">Місткість 8. Потік-виробник кладе заявки один за одним; девʼята отримує відмову — потім злив відкриває шлях. Натисніть ▶ Пуск.</p>
+      <p class="lede">Я зібрав для вас маленьку виставу: місткість вісім, потік-виробник несе заявки одна за одною, а девʼята впирається у переповнення. Тисніть ▶ Пуск — дивіться самі.</p>
       <div class="demo-grid">
         <div class="panel">
           <div class="panel-title"><span>Rust · потік-виробник і exchange_step</span></div>
@@ -454,29 +454,29 @@ while let Some( order ) = consumer.try_recv() // злив у порядку clai
   <!-- 6 -->
   <section class="slide" data-sec="Протокол">
     <div class="inner">
-      <div class="eyebrow">протокол</div>
+      <div class="eyebrow">під капотом</div>
       <h2 class="h-slide">Claim / publish / commit</h2>
-      <p class="lede">Slot-shaped channel з відтворюваним тотальним порядком і доставкою «лише один раз».</p>
+      <p class="lede">В основі — slot-shaped channel з порядком, який відтворюється, і доставкою «лише один раз». Ось чотири кроки, з яких він складається.</p>
       <div class="dec">
-        <div class="dc"><span class="crate">крок 1</span><b>Claim</b><p>Продюсер резервує наступний номер послідовності — локально, без очікування.</p><span class="proof">пропуск ⇒ зниклий номер</span></div>
-        <div class="dc"><span class="crate">крок 2</span><b>Publish</b><p>Прапорець «готово» на слоті, який щойно заповнено.</p><span class="proof">пропуск ⇒ слот-привид</span></div>
-        <div class="dc"><span class="crate">крок 3</span><b>Available</b><p>Споживач бачить суцільний префікс номерів, готових до зливу.</p><span class="proof">тільки порядок claim-ів</span></div>
-        <div class="dc"><span class="crate">крок 4</span><b>Commit</b><p>Місце звільнено для повторного використання.</p><span class="proof">пропуск ⇒ вічне резервування</span></div>
+        <div class="dc"><span class="crate">крок 1</span><b>Claim</b><p>Виробник бере собі наступний номер послідовності — локально й без жодного очікування.</p><span class="proof">пропуск ⇒ зниклий номер</span></div>
+        <div class="dc"><span class="crate">крок 2</span><b>Publish</b><p>Нащойно заповнений слот позначається як «готово».</p><span class="proof">пропуск ⇒ слот-привид</span></div>
+        <div class="dc"><span class="crate">крок 3</span><b>Available</b><p>Споживач бачить суцільний префікс номерів, готових до зливу.</p><span class="proof">лише порядок claim-ів</span></div>
+        <div class="dc"><span class="crate">крок 4</span><b>Commit</b><p>Місце звільнене, на нього можна знову претендувати.</p><span class="proof">пропуск ⇒ вічне резервування</span></div>
       </div>
       <div class="why-grid">
         <div class="card">
-          <h3>Що отримує споживач</h3>
+          <h3>Що через це відчуває споживач</h3>
           <ul>
-            <li><b>Порядок:</b> злиття в порядку claim-ів — тотальний, відтворюваний.</li>
-            <li><b>Exactly-once:</b> кожен елемент ровно один раз.</li>
-            <li><b>Переповнення:</b> промислова політика, а не сюрприз — Fail / DropNewest / DropOldest.</li>
-            <li><b>Зупинка:</b> close → drain_all → reopen.</li>
+            <li><b>Порядок:</b> злиття в порядку claim-ів — той самий день виглядає так само щоразу.</li>
+            <li><b>Exactly-once:</b> кожен елемент — рівно один раз, без дублів і без зниклень.</li>
+            <li><b>Переповнення:</b> це вибрана політика, а не сюрприз — Fail / DropNewest / DropOldest.</li>
+            <li><b>Спокійна зупинка:</b> close → drain_all → reopen.</li>
           </ul>
         </div>
         <div class="card">
-          <h3>Не вигаданий патерн</h3>
-          <p>Протокол відомий; його переписано й перевірено: loom перебирає переплетення, fuzz полює на паніки, гейти CI вміють падати.</p>
-          <p class="src">Пропуск кроку ⇒ garbage / перезапис / вічне резервування — тому кожен крок несний без лок-а.</p>
+          <h3>Я нічого не вигадав із голови</h3>
+          <p>Протокол відомий. Я його не вигадав: переписав під слоти й не щадив — loom перебирає всі переплетення потоків, fuzz полює на паніки, а гейти CI справді вміють падати, а не лише зеленіти.</p>
+          <p class="src">Пропуск кроку ⇒ garbage / перезапис / вічне резервування — тож кожен крок живе без лок-а.</p>
         </div>
       </div>
     </div>
@@ -489,18 +489,18 @@ while let Some( order ) = consumer.try_recv() // злив у порядку clai
       <h2 class="h-slide">Реальний споживач — найкращий критерій</h2>
       <div class="why-grid" style="align-items:center">
         <div class="card">
-          <h3>Ланцюжок</h3>
+          <h3>Що я з цього виношу</h3>
           <ul>
-            <li><b>Споживач:</b> exchange_ — багато потоків → один записувач → журнал і аудит.</li>
-            <li><b>Порівняння:</b> жодна готова черга не дає всіх вимог; rtrb і ArrayQueue — еталони.</li>
-            <li><b>Виміряно:</b> +37% проти rtrb на робочих місткостях; нічия — чесно названа.</li>
-            <li><b>Програвання:</b> кільце заповнюється до відмови, зливається у порядку claim-ів.</li>
-            <li><b>Протокол:</b> claim / publish / available / commit.</li>
+            <li><b>exchange_ задав планку:</b> багато потоків → один записувач → журнал з аудиторським слідом.</li>
+            <li><b>Готові не закрили всього:</b> rtrb і ArrayQueue лишаються моїми еталонами й бекендами.</li>
+            <li><b>Числа на моєму боці:</b> +37% проти rtrb на робочих місткостях — а де ні, там говорю сам.</li>
+            <li><b>Дію воно діє:</b> заповнене до відмови кільце потім зливається в порядку claim-ів — і день збігається.</li>
+            <li><b>Під капотом:</b> claim / publish / available / commit.</li>
             <li><b>Далі:</b> production-readiness — окремий план (capstone); exchange_ — реальний споживач, не продакшен-деплой.</li>
           </ul>
         </div>
         <div class="thanks" style="align-items:flex-start;gap:6px">
-          <b>Дякуємо! <em>Питання?</em></b>
+          <b>Дякую. <em>Питання?</em></b>
           <div class="title-meta" style="margin-top:.4em"><a href="https://github.com/Wandalen/ring">github.com/Wandalen/ring</a><a href="https://github.com/Wandalen/exchange">github.com/Wandalen/exchange</a></div>
           <p class="keyhint">Гортайте <kbd>←</kbd> <kbd>→</kbd> або тисніть «далі». Нотатки: <kbd>N</kbd>.</p>
         </div>
@@ -537,30 +537,24 @@ function highlightRust(src){
   }
   return out;
 }
-/* light-theme code colors */
+/* світла тема для підсвітки коду */
 const style = document.createElement('style');
 style.textContent = '.hl-k{color:var(--t1);font-weight:600}.hl-t{color:var(--t3)}.hl-f{color:var(--warn)}.hl-m{color:var(--t4)}.hl-s{color:var(--bid)}.hl-n{color:var(--t4)}.hl-c{color:var(--muted);font-style:italic}.hl-l{color:var(--t2)}';
 document.head.appendChild(style);
 function highlightAll(){ document.querySelectorAll('pre code').forEach(el=>{ el.innerHTML = highlightRust(el.textContent); }); }
 
 const NOTES = [
-  'Вступ: це історія ring через реального споживача. exchange_ — біржовий рушій на Rust: 24 крейти, 0 runtime-залежностей, 335 тестів. Три числа на титулі: +37% проти rtrb, 2 release-записи на обмін, нуль залежностей. Кільце — не «ще одна черга»: слоти з тотальним порядком і exactly-once.',
-  'Споживач: заявки приходять з багатьох потоків, стан біржі змінює ровно один записувач (exchange_step). Кожен потік має свій ring_spsc — тож конкуренції за спільний лічильник просто немає. Номер заявки і час ставить рушій на вході — тому день відтворюється двічі з тим самим хешем. Порядок тут — коректність, а не побічний ефект.',
-  'Порівняння: жодна готова черга не дає всіх вимог одночасно. rtrb — тільки SPSC; ArrayQueue — MPSC, але без тотального порядку і політик; мʼютекс — lock-based (блокування), джитер під навантаженням; канали — не slot-shaped. Чесність: rtrb лідирує на одиночних записах (3.4–3.6 нс), ArrayQueue — на непакетному MPSC. Але саме поєднання (пакетування + TLS + політики + shutdown) не дає ніхто.',
-  'Виміряно: 334 проти 244 млн записів/с (+37%) на 16 384 слотах на Raspberry Pi 5. Але нічия на малих місткостях (+1–2%, шум) і програш rtrb на одиночних записах. Абсолютні числа не переносяться між машинами — важлива різниця в одному рядку.',
-  'Програвання: місткість 8, заявки 1–8 — кладе потік-виробник, девʼята отримує Err (політика Fail — продюсер спробує знову), потім споживач зливає; дві стрілки покажуть: синя (head) — споживання, бурштинова (tail) — claim. Порядок злиття = порядок надходження, рівно один раз. Це і є те, чому exchange_step може сміливо спиратися на кільце.',
-  'Протокол: claim — резерв номера; publish — прапорець «готово»; available — що можна зливати; commit — місце звільнено. Пропуск кроку ⇒ garbage/перезапис/вічне резервування. Злиття в порядку claim-ів; переповнення — промислова політика; зупинка — close → drain_all → reopen.',
-  'Фінал: реальний споживач — найкращий критерій. ring не виграє скрізь, але виграє там, де споживачу потрібен тотальний порядок і передбачуваність. Чесно: production-readiness попереду — це окремий план (capstone), а exchange_ — реальний споживач, не продакшен-деплой. Кільце і рушій — три репозиторії родини: ring, exact, exchange. Питання?'
+  'Вступ: говорю від себе, від першої особи: я писав ці кільця не «в повітрі», а під живого споживача — рушій заявок exchange_. Три числа, якими підпираю розказку: +37% проти rtrb на 16 384 слотах, два release-записи на весь обмін, нуль runtime-залежностей у споживача. І одне уточнення, яке треба сказати одразу: кільце — не «ще одна черга», це слоти з відтворюваним порядком і доставкою ровно один раз.',
+  'Споживач: заявки приходять з багатьох потоків, а стан біржі міняє ровно один записувач — exchange_step. Я дав кожному потокові власний ring_spsc, тож конкуренції за спільний лічильник просто немає. Номер заявки й час прибуття ставить рушій на вході — тому день можна перепрограти двічі й отримати той самий хеш. Порядок для мене — коректність, а не побічний ефект.',
+  'Порівняння: признання чесне — я спершу дуже хотів не писати своє. rtrb — лише SPSC; ArrayQueue — MPSC, але без тотального порядку і політик; мʼютекс — lock-based (блокування), джитер під навантаженням; канали — не slot-shaped. Де я дав маху: rtrb лідує на одиночних записах (3.4–3.6 нс), ArrayQueue — на непакетному MPSC. Але поєднання «пакетування + TLS (thread-local staging) + політики + shutdown» я ніде не знайшов.',
+  'Виміряно: 334 проти 244 млн записів/с (+37%) на 16 384 слотах на Raspberry Pi 5. Чесно: на малих місткостях — нічия в межах шуму (+1–2%), а на одиночних записах я позаду. Наголосіть: абсолютні числа між машинами не переносяться, порівнюємо лише різницю в одному рядку.',
+  'Програвання: місткість 8, заявки 1–8 — кладе потік-виробник, девʼята отримує Err (політика Fail — продюсер спробує знову), потім споживач зливає. Дві стрілки: синя (head) — споживання, бурштинова (tail) — claim. Порядок злиття дорівнює порядкові надходження, кожна заявка — рівно один раз. Саме тому exchange_step спокійно спирається на мій канал.',
+  'Протокол у чотирьох кроках: claim — резерв номера; publish — прапорець «готово»; available — що вже можна зливати; commit — місце звільнено. Пропуск кроку ⇒ garbage/перезапис/вічне резервування, тож я не вигадував: патерн відомий, я його переписав і прогнав крізь loom, fuzz і CI-гейти.',
+  'Фінал: реальний споживач — найкращий критерій. Я беру перемогу там, де потрібен тотальний порядок і передбачуваність, а там, де програю, — сам називаю. Чесно: production-readiness попереду, це окремий план (capstone); exchange_ — реальний споживач, не продакшен-деплой. Питання?'
 ];
 
 const slides = Array.from(document.querySelectorAll('.slide'));
 let cur = 0;
-
-/* ініціалізація: підсвітка, чарт, демо, легенда */
-highlightAll();
-renderCharts();
-renderReadGrid();
-document.querySelectorAll('[data-demo]').forEach(slide=>{ const name=slide.dataset.demo, cap=parseInt(slide.dataset.cap,10); controller(slide, cap, scenarios[name]()); });
 
 /* nav sections */
 const labels = slides.map(s => s.dataset.sec || '');
@@ -739,7 +733,10 @@ const PERF = { spsc: { max: 400, rows: [
 function renderCharts(){ document.querySelectorAll('[data-chart]').forEach(el=>{ const d=PERF[el.dataset.chart]; if(!d) return; el.innerHTML=''; d.rows.forEach(row=>{ const cr=document.createElement('div'); cr.className='crow'; const lb=document.createElement('div'); lb.className='clabel'; lb.textContent=row.label; cr.appendChild(lb); row.bars.forEach(b=>{ const bar=document.createElement('div'); bar.className='cbar'+(b.us?' us':''); const nm=document.createElement('span'); nm.textContent=b.n; const tr=document.createElement('span'); tr.className='track'; const fl=document.createElement('span'); fl.className='fill'; fl.style.width=Math.max(2,b.v/d.max*100)+'%'; tr.appendChild(fl); const vl=document.createElement('span'); vl.className='val'; vl.textContent=b.v; bar.appendChild(nm); bar.appendChild(tr); bar.appendChild(vl); cr.appendChild(bar); }); el.appendChild(cr); }); const sc=document.createElement('div'); sc.className='scale'; sc.textContent='шкала 0–'+d.max+' M/с'; el.appendChild(sc); }); }
 
 /* init */
-const slides0 = document.querySelectorAll('.slide');
+highlightAll();
+renderCharts();
+renderReadGrid();
+document.querySelectorAll('[data-demo]').forEach(slide=>{ const name=slide.dataset.demo, cap=parseInt(slide.dataset.cap,10); controller(slide, cap, scenarios[name]()); });
 show(0);
 </script>
 </body>

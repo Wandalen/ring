@@ -1,0 +1,745 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ring — у бою</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+:root {
+  color-scheme: light;
+  --paper: #f2f4f8;
+  --surface: #ffffff;
+  --sunk: #e8ecf3;
+  --ink: #131a2c;
+  --muted: #5a6479;
+  --line: #d6dce8;
+  --accent: #2f43cf;
+  --accent-soft: #e3e7ff;
+  --ask: #c4362c;
+  --ask-soft: #fbe6e3;
+  --bid: #0f7d59;
+  --bid-soft: #dcf2e8;
+  --warn: #a85d00;
+  --t1: #7445d6; --t1-soft: #ece4ff;
+  --t2: #b86e00; --t2-soft: #fdf0d9;
+  --t3: #0a7f9e; --t3-soft: #dcf3f9;
+  --t4: #b8327f; --t4-soft: #fbe3f0;
+  --shadow: 0 1px 2px rgba(19, 26, 44, .06), 0 6px 24px rgba(19, 26, 44, .06);
+
+  --display: "Unbounded", "Onest", system-ui, sans-serif;
+  --body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --fs-0: clamp(12px, .78vw + 4px, 16px);
+  --fs-1: clamp(14px, .9vw + 5px, 20px);
+  --fs-2: clamp(16px, 1.15vw + 6px, 26px);
+  --fs-3: clamp(20px, 1.7vw + 6px, 36px);
+  --fs-4: clamp(26px, 2.6vw + 6px, 56px);
+  --fs-5: clamp(40px, 5.6vw, 112px);
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: var(--fs-1); line-height: 1.45;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+ul { margin: 0; padding-left: 1.2em; }
+li { margin: .35em 0; }
+li b { font-weight: 600; }
+
+/* ---------- deck ---------- */
+.deck { flex: 1; min-height: 0; position: relative; }
+.slide {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+  padding-left: 16px; padding-right: 16px;
+  padding-block: clamp(16px, 3vh, 40px);
+}
+.slide:not(.is-active) { display: none; }
+.slide > .inner { max-width: 1680px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: clamp(14px, 2.2vh, 28px); }
+.slide.is-active > .inner { animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(8px); opacity: .6; } to { transform: none; opacity: 1; } }
+
+.eyebrow { font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.h-slide { font-family: var(--display); font-weight: 700; font-size: var(--fs-4); line-height: 1.08; letter-spacing: -.01em; }
+.lede { font-size: var(--fs-2); color: var(--muted); max-width: 62ch; }
+.note-cap { color: var(--muted); font-size: var(--fs-0); }
+kbd { font-family: var(--mono); font-size: .85em; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .4em; background: var(--surface); }
+.keyhint { font-size: var(--fs-0); color: var(--muted); }
+
+/* ---------- title ---------- */
+.title-grid { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(20px, 4vw, 72px); align-items: center; }
+.wordmark { font-family: var(--display); font-weight: 700; font-size: var(--fs-5); line-height: .95; letter-spacing: -.03em; }
+.wordmark .tick { color: var(--accent); }
+.title-sub { font-family: var(--display); font-weight: 500; font-size: var(--fs-3); line-height: 1.2; margin-top: .6em; max-width: 20ch; }
+.title-thesis { font-size: var(--fs-2); color: var(--muted); margin-top: 1em; max-width: 36ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 1.6em; }
+.fact { display: flex; flex-direction: column; }
+.fact b { font-family: var(--mono); font-size: var(--fs-3); font-weight: 700; font-variant-numeric: tabular-nums; }
+.fact span { font-size: var(--fs-0); color: var(--muted); }
+.title-meta { margin-top: 1.6em; font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+
+/* ---------- shared cards ---------- */
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(14px, 2vh, 22px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card h3 { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.2; }
+.card p { color: var(--muted); font-size: var(--fs-0); line-height: 1.5; }
+.card .src { font-family: var(--mono); font-size: calc(var(--fs-0) * .88); color: var(--muted); }
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(18px, 3vw, 56px); align-items: center; flex: 1; }
+.why-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(14px, 2.4vw, 40px); align-items: start; flex: 1; }
+
+/* ---------- arch (споживач) ---------- */
+.arch { display: grid; grid-template-columns: minmax(0, .95fr) auto minmax(0, 2fr) auto minmax(0, 1fr); gap: 12px; align-items: stretch; flex: 1; align-content: center; }
+.arch-box { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.arch-box.core { border: 1.5px solid var(--accent); box-shadow: var(--shadow); }
+.arch-cap { font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.arch-box.core .arch-cap { color: var(--accent); }
+.arch-note { font-size: var(--fs-0); color: var(--muted); }
+.lane { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 9px; background: var(--sunk); font-size: var(--fs-0); }
+.lane .thr { font-weight: 600; }
+.lane .rg { display: inline-flex; align-items: center; gap: 6px; font-family: var(--mono); color: var(--accent); }
+.arch-arrow { align-self: center; justify-self: center; font-family: var(--mono); font-size: var(--fs-3); color: var(--muted); }
+.arch-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin-top: auto; }
+.arch-steps .st { background: var(--sunk); border-radius: 9px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.arch-steps .st b { font-weight: 600; font-size: var(--fs-0); overflow-wrap: anywhere; }
+.arch-steps .st code { font-family: var(--mono); font-size: calc(var(--fs-0) * .82); color: var(--muted); overflow-wrap: anywhere; }
+.outbox { background: var(--sunk); border-radius: 9px; padding: 10px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-0); color: var(--muted); }
+.outbox b { font-family: var(--display); font-weight: 500; font-size: var(--fs-1); color: var(--ink); }
+.outbox .mono { color: var(--accent); font-weight: 700; }
+.arch-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px clamp(16px, 2.4vw, 40px); }
+.arch-facts b { font-family: var(--mono); font-size: var(--fs-3); font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
+.arch-facts span { color: var(--muted); font-size: var(--fs-0); }
+
+/* ---------- comparison table ---------- */
+.cmp-wrap { overflow-x: auto; }
+.cmp { width: 100%; border-collapse: collapse; font-size: var(--fs-0); }
+.cmp th { font-family: var(--mono); font-weight: 500; color: var(--muted); padding: 0 8px 8px; text-align: center; white-space: nowrap; }
+.cmp td { padding: 8px; border-top: 1px solid var(--line); text-align: center; font-family: var(--mono); font-weight: 700; }
+.cmp td:first-child { text-align: left; font-family: var(--body); font-weight: 500; padding-left: 0; }
+.cmp th.us { color: var(--accent); font-weight: 700; }
+.cmp .y { color: var(--bid); }
+.cmp .n { color: var(--ask); }
+.cmp .u { color: var(--muted); }
+.cmp tr.key td { background: var(--accent-soft); }
+.because { font-size: var(--fs-2); font-weight: 500; max-width: 60ch; }
+
+/* ---------- vows ---------- */
+.vows { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); flex: 1; align-content: center; }
+.vow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(14px, 2.2vh, 26px); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vow .qn { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
+.vow b { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); line-height: 1.05; color: var(--accent); overflow-wrap: anywhere; }
+.vow p { font-size: var(--fs-1); }
+.vow .where { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: calc(var(--fs-0) * .9); color: var(--muted); }
+
+/* ---------- code + demo ---------- */
+.demo-grid { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(14px, 2vw, 32px); align-items: start; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.panel-title { font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; }
+pre { margin: 0; background: var(--sunk); border-radius: 10px; padding: 14px; overflow: auto; }
+code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
+.out { margin-top: 10px; background: var(--sunk); border-radius: 8px; padding: 8px 10px; font: calc(var(--fs-0) * .9)/1.5 var(--mono); color: var(--bid); }
+
+/* ring viz (light palette) */
+.viz { position: relative; }
+.ringsvg { display: block; width: 100%; max-width: 330px; margin: 0 auto; }
+.sector { transition: fill .3s, stroke .3s; stroke-width: 2; stroke-linejoin: round; }
+.sector.empty { fill: var(--paper); stroke: var(--line); }
+.sector.filled { fill: var(--bid-soft); stroke: var(--bid); }
+.sector.inflight { fill: var(--t2-soft); stroke: var(--t2); }
+.sectorval,.sectorseq,.sectoridx { text-anchor: middle; }
+.sectorval { fill: var(--ink); font: 700 19px var(--mono); }
+.sectorseq { fill: rgba(19, 26, 44, .55); font: 600 10px var(--mono); }
+.sectoridx { fill: var(--muted); font: 600 10px var(--mono); }
+.cring { fill: none; stroke: var(--line); stroke-width: 1; }
+.ptr { transform-box: view-box; transform-origin: 0 0; transition: transform .32s cubic-bezier(.3,.9,.3,1); }
+.ptr.consumer { fill: var(--accent); }
+.ptr.producer { fill: var(--t2); }
+.centertxt { font: 600 12px var(--mono); text-anchor: middle; }
+.centerbig { font: 700 16px var(--mono); text-anchor: middle; }
+.sector.justpush { animation: pulseG .6s ease; }
+.sector.justpop { animation: pulseA .6s ease; }
+.sector.refused { animation: pulseA .6s ease; }
+@keyframes pulseG { 0%,100% { filter: none; } 45% { filter: drop-shadow(0 0 5px var(--bid)); } }
+@keyframes pulseA { 0%,100% { filter: none; } 45% { filter: drop-shadow(0 0 5px var(--ask)); } }
+.ringlegend { display: flex; gap: 16px; color: var(--muted); font-size: var(--fs-0); margin-top: 8px; flex-wrap: wrap; }
+.ringlegend span { display: inline-flex; align-items: center; gap: 6px; }
+.ringstats { margin-top: 8px; font: var(--fs-0)/1.6 var(--mono); color: var(--muted); }
+.ringstats b { color: var(--ink); }
+.lgsvg { width: 18px; height: 18px; }
+.readgrid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.readitem { display: flex; gap: 9px; align-items: flex-start; }
+.readitem svg { flex: 0 0 auto; margin-top: 1px; }
+.readitem b { display: block; font-size: var(--fs-0); color: var(--ink); font-weight: 600; }
+.readitem span { font-size: var(--fs-0); color: var(--muted); }
+.controls { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.log { margin-top: 10px; height: 130px; overflow: auto; background: var(--paper); border-radius: 10px; padding: 8px 10px; font: calc(var(--fs-0) * .88)/1.6 var(--mono); }
+.logline { white-space: pre-wrap; }
+.logline.ok { color: var(--bid); }
+.logline.out { color: var(--accent); }
+.logline.warn { color: var(--warn); font-weight: 600; }
+.logline.note { color: var(--muted); }
+.logline.err { color: var(--ask); font-weight: 700; }
+
+/* chart */
+.chart { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+.crow .clabel { font-size: var(--fs-0); color: var(--muted); margin-bottom: 5px; }
+.cbar { display: grid; grid-template-columns: 108px 1fr 52px; align-items: center; gap: 8px; font: calc(var(--fs-0) * .88)/1.4 var(--mono); color: var(--muted); margin-bottom: 3px; }
+.cbar .track { display: block; height: 13px; background: var(--sunk); border-radius: 3px; overflow: hidden; }
+.cbar .fill { display: block; height: 100%; background: #aeb8ce; border-radius: 3px 0 0 3px; }
+.cbar.us { color: var(--ink); }
+.cbar.us .fill { background: var(--bid); }
+.cbar .val { text-align: right; font-variant-numeric: tabular-nums; }
+.scale { color: var(--muted); font-size: calc(var(--fs-0) * .9); text-align: right; margin-top: 2px; }
+
+/* ---------- decisions (протокол) ---------- */
+.dec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); }
+.dc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(12px, 1.8vh, 20px); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dc .crate { font-family: var(--mono); font-size: calc(var(--fs-0) * .88); color: var(--muted); }
+.dc b { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.2; }
+.dc p { color: var(--muted); font-size: var(--fs-0); line-height: 1.5; }
+.dc .proof { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: calc(var(--fs-0) * .9); color: var(--accent); }
+
+/* ---------- thanks / totals ---------- */
+.stats-line { display: flex; flex-wrap: wrap; gap: 8px 32px; }
+.stats-line div b { font-family: var(--mono); font-size: var(--fs-3); font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
+.stats-line div span { color: var(--muted); font-size: var(--fs-0); }
+.thanks b { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); line-height: 1.1; }
+.thanks b em { font-style: normal; color: var(--accent); }
+
+/* ---------- nav, notes ---------- */
+.nav {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); background: var(--surface);
+  padding-left: 16px; padding-right: 16px; padding-block: 8px; position: relative; z-index: 5;
+}
+.brand { font-family: var(--display); font-weight: 700; font-size: var(--fs-0); }
+.brand .tick { color: var(--accent); }
+.sections { flex: 1; display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.sections button { flex: 1 1 0; min-width: 0; border: 0; background: transparent; cursor: pointer; padding: 4px 2px 0; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: calc(var(--fs-0) * .88); }
+.sections button::before { content: ""; height: 3px; border-radius: 2px; background: var(--line); }
+.sections button.done::before { background: var(--muted); }
+.sections button[aria-current="true"] { color: var(--ink); font-weight: 600; }
+.sections button[aria-current="true"]::before { background: var(--accent); }
+.sections button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.navbtns { display: flex; gap: 6px; align-items: center; }
+.iconbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; height: 34px; min-width: 34px; padding: 0 9px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: var(--fs-0); font-weight: 600; }
+.iconbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.counter { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); min-width: 3.4em; text-align: center; }
+.notes {
+  position: absolute; left: 0; right: 0; bottom: 100%; max-height: 42vh; overflow-y: auto; background: var(--surface); border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, .12); padding: 14px 16px 16px;
+}
+.notes .nt { max-width: 1100px; margin: 0 auto; display: grid; gap: 8px; }
+.notes .nt-head { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
+.notes p { font-size: var(--fs-2); line-height: 1.45; max-width: 1100px; }
+
+/* ---------- narrow ---------- */
+@media (max-width: 1100px) {
+  .arch { grid-template-columns: minmax(0, 1fr); }
+  .arch-arrow { transform: rotate(90deg); }
+  .dec, .arch-facts, .vows { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .why-grid, .demo-grid, .two, .title-grid { grid-template-columns: minmax(0, 1fr); }
+  .readgrid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 760px) {
+  .sections, .brand, .keyhint { display: none; }
+  .nav { justify-content: space-between; }
+  .dec, .arch-facts, .vows { grid-template-columns: minmax(0, 1fr); }
+  .readgrid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav" id="nav">
+  <div class="brand">ring<span class="tick">.</span>_ · у бою</div>
+  <div class="sections" id="sections"></div>
+  <div class="navbtns">
+    <button class="iconbtn" id="prev" title="назад (←)">‹</button>
+    <span class="counter" id="counter">1 / 7</span>
+    <button class="iconbtn" id="next" title="далі (→)">›</button>
+    <button class="iconbtn hide-narrow" id="notesBtn" aria-pressed="false" title="нотатки (N)">Нотатки</button>
+    <span class="keyhint hide-narrow"><kbd>←</kbd><kbd>→</kbd> · <kbd>N</kbd> нотатки</span>
+  </div>
+</nav>
+
+<main class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide is-active" data-sec="Вступ">
+    <div class="inner">
+      <div class="title-grid">
+        <div>
+          <h1 class="wordmark">ring<span class="tick">.</span>_</h1>
+          <div class="title-sub">у бою: споживач, порівняння, програвання</div>
+          <p class="title-thesis">Історія lock-free (без блокування) кілець, розказана через реального споживача — біржовий рушій <a href="https://github.com/Wandalen/exchange">exchange_</a>.</p>
+          <div class="facts">
+            <div class="fact"><b>+37%</b><span>ring_spsc проти rtrb · 16 384 слоти</span></div>
+            <div class="fact"><b>2</b><span>release-записи на весь обмін</span></div>
+            <div class="fact"><b>0</b><span>runtime-залежностей з crates.io</span></div>
+          </div>
+          <div class="title-meta"><span>github.com/Wandalen/ring</span><span>споживач: github.com/Wandalen/exchange</span></div>
+        </div>
+        <div class="card">
+          <h3>План</h3>
+          <ul>
+            <li><b>Споживач:</b> заявки з багатьох потоків → один записувач</li>
+            <li><b>Порівняння:</b> готові черги проти вимог</li>
+            <li><b>Виміряно:</b> SPSC проти rtrb</li>
+            <li><b>Програвання:</b> кільце до відмови і злив</li>
+            <li><b>Протокол:</b> claim / publish / commit</li>
+          </ul>
+          <p>Кільця — це не «ще одна черга». Це слоти з відтворюваним тотальним порядком і доставкою «лише один раз».</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide" data-sec="Споживач">
+    <div class="inner">
+      <div class="eyebrow">хто використовує</div>
+      <h2 class="h-slide">Багато потоків — один записувач</h2>
+      <p class="lede">exchange_ збирає заявки з багатьох потоків, а стан біржі змінює ровно один записувач — як у справжніх рушіях.</p>
+      <div class="arch">
+        <div class="arch-box">
+          <div class="arch-cap">потоки-виробники</div>
+          <div class="lane"><span class="thr">потік 1</span><span class="rg">ring_spsc</span></div>
+          <div class="lane"><span class="thr">потік 2</span><span class="rg">ring_spsc</span></div>
+          <div class="lane"><span class="thr">потік N</span><span class="rg">ring_spsc</span></div>
+          <p class="arch-note">Кожен виробник має своє lock-free кільце: без мʼютексів і без read-modify-write.</p>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box core">
+          <div class="arch-cap">exchange_step · один записувач</div>
+          <p class="arch-note">Зливає кільця в наперед заданому порядку. Номер заявки й час прибуття ставить рушій, а не клієнт.</p>
+          <div class="arch-steps">
+            <div class="st"><b>Перевірка</b><code>exchange_spec</code></div>
+            <div class="st"><b>Блокування</b><code>exchange_escrow</code></div>
+            <div class="st"><b>Зведення</b><code>exchange_match</code></div>
+            <div class="st"><b>Розрахунок</b><code>exchange_conserve</code></div>
+            <div class="st"><b>Залишок</b><code>exchange_book</code></div>
+          </div>
+          <p class="arch-note">спершу на клонах стакану й ескроу, потім commit</p>
+        </div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box">
+          <div class="arch-cap">що виходить</div>
+          <div class="outbox"><b>Журнал подій</b><span class="mono">#41 · #42 · #43 · #44</span><span>кожна зміна стану — одна подія, номери без пропусків</span></div>
+          <div class="outbox"><b>Аудит</b><span class="mono">Σ ₴ = 0 · Σ шт. = 0</span><span>кожна угода в подвійному записі</span></div>
+        </div>
+      </div>
+      <div class="arch-facts">
+        <div><b>2</b><span>release-записи на весь обмін у SPSC-кільці; курсори на окремих 64-байтних кеш-лініях</span></div>
+        <div><b>+37%</b><span>ring_spsc проти rtrb: 334 проти 244 млн записів/с (Raspberry Pi 5, 16 384 слоти)</span></div>
+        <div><b>loom</b><span>перебирає всі переплетення потоків, а не сподівається на вдалий прогін</span></div>
+        <div><b>0,9 мс</b><span>прохід по 40 000 рівнів стакану на VecDeque; на Vec — 452 мс</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide" data-sec="Порівняння">
+    <div class="inner">
+      <div class="eyebrow">порівняння · чому не взяли готове</div>
+      <h2 class="h-slide">Готові черги проти вимог споживача</h2>
+      <p class="lede">Вимоги exchange_: тотальний порядок, lock-free (без блокування) шлях запису, явна політика переповнення, shutdown з зливом.</p>
+      <div class="why-grid">
+        <div class="card">
+          <div class="cmp-wrap">
+            <table class="cmp">
+              <tr><th></th><th>rtrb</th><th>ArrayQueue</th><th>Mutex&lt;VecDeque&gt;</th><th>канали</th><th class="us">ring</th></tr>
+              <tr><td>Багато продюсерів → один споживач</td><td class="n">✗</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td><td class="y">✓</td></tr>
+              <tr><td>lock-free (без блокування) запис</td><td class="y">✓</td><td class="y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+              <tr><td>Тотальний порядок як гарантія</td><td class="y">✓</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+              <tr class="key"><td>Пакетування + TLS (thread-local staging)</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+              <tr><td>Політика переповнення (Fail / DropNewest / DropOldest)</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+              <tr><td>Shutdown + drain_all</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="n">✗</td><td class="y">✓</td></tr>
+            </table>
+          </div>
+          <p class="src">Жодне готове рішення не дає всіх вимог одночасно; частини залишаються еталонами й бекендами.</p>
+        </div>
+        <div class="card">
+          <h3>Чесність</h3>
+          <ul>
+            <li><b>rtrb лідирує</b> на строгій парі одиночних записів: 3.4–3.6 нс проти наших 13–16 нс.</li>
+            <li><b>ArrayQueue лідирує</b> на непакетному MPSC-шляху при високих кількостях продюсерів.</li>
+            <li><b>Але:</b> потрібне поєднання — пакетування, стейджинг, політики, зупинка — і ніде цього набору немає.</li>
+          </ul>
+          <p class="src">crossbeam-queue — свідомий тимчасовий бекенд у ring_core за фіче-флагом.</p>
+          <p>Мʼютексова черга під навантаженням — це джитер у грошах: очікування на лок-і серіалізує потоки.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide" data-sec="Виміряно">
+    <div class="inner">
+      <div class="eyebrow">виміряно, не аргументовано</div>
+      <h2 class="h-slide">SPSC проти rtrb</h2>
+      <p class="lede">ring_spsc проти rtrb — еталона однопродюсерного випадку. Порівняти можна лише всередині одного запуску.</p>
+      <div class="why-grid">
+        <div class="card">
+          <h3>Пропускна здатність двох потоків, M/с</h3>
+          <div class="chart" data-chart="spsc"></div>
+          <p class="src">Raspberry Pi 5 · 16 384 слоти · медіани criterion</p>
+        </div>
+        <div class="card">
+          <h3>Як читати чесно</h3>
+          <ul>
+            <li><b>Виграємо:</b> 334 проти 244 млн записів/с (+37%) на 16 384 слотах.</li>
+            <li><b>Нічия:</b> на 1024 слотах і 8-байтових записах різниця +1–2% — у межах шуму.</li>
+            <li><b>Програємо:</b> rtrb лідирує на одиночних записах (3.4–3.6 нс проти 13–16 нс).</li>
+            <li><b>Лінія, не машина:</b> абсолютні числа не переносяться; важлива лише різниця в одному рядку.</li>
+          </ul>
+          <p class="src">exchange_ взяв ring_spsc саме через виміряну перевагу на робочих місткостях.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide" data-demo="orders" data-cap="8" data-sec="Програвання">
+    <div class="inner">
+      <div class="eyebrow">програвання</div>
+      <h2 class="h-slide">Заповнення кільця заявками</h2>
+      <p class="lede">Місткість 8. Потік-виробник кладе заявки один за одним; девʼята отримує відмову — потім злив відкриває шлях. Натисніть ▶ Пуск.</p>
+      <div class="demo-grid">
+        <div class="panel">
+          <div class="panel-title"><span>Rust · потік-виробник і exchange_step</span></div>
+          <pre><code>use ring_factory::{ Factory, RingConfig };
+
+let cfg = RingConfig::new( 8 ).unwrap(); // 8 slots, power of two
+let mut split = Factory.build::&lt; u32 &gt;( cfg ).unwrap();
+let ( mut producer, mut consumer ) = split.ends().split();
+
+// потік-виробник: заявка №v прилітає по мережі
+producer.try_push( v )                    // claim + publish
+  .expect( "кільце повне — спробуємо знову" );
+
+// exchange_step — один записувач
+while let Some( order ) = consumer.try_recv() // злив у порядку claim-ів
+{ /* перевірка → ескроу → зведення */ }</code></pre>
+          <div class="out">заявки №1–№8 прийнято; №9 відкинуто; злиття в порядку входження</div>
+        </div>
+        <div class="panel">
+          <div class="panel-title"><span>Наживо</span><span>синя — споживання · бурштинова — claim</span></div>
+          <div class="viz"></div>
+          <div class="controls">
+            <button class="btn primary btn-play" style="border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:var(--fs-0)">▶ Пуск</button>
+            <button class="btn btn-step" style="border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:var(--fs-0)">⤼ Крок</button>
+            <button class="btn btn-reset" style="border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:var(--fs-0)">↺ Скинути</button>
+          </div>
+          <div class="log"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="panel-title"><span>Як читати кільце</span></div>
+        <div class="readgrid" data-readgrid></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide" data-sec="Протокол">
+    <div class="inner">
+      <div class="eyebrow">протокол</div>
+      <h2 class="h-slide">Claim / publish / commit</h2>
+      <p class="lede">Slot-shaped channel з відтворюваним тотальним порядком і доставкою «лише один раз».</p>
+      <div class="dec">
+        <div class="dc"><span class="crate">крок 1</span><b>Claim</b><p>Продюсер резервує наступний номер послідовності — локально, без очікування.</p><span class="proof">пропуск ⇒ зниклий номер</span></div>
+        <div class="dc"><span class="crate">крок 2</span><b>Publish</b><p>Прапорець «готово» на слоті, який щойно заповнено.</p><span class="proof">пропуск ⇒ слот-привид</span></div>
+        <div class="dc"><span class="crate">крок 3</span><b>Available</b><p>Споживач бачить суцільний префікс номерів, готових до зливу.</p><span class="proof">тільки порядок claim-ів</span></div>
+        <div class="dc"><span class="crate">крок 4</span><b>Commit</b><p>Місце звільнено для повторного використання.</p><span class="proof">пропуск ⇒ вічне резервування</span></div>
+      </div>
+      <div class="why-grid">
+        <div class="card">
+          <h3>Що отримує споживач</h3>
+          <ul>
+            <li><b>Порядок:</b> злиття в порядку claim-ів — тотальний, відтворюваний.</li>
+            <li><b>Exactly-once:</b> кожен елемент ровно один раз.</li>
+            <li><b>Переповнення:</b> промислова політика, а не сюрприз — Fail / DropNewest / DropOldest.</li>
+            <li><b>Зупинка:</b> close → drain_all → reopen.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Не вигаданий патерн</h3>
+          <p>Протокол відомий; його переписано й перевірено: loom перебирає переплетення, fuzz полює на паніки, гейти CI вміють падати.</p>
+          <p class="src">Пропуск кроку ⇒ garbage / перезапис / вічне резервування — тому кожен крок несний без лок-а.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide" data-sec="Підсумок">
+    <div class="inner">
+      <div class="eyebrow">підсумок</div>
+      <h2 class="h-slide">Реальний споживач — найкращий критерій</h2>
+      <div class="why-grid" style="align-items:center">
+        <div class="card">
+          <h3>Ланцюжок</h3>
+          <ul>
+            <li><b>Споживач:</b> exchange_ — багато потоків → один записувач → журнал і аудит.</li>
+            <li><b>Порівняння:</b> жодна готова черга не дає всіх вимог; rtrb і ArrayQueue — еталони.</li>
+            <li><b>Виміряно:</b> +37% проти rtrb на робочих місткостях; нічия — чесно названа.</li>
+            <li><b>Програвання:</b> кільце заповнюється до відмови, зливається у порядку claim-ів.</li>
+            <li><b>Протокол:</b> claim / publish / available / commit.</li>
+          </ul>
+        </div>
+        <div class="thanks" style="align-items:flex-start;gap:6px">
+          <b>Дякуємо! <em>Питання?</em></b>
+          <div class="title-meta" style="margin-top:.4em"><a href="https://github.com/Wandalen/ring">github.com/Wandalen/ring</a><a href="https://github.com/Wandalen/exchange">github.com/Wandalen/exchange</a></div>
+          <p class="keyhint">Гортайте <kbd>←</kbd> <kbd>→</kbd> або тисніть «далі». Нотатки: <kbd>N</kbd>.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<div class="notes" id="notes" hidden>
+  <div class="nt">
+    <div class="nt-head">Нотатки доповідача</div>
+    <p id="notetext"></p>
+  </div>
+</div>
+
+<script>
+const RUST_KW = new Set(['as','async','await','break','const','continue','crate','dyn','else','enum','extern','false','fn','for','if','impl','in','let','loop','match','mod','move','mut','pub','ref','return','self','Self','static','struct','super','trait','true','type','unsafe','use','where','while','yield']);
+const RUST_TY = new Set(['u8','u16','u32','u64','u128','usize','i8','i16','i32','i64','i128','isize','f32','f64','bool','char','str','String','Vec','Option','Result','Some','None','Ok','Err','Box']);
+function hlEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightRust(src){
+  let out = '', i = 0; const n = src.length;
+  const idStart = c => /[A-Za-z_]/.test(c);
+  const idChar  = c => /[A-Za-z0-9_]/.test(c);
+  const span = (cls, text) => '<span class="hl-' + cls + '">' + hlEsc(text) + '</span>';
+  while (i < n){
+    const c = src[i];
+    if (c === '/' && src[i+1] === '/'){ let j = src.indexOf('\n', i); if (j < 0) j = n; out += span('c', src.slice(i, j)); i = j; continue; }
+    if (c === '"'){ let j = i+1; while (j < n){ if (src[j] === '\\'){ j += 2; continue; } if (src[j] === '"'){ j++; break; } j++; } out += span('s', src.slice(i, j)); i = j; continue; }
+    if (c === "'"){ if (src[i+2] === "'"){ out += span('s', src.slice(i, i+3)); i += 3; continue; } let j = i+1; while (j < n && idChar(src[j])) j++; out += span('l', src.slice(i, j)); i = j; continue; }
+    if (/[0-9]/.test(c)){ let j = i + 1; while (j < n && /[0-9a-fA-F_xXoObBeE]/.test(src[j])) j++; while (j < n && /[A-Za-z0-9]/.test(src[j])) j++; out += span('n', src.slice(i, j)); i = j; continue; }
+    if (idStart(c)){ let j = i; while (j < n && idChar(src[j])) j++; const word = src.slice(i, j); let cls = null; if (src[j] === '!'){ cls = 'm'; j++; } else if (RUST_KW.has(word)) cls = 'k'; else if (RUST_TY.has(word) || /^[A-Z]/.test(word)) cls = 't'; else if (src[j] === '(') cls = 'f'; out += cls ? span(cls, src.slice(i, j)) : hlEsc(src.slice(i, j)); i = j; continue; }
+    out += hlEsc(c); i++;
+  }
+  return out;
+}
+/* light-theme code colors */
+const style = document.createElement('style');
+style.textContent = '.hl-k{color:var(--t1);font-weight:600}.hl-t{color:var(--t3)}.hl-f{color:var(--warn)}.hl-m{color:var(--t4)}.hl-s{color:var(--bid)}.hl-n{color:var(--t4)}.hl-c{color:var(--muted);font-style:italic}.hl-l{color:var(--t2)}';
+document.head.appendChild(style);
+function highlightAll(){ document.querySelectorAll('pre code').forEach(el=>{ el.innerHTML = highlightRust(el.textContent); }); }
+
+const NOTES = [
+  'Вступ: це історія ring через реального споживача. exchange_ — біржовий рушій на Rust: 24 крейти, 0 runtime-залежностей, 335 тестів. Три числа на титулі: +37% проти rtrb, 2 release-записи на обмін, нуль залежностей. Кільце — не «ще одна черга»: слоти з тотальним порядком і exactly-once.',
+  'Споживач: заявки приходять з багатьох потоків, стан біржі змінює ровно один записувач (exchange_step). Кожен потік має свій ring_spsc — тож конкуренції за спільний лічильник просто немає. Номер заявки і час ставить рушій на вході — тому день відтворюється двічі з тим самим хешем. Порядок тут — коректність, а не побічний ефект.',
+  'Порівняння: жодна готова черга не дає всіх вимог одночасно. rtrb — тільки SPSC; ArrayQueue — MPSC, але без тотального порядку і політик; мʼютекс — lock-based (блокування), джитер під навантаженням; канали — не slot-shaped. Чесність: rtrb лідирує на одиночних записах (3.4–3.6 нс), ArrayQueue — на непакетному MPSC. Але саме поєднання (пакетування + TLS + політики + shutdown) не дає ніхто.',
+  'Виміряно: 334 проти 244 млн записів/с (+37%) на 16 384 слотах на Raspberry Pi 5. Але нічия на малих місткостях (+1–2%, шум) і програш rtrb на одиночних записах. Абсолютні числа не переносяться між машинами — важлива різниця в одному рядку.',
+  'Програвання: місткість 8, заявки 1–8 — кладе потік-виробник, девʼята отримує Err (політика Fail — продюсер спробує знову), потім споживач зливає; дві стрілки покажуть: синя (head) — споживання, бурштинова (tail) — claim. Порядок злиття = порядок надходження, рівно один раз. Це і є те, чому exchange_step може сміливо спиратися на кільце.',
+  'Протокол: claim — резерв номера; publish — прапорець «готово»; available — що можна зливати; commit — місце звільнено. Пропуск кроку ⇒ garbage/перезапис/вічне резервування. Злиття в порядку claim-ів; переповнення — промислова політика; зупинка — close → drain_all → reopen.',
+  'Фінал: реальний споживач — найкращий критерій. ring не виграє скрізь, але виграє там, де споживачу потрібен тотальний порядок і передбачуваність. Кільце і рушій — три репозиторії родини: ring, exact, exchange. Питання?'
+];
+
+const slides = Array.from(document.querySelectorAll('.slide'));
+let cur = 0;
+
+/* ініціалізація: підсвітка, чарт, демо, легенда */
+highlightAll();
+renderCharts();
+renderReadGrid();
+document.querySelectorAll('[data-demo]').forEach(slide=>{ const name=slide.dataset.demo, cap=parseInt(slide.dataset.cap,10); controller(slide, cap, scenarios[name]()); });
+
+/* nav sections */
+const labels = slides.map(s => s.dataset.sec || '');
+const sectionsEl = document.getElementById('sections');
+sectionsEl.innerHTML = labels.map((t,i)=>'<button type="button"><span>' + t + '</span></button>').join('');
+const secBtns = Array.from(sectionsEl.querySelectorAll('button'));
+secBtns.forEach((b,i)=> b.onclick = ()=>show(i));
+
+function show(n){
+  cur = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s,i)=>s.classList.toggle('is-active', i === cur));
+  document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+  secBtns.forEach((b,i)=>{
+    b.setAttribute('aria-current', i === cur ? 'true' : 'false');
+    b.classList.toggle('done', i < cur);
+  });
+  const nt = document.getElementById('notetext');
+  if (nt) nt.textContent = NOTES[cur] || '';
+}
+document.getElementById('next').onclick = ()=>show(cur + 1);
+document.getElementById('prev').onclick = ()=>show(cur - 1);
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); show(cur + 1); }
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); show(cur - 1); }
+});
+const notesEl = document.getElementById('notes');
+const notesBtn = document.getElementById('notesBtn');
+function toggleNotes(){
+  const open = notesEl.hidden;
+  notesEl.hidden = !open;
+  notesBtn.setAttribute('aria-pressed', open ? 'true' : 'false');
+}
+notesBtn.onclick = toggleNotes;
+document.addEventListener('keydown', e=>{
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  if (e.key === 'n' || e.key === 'N') toggleNotes();
+});
+
+/* ── ring model ─────────────────────────────────────────────────────────── */
+function makeRing(cap){
+  return { cap, cells: Array.from({length: cap}, () => ({seq:null, val:null, pub:false})), tail: 0, head: 0 };
+}
+function contiguous(m){
+  let e = m.head;
+  while (true){ const c = m.cells[e % m.cap]; if (c && c.seq === e && c.pub) e++; else break; }
+  return e;
+}
+function push(m, val){
+  if (m.tail - m.head >= m.cap) return {ok:false};
+  const seq = m.tail; m.cells[seq % m.cap] = {seq, val, pub:false}; m.tail++;
+  return {ok:true, seq, idx: seq % m.cap};
+}
+function publish(m, seq){ const c = m.cells[seq % m.cap]; if (c && c.seq === seq) c.pub = true; }
+function pop(m){
+  const e = contiguous(m); if (m.head >= e) return {ok:false};
+  const seq = m.head, c = m.cells[seq % m.cap], val = c.val;
+  m.cells[seq % m.cap] = {seq:null, val:null, pub:false}; m.head++;
+  return {ok:true, seq, val, idx: seq % m.cap};
+}
+
+/* ── scenario · заявки в SPSC-кільце ─────────────────────────────────────── */
+const scenarios = {
+  orders: () => (ctx) => {
+    const s = [];
+    s.push(()=>ctx.say('потік-виробник: заявки прилітають по мережі · SPSC, місткість 8', 'note'));
+    for (let v = 1; v <= 8; v++) {
+      s.push(()=>{ const r = ctx.push(v); ctx.say('заявка №' + v + '  → try_push  → Ok(())   посл. ' + r.seq, 'ok'); });
+    }
+    s.push(()=>ctx.say('кільце ПОВНЕ — 8 заявок чекають споживача', 'warn'));
+    s.push(()=>ctx.refuse('заявка №9  → Err  — кільце повне (політика Fail), продюсер спробує знову', 'err'));
+    s.push(()=>ctx.say('споживач (exchange_step) — зливає кільце в порядку надходження', 'note'));
+    for (let k = 0; k < 8; k++) {
+      s.push(()=>{ const r = ctx.pop(); ctx.say('  заявка №' + r.val + '  → злита у порядку №' + r.val, 'out'); });
+    }
+    s.push(()=>{ const r = ctx.push(9); ctx.say('заявка №9  → try_push  → Ok(())   посл. ' + r.seq + '   — місце звільнилося', 'ok'); });
+    s.push(()=>ctx.say('порядок злиття = порядок надходження; номера без пропусків — це тотальний порядок', 'note'));
+    return s;
+  }
+};
+
+/* ── RingView ───────────────────────────────────────────────────────────── */
+class RingView{
+  constructor(root, cap){
+    this.cap = cap; root.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg';
+    const S = 340; this.cx = S/2; this.cy = S/2; this.rOut = 138; this.rIn = 84; this.rMid = (this.rOut+this.rIn)/2;
+    const svg = document.createElementNS(NS,'svg'); svg.setAttribute('viewBox','0 0 '+S+' '+S); svg.setAttribute('class','ringsvg');
+    this.sectors=[]; this.vals=[]; this.seqs=[];
+    const step = 360/cap;
+    for (let i=0;i<cap;i++){
+      const a0=i*step, a1=(i+1)*step, mid=a0+step/2;
+      const path=document.createElementNS(NS,'path'); path.setAttribute('d',this.arc(a0,a1)); path.setAttribute('class','sector empty');
+      svg.appendChild(path); this.sectors.push(path);
+      const pv=this.polar(this.rMid+5,mid); const tv=document.createElementNS(NS,'text'); tv.setAttribute('x',pv[0]); tv.setAttribute('y',pv[1]); tv.setAttribute('class','sectorval'); tv.setAttribute('dominant-baseline','central'); svg.appendChild(tv); this.vals.push(tv);
+      const ps=this.polar(this.rMid-16,mid); const ts=document.createElementNS(NS,'text'); ts.setAttribute('x',ps[0]); ts.setAttribute('y',ps[1]); ts.setAttribute('class','sectorseq'); ts.setAttribute('dominant-baseline','central'); svg.appendChild(ts); this.seqs.push(ts);
+      const pi=this.polar(this.rIn+9,mid); const ti=document.createElementNS(NS,'text'); ti.setAttribute('x',pi[0]); ti.setAttribute('y',pi[1]); ti.setAttribute('class','sectoridx'); ti.setAttribute('dominant-baseline','central'); ti.textContent=i; svg.appendChild(ti);
+    }
+    [this.rIn,this.rOut].forEach(r=>{ const c=document.createElementNS(NS,'circle'); c.setAttribute('cx',this.cx); c.setAttribute('cy',this.cy); c.setAttribute('r',r); c.setAttribute('class','cring'); svg.appendChild(c); });
+    const mkText=(y,cls,fill)=>{ const t=document.createElementNS(NS,'text'); t.setAttribute('x',this.cx); t.setAttribute('y',y); t.setAttribute('class',cls); t.setAttribute('fill',fill); svg.appendChild(t); return t; };
+    this.headTxt=mkText(this.cy-16,'centerbig','var(--accent)');
+    this.tailTxt=mkText(this.cy+6,'centertxt','var(--t2)');
+    this.lapTxt=mkText(this.cy+24,'centertxt','var(--muted)');
+    const mkPtr=(cls)=>{ const p=document.createElementNS(NS,'polygon'); p.setAttribute('points','0,-9 7,5 -7,5'); p.setAttribute('class','ptr '+cls); svg.appendChild(p); return p; };
+    this.consPtr=mkPtr('consumer'); this.prodPtr=mkPtr('producer');
+    root.appendChild(svg);
+    const lg=document.createElement('div'); lg.className='ringlegend';
+    lg.innerHTML='<span>'+glyph('consumer')+'споживання (head)</span><span>'+glyph('producer')+'claim (tail)</span><span>'+glyph('published')+'опубліковано</span><span>'+glyph('inflight')+'у польоті</span>';
+    root.appendChild(lg);
+    this.stats=document.createElement('div'); this.stats.className='ringstats'; root.appendChild(this.stats);
+  }
+  polar(r,aDeg){ const a=(aDeg-90)*Math.PI/180; return [this.cx+r*Math.cos(a), this.cy+r*Math.sin(a)]; }
+  arc(a0,a1){ const o0=this.polar(this.rOut,a0), o1=this.polar(this.rOut,a1); const i1=this.polar(this.rIn,a1), i0=this.polar(this.rIn,a0); const large=(a1-a0)>180?1:0; return 'M'+o0[0]+' '+o0[1]+'A'+this.rOut+' '+this.rOut+' 0 '+large+' 1 '+o1[0]+' '+o1[1]+'L'+i1[0]+' '+i1[1]+'A'+this.rIn+' '+this.rIn+' 0 '+large+' 0 '+i0[0]+' '+i0[1]+'Z'; }
+  update(m){
+    const cend=contiguous(m);
+    for (let i=0;i<this.cap;i++){
+      const c=m.cells[i], p=this.sectors[i]; p.classList.remove('filled','inflight','empty');
+      if (c && c.seq !== null){ p.classList.add(c.pub?'filled':'inflight'); this.vals[i].textContent=c.val; this.seqs[i].textContent='#'+c.seq; }
+      else { p.classList.add('empty'); this.vals[i].textContent=''; this.seqs[i].textContent=''; }
+    }
+    const step=360/this.cap; const headA=(m.head%this.cap)*step+step/2; const tailA=(m.tail%this.cap)*step+step/2;
+    const cp=this.polar(this.rOut+17,headA); this.consPtr.style.transform='translate('+cp[0]+'px,'+cp[1]+'px) rotate('+(headA+180)+'deg)';
+    const pp=this.polar(this.rIn-25,tailA); this.prodPtr.style.transform='translate('+pp[0]+'px,'+pp[1]+'px) rotate('+tailA+'deg)';
+    this.headTxt.textContent='голова '+m.head; this.tailTxt.textContent='хвіст '+m.tail; this.lapTxt.textContent='оберт '+Math.floor(m.head/this.cap);
+    const gap=(m.tail-m.head)-(cend-m.head);
+    this.stats.innerHTML='місткість <b>'+this.cap+'</b> · у кільці <b>'+(m.tail-m.head)+'</b> · готово до зливу <b>'+(cend-m.head)+'</b>'+(gap>0?' · <span style="color:var(--warn)">розрив — споживач чекає посл. '+cend+'</span>':'')+' · злито <b>'+m.head+'</b> · заявлено <b>'+m.tail+'</b>';
+  }
+  flash(i,cls){ const el=this.sectors[i]; if(!el) return; el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); setTimeout(()=>el.classList.remove(cls),620); }
+}
+
+function glyph(kind){
+  const wrap=inner=>'<svg class="lgsvg" viewBox="0 0 24 24">'+inner+'</svg>';
+  if (kind==='consumer') return wrap('<polygon class="ptr consumer" points="12,3 19,17 5,17" transform="rotate(180 12 12)"/>');
+  if (kind==='producer') return wrap('<polygon class="ptr producer" points="12,3 19,17 5,17"/>');
+  const d=miniArc(-64,40,12,12,5,10);
+  if (kind==='published') return wrap('<path class="sector filled" d="'+d+'"/>');
+  if (kind==='inflight')  return wrap('<path class="sector inflight" d="'+d+'"/>');
+  return wrap('<path class="sector empty" d="'+d+'"/>');
+}
+function miniArc(a0,a1,cx,cy,rIn,rOut){
+  const p=(r,a)=>{ const t=(a-90)*Math.PI/180; return [cx+r*Math.cos(t), cy+r*Math.sin(t)]; };
+  const o0=p(rOut,a0), o1=p(rOut,a1), i1=p(rIn,a1), i0=p(rIn,a0);
+  const large=(a1-a0)>180?1:0; const f=n=>n.toFixed(2);
+  return 'M'+f(o0[0])+' '+f(o0[1])+'A'+rOut+' '+rOut+' 0 '+large+' 1 '+f(o1[0])+' '+f(o1[1])+'L'+f(i1[0])+' '+f(i1[1])+'A'+rIn+' '+rIn+' 0 '+large+' 0 '+f(i0[0])+' '+f(i0[1])+'Z';
+}
+const READ_ITEMS=[{g:'consumer',t:'споживання · head',d:'наступну заявку зіллє споживач'},{g:'producer',t:'claim · tail',d:'наступний слот, який заповнить потік-виробник'},{g:'published',t:'опубліковано',d:'заявка повна й готова до зливу'},{g:'inflight',t:'у польоті',d:'заявлено, але ще не опубліковано'},{g:'empty',t:'порожньо',d:'вільно для наступної заявки'}];
+function renderReadGrid(){ document.querySelectorAll('[data-readgrid]').forEach(el=>{ el.innerHTML=READ_ITEMS.map(it=>'<div class="readitem">'+glyph(it.g)+'<div><b>'+it.t+'</b><span>'+it.d+'</span></div></div>').join(''); }); }
+
+function controller(slide, cap, makeSteps){
+  const view = new RingView(slide.querySelector('.viz'), cap);
+  const logEl = slide.querySelector('.log');
+  let model, steps, i = 0, timer = null;
+  const say = (t, c) => { const d=document.createElement('div'); d.className='logline '+(c||''); d.textContent=t; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; };
+  const ctx = { get model(){return model;}, say,
+    push(v){ const r=push(model,v); if(r.ok){ publish(model,r.seq); view.flash(r.idx,'justpush'); } return r; },
+    pop(){ const r=pop(model); if(r.ok) view.flash(r.idx,'justpop'); return r; },
+    refuse(msg,cls){ view.flash(model.tail%cap,'refused'); say(msg,cls); }
+  };
+  function setPlay(on){ const b=slide.querySelector('.btn-play'); if(b) b.textContent=on?'❚❚ Пауза':'▶ Пуск'; }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} setPlay(false); }
+  function reset(){ stop(); model=makeRing(cap); steps=makeSteps(ctx); i=0; logEl.innerHTML=''; view.update(model); }
+  function step(){ if(i>=steps.length) return false; steps[i++](); view.update(model); return i<steps.length; }
+  function play(){ if(timer) return; setPlay(true); timer=setInterval(()=>{ if(!step()) stop(); },850); }
+  slide.querySelector('.btn-play').onclick=()=>{ if(timer) stop(); else { if(i>=steps.length) reset(); play(); } };
+  slide.querySelector('.btn-step').onclick=()=>{ stop(); if(i>=steps.length) reset(); step(); };
+  slide.querySelector('.btn-reset').onclick=()=> reset();
+  reset();
+}
+
+/* ── charts ──────────────────────────────────────────────────────────────── */
+const PERF = { spsc: { max: 400, rows: [
+  { label:'16384 слоти', bars:[ {n:'ring_spsc', v:334, us:true}, {n:'rtrb', v:244} ] },
+  { label:'1024 слоти', bars:[ {n:'ring_spsc', v:192, us:true}, {n:'rtrb', v:189} ] },
+  { label:'8-байтові записи', bars:[ {n:'ring_spsc', v:194, us:true}, {n:'rtrb', v:192} ] }
+]}};
+function renderCharts(){ document.querySelectorAll('[data-chart]').forEach(el=>{ const d=PERF[el.dataset.chart]; if(!d) return; el.innerHTML=''; d.rows.forEach(row=>{ const cr=document.createElement('div'); cr.className='crow'; const lb=document.createElement('div'); lb.className='clabel'; lb.textContent=row.label; cr.appendChild(lb); row.bars.forEach(b=>{ const bar=document.createElement('div'); bar.className='cbar'+(b.us?' us':''); const nm=document.createElement('span'); nm.textContent=b.n; const tr=document.createElement('span'); tr.className='track'; const fl=document.createElement('span'); fl.className='fill'; fl.style.width=Math.max(2,b.v/d.max*100)+'%'; tr.appendChild(fl); const vl=document.createElement('span'); vl.className='val'; vl.textContent=b.v; bar.appendChild(nm); bar.appendChild(tr); bar.appendChild(vl); cr.appendChild(bar); }); el.appendChild(cr); }); const sc=document.createElement('div'); sc.className='scale'; sc.textContent='шкала 0–'+d.max+' M/с'; el.appendChild(sc); }); }
+
+/* init */
+const slides0 = document.querySelectorAll('.slide');
+show(0);
+</script>
+</body>
+</html>

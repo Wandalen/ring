@@ -240,6 +240,18 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
 .notes .nt-head { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
 .notes p { font-size: var(--fs-2); line-height: 1.45; max-width: 1100px; }
 
+/* ---------- script (текст виступу) ---------- */
+.btn { border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: var(--fs-0); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { border-color: var(--accent); }
+.script { position: fixed; inset: 0; z-index: 20; background: var(--paper); overflow-y: auto; padding-left: 16px; padding-right: 16px; padding-block: 24px 40px; }
+.script .sc-inner { max-width: 760px; margin: 0 auto; display: grid; gap: 22px; }
+.script header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.script h2 { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); }
+.script .seg-t { display: grid; gap: 6px; }
+.script .seg-t .tm { font-family: var(--mono); font-size: var(--fs-0); color: var(--accent); }
+.script .seg-t p { font-size: var(--fs-1); line-height: 1.6; }
+.script .meta { color: var(--muted); font-size: var(--fs-0); }
+
 /* ---------- narrow ---------- */
 @media (max-width: 1100px) {
   .arch { grid-template-columns: minmax(0, 1fr); }
@@ -269,7 +281,8 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
     <span class="counter" id="counter">1 / 7</span>
     <button class="iconbtn" id="next" title="далі (→)">›</button>
     <button class="iconbtn hide-narrow" id="notesBtn" aria-pressed="false" title="нотатки (N)">Нотатки</button>
-    <span class="keyhint hide-narrow"><kbd>←</kbd><kbd>→</kbd> · <kbd>N</kbd> нотатки</span>
+    <button class="iconbtn" id="script-btn" title="Текст виступу (S)">Текст</button>
+    <span class="keyhint hide-narrow"><kbd>←</kbd><kbd>→</kbd> · <kbd>N</kbd> нотатки · <kbd>S</kbd> текст</span>
   </div>
 </nav>
 
@@ -502,7 +515,7 @@ while let Some( order ) = consumer.try_recv() // злив у порядку clai
         <div class="thanks" style="align-items:flex-start;gap:6px">
           <b>Дякую. <em>Питання?</em></b>
           <div class="title-meta" style="margin-top:.4em"><a href="https://github.com/Wandalen/ring">github.com/Wandalen/ring</a><a href="https://github.com/Wandalen/exchange">github.com/Wandalen/exchange</a></div>
-          <p class="keyhint">Гортайте <kbd>←</kbd> <kbd>→</kbd> або тисніть «далі». Нотатки: <kbd>N</kbd>.</p>
+          <p class="keyhint">Гортайте <kbd>←</kbd> <kbd>→</kbd> або тисніть «далі». Нотатки: <kbd>N</kbd>. Текст виступу: <kbd>S</kbd>.</p>
         </div>
       </div>
     </div>
@@ -514,6 +527,14 @@ while let Some( order ) = consumer.try_recv() // злив у порядку clai
   <div class="nt">
     <div class="nt-head">Нотатки доповідача</div>
     <p id="notetext"></p>
+  </div>
+</div>
+
+<div class="script" id="script" hidden>
+  <div class="sc-inner">
+    <header><h2>Текст виступу · ≈4:00</h2><button class="btn" id="script-close">Закрити</button></header>
+    <p class="meta">Близько <span id="script-words">…</span> слів, приблизно чотири хвилини у спокійному темпі. Час біля блоку означає, коли його починати.</p>
+    <div id="script-body"></div>
   </div>
 </div>
 
@@ -556,6 +577,29 @@ const NOTES = [
 const slides = Array.from(document.querySelectorAll('.slide'));
 let cur = 0;
 
+/* ---- текст виступу (панель «Текст», клавіша S) ---- */
+const SCRIPT = [
+  { t: '0:00', text: 'Доброго дня! Зовуть мене автором кільцевих черг проєкту ring, і сьогодні я розкажу не теорію, а живу історію: як мої кільця опинилися в середині реального рушія — біржового exchange_. Мою розповідь тримають три числа. На великих місткостях моє SPSC-кільце на тридцять сім відсотків швидше за rtrb. На весь обмін у кільці хапає рівно двох release-записів. А у споживача — жодної runtime-залежності з crates.io. І одне скажу одразу, щоб ви не помилялися: мої кільця — не «ще одна черга». Це слоти, у яких порядок можна відтворити до останнього номера, і кожен елемент чесно приходить у споживача рівно один раз.' },
+  { t: '0:40', text: 'Мене часто питають, для кого я все це писав. Відповідь проста: для exchange_. Заявки прилітають з багатьох потоків, а стан біржі змінює ровно один записувач на імʼя exchange_step. Тому я дав кожному потокові власне SPSC-кільце — і та сама конкуренція, яку всі звикли бачити на спільних лічильниках, у мене просто зникла. Номер заявки й час прибуття ставить рушій на вході, а не клієнт, тож день можна перепрограти двічі й отримати той самий хеш. Для мене це не красива теорія: порядок — це коректність, а джитер — це гроші, які вже ніхто не поверне.' },
+  { t: '1:20', text: 'Признаюся чесно: спершу я дуже не хотів писати своє. Розклав вимоги exchange_ і дав кожній із готових черг шанс. rtrb — гарна, але тільки SPSC. ArrayQueue — MPSC, проте без тотального порядку й без жодної політики переповнення. Мʼютексова черга — lock-based (блокування): під навантаженням потоки вишиковуються в чергу очікування, і саме це очікування перетворюється на джитер. Канали — не slot-shaped: вони віддають готове значення, а не дають заповнити слот на місці. Де я дав маху, теж скажу: rtrb лідує на одиночних записах, ArrayQueue — на непакетному MPSC. Але поєднання, якого потребує споживач — пакетування, TLS (thread-local staging), політика переповнення і спокійна зупинка, — я не знайшов ніде.' },
+  { t: '2:00', text: 'Тепер числа, на яких я стою. Два потоки, місткість шістнадцять тисяч слотів: триста тридцять чотири мільйони записів на секунду проти двохсот сорока чотирьох у rtrb — плюс тридцять сім відсотків. Але чесність тримаю й далі: на малих місткостях це нічия в межах шуму, а на одиночних записах попереду rtrb — 3,4–3,6 наносекунди проти моїх 13–16. Моє правило «виміряно, не арґументовано» означає одне: я показую не абсолютні числа, а різницю в одному рядку одного запуску. exchange_ вибрав ring_spsc саме за цю перемогу на місткостях, де доводиться жити.' },
+  { t: '2:35', text: 'Зараз — невелика вистава, яку я зібрав для вас. Тисну «Пуск». Місткість кільця — вісім, потік-виробник кладе заявки одна за одною, а девʼята тихо отримує Err. Це не помилка: це моя політика переповнення, яка працює саме так, як ми домовилися. Тепер зливає споживач: синя стрілка — споживання, бурштинова — claim. Заявки виходять у тому самому порядку, в якому увійшли, кожна — рівно один раз. Місце звільнилося — девʼята знову пройшла. Сенс простий: день, який можна перепрограти двічі й отримати той самий результат, — ось з чого починається довіра до рушія.' },
+  { t: '3:10', text: 'Під капотом у мене чотири кроки: claim — беру номер послідовності; publish — піднімаю прапорець «готово»; available — споживач бачить суцільний префікс готового; commit — звільняю місце для нового. Протокол я не вигадував. Це відомий патерн, я просто переписав його під слоти, а перевіряє loom — він перебирає всі переплетення потоків — і fuzz. Пропуск будь-якого кроку означає сміття, перезапис або вічне резервування, тому жоден із цих кроків не тримається на лок-і.' },
+  { t: '3:35', text: 'Підсумок у мене короткий. Реальний споживач — найкращий критерій: я беру верх там, де потрібні порядок і передбачуваність, а де програю — сам називаю, що попереду rtrb. І ще одне чесне уточнення: production-readiness попереду, це окремий план — капстоун; exchange_ — мій реальний споживач, а не продакшен-деплой. Дякую! Питання?' },
+];
+const scriptEl = document.getElementById('script');
+document.getElementById('script-body').innerHTML = SCRIPT.map((n, i) =>
+  `<section class="seg-t"><span class="tm">${n.t} · ${slides[i] ? (slides[i].dataset.sec || '') : ''}</span><p>${n.text}</p></section>`).join('');
+const words = SCRIPT.reduce((n, x) => n + x.text.split(/\s+/).filter((w) => /[\p{L}\d]/u.test(w)).length, 0);
+document.getElementById('script-words').textContent = String(Math.round(words / 10) * 10);
+function toggleScript(force) {
+  const on = force !== undefined ? force : scriptEl.hidden;
+  scriptEl.hidden = !on;
+  if (on) scriptEl.scrollTop = 0;
+}
+document.getElementById('script-btn').addEventListener('click', () => toggleScript());
+document.getElementById('script-close').addEventListener('click', () => toggleScript(false));
+
 /* nav sections */
 const labels = slides.map(s => s.dataset.sec || '');
 const sectionsEl = document.getElementById('sections');
@@ -578,6 +622,9 @@ document.getElementById('next').onclick = ()=>show(cur + 1);
 document.getElementById('prev').onclick = ()=>show(cur - 1);
 document.addEventListener('keydown', e=>{
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  const scriptOpen = scriptEl && !scriptEl.hidden;
+  if ((e.code === 'KeyS' && !e.ctrlKey && !e.altKey && !e.metaKey) || (scriptOpen && (e.key === 'Escape' || e.code === 'KeyS'))) { e.preventDefault(); toggleScript(!scriptOpen); return; }
+  if (scriptOpen) return; /* панель відкрита — слайди не гортаємо */
   if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); show(cur + 1); }
   if (e.key === 'ArrowLeft'){ e.preventDefault(); show(cur - 1); }
 });

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>ring — у бою</title>
+<title>ring — у реальному рушії</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
@@ -262,7 +262,7 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
 <body>
 
 <nav class="nav" id="nav">
-  <div class="brand">ring<span class="tick">.</span>_ · у бою</div>
+  <div class="brand">ring<span class="tick">.</span>_ · у реальному рушії</div>
   <div class="sections" id="sections"></div>
   <div class="navbtns">
     <button class="iconbtn" id="prev" title="назад (←)">‹</button>
@@ -281,7 +281,7 @@ code { font: calc(var(--fs-0) * .92)/1.6 var(--mono); white-space: pre; }
       <div class="title-grid">
         <div>
           <h1 class="wordmark">ring<span class="tick">.</span>_</h1>
-          <div class="title-sub">у бою: споживач, порівняння, програвання</div>
+          <div class="title-sub">у реальному рушії: споживач, порівняння, програвання</div>
           <p class="title-thesis">Історія lock-free (без блокування) кілець, розказана через реального споживача — біржовий рушій <a href="https://github.com/Wandalen/exchange">exchange_</a>.</p>
           <div class="facts">
             <div class="fact"><b>+37%</b><span>ring_spsc проти rtrb · 16 384 слоти</span></div>
@@ -496,6 +496,7 @@ while let Some( order ) = consumer.try_recv() // злив у порядку clai
             <li><b>Виміряно:</b> +37% проти rtrb на робочих місткостях; нічия — чесно названа.</li>
             <li><b>Програвання:</b> кільце заповнюється до відмови, зливається у порядку claim-ів.</li>
             <li><b>Протокол:</b> claim / publish / available / commit.</li>
+            <li><b>Далі:</b> production-readiness — окремий план (capstone); exchange_ — реальний споживач, не продакшен-деплой.</li>
           </ul>
         </div>
         <div class="thanks" style="align-items:flex-start;gap:6px">
@@ -549,7 +550,7 @@ const NOTES = [
   'Виміряно: 334 проти 244 млн записів/с (+37%) на 16 384 слотах на Raspberry Pi 5. Але нічия на малих місткостях (+1–2%, шум) і програш rtrb на одиночних записах. Абсолютні числа не переносяться між машинами — важлива різниця в одному рядку.',
   'Програвання: місткість 8, заявки 1–8 — кладе потік-виробник, девʼята отримує Err (політика Fail — продюсер спробує знову), потім споживач зливає; дві стрілки покажуть: синя (head) — споживання, бурштинова (tail) — claim. Порядок злиття = порядок надходження, рівно один раз. Це і є те, чому exchange_step може сміливо спиратися на кільце.',
   'Протокол: claim — резерв номера; publish — прапорець «готово»; available — що можна зливати; commit — місце звільнено. Пропуск кроку ⇒ garbage/перезапис/вічне резервування. Злиття в порядку claim-ів; переповнення — промислова політика; зупинка — close → drain_all → reopen.',
-  'Фінал: реальний споживач — найкращий критерій. ring не виграє скрізь, але виграє там, де споживачу потрібен тотальний порядок і передбачуваність. Кільце і рушій — три репозиторії родини: ring, exact, exchange. Питання?'
+  'Фінал: реальний споживач — найкращий критерій. ring не виграє скрізь, але виграє там, де споживачу потрібен тотальний порядок і передбачуваність. Чесно: production-readiness попереду — це окремий план (capstone), а exchange_ — реальний споживач, не продакшен-деплой. Кільце і рушій — три репозиторії родини: ring, exact, exchange. Питання?'
 ];
 
 const slides = Array.from(document.querySelectorAll('.slide'));

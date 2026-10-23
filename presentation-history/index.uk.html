@@ -1,0 +1,892 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ring — історія рішення</title>
+<style>
+  :root{
+    --bg:#0a0f1e; --panel:#111a30; --panel2:#0e1729; --ink:#e9eefb; --muted:#8ea3c6;
+    --line:#22304e; --accent:#6aa6ff; --good:#2fbf71; --goodbg:#12351f;
+    --warn:#e0a52a; --warnbg:#3a2c08; --bad:#ff6b6b; --badbg:#3d1414;
+    --empty:#16203a; --emptyline:#2a3a5e;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1200px 800px at 18% -10%, #17244e 0%, var(--bg) 58%);color:var(--ink);
+       font:16px/1.5 ui-sans-serif,system-ui,"Segoe UI",Roboto,Helvetica,Arial}
+  .topbar{position:fixed;inset:0 0 auto 0;display:flex;justify-content:space-between;align-items:center;
+          padding:10px 18px;background:rgba(10,15,30,.72);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:20}
+  .brand{font-weight:600;letter-spacing:.3px;color:var(--muted);white-space:nowrap}
+  .brand b{color:var(--ink)}
+  .nav{display:flex;align-items:center;gap:10px}
+  .nav button{background:#1b2743;color:var(--ink);border:1px solid var(--line);border-radius:8px;
+              width:34px;height:30px;font-size:16px;cursor:pointer}
+  .nav button:hover{background:#25355c}
+  #counter{color:var(--muted);font-variant-numeric:tabular-nums;min-width:56px;text-align:center;flex-shrink:0}
+  #notesBtn{margin-left:8px}
+  main{height:100%;overflow:hidden}
+  .slide{position:absolute;inset:0;padding:66px 46px 56px;display:none;overflow:auto}
+  .slide.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  h1{font-size:48px;margin:0 0 12px;letter-spacing:-.5px}
+  h2{font-size:26px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:14px;margin:0 0 14px}
+  .lede{font-size:19px;color:var(--muted);max-width:900px}
+  .cols{display:grid;grid-template-columns:1.02fr 1fr;gap:26px;align-items:start;margin-top:14px}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+  .card h3{margin:0 0 10px;font-size:13px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted)}
+  pre{margin:0;background:#0a1224;border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto}
+  code{font:13.5px/1.55 ui-monospace,SFMono-Regular,Consolas,"Liberation Mono",monospace;white-space:pre}
+  .out{margin-top:10px;background:#08101f;border:1px dashed var(--emptyline);border-radius:8px;padding:8px 10px;
+       font:12.5px/1.5 ui-monospace,monospace;color:#9fe6bd}
+  .out b{color:var(--muted);font-weight:600}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .vspanel{background:#0a1224;border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+  .vstitle{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:9px}
+  .vsflow{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .th{background:#1b2743;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font:600 11px ui-monospace,monospace;color:var(--ink)}
+  .th.dim{opacity:.42}
+  .lockbox{background:#3d1414;border:1px solid var(--bad);border-radius:6px;padding:3px 8px;font:700 10px ui-monospace,monospace;color:#ffc9c9}
+  .slotmini{width:15px;height:15px;border-radius:4px;background:var(--empty);border:1px solid var(--emptyline);display:inline-block}
+  .slotmini.go{background:var(--goodbg);border-color:var(--good)}
+  .arw{color:var(--muted);font-size:13px}
+  .vscap{color:var(--muted);font-size:12px;margin:9px 0 0}
+  .pills{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12.5px;color:var(--muted)}
+  .notespanel{display:none;position:fixed;left:0;right:0;bottom:0;z-index:19;max-height:46vh;overflow:auto;
+              background:rgba(9,14,27,.97);border-top:1px solid var(--line);padding:14px 46px 20px}
+  body.show-notes .notespanel{display:block}
+  body.show-notes .slide{padding-bottom:48vh}
+  .notespanel b{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:7px}
+  .notespanel p{margin:0;font-size:13.5px;line-height:1.62;color:#c7d4ee;max-width:1080px}
+  #notesBtn{background:#1b2743;color:var(--ink);border:1px solid var(--line);border-radius:8px;
+            padding:5px 11px;font-size:12.5px;cursor:pointer}
+  #notesBtn:hover{background:#25355c}
+  .tierladder{display:flex;flex-direction:column;gap:5px}
+  .tierrow{display:grid;grid-template-columns:76px 1fr;align-items:center;gap:10px}
+  .tierlab{font:600 11px ui-monospace,monospace;color:var(--muted);text-align:right}
+  .tierchips{display:flex;flex-wrap:wrap;gap:5px}
+  .chip{background:#1b2743;border:1px solid var(--line);border-radius:6px;padding:2px 7px;
+        font:11px/1.5 ui-monospace,monospace;color:var(--ink);white-space:nowrap}
+  .chip.pub{background:#12351f;border-color:var(--good);color:#bff3d3}
+  .crategrid{columns:3;column-gap:24px}
+  .centry{break-inside:avoid;margin:0 0 9px}
+  .centry code{display:block;font:600 11.5px ui-monospace,monospace;color:#9fc4ff;white-space:normal}
+  .centry span{display:block;font-size:11.5px;line-height:1.45;color:var(--muted);white-space:normal}
+  .centry.pub code{color:#7fe0a3}
+  .centry.nf code{color:var(--muted)}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:7px 16px;font-size:14.5px}
+  .kv dt{color:var(--muted)}
+  .kv dd{margin:0}
+  .hint{color:var(--muted);font-size:13px;margin-top:24px}
+  .progress{position:fixed;left:0;right:0;bottom:0;height:3px;background:#141d33;z-index:20}
+  #bar{height:100%;width:0;background:linear-gradient(90deg,#3b6bd6,#6aa6ff);transition:width .25s}
+  a{color:var(--accent)}
+  ul.bul{margin:6px 0 0 18px;padding:0;color:var(--muted);font-size:14.5px;line-height:1.6}
+  ul.bul li{margin:4px 0}
+  ul.bul b{color:var(--ink)}
+  @media (max-width:1040px){.cols{grid-template-columns:1fr}h1{font-size:34px}.slide{padding:62px 18px 48px}}
+  @media (max-width:720px){.brand-sub{display:none}.topbar{padding:8px 12px}.nav{gap:6px}#notesBtn{padding:4px 8px;font-size:11.5px;margin-left:4px}#counter{min-width:48px;font-size:12px}}
+  .viz{position:relative}
+  .ringsvg{display:block;width:100%;max-width:330px;margin:0 auto}
+  .sector{transition:fill .3s,stroke .3s;stroke-width:2;stroke-linejoin:round}
+  .sector.empty{fill:var(--empty);stroke:var(--emptyline)}
+  .sector.filled{fill:var(--goodbg);stroke:var(--good)}
+  .sector.inflight{fill:var(--warnbg);stroke:var(--warn)}
+  .sectorval,.sectorseq,.sectoridx{text-anchor:middle}
+  .sectorval{fill:#c6f7db;font:700 19px ui-monospace,SFMono-Regular,Consolas,monospace}
+  .sectorseq{fill:rgba(198,247,219,.62);font:600 10px ui-monospace,monospace}
+  .sectoridx{fill:#54688f;font:600 10px ui-monospace,monospace}
+  .cring{fill:none;stroke:var(--line);stroke-width:1}
+  .ptr{transform-box:view-box;transform-origin:0 0;transition:transform .32s cubic-bezier(.3,.9,.3,1)}
+  .ptr.consumer{fill:var(--accent)}
+  .ptr.producer{fill:var(--warn)}
+  .centertxt{font:600 12px ui-monospace,monospace;text-anchor:middle}
+  .centerbig{font:700 16px ui-monospace,monospace;text-anchor:middle}
+  .sector.justpush{animation:pulseB .6s ease}
+  .sector.justpop{animation:pulseR .6s ease}
+  .sector.refused{animation:pulseR .6s ease}
+  @keyframes pulseB{0%,100%{filter:none}45%{filter:drop-shadow(0 0 9px #6aa6ff)}}
+  @keyframes pulseR{0%,100%{filter:none}45%{filter:drop-shadow(0 0 9px #ff6b6b)}}
+  .hl-k{color:#c792ea;font-weight:600}
+  .hl-t{color:#82d2ff}
+  .hl-f{color:#ffd479}
+  .hl-m{color:#ff9d5c}
+  .hl-s{color:#9be3a5}
+  .hl-n{color:#f6a06a}
+  .hl-c{color:#6b7ea3;font-style:italic}
+  .hl-l{color:#c792ea}
+  .ringlegend{display:flex;gap:16px;color:var(--muted);font-size:12px;margin-top:8px;flex-wrap:wrap}
+  .ringstats{margin-top:8px;font:12px/1.6 ui-monospace,monospace;color:var(--muted)}
+  .ringstats b{color:var(--ink)}
+  .vs{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+  .vspanel{background:#0a1224;border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+  .vstitle{font-size:11.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);margin-bottom:9px}
+  .vsflow{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .th{background:#1b2743;border:1px solid var(--line);border-radius:6px;padding:3px 7px;font:600 11px ui-monospace,monospace;color:var(--ink)}
+  .th.dim{opacity:.42}
+  .lockbox{background:#3d1414;border:1px solid var(--bad);border-radius:6px;padding:3px 8px;font:700 10px ui-monospace,monospace;color:#ffc9c9}
+  .slotmini{width:15px;height:15px;border-radius:4px;background:var(--empty);border:1px solid var(--emptyline);display:inline-block}
+  .slotmini.go{background:var(--goodbg);border-color:var(--good)}
+  .arw{color:var(--muted);font-size:13px}
+  .vscap{color:var(--muted);font-size:12px;margin:9px 0 0}
+  .chart{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+  .crow .clabel{font-size:12px;color:var(--muted);margin-bottom:5px}
+  .cbar{display:grid;grid-template-columns:108px 1fr 52px;align-items:center;gap:8px;font:11.5px/1.4 ui-monospace,monospace;color:var(--muted);margin-bottom:3px}
+  .cbar .track{display:block;height:13px;background:#0a1224;border:1px solid var(--line);border-radius:3px;overflow:hidden}
+  .cbar .fill{display:block;height:100%;background:#38476b;border-radius:3px 0 0 3px}
+  .cbar.us{color:var(--ink)}
+  .cbar.us .fill{background:linear-gradient(90deg,#2f7d4f,#3ec97f)}
+  .cbar .val{text-align:right;font-variant-numeric:tabular-nums}
+  .scale{color:#5d7099;font-size:11px;text-align:right;margin-top:2px}
+  .readgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  .readitem{display:flex;gap:9px;align-items:flex-start}
+  .readitem svg{flex:0 0 auto;margin-top:1px}
+  .readitem b{display:block;font-size:12.5px;color:var(--ink);font-weight:600}
+  .readitem span{font-size:12px;color:var(--muted)}
+  .lgsvg{width:22px;height:22px}
+  .ringlegend span{display:inline-flex;align-items:center;gap:6px}
+  .ringlegend .lgsvg{width:18px;height:18px}
+  .controls{display:flex;gap:8px;margin-top:12px}
+  .controls button{background:#1b2743;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px}
+  .controls button:hover{background:#25355c}
+  .log{margin-top:10px;height:132px;overflow:auto;background:#0a1224;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:12.5px/1.6 ui-monospace,monospace}
+  .logline{white-space:pre-wrap}
+  .logline.ok{color:#7fe0a3}.logline.out{color:#9fc4ff}.logline.warn{color:#ffd479}
+  .logline.note{color:#7f8fb3}.logline.err{color:#ff9b9b}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="brand"><b>ring</b><span class="brand-sub"> · історія рішення</span></div>
+  <div class="nav">
+    <button id="prev" title="назад">‹</button>
+    <span id="counter">1 / 17</span>
+    <button id="next" title="далі">›</button>
+    <button id="notesBtn">Нотатки</button>
+  </div>
+</div>
+
+<main id="deck">
+
+  <!-- 1 -->
+  <section class="slide active">
+    <h1>ring — історія рішення</h1>
+    <p class="lede">Як задача «справедливої черги» перетворилась на родину з 34 крейтів.</p>
+    <div class="pills">
+      <span class="pill">проблема</span>
+      <span class="pill">мотивація</span>
+      <span class="pill">альтернативи</span>
+      <span class="pill">рішення і підходи</span>
+    </div>
+    <div class="cols" style="grid-template-columns:1fr 1fr">
+      <div class="card">
+        <h3>Про що ця презентація</h3>
+        <dl class="kv">
+          <dt>проблема</dt><dd>що саме не так зі звичайними чергами під навантаженням</dd>
+          <dt>мотивація</dt><dd>для кого і чому це вимога, а не побажання</dd>
+          <dt>альтернативи</dt><dd>готові рішення й чому вони не підходять</dd>
+          <dt>рішення</dt><dd>протокол claim / publish / commit</dd>
+          <dt>підходи</dt><dd>архітектура, верифікація, компроміси</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Одне речення</h3>
+        <p class="lede" style="font-size:15px">Багато продюсерів <b>видають</b> елементи, а один споживач
+        <b>зливає</b> їх у єдиному, сталому порядку — без спільного лок-а на шляху запису.</p>
+        <p class="vscap">Це не «ще одна черга». Це канал щілинного типу з відтворюваним тотальним порядком
+        і доставкою "лише один".</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <h2>Проблема</h2>
+    <p class="sub">Не «повільно», а конкретний патерн доступу, якого загальні черги не обіцяють.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Потрібна форма</h3>
+        <dl class="kv">
+          <dt>топологія</dt><dd>багато продюсерів → <b>один</b> упорядкований споживач</dd>
+          <dt>порядок</dt><dd><b>відтворюваний загальний порядок</b>, рівно один раз</dd>
+          <dt>шлях запису</dt><dd>lock-free (без блокування) — жодного спільного лок-а, що серіалізує потоки в чергу очікування під навантаженням</dd>
+          <dt>затримка</dt><dd>передбачувана, стабільна під навантаженням</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Що болить</h3>
+        <ul class="bul">
+          <li><b>Блокування:</b> поки один потік тримає lock, решта стоять у черзі.</li>
+          <li><b>Jitter (тремтіння) затримки:</b> саме це очікування зʼїдає передбачуваність.</li>
+          <li><b>Порядок як побічний ефект:</b> загальні черги не гарантують тотальний порядок.</li>
+          <li><b>Дублювання логіки коректності:</b> якщо є кілька шляхів запису, одна й та сама перевірка повторюється в кількох місцях — і баг може сховатися в будь-якому з них.</li>
+        </ul>
+        <p class="vscap">Детермінованому споживачу потрібен порядок як <b>гарантія коректності</b>,
+        а не як випадковий результат.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="slide">
+    <h2>Проблема · симптоми під навантаженням</h2>
+    <p class="sub">Що саме ламається, коли навантаження росте.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Під навантаженням</h3>
+        <ul class="bul">
+          <li><b>Серіалізація:</b> усі продюсери йдуть через один лок.</li>
+          <li><b>Не-відтворюваний порядок:</b> порядок у черзі залежить від планувальника.</li>
+          <li><b>Відсутня політика переповнення:</b> try_push повертає Ok(()), але запис може бути відкинуто — Ok не означає «збережено».</li>
+          <li><b>Немає TLS (thread-local staging):</b> кожен запис одразу йде в кільце й бʼє по спільному лічильнику claim-ів (замість накопичення локально).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Чого хочемо натомість</h3>
+        <ul class="bul">
+          <li><b>lock-free (без блокування) шлях запису:</b> жодного лок-а на гарячому шляху.</li>
+          <li><b>Відтворюваний порядок:</b> тотальний, рівно один раз.</li>
+          <li><b>Явна політика:</b> Fail / DropNewest / DropOldest — свідомо.</li>
+          <li><b>TLS (thread-local staging):</b> накопичувати локально (у порядку запису), flush одним рухом резервує суцільний блок номерів — порядок усередині пачки зберігається. Компроміс: між продюсерами порядок стає пачковим, не запис-за-записом; для тонкого чергування — flush частіше (OnBatch з малим N) або без TLS.</li>
+        </ul>
+        <p class="vscap">Це й є вимоги, під які ми будували власне рішення.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="slide">
+    <h2>Мотивація</h2>
+    <p class="sub">Для кого це вимога, а не побажання.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Для кого</h3>
+        <p class="lede" style="font-size:15px">Системи, чутливі до затримки й суворо впорядковані —
+        <b>двигуни зіставлення заявок</b>, де безліч одночасних заявок має зливатися в один
+        детермінований низьколатентний потік рішень.</p>
+        <p class="vscap">Тут порядок — це коректність, а джитер — це втрачені гроші.</p>
+      </div>
+      <div class="card">
+        <h3>Вимоги, не побажання</h3>
+        <dl class="kv">
+          <dt>детермінізм</dt><dd>відтворюваний тотальний порядок як вимога коректності</dd>
+          <dt>exactly-once</dt><dd>кожен елемент рівно один раз</dd>
+          <dt>lock-free</dt><dd>жодного лок-а на шляху запису</dd>
+          <dt>передбачуваність</dt><dd>стабільна затримка під навантаженням</dd>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="slide">
+    <h2>Мотивація · принципи проєкту</h2>
+    <p class="sub">Як ми приймаємо рішення про впровадження.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Принципи</h3>
+        <ul class="bul">
+          <li><b>Виміряно, не аргументовано:</b> нічого не приймають без перемоги у виміряному бенчмарку.</li>
+          <li><b>Unsafe deny by default:</b> лише ring_spsc / ring_mpsc несуть виправданий unsafe.</li>
+          <li><b>Loom:</b> моделі конкурентності перевірені.</li>
+          <li><b>Один механізм на крейт:</b> єдиний шлях не дублює баги коректності.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Ще принципи</h3>
+        <ul class="bul">
+          <li><b>Один крейт на концерн:</b> фокусована верифікація.</li>
+          <li><b>Відомий патерн:</b> переписано в нас, не вигадано.</li>
+          <li><b>Гейти, що можуть впасти:</b> CI-grade, не заяви.</li>
+          <li><b>Перевірка ззовні:</b> bench_harness не залежить від ring_*.</li>
+        </ul>
+        <p class="vscap">«Виміряно, не аргументовано» — це й відповідь на питання «чому не просто взяти готове».</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 -->
+  <section class="slide">
+    <h2>Альтернативи</h2>
+    <p class="sub">Готові рішення, які розглядали.</p>
+    <div class="pills">
+      <span class="pill">Mutex&lt;VecDeque&gt;</span>
+      <span class="pill">crossbeam_queue::ArrayQueue</span>
+      <span class="pill">std::sync::mpsc::sync_channel</span>
+      <span class="pill">rtrb</span>
+      <span class="pill">канали (flume / crossbeam-channel)</span>
+    </div>
+    <div class="cols" style="margin-top:14px">
+      <div class="card">
+        <h3>Критерій відбору</h3>
+        <ul class="bul">
+          <li>відтворюваний тотальний порядок як гарантія</li>
+          <li>lock-free (без блокування) шлях запису</li>
+          <li>batching і TLS (thread-local staging)</li>
+          <li>явна політика переповнення та shutdown</li>
+          <li>перемога у виміряному бенчмарку</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Результат</h3>
+        <p class="lede" style="font-size:15px">Жодне готове рішення не дає <b>всіх</b> вимог одночасно.
+        Частини залишаються еталонами й бекендами, але ядро ми написали сами.</p>
+        <p class="vscap">crossbeam-queue залишається свідомим винятком — тимчасовим бекендом
+        у ring_core за фіче-флагом.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7 -->
+  <section class="slide">
+    <h2>Альтернативи · Mutex&lt;VecDeque&gt;</h2>
+    <p class="sub">Найпростіша базова лінія — і головний анти-приклад.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Чому не підходить</h3>
+        <ul class="bul">
+          <li><b>lock-based (блокування):</b> за схеми «багато продюсерів — один споживач» усі серіалізуються на одному лок-і.</li>
+          <li><b>Джитер:</b> очікування перетворюється на розкид затримки.</li>
+          <li><b>Масштабування:</b> ріст числа продюсерів збільшує lock-based (блокування).</li>
+          <li><b>Немає тотального порядку:</b> порядок — побічний ефект планувальника.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Де залишається корисним</h3>
+        <ul class="bul">
+          <li><b>Базова лінія в бенчмарках:</b> з чим порівнюємо.</li>
+          <li><b>Простий і правильний:</b> добре для прототипів.</li>
+          <li><b>На шляху пакетування:</b> мʼютекс 276–37 M/с проти наших 288–203.</li>
+        </ul>
+        <p class="vscap">Ми не «перемогли мʼютекс скрізь» — ми виграємо там, де є пакетування.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8 -->
+  <section class="slide">
+    <h2>Альтернативи · crossbeam_queue::ArrayQueue</h2>
+    <p class="sub">Сильний конкурент на непакетному шляху.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Сильні сторони</h3>
+        <ul class="bul">
+          <li><b>Лідирує</b> на непакетному MPSC-шляху при високих кількостях продюсерів на x86.</li>
+          <li>Зріла, перевірена реалізація.</li>
+          <li>Зручний API push/pop.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Чому не підходить як основа</h3>
+        <ul class="bul">
+          <li><b>Немає тотального порядку</b> як гарантії для детермінованого споживача.</li>
+          <li><b>Немає batching / TLS (thread-local staging).</b></li>
+          <li><b>Немає явної політики переповнення</b> і shutdown з drain_all.</li>
+          <li><b>Використовується</b> як тимчасовий бекенд у ring_core (feature-gated).</li>
+        </ul>
+        <p class="vscap">Залишається еталоном і запасним варіантом, поки наші кільця
+        не наберуть експлуатаційної історії.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9 -->
+  <section class="slide">
+    <h2>Альтернативи · std::sync::mpsc / канали</h2>
+    <p class="sub">Інший клас задач — передавання повідомлень, не слоти.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Чому не підходить</h3>
+        <ul class="bul">
+          <li><b>Інша топологія/семантика:</b> канали передають володіння, а не слоти.</li>
+          <li><b>Немає claim/publish/commit</b> з відтворюваним порядком.</li>
+          <li><b>Немає явної політики переповнення,</b> TLS (thread-local staging), зливу під час зупинки.</li>
+          <li><b>Не slot-shaped:</b> канали передають готове значення, а не дають заповнити слот безпосередньо в кільці (in-place).</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Де доречні</h3>
+        <ul class="bul">
+          <li>Передавання повідомлень між потоками.</li>
+          <li>Задачі, де володіння значенням важливіше за порядок.</li>
+          <li>Прототипи й прості пайплайни.</li>
+        </ul>
+        <p class="vscap">Наша топологія — багато продюсерів → один упорядкований споживач —
+        для каналів не є рідною.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 -->
+  <section class="slide">
+    <h2>Альтернативи · rtrb та інші SPSC</h2>
+    <p class="sub">Еталон для однопродюсерного випадку.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Сильні сторони rtrb</h3>
+        <ul class="bul">
+          <li><b>Лідирує</b> на строгій парі одиночних записів (3.4–3.6 нс проти 13–16).</li>
+          <li>Виграє на малих місткостях у двопотоковому режимі.</li>
+          <li>Простий і добре перевірений.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Чому не підходить як основа</h3>
+        <ul class="bul">
+          <li><b>Лише SPSC</b> — немає MPSC і тотального порядку між продюсерами.</li>
+          <li><b>Немає пакетування, TLS (thread-local staging), overflow-політик, shutdown.</b></li>
+          <li><b>Немає розширення</b> на багатопродюсерний випадок.</li>
+        </ul>
+        <p class="vscap">Залишається еталоном для SPSC-шляху. Ми виграємо на великих
+        місткостях: <b>+37% на 16384 слотах</b>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 -->
+  <section class="slide">
+    <h2>Рішення · протокол claim / publish / commit</h2>
+    <p class="sub">Slot-shaped channel з відтворюваним тотальним порядком і exactly-once.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Ідея одним рядком</h3>
+        <dl class="kv">
+          <dt>claim</dt><dd>продюсер бере наступний номер послідовності</dd>
+          <dt>publish</dt><dd>позначає цей слот як готовий</dd>
+          <dt>drain</dt><dd>споживач бере їх у <b>порядку claim-ів</b>, кожен рівно раз</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Чотири кроки</h3>
+        <ol style="margin:6px 0 0 18px;padding:0;color:var(--muted);font-size:14.5px;line-height:1.6">
+          <li><b style="color:var(--ink)">Claim</b> — резерв номера (приватно, без очікування).</li>
+          <li><b style="color:var(--ink)">Publish</b> — прапорець вгору, у порядку.</li>
+          <li><b style="color:var(--ink)">Available</b> — що готово до зливу.</li>
+          <li><b style="color:var(--ink)">Commit</b> — місце звільнено для повторного використання.</li>
+        </ol>
+        <p class="vscap">Пропуск кроку ⇒ garbage / перезапис / вічне резервування.
+        Протокол не вигаданий — відомий патерн, переписаний і перевірений.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 12 -->
+  <section class="slide">
+    <h2>Підходи · архітектура</h2>
+    <p class="sub">Один крейт на концерн, граф ациклічний за побудовою.</p>
+    <div class="card">
+      <h3>Яруси, у порядку збірки</h3>
+      <div class="tierladder" data-tiers></div>
+      <p class="vscap">Ярус кожного крейта на один більший за найглибший ярус серед його залежностей.
+      Пʼять підсвічених чіпів — публічний API родини.</p>
+    </div>
+    <div class="cols" style="grid-template-columns:1fr 1fr;margin-top:14px">
+      <div class="card">
+        <h3>Ключові рішення</h3>
+        <ul class="bul">
+          <li><b>Корінь:</b> ring_types і ring_align — єдині без ring_* залежностей.</li>
+          <li><b>Граф:</b> ациклічний за побудовою (Cargo.toml у порядку залежностей).</li>
+          <li><b>Публічний API вузький:</b> 5 крейтів ззовні.</li>
+          <li><b>bench_harness:</b> поза графом, нейтральний грейдер.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Навіщо 34 крейти</h3>
+        <p class="lede" style="font-size:15px">Один крейт на концерн ⇒ фокусована верифікація й
+        можливість перевіряти кожен механізм окремо. Зміна в одному місці не тягне весь граф.</p>
+        <p class="vscap">34 крейти — це не складність заради складності, а
+        можливість довести кожен інваріант окремо.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 13 -->
+  <section class="slide">
+    <h2>Підходи · верифікація (measured, not argued)</h2>
+    <p class="sub">Гейти, що можуть впасти, а не заяви.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Інструменти</h3>
+        <ul class="bul">
+          <li><b>Gates g1–g22:</b> покриття, rustdoc, unsafe-ревʼю, corpus.</li>
+          <li><b>Loom:</b> моделі конкурентності (6+ крейтів, розширення на allowlist).</li>
+          <li><b>Fuzz:</b> cargo-fuzz над ring_spsc / ring_mpsc.</li>
+          <li><b>Benchmarks:</b> ring_bench + perf/, intra-run порівняння.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Компроміси</h3>
+        <ul class="bul">
+          <li><b>Crossbeam interim:</b> ring_core абсорбує crossbeam-queue за фіче-флагом, з зафіксованими умовами видалення.</li>
+          <li><b>Історія:</b> один коміт ⇒ довіряємо гейтам, а не git blame.</li>
+          <li><b>Чесність:</b> де ми позаду (MPSC без пакетів) — названо слабким місцем.</li>
+          <li><b>Нейтральний грейдер:</b> bench_harness не залежить від ring_*.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 14 -->
+  <section class="slide">
+    <h2>Підходи · TLS (thread-local staging), overflow, shutdown, handle</h2>
+    <p class="sub">Чотири механізми, що роблять систему придатною до експлуатації.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>TLS (thread-local staging) + flush</h3>
+        <ul class="bul">
+          <li>Thread-local стейджинг: 0 атомарок під час накопичення.</li>
+          <li>Один fetch_add на flush.</li>
+          <li>Політики: OnFull / OnBarrier / OnBatch(n).</li>
+          <li>Виклик drive() — відповідальність викликаючого.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Overflow / shutdown / handle</h3>
+        <ul class="bul">
+          <li><b>Overflow:</b> Fail / DropNewest / DropOldest — явна політика; try_push може повернути Ok(()), але запис відкинуто — Ok ≠ «збережено».</li>
+          <li><b>Shutdown:</b> close → drain_all → reopen; прапорець advisory.</li>
+          <li><b>Handle:</b> звужені кінці; borrow-checker робить «один продюсер» властивістю.</li>
+          <li><b>Poll:</b> tick-safe, ніколи не залежить від wait.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 16 -->
+  <section class="slide">
+    <h2>Виміряні результати · SPSC проти rtrb</h2>
+    <p class="sub">Intel i7-10750H · Windows · медіани criterion, один запуск на сторону. Порівняння — всередині того самого запуску.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>SPSC — пропускна здатність двох потоків, M/с</h3>
+        <div class="chart" data-chart="spsc"></div>
+        <div class="out"><b>попереду</b> +37% на 16384 слотах · +2% на 1024 · +1% на 8-байтових записах</div>
+      </div>
+      <div class="card">
+        <h3>Як читати чесно</h3>
+        <ul class="bul">
+          <li><b>Виграємо:</b> 334 M/s проти 244 (rtrb) на 16384 слотах (+37%).</li>
+          <li><b>Нічия:</b> на 1024 слотах і 8-байтових записах різниця +1–2% — у межах шуму, не підтверджений лід.</li>
+          <li><b>Програємо:</b> rtrb лідирує на строгій парі одиночних записів (3.4–3.6 нс проти 13–16) і малих місткостях.</li>
+          <li><b>MPSC без пакетів:</b> слабке місце — ArrayQueue попереду; пакетування (push32) змінює картину: 288–203 проти 276–37 у мʼютекса.</li>
+        </ul>
+        <p class="vscap">Абсолютні числа не переносяться між машинами; порівнювати можна лише всередині рядка.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 17 -->
+  <section class="slide" data-demo="fill" data-cap="8">
+    <h2>Заповнення кільця — один елемент за раз, до відмови</h2>
+    <p class="sub">Місткість 8. Спершу заповнюємо, потім отримуємо відмову, зливаємо й знову маємо місце. Натисніть ▶ Пуск.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Rust</h3>
+        <pre><code>use ring_factory::{ Factory, RingConfig };
+
+let cfg = RingConfig::new( 8 ).unwrap();      // 8 slots, power of two
+let mut split = Factory.build::&lt; u32 &gt;( cfg ).unwrap();
+
+let mut ends = split.ends();
+let ( mut producer, mut consumer ) = ends.split();
+
+producer.try_push( 7 ).unwrap();              // claim + publish
+assert_eq!( consumer.try_recv(), Some( 7 ) ); // drain in order</code></pre>
+        <div class="out"><b>реальний вивід</b>  [base] pushed 7, received Some(7)</div>
+      </div>
+      <div class="card">
+        <h3>Наживо</h3>
+        <div class="viz"></div>
+        <div class="controls"><button class="btn-play">▶ Пуск</button><button class="btn-step">⤼ Крок</button><button class="btn-reset">↺ Скинути</button></div>
+        <div class="log"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>Як читати кільце</h3>
+      <div class="readgrid" data-readgrid></div>
+    </div>
+  </section>
+
+  <!-- 15 -->
+  <section class="slide">
+    <h2>Підсумок</h2>
+    <p class="sub">Одна історія в пʼяти частинах.</p>
+    <div class="cols">
+      <div class="card">
+        <h3>Ланцюжок</h3>
+        <dl class="kv">
+          <dt>проблема</dt><dd>MPSC + відтворюваний порядок + передбачувана затримка</dd>
+          <dt>мотивація</dt><dd>детермінований споживач; виміряно, не аргументовано</dd>
+          <dt>альтернативи</dt><dd>не дають тотального порядку/топології/batching — еталони</dd>
+          <dt>рішення</dt><dd>claim/publish/commit, slot-shaped channel</dd>
+          <dt>підходи</dt><dd>tiered graph, вузький API, gates/loom/fuzz/bench</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Де дивитися</h3>
+        <dl class="kv">
+          <dt>код</dt><dd><a href="https://github.com/Wandalen/ring">github.com/Wandalen/ring</a></dd>
+          <dt>огляд</dt><dd><a href="https://github.com/Wandalen/ring/discussions/70">обговорення #70</a> · <a href="https://github.com/Wandalen/ring/pull/72">PR #72</a></dd>
+          <dt>readme</dt><dd>архітектура, яруси, build-vs-buy</dd>
+          <dt>capstone</dt><dd>9 тем для production-readiness</dd>
+        </dl>
+        <p class="hint">Гортайте ← → або тисніть «далі». Нотатки: клавіша N.</p>
+      </div>
+    </div>
+  </section>
+
+</main>
+<div class="notespanel"><b>Нотатки доповідача</b><p id="notetext"></p></div>
+<div class="progress"><div id="bar"></div></div>
+
+<script>
+const TIER_LABEL = 'Рівень';
+const TIERS = [
+  { n:0,  c:['ring_types','ring_align'] },
+  { n:1,  c:['ring_atomic','ring_config','ring_index','ring_seqno','ring_slot','ring_stats','ring_trace'] },
+  { n:2,  c:['ring_batch','ring_store','ring_cursor','ring_overflow'] },
+  { n:3,  c:['ring_event','ring_gating','ring_spsc','ring_wait'] },
+  { n:4,  c:['ring_barrier','ring_claim','ring_tls'] },
+  { n:5,  c:['ring_consume','ring_mpsc'] },
+  { n:6,  c:['ring_core','ring_publish'] },
+  { n:7,  c:['ring_debug','ring_flush','ring_handle','ring_poll','ring_shutdown'] },
+  { n:8,  c:['ring_registry','ring_testkit'] },
+  { n:9,  c:['ring_factory'] },
+  { n:10, c:['ring_bench'] }
+];
+const PUBLIC_API = ['ring_types','ring_handle','ring_tls','ring_flush','ring_factory'];
+function renderTiers(){
+  document.querySelectorAll('[data-tiers]').forEach(el=>{
+    el.innerHTML = TIERS.map(t =>
+      '<div class="tierrow"><span class="tierlab">'+TIER_LABEL+' '+t.n+'</span><span class="tierchips">'+
+      t.c.map(n => '<span class="chip'+(PUBLIC_API.indexOf(n)>=0?' pub':'')+'">'+n+'</span>').join('')+
+      '</span></div>').join('');
+  });
+}
+
+const RUST_KW = new Set(['as','async','await','break','const','continue','crate','dyn','else','enum','extern','false','fn','for','if','impl','in','let','loop','match','mod','move','mut','pub','ref','return','self','Self','static','struct','super','trait','true','type','unsafe','use','where','while','yield']);
+const RUST_TY = new Set(['u8','u16','u32','u64','u128','usize','i8','i16','i32','i64','i128','isize','f32','f64','bool','char','str','String','Vec','Option','Result','Some','None','Ok','Err','Box']);
+function hlEsc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function highlightRust(src){
+  let out = '', i = 0; const n = src.length;
+  const idStart = c => /[A-Za-z_]/.test(c);
+  const idChar  = c => /[A-Za-z0-9_]/.test(c);
+  const span = (cls, text) => '<span class="hl-' + cls + '">' + hlEsc(text) + '</span>';
+  while (i < n){
+    const c = src[i];
+    if (c === '/' && src[i+1] === '/'){ let j = src.indexOf('\n', i); if (j < 0) j = n; out += span('c', src.slice(i, j)); i = j; continue; }
+    if (c === '"'){ let j = i+1; while (j < n){ if (src[j] === '\\'){ j += 2; continue; } if (src[j] === '"'){ j++; break; } j++; } out += span('s', src.slice(i, j)); i = j; continue; }
+    if (c === "'"){ if (src[i+2] === "'"){ out += span('s', src.slice(i, i+3)); i += 3; continue; } let j = i+1; while (j < n && idChar(src[j])) j++; out += span('l', src.slice(i, j)); i = j; continue; }
+    if (/[0-9]/.test(c)){ let j = i + 1; while (j < n && /[0-9a-fA-F_xXoObBeE]/.test(src[j])) j++; while (j < n && /[A-Za-z0-9]/.test(src[j])) j++; out += span('n', src.slice(i, j)); i = j; continue; }
+    if (idStart(c)){ let j = i; while (j < n && idChar(src[j])) j++; const word = src.slice(i, j); let cls = null; if (src[j] === '!'){ cls = 'm'; j++; } else if (RUST_KW.has(word)) cls = 'k'; else if (RUST_TY.has(word) || /^[A-Z]/.test(word)) cls = 't'; else if (src[j] === '(') cls = 'f'; out += cls ? span(cls, src.slice(i, j)) : hlEsc(src.slice(i, j)); i = j; continue; }
+    out += hlEsc(c); i++;
+  }
+  return out;
+}
+function highlightAll(){ document.querySelectorAll('pre code:not([data-plain])').forEach(el=>{ el.innerHTML = highlightRust(el.textContent); }); }
+
+const NOTES = [
+  'Вступна: це історія рішення, а не каталог фіч. Пʼять частин: проблема, мотивація, альтернативи, рішення, підходи. Одне речення про проєкт: багато продюсерів видають, один споживач зливає в сталому порядку, без лок-а. Це slot-shaped channel, не «ще одна черга».',
+  'Проблема: не «повільно», а конкретний патерн доступу. Топологія багато→один, відтворюваний тотальний порядок, lock-free (без блокування) шлях запису, передбачувана затримка без джитеру. Звичайні черги під лок-ом творять lock-based (блокування) — очікування перетворюється на джитер. Порядок у них — побічний ефект, а не гарантія.',
+  'Симптоми під навантаженням: серіалізація на одному лок-і, не-відтворюваний порядок, відсутня політика переповнення, немає стейджингу. Натомість хочемо: lock-free (без блокування) шлях, відтворюваний порядок, явну політику, TLS (thread-local staging). Це вимоги, під які будували рішення.',
+  'Мотивація: для кого це вимога — latency-critical systems, двигуни зіставлення заявок, де порядок — це коректність. Вимоги: детермінізм, exactly-once, lock-free, передбачуваність. Тут джитер — це втрачені гроші.',
+  'Принципи проєкту: виміряно не аргументовано; unsafe deny by default; loom; один механізм на крейт; один крейт на концерн; відомий патерн; гейти, що можуть впасти; перевірка ззовні. «Виміряно, не аргументовано» — відповідь на «чому не взяти готове».',
+  'Альтернативи: список готових рішень. Критерій відбору: тотальний порядок, lock-free (без блокування) шлях, batching/TLS (thread-local staging), політика переповнення/shutdown, перемога в бенчмарку. Жодне готове не дає всіх вимог. Частини — еталони й бекенди. Crossbeam залишається свідомим винятком.',
+  'Mutex<VecDeque>: lock-based (блокування), джитер, масштабування, порядок як побічний ефект. Але: базова лінія в бенчмарках, простий і правильний, на шляху пакетування ми його наздоганяємо, а не «перемагаємо скрізь».',
+  'ArrayQueue: лідирує на непакетному MPSC-шляху при високих кількостях продюсерів. Але: немає тотального порядку як гарантії, немає batching/TLS (thread-local staging), немає політики переповнення/shutdown. Використовується як тимчасовий бекенд у ring_core.',
+  'std::sync::mpsc / канали: інший клас задач — передавання повідомлень, не слоти. Немає claim/publish/commit, немає політики, не slot-shaped. Доречні для повідомлень і прототипів, але не для нашої топології.',
+  'rtrb та інші SPSC: еталон для однопродюсерного випадку, лідирує на строгій парі (3.4–3.6 нс). Але: лише SPSC, немає MPSC/тотального порядку/пакетування/TLS (thread-local staging)/overflow/shutdown. Ми виграємо на великих місткостях: +37% на 16384.',
+  'Рішення: протокол claim/publish/commit. Claim — резерв номера; publish — прапорець вгору; drain — у порядку claim-ів, рівно раз. Чотири кроки: claim, publish, available, commit. Пропуск кроку ⇒ garbage/перезапис/вічне резервування. Відомий патерн, переписаний і перевірений.',
+  'Підходи — архітектура: корінь ring_types/ring_align, граф ациклічний, 11 ярусів, один крейт на концерн (34 крейти), вузький публічний API (5), bench_harness поза графом. 34 крейти — не складність заради складності, а можливість довести кожен інваріант окремо.',
+  'Підходи — верифікація: gates g1–g22, loom, fuzz, benchmarks. Компроміси: crossbeam interim, один коміт ⇒ довіряємо гейтам, чесність про слабкі місця, нейтральний грейдер. Гейти, що можуть впасти — не заяви.',
+  'Підходи — TLS (thread-local staging)/overflow/shutdown/handle: TLS (thread-local staging)+flush (0 атомарок під час накопичення, один fetch_add), overflow (Fail/DropNewest/DropOldest; try_push може повернути Ok(()), але запис відкинуто), shutdown (close→drain_all→reopen, advisory), handle (borrow-checker робить «один продюсер» властивістю), poll (tick-safe).',
+  'Виміряні результати: 334 M/s проти 244 (rtrb) на 16384 слотах (+37%). На малих місткостях і 8-байтових записах — нічия (у межах шуму). rtrb лідирує на строгій парі одиночних записів. MPSC без пакетів — слабке місце; пакетування змінює картину.',
+  'Заповнення кільця: місткість 8, продюсер кладе 1..=8, девʼятий отримує Err (політика Fail), споживач зливає, місце звільняється і push 9 проходить. Покажіть, що повне кільце зупиняє продюсера, а злив відкриває шлях.',
+  'Підсумок: проблема → мотивація → альтернативи → рішення → підходи. Код на github.com/Wandalen/ring, огляд discussions #70, PR #72, readme, capstone. Нотатки: клавіша N.'
+];
+
+const slides = Array.from(document.querySelectorAll('.slide'));
+let cur = 0;
+function show(n){
+  cur = Math.max(0, Math.min(slides.length - 1, n));
+  slides.forEach((s,i)=>s.classList.toggle('active', i === cur));
+  document.getElementById('counter').textContent = (cur + 1) + ' / ' + slides.length;
+  document.getElementById('bar').style.width = ((cur + 1) / slides.length * 100) + '%';
+  const nt = document.getElementById('notetext');
+  if (nt) nt.textContent = NOTES[cur] || '';
+}
+document.getElementById('next').onclick = ()=>show(cur + 1);
+document.getElementById('prev').onclick = ()=>show(cur - 1);
+document.addEventListener('keydown', e=>{
+  if (e.key === 'ArrowRight' || e.key === ' '){ e.preventDefault(); show(cur + 1); }
+  if (e.key === 'ArrowLeft'){ e.preventDefault(); show(cur - 1); }
+});
+
+/* ── ring model ─────────────────────────────────────────────────────────── */
+function makeRing(cap){
+  return { cap, cells: Array.from({length: cap}, () => ({seq:null, val:null, pub:false})), tail: 0, head: 0 };
+}
+function contiguous(m){
+  let e = m.head;
+  while (true){ const c = m.cells[e % m.cap]; if (c && c.seq === e && c.pub) e++; else break; }
+  return e;
+}
+function push(m, val){
+  if (m.tail - m.head >= m.cap) return {ok:false};
+  const seq = m.tail; m.cells[seq % m.cap] = {seq, val, pub:false}; m.tail++;
+  return {ok:true, seq, idx: seq % m.cap};
+}
+function publish(m, seq){ const c = m.cells[seq % m.cap]; if (c && c.seq === seq) c.pub = true; }
+function pop(m){
+  const e = contiguous(m); if (m.head >= e) return {ok:false};
+  const seq = m.head, c = m.cells[seq % m.cap], val = c.val;
+  m.cells[seq % m.cap] = {seq:null, val:null, pub:false}; m.head++;
+  return {ok:true, seq, val, idx: seq % m.cap};
+}
+
+/* ── scenarios ───────────────────────────────────────────────────────────── */
+const scenarios = {
+  base: () => (ctx) => {
+    const s = [];
+    s.push(()=>ctx.say('RingConfig::new( 8 )            → місткість 8', 'note'));
+    s.push(()=>ctx.say('Factory.build::<u32>( cfg )     → SPSC (продюсерів = 1)', 'note'));
+    s.push(()=>{ const r = ctx.push(7); ctx.say('producer.try_push( 7 )          → Ok(())   посл. ' + r.seq, 'ok'); });
+    s.push(()=>{ const r = ctx.pop();  ctx.say('consumer.try_recv()             → Some(' + r.val + ')', 'out'); });
+    s.push(()=>ctx.say('використано один слот, кільце знову порожнє — увесь базовий приклад', 'note'));
+    return s;
+  },
+  fill: () => (ctx) => {
+    const s = [];
+    s.push(()=>ctx.say('заповнюємо кільце — місткість 8', 'note'));
+    for (let v = 1; v <= 8; v++) {
+      s.push(()=>{ const r = ctx.push(v); ctx.say('try_push( ' + v + ' ) → Ok(())   посл. ' + r.seq, 'ok'); });
+    }
+    s.push(()=>ctx.say('кільце ПОВНЕ — у кільці 8 = місткість 8', 'warn'));
+    s.push(()=>ctx.refuse('try_push( 9 ) → Err(9)   місця немає, запис повертається', 'err'));
+    s.push(()=>ctx.say('споживач зливає — місце звільняється', 'note'));
+    for (let k = 0; k < 8; k++) {
+      s.push(()=>{ const r = ctx.pop(); ctx.say('  try_recv() → ' + r.val, 'out'); });
+    }
+    s.push(()=>{ const r = ctx.push(9); ctx.say('try_push( 9 ) → Ok(())   посл. ' + r.seq + '   — знову є місце', 'ok'); });
+    s.push(()=>ctx.say('повне кільце зупиняє продюсера; саме злив відкриває шлях', 'note'));
+    return s;
+  }
+};
+
+/* ── RingView + controller ──────────────────────────────────────────────── */
+class RingView{
+  constructor(root, cap){
+    this.cap = cap; root.innerHTML = '';
+    const NS = 'http://www.w3.org/2000/svg'; this.NS = NS;
+    const S = 340; this.cx = S/2; this.cy = S/2; this.rOut = 138; this.rIn = 84; this.rMid = (this.rOut+this.rIn)/2;
+    const svg = document.createElementNS(NS,'svg'); svg.setAttribute('viewBox','0 0 '+S+' '+S); svg.setAttribute('class','ringsvg');
+    this.sectors=[]; this.vals=[]; this.seqs=[];
+    const step = 360/cap;
+    for (let i=0;i<cap;i++){
+      const a0=i*step, a1=(i+1)*step, mid=a0+step/2;
+      const path=document.createElementNS(NS,'path'); path.setAttribute('d',this.arc(a0,a1)); path.setAttribute('class','sector empty');
+      svg.appendChild(path); this.sectors.push(path);
+      const pv=this.polar(this.rMid+5,mid); const tv=document.createElementNS(NS,'text'); tv.setAttribute('x',pv[0]); tv.setAttribute('y',pv[1]); tv.setAttribute('class','sectorval'); tv.setAttribute('dominant-baseline','central'); svg.appendChild(tv); this.vals.push(tv);
+      const ps=this.polar(this.rMid-16,mid); const ts=document.createElementNS(NS,'text'); ts.setAttribute('x',ps[0]); ts.setAttribute('y',ps[1]); ts.setAttribute('class','sectorseq'); ts.setAttribute('dominant-baseline','central'); svg.appendChild(ts); this.seqs.push(ts);
+      const pi=this.polar(this.rIn+9,mid); const ti=document.createElementNS(NS,'text'); ti.setAttribute('x',pi[0]); ti.setAttribute('y',pi[1]); ti.setAttribute('class','sectoridx'); ti.setAttribute('dominant-baseline','central'); ti.textContent=i; svg.appendChild(ti);
+    }
+    [this.rIn,this.rOut].forEach(r=>{ const c=document.createElementNS(NS,'circle'); c.setAttribute('cx',this.cx); c.setAttribute('cy',this.cy); c.setAttribute('r',r); c.setAttribute('class','cring'); svg.appendChild(c); });
+    const mkText=(y,cls,fill)=>{ const t=document.createElementNS(NS,'text'); t.setAttribute('x',this.cx); t.setAttribute('y',y); t.setAttribute('class',cls); t.setAttribute('fill',fill); svg.appendChild(t); return t; };
+    this.headTxt=mkText(this.cy-16,'centerbig','var(--accent)');
+    this.tailTxt=mkText(this.cy+6,'centertxt','var(--warn)');
+    this.lapTxt=mkText(this.cy+24,'centertxt','var(--muted)');
+    const mkPtr=(cls)=>{ const p=document.createElementNS(NS,'polygon'); p.setAttribute('points','0,-9 7,5 -7,5'); p.setAttribute('class','ptr '+cls); svg.appendChild(p); return p; };
+    this.consPtr=mkPtr('consumer'); this.prodPtr=mkPtr('producer');
+    root.appendChild(svg);
+    const lg=document.createElement('div'); lg.className='ringlegend';
+    lg.innerHTML='<span>'+glyph('consumer')+'споживання (head)</span><span>'+glyph('producer')+'claim (tail)</span><span>'+glyph('published')+'опубліковано</span><span>'+glyph('inflight')+'у польоті</span>';
+    root.appendChild(lg);
+    this.stats=document.createElement('div'); this.stats.className='ringstats'; root.appendChild(this.stats);
+  }
+  polar(r,aDeg){ const a=(aDeg-90)*Math.PI/180; return [this.cx+r*Math.cos(a), this.cy+r*Math.sin(a)]; }
+  arc(a0,a1){ const o0=this.polar(this.rOut,a0), o1=this.polar(this.rOut,a1); const i1=this.polar(this.rIn,a1), i0=this.polar(this.rIn,a0); const large=(a1-a0)>180?1:0; return 'M'+o0[0]+' '+o0[1]+'A'+this.rOut+' '+this.rOut+' 0 '+large+' 1 '+o1[0]+' '+o1[1]+'L'+i1[0]+' '+i1[1]+'A'+this.rIn+' '+this.rIn+' 0 '+large+' 0 '+i0[0]+' '+i0[1]+'Z'; }
+  update(m){
+    const cend=contiguous(m);
+    for (let i=0;i<this.cap;i++){
+      const c=m.cells[i], p=this.sectors[i]; p.classList.remove('filled','inflight','empty');
+      if (c && c.seq !== null){ p.classList.add(c.pub?'filled':'inflight'); this.vals[i].textContent=c.val; this.seqs[i].textContent='#'+c.seq; }
+      else { p.classList.add('empty'); this.vals[i].textContent=''; this.seqs[i].textContent=''; }
+    }
+    const step=360/this.cap; const headA=(m.head%this.cap)*step+step/2; const tailA=(m.tail%this.cap)*step+step/2;
+    const cp=this.polar(this.rOut+17,headA); this.consPtr.style.transform='translate('+cp[0]+'px,'+cp[1]+'px) rotate('+(headA+180)+'deg)';
+    const pp=this.polar(this.rIn-25,tailA); this.prodPtr.style.transform='translate('+pp[0]+'px,'+pp[1]+'px) rotate('+tailA+'deg)';
+    this.headTxt.textContent='голова '+m.head; this.tailTxt.textContent='хвіст '+m.tail; this.lapTxt.textContent='оберт '+Math.floor(m.head/this.cap);
+    const gap=(m.tail-m.head)-(cend-m.head);
+    this.stats.innerHTML='місткість <b>'+this.cap+'</b> · у кільці <b>'+(m.tail-m.head)+'</b> · готово до зливу <b>'+(cend-m.head)+'</b>'+(gap>0?' · <span style="color:var(--warn)">розрив — споживач чекає посл. '+cend+'</span>':'')+' · злито <b>'+m.head+'</b> · заявлено <b>'+m.tail+'</b>';
+  }
+  flash(i,cls){ const el=this.sectors[i]; if(!el) return; el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); setTimeout(()=>el.classList.remove(cls),620); }
+}
+
+function glyph(kind){
+  const wrap=inner=>'<svg class="lgsvg" viewBox="0 0 24 24">'+inner+'</svg>';
+  if (kind==='consumer') return wrap('<polygon class="ptr consumer" points="12,3 19,17 5,17" transform="rotate(180 12 12)"/>');
+  if (kind==='producer') return wrap('<polygon class="ptr producer" points="12,3 19,17 5,17"/>');
+  const d=miniArc(-64,40,12,12,5,10);
+  if (kind==='published') return wrap('<path class="sector filled" d="'+d+'"/>');
+  if (kind==='inflight')  return wrap('<path class="sector inflight" d="'+d+'"/>');
+  return wrap('<path class="sector empty" d="'+d+'"/>');
+}
+function miniArc(a0,a1,cx,cy,rIn,rOut){
+  const p=(r,a)=>{ const t=(a-90)*Math.PI/180; return [cx+r*Math.cos(t), cy+r*Math.sin(t)]; };
+  const o0=p(rOut,a0), o1=p(rOut,a1), i1=p(rIn,a1), i0=p(rIn,a0);
+  const large=(a1-a0)>180?1:0; const f=n=>n.toFixed(2);
+  return 'M'+f(o0[0])+' '+f(o0[1])+'A'+rOut+' '+rOut+' 0 '+large+' 1 '+f(o1[0])+' '+f(o1[1])+'L'+f(i1[0])+' '+f(i1[1])+'A'+rIn+' '+rIn+' 0 '+large+' 0 '+f(i0[0])+' '+f(i0[1])+'Z';
+}
+const READ_ITEMS=[{g:'consumer',t:'споживання · head',d:'наступний елемент, який зливає споживач'},{g:'producer',t:'claim · tail',d:'наступний слот, який заповнить продюсер'},{g:'published',t:'опубліковано',d:'заповнено й готово до зливу'},{g:'inflight',t:'у польоті',d:'заявлено, але ще не опубліковано'},{g:'empty',t:'порожньо',d:'вільно для наступного claim-у'}];
+function renderReadGrid(){ document.querySelectorAll('[data-readgrid]').forEach(el=>{ el.innerHTML=READ_ITEMS.map(it=>'<div class="readitem">'+glyph(it.g)+'<div><b>'+it.t+'</b><span>'+it.d+'</span></div></div>').join(''); }); }
+
+function controller(slide, cap, makeSteps){
+  const view = new RingView(slide.querySelector('.viz'), cap);
+  const logEl = slide.querySelector('.log');
+  let model, steps, i = 0, timer = null;
+  const say = (t, c) => { const d=document.createElement('div'); d.className='logline '+(c||''); d.textContent=t; logEl.appendChild(d); logEl.scrollTop=logEl.scrollHeight; };
+  const ctx = { get model(){return model;}, say,
+    push(v){ const r=push(model,v); if(r.ok){ publish(model,r.seq); view.flash(r.idx,'justpush'); } return r; },
+    claim(v){ const r=push(model,v); if(r.ok) view.flash(r.idx,'justpush'); return r; },
+    pop(){ const r=pop(model); if(r.ok) view.flash(r.idx,'justpop'); return r; },
+    publish(seq){ publish(model,seq); },
+    refuse(msg,cls){ view.flash(model.tail%cap,'refused'); say(msg,cls); }
+  };
+  function setPlay(on){ const b=slide.querySelector('.btn-play'); if(b) b.textContent=on?'❚❚ Пауза':'▶ Пуск'; }
+  function stop(){ if(timer){clearInterval(timer);timer=null;} setPlay(false); }
+  function reset(){ stop(); model=makeRing(cap); steps=makeSteps(ctx); i=0; logEl.innerHTML=''; view.update(model); }
+  function step(){ if(i>=steps.length) return false; steps[i++](); view.update(model); return i<steps.length; }
+  function play(){ if(timer) return; setPlay(true); timer=setInterval(()=>{ if(!step()) stop(); },850); }
+  slide.querySelector('.btn-play').onclick=()=>{ if(timer) stop(); else { if(i>=steps.length) reset(); play(); } };
+  slide.querySelector('.btn-step').onclick=()=>{ stop(); if(i>=steps.length) reset(); step(); };
+  slide.querySelector('.btn-reset').onclick=()=> reset();
+  reset();
+}
+
+/* ── charts ──────────────────────────────────────────────────────────────── */
+const PERF = { spsc: { max: 400, rows: [
+  { label:'16384 слоти', bars:[ {n:'ring_spsc', v:334, us:true}, {n:'rtrb', v:244}, {n:'ringbuf', v:112} ] },
+  { label:'1024 слоти', bars:[ {n:'ring_spsc', v:192, us:true}, {n:'rtrb', v:189}, {n:'ringbuf', v:109} ] },
+  { label:'8-байтові записи', bars:[ {n:'ring_spsc', v:194, us:true}, {n:'rtrb', v:192}, {n:'ringbuf', v:110} ] }
+]}};
+function renderCharts(){ document.querySelectorAll('[data-chart]').forEach(el=>{ const d=PERF[el.dataset.chart]; if(!d) return; el.innerHTML=''; d.rows.forEach(row=>{ const cr=document.createElement('div'); cr.className='crow'; const lb=document.createElement('div'); lb.className='clabel'; lb.textContent=row.label; cr.appendChild(lb); row.bars.forEach(b=>{ const bar=document.createElement('div'); bar.className='cbar'+(b.us?' us':''); const nm=document.createElement('span'); nm.textContent=b.n; const tr=document.createElement('span'); tr.className='track'; const fl=document.createElement('span'); fl.className='fill'; fl.style.width=Math.max(2,b.v/d.max*100)+'%'; tr.appendChild(fl); const vl=document.createElement('span'); vl.className='val'; vl.textContent=b.v; bar.appendChild(nm); bar.appendChild(tr); bar.appendChild(vl); cr.appendChild(bar); }); el.appendChild(cr); }); const sc=document.createElement('div'); sc.className='scale'; sc.textContent='шкала 0–'+d.max+' M/с'; el.appendChild(sc); }); }
+
+highlightAll();
+renderCharts();
+renderReadGrid();
+renderTiers();
+
+document.querySelectorAll('[data-demo]').forEach(slide=>{ const name=slide.dataset.demo, cap=parseInt(slide.dataset.cap,10); controller(slide, cap, scenarios[name]()); });
+
+const notesBtn = document.getElementById('notesBtn');
+notesBtn.onclick = ()=> document.body.classList.toggle('show-notes');
+document.addEventListener('keydown', e=>{
+  if (e.key === 'n' || e.key === 'N') document.body.classList.toggle('show-notes');
+});
+
+show(0);
+</script>
+</body>
+</html>

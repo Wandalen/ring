@@ -146,6 +146,7 @@ impl Shutdown {
   /// its batch. [`Stopped::drain_all`] does not wait for those pushes. One that
   /// lands after the drain's last batch stays in the ring, so a caller that
   /// needs every record stops its producers before draining.
+  /// [`Stopped::drain_all`]'s second example shows the full order.
   ///
   /// **Enforced by.** `a_guarded_producer_refuses_a_closed_ring_and_returns_the_record`
   /// and `a_closed_batch_push_consumes_nothing`, for pushes that start after the
@@ -232,6 +233,56 @@ impl<'a> Stopped<'a> {
   /// let mut recovered = Vec::new();
   /// assert_eq!( stopped.drain_all( &mut consumer, &mut recovered ), 3 );
   /// assert_eq!( recovered, [ 1, 2, 3 ] );
+  /// ```
+  ///
+  /// The order the invariant paragraph requires, made visible: the close
+  /// signals the stop, the producer is joined, and only then does the drain
+  /// run. A producer still running when the drain runs can land a push after
+  /// the last batch, and that record stays in the ring.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_core::Ring;
+  /// use ring_shutdown::Shutdown;
+  /// use std::thread;
+  ///
+  /// let mut ring : Ring< usize > = Ring::new( &RingConfig::new( 32 ).unwrap() ).unwrap();
+  /// let mut ends = ring.ends();
+  /// let ( producer, mut consumer ) = ends.split();
+  ///
+  /// let shutdown = Shutdown::new();
+  ///
+  /// thread::scope( | scope |
+  /// {
+  ///   let handle = scope.spawn( ||
+  ///   {
+  ///     let mut guarded = shutdown.guard( producer );
+  ///     let mut published = 0;
+  ///     for i in 0 .. 16
+  ///     {
+  ///       // The close is the stop signal: once a push sees it, the
+  ///       // guard refuses and the producer leaves.
+  ///       if guarded.try_push( i ).is_err()
+  ///       {
+  ///         break;
+  ///       }
+  ///       published += 1;
+  ///     }
+  ///     published
+  ///   } );
+  ///
+  ///   // Signal the stop while the producer may still be publishing.
+  ///   let stopped = shutdown.close();
+  ///
+  ///   // Wait for the producer to observe it before draining.
+  ///   let published = handle.join().unwrap();
+  ///
+  ///   // Only after the join does the drain recover every published
+  ///   // record; draining first could strand a push past the last batch.
+  ///   let mut recovered = Vec::new();
+  ///   assert_eq!( stopped.drain_all( &mut consumer, &mut recovered ), published );
+  ///   assert_eq!( recovered, ( 0 .. published ).collect::< Vec< _ > >() );
+  /// } );
   /// ```
   pub fn drain_all<T: Send>(&self, consumer: &mut Consumer<'_, T>, out: &mut Vec<T>) -> usize {
     // A `while` rather than a `loop` with an inner `return`. The choice is for

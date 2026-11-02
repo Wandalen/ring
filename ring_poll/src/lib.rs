@@ -263,13 +263,8 @@ pub fn push_within<T: Send>(producer: &mut Producer<'_, T>, record: T, budget: B
   let mut held = record;
   let mut attempt = 0;
   // `while` rather than `loop` + `break` on purpose, here and at the two other
-  // budget-bounded loops below. `ring_shutdown` measured the difference.
-  // `cargo llvm-cov` attributes a `loop`'s exit edge to a region no test can
-  // enter, reporting 72/73 lines where the `while` form reports 73/73 on an
-  // identical suite. Rewriting this as a `loop` reads as pure simplification
-  // and costs a coverage line that will show up days later, attributed to
-  // whatever else moved. To check, make the change and re-run
-  // `cargo llvm-cov -p ring_poll`.
+  // budget-bounded loops below: `cargo llvm-cov` attributes a `loop`'s exit
+  // edge to a region no test can enter. Measured in `tests/manual/readme.md` P4.
   while attempt < budget.attempts() {
     match producer.try_push(held) {
       Ok(()) => return Ok(()),

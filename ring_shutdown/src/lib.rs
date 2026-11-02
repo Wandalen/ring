@@ -234,12 +234,8 @@ impl<'a> Stopped<'a> {
   /// assert_eq!( recovered, [ 1, 2, 3 ] );
   /// ```
   pub fn drain_all<T: Send>(&self, consumer: &mut Consumer<'_, T>, out: &mut Vec<T>) -> usize {
-    // A `while` rather than a `loop` with an inner `return`. The choice is for
-    // coverage measurement, not style. `llvm-cov` opens a region on a bare
-    // `loop` line and never attributes a hit to it, so the line reads as
-    // uncovered however hard the tests drain. Measured at 80/81 with `loop`
-    // and 81/81 with this, for the identical suite, `cargo tarpaulin --engine
-    // llvm`. Recorded in `tests/manual/readme.md` D2.
+    // A `while` rather than a `loop` with an inner `return`: a coverage-tool
+    // attribution quirk, not style. Measured in `tests/manual/readme.md` D2.
     let mut total = 0;
     let mut taken = consumer.try_recv_batch(out);
     while taken > 0 {

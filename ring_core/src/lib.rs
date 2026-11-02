@@ -147,10 +147,9 @@ impl<T: Send> Ring<T> {
       return Err(RingError::PolicyUnsupported);
     }
 
-    // A `match` rather than `if`/`else`, because under the family's brace style
-    // the `else` keyword lands on a line of its own. There `llvm-cov` opens a
-    // region that nothing can ever execute, so the crate reads 120/121 with both
-    // arms demonstrably covered. `tests/manual/readme.md` C4 records the measurement.
+    // A `match` rather than `if`/`else`: under the family's brace style the
+    // `else` keyword lands on a line of its own, which `llvm-cov` reads as
+    // an uncovered region. Measured in `tests/manual/readme.md` C4.
     let storage = match config.is_multi_producer() {
       true => Storage::Mpsc(ring_mpsc::Ring::with_config(config)),
       false => Storage::Spsc(ring_spsc::Ring::with_config(config)),

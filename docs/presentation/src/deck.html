@@ -1,0 +1,708 @@
+<title>Кільце ring</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: one slide at a time over a quiet paper ground; the ring itself is the hero object,
+   eight sectors with the claim cursor outside and the reader's cursor inside, nav rail along the bottom.
+   Same tokens and type as the exchange deck, so the two decks of the family read as one. */
+:root {
+  --paper: #f2f4f8;
+  --surface: #ffffff;
+  --sunk: #e8ecf3;
+  --ink: #131a2c;
+  --muted: #5a6479;
+  --line: #d6dce8;
+  --accent: #2f43cf;
+  --accent-soft: #e3e7ff;
+  --bad: #c4362c;
+  --bad-soft: #fbe6e3;
+  --good: #0f7d59;
+  --good-soft: #dcf2e8;
+  --t1: #7445d6; --t1-soft: #ece4ff;
+  --t2: #b86e00; --t2-soft: #fdf0d9;
+  --t3: #0a7f9e; --t3-soft: #dcf3f9;
+  --s-ring: #2f43cf;
+  --s-mutex: #b86e00;
+  --shadow: 0 1px 2px rgba(19, 26, 44, .06), 0 6px 24px rgba(19, 26, 44, .06);
+
+  --display: "Unbounded", "Onest", system-ui, sans-serif;
+  --body: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --fs-0: clamp(12px, .78vw + 4px, 16px);
+  --fs-1: clamp(14px, .9vw + 5px, 20px);
+  --fs-2: clamp(16px, 1.15vw + 6px, 26px);
+  --fs-3: clamp(20px, 1.7vw + 6px, 36px);
+  --fs-4: clamp(26px, 2.6vw + 6px, 56px);
+  --fs-5: clamp(40px, 5.6vw, 112px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #0d1220; --surface: #151b2d; --sunk: #1b2236; --ink: #e7ebf5; --muted: #97a0b8; --line: #283049;
+    --accent: #8f9cff; --accent-soft: #232a52; --bad: #ff7d71; --bad-soft: #3a1d22; --good: #4fd3a0; --good-soft: #10302a;
+    --t1: #b597ff; --t1-soft: #2c2350; --t2: #f2b04a; --t2-soft: #3a2a10; --t3: #5fcbe8; --t3-soft: #11303b;
+    --s-ring: #7484f2; --s-mutex: #c4862a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #0d1220; --surface: #151b2d; --sunk: #1b2236; --ink: #e7ebf5; --muted: #97a0b8; --line: #283049;
+  --accent: #8f9cff; --accent-soft: #232a52; --bad: #ff7d71; --bad-soft: #3a1d22; --good: #4fd3a0; --good-soft: #10302a;
+  --t1: #b597ff; --t1-soft: #2c2350; --t2: #f2b04a; --t2-soft: #3a2a10; --t3: #5fcbe8; --t3-soft: #11303b;
+  --s-ring: #7484f2; --s-mutex: #c4862a;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 28px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink); font-family: var(--body); font-size: var(--fs-1); line-height: 1.45;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+p { margin: 0; }
+code { font-family: var(--mono); font-size: .9em; }
+
+/* ---------- deck ---------- */
+.deck { flex: 1; min-height: 0; position: relative; }
+.slide {
+  position: absolute; inset: 0; overflow-y: auto; overflow-x: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: clamp(16px, 3vh, 40px);
+}
+.slide:not(.is-active) { display: none; }
+.slide > .inner { max-width: 1680px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: clamp(14px, 2.2vh, 28px); }
+.slide.is-active > .inner { animation: rise .35s ease-out; }
+@keyframes rise { from { transform: translateY(8px); opacity: .6; } to { transform: none; opacity: 1; } }
+
+.eyebrow { font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.h-slide { font-family: var(--display); font-weight: 700; font-size: var(--fs-4); line-height: 1.08; letter-spacing: -.01em; }
+.lede { font-size: var(--fs-2); color: var(--muted); max-width: 62ch; }
+
+/* ---------- title ---------- */
+.title-grid { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(20px, 4vw, 72px); align-items: center; }
+.wordmark { font-family: var(--display); font-weight: 700; font-size: var(--fs-5); line-height: .95; letter-spacing: -.03em; }
+.wordmark .tick { color: var(--accent); }
+.title-sub { font-family: var(--display); font-weight: 500; font-size: var(--fs-3); line-height: 1.2; margin-top: .6em; max-width: 22ch; }
+.title-thesis { font-size: var(--fs-2); color: var(--muted); margin-top: 1em; max-width: 38ch; }
+.facts { display: flex; flex-wrap: wrap; gap: 10px 28px; margin-top: 1.6em; }
+.fact { display: flex; flex-direction: column; }
+.fact b { font-family: var(--mono); font-size: var(--fs-3); font-weight: 700; font-variant-numeric: tabular-nums; }
+.fact span { font-size: var(--fs-0); color: var(--muted); }
+.title-meta { margin-top: 1.6em; font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.title-meta a, .thanks a { color: var(--accent); }
+.keyhint { font-size: var(--fs-0); color: var(--muted); }
+kbd { font-family: var(--mono); font-size: .85em; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 .4em; background: var(--surface); }
+
+/* ---------- the ring ---------- */
+.ringbox { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ringbox.flat { box-shadow: none; }
+.ringbox-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 0 2px 6px; border-bottom: 1px solid var(--line); }
+.ringbox-head b { font-family: var(--display); font-weight: 500; font-size: var(--fs-1); }
+.ringbox-head span { font-size: var(--fs-0); color: var(--muted); text-align: right; }
+.ring { width: 100%; height: auto; display: block; margin: 0 auto; max-height: 52vh; }
+.frame .ring { max-height: 40vh; }
+.stage .ring { max-height: 40vh; }
+.ring .rs { stroke-width: 1.4; }
+.ring .rs.free { fill: var(--surface); stroke: var(--line); }
+.ring .rs[data-t="1"] { --c: var(--t1); --cs: var(--t1-soft); }
+.ring .rs[data-t="2"] { --c: var(--t2); --cs: var(--t2-soft); }
+.ring .rs[data-t="3"] { --c: var(--t3); --cs: var(--t3-soft); }
+.ring .rs.claimed { stroke: var(--c); stroke-width: 2; stroke-dasharray: 5 3; }
+.ring .rs.claimed[data-t="1"] { fill: url(#hp1); }
+.ring .rs.claimed[data-t="2"] { fill: url(#hp2); }
+.ring .rs.claimed[data-t="3"] { fill: url(#hp3); }
+.ring .rs.pub { fill: var(--cs); stroke: var(--c); stroke-width: 2; }
+.ring .rs.flash { animation: slot-in .7s ease-out both; }
+@keyframes slot-in { 0% { stroke-width: 6; } 100% { stroke-width: 2; } }
+.ring .t-idx { fill: var(--muted); font-family: var(--mono); font-size: 11px; }
+.ring .t-seq { fill: var(--ink); font-family: var(--mono); font-weight: 700; font-size: 22px; }
+.ring .t-own { fill: var(--muted); font-family: var(--body); font-weight: 600; font-size: 13px; }
+.ring .hub { fill: var(--paper); stroke: var(--line); }
+.ring .t-seq, .ring .t-own { paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round; }
+.frame .ring .t-own { font-size: 16px; }
+.frame .ring .t-idx { font-size: 14px; }
+.frame .ring .t-c1, .frame .ring .t-c3 { font-size: 15px; }
+.ring .t-c1 { fill: var(--muted); font-family: var(--body); font-size: 12px; }
+.ring .t-c2 { fill: var(--ink); font-family: var(--display); font-size: 30px; font-weight: 700; }
+.ring .t-c3 { font-family: var(--body); font-size: 12px; font-weight: 600; }
+.ring .t-c3.ok { fill: var(--good); } .ring .t-c3.bad { fill: var(--bad); } .ring .t-c3.idle { fill: var(--muted); }
+.ring .mk-claim { fill: var(--ink); } .ring .mk-claim.full { fill: var(--bad); }
+.ring .mk-cons { fill: var(--accent); }
+.hp-bg { fill: var(--surface); }
+#hp1 line { stroke: var(--t1); } #hp2 line { stroke: var(--t2); } #hp3 line { stroke: var(--t3); }
+.hp line { stroke-width: 2.2; opacity: .55; }
+.legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 14px; font-size: calc(var(--fs-0) * .92); color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: .95em; height: .95em; border-radius: 3px; border: 1.4px solid var(--line); background: var(--surface); display: inline-block; }
+.sw.claimed { border-color: var(--muted); border-style: dashed; background: repeating-linear-gradient(45deg, var(--surface) 0 3px, var(--sunk) 3px 6px); }
+.sw.pub { border-color: var(--muted); background: var(--sunk); }
+.tri { width: 0; height: 0; border-left: .38em solid transparent; border-right: .38em solid transparent; }
+.tri.claim { border-top: .62em solid var(--ink); }
+.tri.cons { border-bottom: .62em solid var(--accent); }
+
+/* ---------- problem: many writers, one lock ---------- */
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(18px, 3vw, 56px); align-items: center; flex: 1; }
+.pitch { display: flex; flex-direction: column; gap: clamp(12px, 2vh, 22px); }
+.convoy { display: grid; grid-template-columns: minmax(0, 1fr) minmax(64px, .9fr) minmax(0, .8fr); align-items: stretch; }
+.convoy-cap { grid-column: 1 / -1; display: grid; grid-template-columns: subgrid; font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding-bottom: 8px; }
+.convoy-cap span:last-child { text-align: right; }
+.stalls { display: grid; grid-auto-rows: 1fr; gap: 10px; }
+.stall { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.stall > span:last-child { font-size: var(--fs-0); color: var(--muted); }
+.stall.wait { border-style: dashed; }
+.stall.wait > span:last-child { color: var(--bad); }
+.stall.more { background: transparent; border-style: dashed; justify-content: center; color: var(--muted); font-size: var(--fs-0); }
+.gate { position: relative; }
+.gate svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.gate line { stroke: var(--muted); stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+.gate line.wait { stroke-dasharray: 4 4; opacity: .55; }
+.gate line.go { stroke: var(--ink); stroke-width: 2; }
+.gate .lock { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 2.4em; height: 2.4em; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 1.5px solid var(--bad); color: var(--bad); font-size: var(--fs-2); }
+.reader { align-self: center; background: var(--surface); border: 1.5px solid var(--accent); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.reader b { font-family: var(--display); font-weight: 500; font-size: var(--fs-1); }
+.reader span { font-size: var(--fs-0); color: var(--muted); }
+.quads { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.quad { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.quad .qn { font-family: var(--mono); font-size: var(--fs-0); color: var(--accent); }
+.quad b { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.2; }
+.quad span:last-child { color: var(--muted); font-size: var(--fs-0); }
+
+/* ---------- storyboard ---------- */
+.story { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.6vw, 28px); align-items: start; align-content: center; flex: 1; }
+.frame { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 10px; align-items: center; min-width: 0; }
+.frame-cap { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.frame .ringbox { padding: 6px; }
+.frame-cap .step { flex: none; width: 1.8em; height: 1.8em; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-family: var(--mono); font-size: var(--fs-0); font-weight: 700; }
+.evs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.evs li { border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; background: var(--surface); font-size: var(--fs-0); }
+.evs li.read { background: var(--accent-soft); border-color: transparent; }
+.evs li.wait { background: var(--bad-soft); border-color: transparent; }
+.evs .mono { font-weight: 700; }
+.gloss { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px clamp(16px, 2vw, 32px); margin: 0; padding-top: clamp(10px, 1.6vh, 18px); border-top: 1px solid var(--line); }
+.gloss > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.gloss dt { font-family: var(--display); font-weight: 500; font-size: var(--fs-1); }
+.gloss dd { margin: 0; color: var(--muted); font-size: var(--fs-0); }
+
+/* ---------- why ---------- */
+.why-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(14px, 2.4vw, 40px); align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(14px, 2vh, 22px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card h3 { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.2; }
+.card p { color: var(--muted); font-size: var(--fs-0); line-height: 1.5; }
+.card .src { font-family: var(--mono); font-size: calc(var(--fs-0) * .88); color: var(--muted); }
+.fig { width: 100%; height: auto; max-height: 27vh; }
+.fig text { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
+.fig .ax { fill: var(--muted); }
+.fig .grid { stroke: var(--line); stroke-width: 1; }
+.fig .lane-bg { fill: var(--sunk); }
+.fig .run-low { fill: var(--t3); } .fig .run-mid { fill: var(--t2); }
+.fig .held { fill: none; stroke: var(--t3); stroke-width: 2; stroke-dasharray: 5 4; }
+.fig .blocked { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 2; stroke-dasharray: 5 4; }
+.fig .reset { stroke: var(--bad); stroke-width: 3; stroke-linecap: round; }
+.fig .lbl-bad { fill: var(--bad); font-weight: 700; }
+.fig .in-bar { fill: var(--surface); font-weight: 700; }
+.fig .s-ring { stroke: var(--s-ring); stroke-width: 2; fill: none; }
+.fig .s-mutex { stroke: var(--s-mutex); stroke-width: 2; fill: none; }
+.fig .d-ring { fill: var(--s-ring); stroke: var(--surface); stroke-width: 2; }
+.fig .d-mutex { fill: var(--s-mutex); stroke: var(--surface); stroke-width: 2; }
+.fig .lbl { font-weight: 700; }
+.fig-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-0); color: var(--muted); }
+.fig-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.fig-legend i { width: 1.2em; height: 2px; border-radius: 1px; display: inline-block; }
+.because { font-size: var(--fs-2); font-weight: 500; max-width: 62ch; }
+
+/* ---------- guarantees ---------- */
+.vows { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); flex: 1; align-content: center; }
+.vow { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(14px, 2.2vh, 26px); display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.vow .qn { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
+.vow b { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); line-height: 1.05; color: var(--accent); overflow-wrap: anywhere; }
+.vow p { font-size: var(--fs-1); }
+.vow .where { margin-top: auto; padding-top: 10px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: calc(var(--fs-0) * .9); color: var(--muted); overflow-wrap: anywhere; }
+
+/* ---------- engineering ---------- */
+.dec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(10px, 1.4vw, 20px); }
+.dc { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: clamp(12px, 1.8vh, 20px); display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dc .crate { font-family: var(--mono); font-size: calc(var(--fs-0) * .88); color: var(--muted); }
+.dc b { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.2; }
+.dc p { color: var(--muted); font-size: var(--fs-0); line-height: 1.5; }
+.dc .proof { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: calc(var(--fs-0) * .9); color: var(--accent); overflow-wrap: anywhere; }
+.lines2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; margin-block: 4px; }
+.lines2 > div { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; padding: 3px; border-radius: 6px; background: var(--sunk); }
+.lines2 i { height: 14px; border-radius: 2px; background: var(--surface); }
+.lines2 i.p { background: var(--ink); }
+.lines2 i.c { background: var(--accent); }
+.stats-line { display: flex; flex-wrap: wrap; gap: 10px 36px; }
+.stats-line > div { min-width: 0; max-width: 34ch; }
+.stats-line b { font-family: var(--mono); font-size: var(--fs-3); font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
+.stats-line b.lag { color: var(--bad); }
+.stats-line span { color: var(--muted); font-size: var(--fs-0); }
+.footnote { font-family: var(--mono); font-size: calc(var(--fs-0) * .88); color: var(--muted); }
+
+/* ---------- checks ---------- */
+.checks-wrap { overflow-x: auto; }
+.checks { width: 100%; border-collapse: collapse; font-size: var(--fs-1); }
+.checks th { font-family: var(--mono); font-weight: 500; font-size: var(--fs-0); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); text-align: left; padding: 0 14px 8px 0; }
+.checks td { border-top: 1px solid var(--line); padding: clamp(8px, 1.4vh, 14px) 14px clamp(8px, 1.4vh, 14px) 0; vertical-align: baseline; }
+.checks td:first-child { font-family: var(--display); font-weight: 500; white-space: nowrap; color: var(--accent); }
+.checks td:last-child { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); white-space: nowrap; padding-right: 0; }
+.rule-quote { font-family: var(--display); font-weight: 500; font-size: var(--fs-2); line-height: 1.25; max-width: 40ch; }
+.rule-quote span { display: block; margin-top: 6px; font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); font-weight: 400; }
+
+/* ---------- sandbox ---------- */
+.sb-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 10px 24px; }
+.h-sub { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); line-height: 1.1; }
+.thanks { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.thanks b { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); line-height: 1.1; }
+.thanks b em { font-style: normal; color: var(--accent); }
+.thanks a { font-family: var(--mono); font-size: var(--fs-0); }
+.stage { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr) minmax(0, 1fr); gap: clamp(12px, 1.4vw, 24px); align-items: start; min-height: 0; }
+.col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+.panel-title { font-family: var(--mono); font-size: var(--fs-0); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; }
+.prods { display: flex; flex-direction: column; gap: 10px; }
+.prod { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+.prod:last-child { border-bottom: 0; padding-bottom: 0; }
+.prod-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.prod-head .st { font-size: var(--fs-0); color: var(--muted); }
+.prod-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint { font-size: var(--fs-0); color: var(--muted); margin-top: 8px; }
+.btn {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 7px 12px; cursor: pointer; font-weight: 600; font-size: var(--fs-0);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { opacity: .4; cursor: default; border-color: var(--line); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--surface); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.big { font-size: var(--fs-1); padding: 10px 18px; }
+.incoming { display: flex; flex-direction: column; gap: 6px; border-radius: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); min-height: 5.4em; }
+.incoming.flash { animation: card-in .35s ease-out; }
+@keyframes card-in { from { transform: translateY(-6px); opacity: .3; } to { transform: none; opacity: 1; } }
+.inc-head .tag { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
+.inc-order { font-size: var(--fs-2); font-weight: 600; }
+.badge { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 10px; font-size: var(--fs-0); font-weight: 600; background: var(--sunk); color: var(--ink); }
+.badge.ok { background: var(--good-soft); color: var(--good); }
+.badge.bad { background: var(--bad-soft); color: var(--bad); }
+.badge.mid { background: var(--accent-soft); color: var(--accent); }
+.outcome { display: flex; flex-wrap: wrap; gap: 6px; }
+.person { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; }
+.person::before { content: ""; width: .62em; height: .62em; border-radius: 50%; background: var(--pc, var(--t1)); }
+.person[data-t="2"] { --pc: var(--t2); }
+.person[data-t="3"] { --pc: var(--t3); }
+.person[data-t="0"] { --pc: var(--accent); }
+.got { display: flex; flex-wrap: wrap; gap: 4px; min-height: 2em; align-content: flex-start; }
+.got .lt { font-family: var(--mono); font-size: calc(var(--fs-0) * .92); font-weight: 700; border-radius: 6px; padding: 2px 7px; border: 1.5px solid var(--c); color: var(--c); background: var(--cs); animation: card-in .3s ease-out both; }
+.lt[data-t="1"] { --c: var(--t1); --cs: var(--t1-soft); }
+.lt[data-t="2"] { --c: var(--t2); --cs: var(--t2-soft); }
+.lt[data-t="3"] { --c: var(--t3); --cs: var(--t3-soft); }
+.got .empty, .tape .empty { color: var(--muted); font-size: var(--fs-0); }
+.tape { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 30vh; overflow-y: auto; }
+.tape li { font-size: var(--fs-0); line-height: 1.35; animation: card-in .3s ease-out both; }
+.tape li.read { font-weight: 600; }
+.tape li.bad { color: var(--bad); }
+.foot { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: var(--fs-0); color: var(--muted); }
+.foot .ok { color: var(--good); font-weight: 600; }
+.foot .bad { color: var(--bad); font-weight: 600; }
+.engine-badge { font-family: var(--mono); font-size: calc(var(--fs-0) * .92); border-radius: 999px; padding: 3px 10px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.engine-badge.wasm { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- nav, notes, script ---------- */
+.nav {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line); background: var(--surface);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 8px calc(8px + env(safe-area-inset-bottom, 0px)); position: relative; z-index: 5;
+}
+.brand { font-family: var(--display); font-weight: 700; font-size: var(--fs-0); }
+.brand .tick { color: var(--accent); }
+.sections { flex: 1; display: flex; gap: 4px; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.sections button { flex: 1 1 0; min-width: 0; border: 0; background: transparent; cursor: pointer; padding: 4px 2px 0; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: calc(var(--fs-0) * .88); }
+.sections button::before { content: ""; height: 3px; border-radius: 2px; background: var(--line); }
+.sections button.done::before { background: var(--muted); }
+.sections button[aria-current="true"] { color: var(--ink); font-weight: 600; }
+.sections button[aria-current="true"]::before { background: var(--accent); }
+.sections button span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.navbtns { display: flex; gap: 6px; align-items: center; }
+.iconbtn { border: 1px solid var(--line); background: var(--surface); border-radius: 9px; height: 34px; min-width: 34px; padding: 0 9px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: var(--fs-0); font-weight: 600; }
+.iconbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.ico { width: 1em; height: 1em; vertical-align: -.12em; }
+.timer { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.timer.over { color: var(--bad); }
+.counter { font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); min-width: 3.4em; text-align: center; }
+.notes {
+  position: absolute; left: 0; right: 0; bottom: 100%; max-height: 42vh; overflow-y: auto; background: var(--surface); border-top: 1px solid var(--line);
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, .12);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 14px 16px;
+}
+.notes .nt { max-width: 1100px; margin: 0 auto; display: grid; gap: 8px; }
+.notes .nt-head { display: flex; justify-content: space-between; gap: 10px; font-family: var(--mono); font-size: var(--fs-0); color: var(--muted); }
+.notes p { font-size: var(--fs-2); line-height: 1.45; }
+.notes .alt { font-size: var(--fs-0); color: var(--muted); }
+.script { position: fixed; inset: 0; z-index: 20; background: var(--paper); overflow-y: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(24px + env(safe-area-inset-top, 0px)) calc(40px + env(safe-area-inset-bottom, 0px)); }
+.script .sc-inner { max-width: 760px; margin: 0 auto; display: grid; gap: 22px; }
+.script header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.script h2 { font-family: var(--display); font-weight: 700; font-size: var(--fs-3); }
+#script-body { display: grid; gap: 22px; }
+.script .seg-t { display: grid; gap: 6px; }
+.script .seg-t .tm { font-family: var(--mono); font-size: var(--fs-0); color: var(--accent); }
+.script .seg-t p { font-size: var(--fs-1); line-height: 1.6; }
+.script .meta { color: var(--muted); font-size: var(--fs-0); }
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 1100px) {
+  .stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .stage > .col:nth-child(2) { grid-column: 1 / -1; grid-row: 1; }
+  .dec, .quads, .vows, .gloss { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .story { grid-template-columns: minmax(0, 1fr); }
+  .why-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .title-grid, .two, .stage, .dec, .story, .vows, .quads, .gloss { grid-template-columns: minmax(0, 1fr); }
+  .stage > .col:nth-child(2) { grid-row: auto; }
+  .thanks { align-items: flex-start; }
+  .checks td:last-child { white-space: normal; }
+  .sections, .brand, .hide-narrow { display: none; }
+  .nav { justify-content: space-between; }
+}
+.still .rs { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-delay: 0ms !important; transition-duration: 1ms !important; }
+}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="hp1" class="hp" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hp-bg" width="7" height="7"/><line x1="0" y1="0" x2="0" y2="7"/></pattern>
+    <pattern id="hp2" class="hp" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hp-bg" width="7" height="7"/><line x1="0" y1="0" x2="0" y2="7"/></pattern>
+    <pattern id="hp3" class="hp" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect class="hp-bg" width="7" height="7"/><line x1="0" y1="0" x2="0" y2="7"/></pattern>
+  </defs>
+  <symbol id="i-lock" viewBox="0 0 16 16"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor"/><path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-next" viewBox="0 0 16 16"><path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<main class="deck" id="deck">
+
+  <!-- 1. title -->
+  <section class="slide is-active" data-id="title" data-label="Вступ">
+    <div class="inner">
+      <div class="title-grid">
+        <div>
+          <div class="eyebrow">Rust Bootcamp · capstone</div>
+          <h1 class="wordmark">ring<span class="tick">_</span></h1>
+          <p class="title-sub">Lock-free шлях запису на Rust</p>
+          <p class="title-thesis">Багато потоків пишуть, один читає строго по черзі. Без замка, без втрат і без затирання непрочитаного.</p>
+          <div class="facts">
+            <div class="fact"><b>33</b><span>крейти ring_*, по механізму в кожному</span></div>
+            <div class="fact"><b>806</b><span>тестів</span></div>
+            <div class="fact"><b>3</b><span>крейти з unsafe, решта deny</span></div>
+          </div>
+          <div class="title-meta">
+            <a href="https://github.com/Wandalen/ring" target="_blank" rel="noopener">github.com/Wandalen/ring</a>
+            <span>edition 2024 · MIT</span>
+          </div>
+        </div>
+        <div class="ringbox" id="title-ring" aria-label="Кільце на вісім комірок: троє пишуть, читач чекає"></div>
+      </div>
+      <p class="keyhint"><kbd>→</kbd> далі · <kbd>←</kbd> назад · <kbd>N</kbd> нотатки · <kbd>S</kbd> текст виступу · <kbd>T</kbd> таймер · <kbd>F</kbd> на весь екран</p>
+    </div>
+  </section>
+
+  <!-- 2. the problem -->
+  <section class="slide" data-id="problem" data-label="Проблема">
+    <div class="inner">
+      <div class="two">
+        <div class="pitch">
+          <div class="eyebrow">Проблема</div>
+          <h2 class="h-slide">Пишуть багато, а читає один</h2>
+          <p class="lede">Сотні потоків одночасно надсилають записи: заявки на біржу, телеметрію, рядки журналу. Обробляє їх один потік, строго по черзі. Найпростіше рішення — черга під замком: поки один пише, решта стоять і чекають на ключ.</p>
+        </div>
+        <div class="convoy" role="img" aria-label="Три потоки пишуть у чергу під одним замком: один пише, двоє чекають, читач один">
+          <div class="convoy-cap"><span>Потоки</span><span></span><span>Читач</span></div>
+          <div class="stalls">
+            <div class="stall"><span class="person" data-t="1">Оксана</span><span>пише, тримає замок</span></div>
+            <div class="stall wait"><span class="person" data-t="2">Богдан</span><span>чекає на замок</span></div>
+            <div class="stall wait"><span class="person" data-t="3">Ярина</span><span>чекає на замок</span></div>
+            <div class="stall more">і ще сотні потоків</div>
+          </div>
+          <div class="gate" aria-hidden="true">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+              <line class="go" x1="0" y1="11.5" x2="50" y2="50"/>
+              <line class="wait" x1="0" y1="37.2" x2="50" y2="50"/>
+              <line class="wait" x1="0" y1="62.8" x2="50" y2="50"/>
+              <line class="wait" x1="0" y1="88.5" x2="50" y2="50"/>
+              <line class="go" x1="50" y1="50" x2="100" y2="50"/>
+            </svg>
+            <span class="lock"><svg class="ico"><use href="#i-lock"/></svg></span>
+          </div>
+          <div class="reader"><b>Один читач</b><span>бере записи по одному, у тому порядку, в якому їх поклали</span></div>
+        </div>
+      </div>
+      <div class="quads">
+        <div class="quad"><span class="qn">01</span><b>Хто перший?</b><span>Записи приходять одночасно. Порядок має бути один, і його треба вміти відтворити.</span></div>
+        <div class="quad"><span class="qn">02</span><b>Чи є місце?</b><span>Черга обмежена. Не можна затерти запис, якого ще ніхто не прочитав.</span></div>
+        <div class="quad"><span class="qn">03</span><b>Чи запис цілий?</b><span>Читач не має побачити запис, який ще дописують.</span></div>
+        <div class="quad"><span class="qn">04</span><b>Хто тримає замок?</b><span>Потік із замком може заснути, і тоді стоять усі інші.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. how it works -->
+  <section class="slide" data-id="how" data-label="Як працює">
+    <div class="inner">
+      <div class="eyebrow">Як це працює · claim → publish → drain</div>
+      <h2 class="h-slide">Кільце роздає квитки й читає за номерами</h2>
+      <div class="story">
+        <div class="frame">
+          <div class="frame-cap"><span class="step">1</span>Беруть квитки</div>
+          <div class="ringbox flat" id="s1-ring"></div>
+          <ul class="evs" id="s1-evs"></ul>
+        </div>
+        <div class="frame">
+          <div class="frame-cap"><span class="step">2</span>Пишуть, хто як встигне</div>
+          <div class="ringbox flat" id="s2-ring"></div>
+          <ul class="evs" id="s2-evs"></ul>
+        </div>
+        <div class="frame">
+          <div class="frame-cap"><span class="step">3</span>Читач забирає по черзі</div>
+          <div class="ringbox flat" id="s3-ring"></div>
+          <ul class="evs" id="s3-evs"></ul>
+        </div>
+      </div>
+      <div class="legend"><span><i class="sw"></i>вільна</span><span><i class="sw claimed"></i>пише</span><span><i class="sw pub"></i>штамп стоїть</span><span><i class="tri claim"></i>наступний квиток</span><span><i class="tri cons"></i>читач</span></div>
+      <dl class="gloss">
+        <div><dt>Квиток</dt><dd>Номер запису, що росте без кінця. Комірка — це квиток за модулем 8.</dd></div>
+        <div><dt>Claim</dt><dd>Взяти квиток: одна атомарна операція (CAS). Якщо кільце повне, відмова, а не очікування.</dd></div>
+        <div><dt>Штамп</dt><dd>Дописавши, виробник кладе в комірку номер свого квитка. Це і є публікація.</dd></div>
+        <div><dt>Commit</dt><dd>Читач забрав записи й посунув свій курсор. Комірки знову можна займати.</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <!-- 4. why without a lock -->
+  <section class="slide" data-id="why" data-label="Навіщо">
+    <div class="inner">
+      <div class="eyebrow">Навіщо без замка</div>
+      <h2 class="h-slide">Замок коштує дорожче, ніж здається</h2>
+      <div class="why-grid">
+        <article class="card">
+          <h3>Mars Pathfinder, липень 1997</h3>
+          <svg class="fig" viewBox="0 0 520 200" role="img" aria-label="Інверсія пріоритетів: найважливіша задача чекає на м'ютекс, який тримає витіснена низькопріоритетна, доки система не скидає себе">
+            <rect class="lane-bg" x="132" y="30" width="370" height="26" rx="5"/>
+            <rect class="lane-bg" x="132" y="86" width="370" height="26" rx="5"/>
+            <rect class="lane-bg" x="132" y="142" width="370" height="26" rx="5"/>
+            <text x="0" y="41">висока</text><text class="ax" x="0" y="56">шина даних</text>
+            <text x="0" y="97">середня</text><text class="ax" x="0" y="112">зв'язок</text>
+            <text x="0" y="153">низька</text><text class="ax" x="0" y="168">метеодані</text>
+            <rect class="run-low" x="132" y="142" width="64" height="26" rx="5"/>
+            <text class="in-bar" x="164" y="159" text-anchor="middle">замок</text>
+            <rect class="held" x="198" y="143" width="300" height="24" rx="5"/>
+            <text class="ax" x="348" y="159" text-anchor="middle">витіснена, але тримає замок</text>
+            <rect class="run-mid" x="212" y="86" width="232" height="26" rx="5"/>
+            <text class="in-bar" x="328" y="103" text-anchor="middle">працює</text>
+            <rect class="blocked" x="198" y="31" width="246" height="24" rx="5"/>
+            <text class="lbl-bad" x="321" y="47" text-anchor="middle">чекає на замок</text>
+            <line class="reset" x1="452" y1="26" x2="466" y2="40"/><line class="reset" x1="466" y1="26" x2="452" y2="40"/>
+            <text class="lbl-bad" x="474" y="38">скид</text>
+            <text class="ax" x="502" y="194" text-anchor="end">час →</text>
+          </svg>
+          <p>Зонд на Марсі раз у раз перезавантажувався. Задача з низьким пріоритетом тримала м'ютекс спільної шини даних, її витісняла задача середнього пріоритету, а найважливіша задача чекала на той самий м'ютекс, не встигала у свій цикл, і система скидала себе.</p>
+          <span class="src">Розбір Glenn Reeves, JPL, грудень 1997</span>
+        </article>
+        <article class="card">
+          <h3>Під навантаженням м'ютекс падає в 7,5 раза</h3>
+          <svg class="fig" viewBox="0 0 520 230" role="img" aria-label="Пачки по 32 записи: з одним виробником кільце 288, м'ютекс 276 мільйонів записів за секунду; з одинадцятьма кільце 203, м'ютекс 37">
+            <text class="ax" x="0" y="12">млн записів/с</text>
+            <line class="grid" x1="60" y1="190" x2="380" y2="190"/>
+            <line class="grid" x1="60" y1="136.7" x2="380" y2="136.7"/>
+            <line class="grid" x1="60" y1="83.3" x2="380" y2="83.3"/>
+            <line class="grid" x1="60" y1="30" x2="380" y2="30"/>
+            <text class="ax" x="52" y="194" text-anchor="end">0</text>
+            <text class="ax" x="52" y="140.7" text-anchor="end">100</text>
+            <text class="ax" x="52" y="87.3" text-anchor="end">200</text>
+            <text class="ax" x="52" y="34" text-anchor="end">300</text>
+            <line class="s-mutex" x1="60" y1="42.8" x2="380" y2="170.3"/>
+            <line class="s-ring" x1="60" y1="36.4" x2="380" y2="81.7"/>
+            <circle class="d-mutex" cx="60" cy="42.8" r="5"><title>Mutex, 1 виробник: 276 млн/с</title></circle>
+            <circle class="d-ring" cx="60" cy="36.4" r="5"><title>ring_mpsc, 1 виробник: 288 млн/с</title></circle>
+            <circle class="d-mutex" cx="380" cy="170.3" r="5"><title>Mutex, 11 виробників: 37 млн/с</title></circle>
+            <circle class="d-ring" cx="380" cy="81.7" r="5"><title>ring_mpsc, 11 виробників: 203 млн/с</title></circle>
+            <text class="lbl" x="70" y="24">288</text>
+            <text class="lbl" x="70" y="72">276</text>
+            <text class="lbl" x="392" y="86">203 · ring_mpsc</text>
+            <text class="lbl" x="392" y="174">37 · Mutex</text>
+            <text class="ax" x="60" y="212">1 виробник</text>
+            <text class="ax" x="380" y="212" text-anchor="end">11 виробників</text>
+          </svg>
+          <div class="fig-legend"><span><i style="background: var(--s-ring)"></i>ring_mpsc</span><span><i style="background: var(--s-mutex)"></i>Mutex&lt;VecDeque&gt;</span><span>пачки по 32 записи</span></div>
+          <p>З одним виробником м'ютекс майже не відстає. З одинадцятьма він втрачає 87% пропускної здатності, кільце — 30%.</p>
+          <span class="src">i7-10750H, criterion, медіани; кінцеві точки із заміру, лінії між ними умовні · readme.md</span>
+        </article>
+      </div>
+      <p class="because">Тож ми написали кільце без замка. І беремо механізм, лише коли він виграв замір на нашому навантаженні.</p>
+    </div>
+  </section>
+
+  <!-- 5. what it guarantees -->
+  <section class="slide" data-id="promises" data-label="Гарантії">
+    <div class="inner">
+      <div class="eyebrow">Що гарантує ring</div>
+      <h2 class="h-slide">Чотири відповіді на чотири питання</h2>
+      <div class="vows">
+        <article class="vow"><span class="qn">01 · Хто перший?</span><b>По черзі</b><p>Кожен запис доходить рівно один раз, у порядку квитків. Читач зупиняється на першому неготовому.</p><span class="where">drain до першого неопублікованого<br>ring_mpsc · ring_claim</span></article>
+        <article class="vow"><span class="qn">02 · Чи є місце?</span><b>Не затре</b><p>Кільце повне — виробник отримує Full, а політика вирішує: відмовити чи відкинути новий запис. Непрочитаного не торкається жодна.</p><span class="where">місце рахується від курсора читача<br>ring_gating · ring_overflow</span></article>
+        <article class="vow"><span class="qn">03 · Чи запис цілий?</span><b>Цілком</b><p>Штамп ставиться після запису (Release), читач дивиться на штамп (Acquire). Половини запису він не побачить.</p><span class="where">PUBLISH → OBSERVE<br>перевіряє loom</span></article>
+        <article class="vow"><span class="qn">04 · Хто тримає замок?</span><b>Ніхто</b><p>Квиток — один CAS, запис без синхронізації, штамп — один запис у пам'ять. Замка немає, тож ніхто не чекає на того, хто заснув.</p><span class="where">lock-free, але не wait-free<br>ring_claim · ring_cursor</span></article>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. engineering: hardware -->
+  <section class="slide" data-id="hardware" data-label="Залізо">
+    <div class="inner">
+      <div class="eyebrow">Інженерна складність · залізо</div>
+      <h2 class="h-slide">Швидкість ховається в кеш-лініях</h2>
+      <div class="dec">
+        <article class="dc">
+          <span class="crate">ring_align · ring_cursor</span>
+          <b>Кожен курсор на своїй лінії</b>
+          <div class="lines2" role="img" aria-label="Курсор виробника і курсор читача лежать у двох різних рядках кешу по 64 байти"><div><i class="p"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div><i class="c"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+          <p>Ядра обмінюються пам'яттю рядками по 64 байти. Два курсори в одному рядку змушували б ядра відбирати його одне в одного, хоча кожне пише своє.</p>
+          <span class="proof">on_distinct_lines() звіряє реальні адреси</span>
+        </article>
+        <article class="dc">
+          <span class="crate">ring_spsc · PrimaryProducer</span>
+          <b>Чужий курсор — з кешу</b>
+          <p>Виробник тримає копію курсора читача і перечитує справжній, лише коли копія каже «повно». Копія може тільки відставати: зайва відмова можлива, затирання — ні.</p>
+          <span class="proof">розрив із rtrb закрився на aarch64</span>
+        </article>
+        <article class="dc">
+          <span class="crate">ring_mpsc · stamps</span>
+          <b>Штамп — це номер квитка</b>
+          <p>Комірка готова, коли в штампі той квиток, на який чекає читач. Штамп минулого кола не збігається, тож його не треба скидати: на гарячому шляху на один запис менше.</p>
+          <span class="proof">a_stale_stamp_from_the_previous_lap_does_not_read_as_published</span>
+        </article>
+        <article class="dc">
+          <span class="crate">ring_claim · claim_batch</span>
+          <b>Пачка за один CAS</b>
+          <p>Виробник просить до 32 квитків одразу: одна перевірка місця й одна атомарна операція на всю пачку.</p>
+          <span class="proof">288 → 203 млн/с на 1 → 11 виробниках</span>
+        </article>
+      </div>
+      <div class="stats-line">
+        <div><b>+83%</b><span>ring_spsc проти rtrb: 381 проти 208 млн записів/с, 16 384 комірки</span></div>
+        <div><b>3,5 нс</b><span>записати й прочитати один запис: нічия з rtrb</span></div>
+        <div><b class="lag">13,6</b><span>млн/с без пачок на 4 виробниках, у crossbeam ArrayQueue — 53,5. Тут ми поки програємо</span></div>
+      </div>
+      <p class="footnote">i7-10750H, criterion, медіани; кожне порівняння в межах одного прогону</p>
+    </div>
+  </section>
+
+  <!-- 7. verification -->
+  <section class="slide" data-id="checks" data-label="Перевірки">
+    <div class="inner">
+      <div class="eyebrow">Production-ready · що ми підключили за capstone</div>
+      <h2 class="h-slide">Кожна перевірка вміє впасти</h2>
+      <div class="checks-wrap">
+        <table class="checks">
+          <thead><tr><th>Перевірка</th><th>Що ловить</th><th>Коли</th></tr></thead>
+          <tbody>
+            <tr><td>loom</td><td>Порядок пам'яті, який «працює» на x86: перебирає всі переплетення потоків у моделях spsc, mpsc і публікації</td><td>push у master, щоночі</td></tr>
+            <tr><td>fuzz</td><td>Послідовність операцій, після якої кільце розходиться з простою FIFO-чергою</td><td>PR у гарячий шлях, нічний soak</td></tr>
+            <tr><td>мутації</td><td>Тест, який не помітив навмисно зламаного коду: такий тест не рахується</td><td>гейти, щоночі</td></tr>
+            <tr><td>регресія p99</td><td>Кільце перестало бити м'ютекс у тому самому прогоні (локально було ~130 проти ~330 нс)</td><td>кожен PR у гарячий шлях</td></tr>
+            <tr><td>бенчмарки</td><td>Зміну швидкості проти 11 готових черг на x86_64, aarch64 і Apple Silicon</td><td>щоночі</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="rule-quote">Гейт рахується, лише коли впав з власної причини.<span>bench_harness/docs/decisions/001</span></p>
+      <div class="stats-line">
+        <div><b>8</b><span>процесів CI; до capstone не було жодного</span></div>
+        <div><b>806</b><span>тестів у workspace</span></div>
+        <div><b>3 / 33</b><span>крейти з unsafe; у решті unsafe заборонено</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. sandbox, and the close -->
+  <section class="slide" data-id="sandbox" data-label="Спробуйте">
+    <div class="inner">
+      <div class="sb-top">
+        <div>
+          <div class="eyebrow">Наостанок · ring_mpsc у WebAssembly</div>
+          <h2 class="h-sub">Спробуйте самі</h2>
+        </div>
+        <div class="thanks">
+          <b>Дякуємо! <em>Питання?</em></b>
+          <a href="https://github.com/Wandalen/ring" target="_blank" rel="noopener">github.com/Wandalen/ring</a>
+        </div>
+      </div>
+      <div class="stage" id="sandbox">
+        <div class="col">
+          <div class="panel">
+            <div class="panel-title"><span>Виробники</span><span>кожен тримає ≤ 1 квиток</span></div>
+            <div class="prods" id="sb-prods"></div>
+            <p class="hint">«Взяти квиток» займає комірку. «Поставити штамп» дописує лист і публікує його. «Надіслати» робить усе одразу.</p>
+          </div>
+          <div class="panel">
+            <div class="panel-title"><span>Кільце</span></div>
+            <div class="prod-acts"><button class="btn" id="sb-fill" type="button">Заповнити до відмови</button><button class="btn" id="sb-reset" type="button">Почати спочатку</button></div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="incoming" id="sb-inc"></div>
+          <div class="ringbox" id="sb-ring"></div>
+        </div>
+        <div class="col">
+          <div class="panel">
+            <div class="panel-title"><span>Читач</span><span id="sb-avail"></span></div>
+            <button class="btn primary big" id="sb-drain" type="button">Забрати готове</button>
+            <div class="panel-title" style="margin-top: 12px"><span>Отримано по черзі</span><span id="sb-count"></span></div>
+            <div class="got" id="sb-got"></div>
+          </div>
+          <div class="panel"><div class="panel-title"><span>Журнал</span></div><ul class="tape" id="sb-tape"></ul></div>
+          <div class="foot" id="sb-foot"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="nav" aria-label="Навігація слайдами">
+  <div class="notes" id="notes" hidden></div>
+  <span class="brand">ring<span class="tick">_</span></span>
+  <div class="sections" id="sections"></div>
+  <div class="navbtns">
+    <span class="engine-badge hide-narrow" id="engine-badge">кільце…</span>
+    <button class="iconbtn timer hide-narrow" id="timer" title="Таймер (T)">0:00</button>
+    <button class="iconbtn" id="notes-btn" aria-pressed="false" title="Нотатки (N)">N</button>
+    <button class="iconbtn" id="script-btn" title="Текст виступу (S)">Текст</button>
+    <button class="iconbtn" id="prev" aria-label="Назад"><svg class="ico"><use href="#i-prev"/></svg></button>
+    <span class="counter" id="counter">1/8</span>
+    <button class="iconbtn" id="next" aria-label="Далі"><svg class="ico"><use href="#i-next"/></svg></button>
+  </div>
+</nav>
+
+<div class="script" id="script" hidden>
+  <div class="sc-inner">
+    <header><h2>Текст виступу · ~4:00</h2><button class="btn" id="script-close">Закрити</button></header>
+    <p class="meta">Близько <span id="script-words">500</span> слів, приблизно чотири хвилини у спокійному темпі; межа — п'ять. Час біля кожного блоку означає, коли його починати.</p>
+    <div id="script-body"></div>
+  </div>
+</div>
+
+<script type="application/octet-stream" id="wasm-b64">__WASM_B64__</script>
+<script>
+/*__ENGINE_JS__*/
+</script>
+<script>
+/*__APP_JS__*/
+</script>

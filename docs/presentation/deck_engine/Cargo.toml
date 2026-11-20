@@ -1,0 +1,30 @@
+[package]
+name = "deck_engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "ring_mpsc behind a one-line text protocol, built to wasm32 for the presentation deck"
+
+# At the crate root, not under `src/`. G22 reads `pub` items under `src/` as an exempted crate that
+# has grown an implementation and must join a family; this one is a build input of one page.
+[lib]
+path = "lib.rs"
+crate-type = [ "cdylib", "rlib" ]
+
+[dependencies]
+ring_atomic = { path = "../../../ring_atomic" }
+ring_mpsc = { path = "../../../ring_mpsc" }
+ring_slot = { path = "../../../ring_slot" }
+ring_types = { path = "../../../ring_types" }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+# Its own workspace root: not a member of the repository's workspace, so CI, `verb/test` and the
+# gates' cargo runs never build it.
+[workspace]

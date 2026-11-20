@@ -423,14 +423,15 @@ impl<'a, T: Send> Guarded<'a, T> {
   /// [`Refusal::Closed`] when the shutdown is closed, [`Refusal::Full`] when
   /// the ring has no room. The record comes back in both cases.
   ///
-  /// **`Full` is unreachable only under `OverflowPolicy::DropNewest`.** That
-  /// policy's contract is to discard the record and report success, so
-  /// under the default a full push returns `Ok` and the record is gone. The
-  /// guard does not change that and could not. Refusing where the policy
-  /// says discard would be a different policy. `Full` is reachable under
-  /// `Fail`, and also under `DropOldest` on a build without the `crossbeam`
-  /// feature (`ring_core`'s own default). Eviction is a `crossbeam`-gated
-  /// code path; without it, `DropOldest` refuses instead of evicting.
+  /// **`Full` is reachable only under `OverflowPolicy::Fail`.** Under
+  /// `DropNewest` the contract is to discard the record and report success,
+  /// so under the default a full push returns `Ok` and the record is gone.
+  /// The guard does not change that and could not. Refusing where the policy
+  /// says discard would be a different policy. Under `DropOldest` it is
+  /// unreachable too: [`ring_core::Ring::new`] rejects the policy at
+  /// construction with [`RingError::PolicyUnsupported`], and the
+  /// feature-gated crossbeam backend evicts via `force_push` and reports
+  /// success rather than refusing.
   pub fn try_push(&mut self, record: T) -> Result<(), Refusal<T>> {
     if self.shutdown.is_closed() {
       return Err(Refusal::Closed(record));

@@ -82,7 +82,7 @@ The rest are internal to the family's own composition.
 
 Reasons, at a glance:
 
-1. Determinism needs a reproducible total order
+1. Determinism needs a total order, reproducible at SPSC
 2. Exact shape: many producers, one ordered consumer
 3. Generic queues lock-convoy under this access pattern
 4. Adoption requires winning a measured benchmark
@@ -92,8 +92,15 @@ Reasons, at a glance:
 8. One crate per concern enables focused verification
 
 The mechanism crates implement a slot-shaped channel with exactly-once
-delivery and a *reproducible total order*. A deterministic consumer depends
-on that property for correctness. It is a requirement, not a performance
+delivery and a total order the consumer observes. The order guarantee is
+stated per backend. At SPSC the order is *reproducible across runs*: one
+producer makes the drain order the issue order. At MPSC the order is
+total — every record once, in one linear sequence — but the interleaving
+between concurrent producers is decided by claim order and is *not*
+reproducible across runs; only each producer's own records keep their
+issue order ([`ring_mpsc`](ring_mpsc/src/lib.rs) states this exclusion in
+its module documentation). A deterministic consumer must not build replay
+assumptions on the MPSC merge. It is a requirement, not a performance
 preference a general-purpose crate happens to satisfy.
 Adoption is gated on benchmarking in-house pattern candidates against each
 other on this project's own workload, never on a crates.io survey

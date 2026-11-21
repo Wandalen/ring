@@ -228,6 +228,10 @@ fn errors_split_configuration_from_traffic() {
     // This is configuration rather than traffic. The policy will still be unsupported
     // on the next call, so the caller must change the config, not retry.
     RingError::PolicyUnsupported,
+    // The checked setters refuse the values the clamping builders correct, so
+    // these surface a supplied mistake, not a traffic condition.
+    RingError::ProducersZero,
+    RingError::BatchZero,
   ];
   let traffic = [RingError::Full, RingError::Empty, RingError::Closed];
   let naming = [RingError::NameTaken, RingError::NameUnknown];
@@ -285,6 +289,8 @@ fn every_error_displays_distinctly() {
       capacity: 8,
     },
     RingError::PolicyUnsupported,
+    RingError::ProducersZero,
+    RingError::BatchZero,
   ];
 
   let mut rendered: Vec<String> = Vec::new();
@@ -294,7 +300,7 @@ fn every_error_displays_distinctly() {
     assert!(!rendered.contains(&text), "{e:?} duplicates an earlier message");
     rendered.push(text);
   }
-  assert_eq!(rendered.len(), 9);
+  assert_eq!(rendered.len(), 11);
 
   // The two variants carrying data put it in the message.
   assert!(RingError::CapacityNotPowerOfTwo(6).to_string().contains('6'));

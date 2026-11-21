@@ -21,7 +21,11 @@ use ring_types::{Capacity, OverflowPolicy, RingError, WaitKind};
 /// Everything that varies between one ring and another.
 ///
 /// Built through [`RingConfig::new`] and narrowed by the `with_*` methods,
-/// which return `Self` so a configuration reads as one expression:
+/// which return `Self` so a configuration reads as one expression. The two
+/// setters that clamp — [`Self::with_producers`] and [`Self::with_batch`] —
+/// have checked counterparts, [`Self::try_with_producers`] and
+/// [`Self::try_with_batch`], that refuse the values the clamps would correct,
+/// for callers whose values come from outside the chain:
 ///
 /// ```
 /// use ring_types::{ OverflowPolicy, WaitKind };
@@ -113,6 +117,35 @@ impl RingConfig {
     self
   }
 
+  /// Set the expected producer count, refusing a count of zero.
+  ///
+  /// The checked counterpart of [`Self::with_producers`], which clamps a zero
+  /// count up to one to keep a builder chain infallible. Use the checked
+  /// setter where the count arrives from outside the chain — a deployment
+  /// setting, a benchmark parameter — and a silently corrected value would
+  /// surface too far from the mistake to be traced.
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::ProducersZero`] when `producers` is `0`.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_types::RingError;
+  ///
+  /// let cfg = RingConfig::new( 8 ).unwrap();
+  /// assert_eq!( cfg.try_with_producers( 6 ).unwrap().producers(), 6 );
+  /// assert_eq!( cfg.try_with_producers( 0 ), Err( RingError::ProducersZero ) );
+  /// ```
+  pub const fn try_with_producers(self, producers: usize) -> Result<Self, RingError> {
+    if producers == 0 {
+      return Err(RingError::ProducersZero);
+    }
+    let mut checked = self;
+    checked.producers = producers;
+    Ok(checked)
+  }
+
   /// Set the batch size, clamped to at least `1` and at most the capacity.
   ///
   /// A batch larger than the ring can never be served however much draining
@@ -135,6 +168,46 @@ impl RingConfig {
     };
     self.batch = if capped == 0 { 1 } else { capped };
     self
+  }
+
+  /// Set the batch size, refusing zero and anything past the capacity.
+  ///
+  /// The checked counterpart of [`Self::with_batch`], which clamps into
+  /// `1..=capacity` instead of refusing. Use the checked setter where the
+  /// batch arrives from outside the chain, so a value that could never be
+  /// served is rejected where it is read rather than corrected out of sight.
+  ///
+  /// # Errors
+  ///
+  /// [`RingError::BatchZero`] when `batch` is `0`.
+  /// [`RingError::BatchTooLarge`] when `batch` exceeds the capacity, carrying
+  /// the request and the capacity it exceeded.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_types::RingError;
+  ///
+  /// let cfg = RingConfig::new( 16 ).unwrap();
+  /// assert_eq!( cfg.try_with_batch( 8 ).unwrap().batch(), 8 );
+  /// assert_eq!( cfg.try_with_batch( 0 ), Err( RingError::BatchZero ) );
+  /// assert_eq!(
+  ///   cfg.try_with_batch( 999 ),
+  ///   Err( RingError::BatchTooLarge { requested: 999, capacity: 16 } )
+  /// );
+  /// ```
+  pub const fn try_with_batch(self, batch: usize) -> Result<Self, RingError> {
+    if batch == 0 {
+      return Err(RingError::BatchZero);
+    }
+    if batch > self.capacity.get() {
+      return Err(RingError::BatchTooLarge {
+        requested: batch,
+        capacity: self.capacity.get(),
+      });
+    }
+    let mut checked = self;
+    checked.batch = batch;
+    Ok(checked)
   }
 
   /// The validated capacity.

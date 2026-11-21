@@ -208,6 +208,88 @@ fn a_caller_can_detect_a_clamp_by_comparing_what_they_asked_for() {
   assert_eq!(cfg.producers(), 1);
 }
 
+/// The checked setters refuse exactly the values their clamping siblings
+/// correct, so an externally supplied value can be rejected where it is read
+/// rather than discovered clamped later. `with_producers` raises 0 to 1;
+/// `with_batch` corrects 0 up to 1 and anything past the capacity down to it.
+#[test]
+fn checked_setters_reject_what_the_clamping_setters_correct() {
+  let cfg = RingConfig::new(16).unwrap();
+
+  assert_eq!(cfg.try_with_producers(0), Err(RingError::ProducersZero));
+  assert_eq!(cfg.try_with_batch(0), Err(RingError::BatchZero));
+  assert_eq!(
+    cfg.try_with_batch(17),
+    Err(RingError::BatchTooLarge {
+      requested: 17,
+      capacity: 16
+    }),
+    "the payload names the request and the capacity it exceeded"
+  );
+  assert_eq!(
+    RingConfig::new(2).unwrap().try_with_batch(999),
+    Err(RingError::BatchTooLarge {
+      requested: 999,
+      capacity: 2
+    }),
+    "the capacity in the error follows the ring, not a constant"
+  );
+}
+
+/// A checked setter that accepts sets exactly its own field and leaves the
+/// other four alone — the same property the clamping setters promise, so the
+/// two forms are interchangeable inside the honoured range.
+#[test]
+fn checked_setters_honour_the_valid_range() {
+  let base = RingConfig::new(16).unwrap();
+
+  let produced = base.try_with_producers(6).unwrap();
+  assert_eq!(produced.producers(), 6);
+  assert_eq!(produced.wait(), base.wait());
+  assert_eq!(produced.overflow(), base.overflow());
+  assert_eq!(produced.batch(), base.batch());
+  assert_eq!(produced.capacity(), base.capacity());
+  assert!(produced.is_multi_producer());
+
+  let batched = base.try_with_batch(8).unwrap();
+  assert_eq!(batched.batch(), 8);
+  assert_eq!(batched.producers(), base.producers());
+
+  // The range is closed at both ends: the same `1..=capacity` the clamp serves.
+  assert_eq!(base.try_with_producers(1).unwrap().producers(), 1);
+  assert_eq!(base.try_with_batch(1).unwrap().batch(), 1);
+  assert_eq!(base.try_with_batch(16).unwrap().batch(), 16);
+}
+
+/// The checked setters commute with the clamping ones wherever neither is
+/// refused, extending `setters_commute` to the checked form.
+#[test]
+fn checked_setters_commute_with_the_clamping_ones() {
+  let forward = RingConfig::new(32)
+    .unwrap()
+    .with_overflow(OverflowPolicy::Fail)
+    .try_with_producers(2)
+    .unwrap();
+  let backward = RingConfig::new(32)
+    .unwrap()
+    .try_with_producers(2)
+    .unwrap()
+    .with_overflow(OverflowPolicy::Fail);
+  assert_eq!(forward, backward);
+
+  let forward = RingConfig::new(32)
+    .unwrap()
+    .with_wait(WaitKind::Yield)
+    .try_with_batch(8)
+    .unwrap();
+  let backward = RingConfig::new(32)
+    .unwrap()
+    .try_with_batch(8)
+    .unwrap()
+    .with_wait(WaitKind::Yield);
+  assert_eq!(forward, backward);
+}
+
 /// The one derived reading a factory branches on. A single-producer ring must
 /// not pay for the contended claim it does not need.
 #[test]

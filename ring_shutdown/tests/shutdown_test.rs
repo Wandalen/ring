@@ -265,6 +265,33 @@ fn a_closed_batch_push_consumes_nothing() {
   assert_eq!(closed_records.collect::<Vec<_>>(), [4, 5, 6], "nothing was taken");
 }
 
+/// The bounded batch push stops at its budget while the shutdown is open, and
+/// consumes nothing once it is closed — the unbounded form's close behaviour,
+/// with a budget on top.
+#[test]
+fn a_bounded_batch_push_honours_the_budget_and_the_close() {
+  let mut ring = ring(8);
+  let mut ends = ring.ends();
+  let (producer, _consumer) = ends.split();
+
+  let shutdown = Shutdown::new();
+  let mut guarded = shutdown.guard(producer);
+
+  let mut endless = core::iter::repeat(7);
+  assert_eq!(
+    guarded.try_push_batch_bounded(&mut endless, 4),
+    Ok(4),
+    "the budget ended the call, not the ring"
+  );
+  assert_eq!(endless.next(), Some(7), "the iterator keeps everything past the budget");
+
+  let _ = shutdown.close();
+
+  let mut closed_records = [1, 2, 3].into_iter();
+  assert_eq!(guarded.try_push_batch_bounded(&mut closed_records, 2), Ok(0));
+  assert_eq!(closed_records.collect::<Vec<_>>(), [1, 2, 3], "the close took nothing");
+}
+
 /// The guarantee ends where the wrapper does.
 ///
 /// This asserts the crate's limitation on purpose. `into_inner` hands back a

@@ -447,7 +447,8 @@ impl<'a, T: Send> Producer<'a, T> {
   ///
   /// **Mitigation.** Choose [`OverflowPolicy::Fail`] when a lost record matters.
   /// Under it the count does mean kept, and the refused record comes back.
-  /// Otherwise bound the iterator and count on the consumer side.
+  /// Otherwise bound the call itself with [`Self::try_push_batch_bounded`]
+  /// and count on the consumer side.
   ///
   /// ```
   /// use ring_config::RingConfig;
@@ -464,9 +465,69 @@ impl<'a, T: Send> Producer<'a, T> {
   /// assert_eq!( records.next(), Some( 4 ), "and the iterator resumes after it" );
   /// ```
   pub fn try_push_batch(&mut self, records: &mut impl Iterator<Item = T>) -> Result<usize, (usize, T)> {
+    self.try_push_batch_bounded(records, usize::MAX)
+  }
+
+  /// Publish at most `max` of `records`, then hand control back even if the
+  /// iterator has more to give.
+  ///
+  /// The bounded form of [`Self::try_push_batch`], for a caller that owes its
+  /// scheduler a per-call budget: the loop stops after `max` records taken
+  /// from the iterator, refused or not, so a batch can no longer run longer
+  /// than the caller budgeted for, and an endless iterator becomes a bounded
+  /// wait. [`Self::try_push_batch`] is this call with no budget.
+  ///
+  /// The refusal rule is unchanged: `Err` carries what did not go in, and
+  /// `Ok( n )` means the budget or the iterator ran out, whichever came first
+  /// — never that the ring is drained. `max` of `0` takes nothing and returns
+  /// `Ok( 0 )` without reading the iterator.
+  ///
+  /// The budget bounds the *wait*, not the *loss*. Under a dropping policy a
+  /// full ring still discards inside [`Self::try_push`] and reports success,
+  /// so `n` still counts records the ring did not keep, exactly as
+  /// [`Self::try_push_batch`]'s pitfall describes.
+  ///
+  /// # Errors
+  ///
+  /// `( n, record )` under [`OverflowPolicy::Fail`], when `n` records went in
+  /// and then the ring refused `record`. The record comes back intact and the
+  /// iterator resumes after it, exactly as [`Self::try_push_batch`]. The
+  /// budget never takes a record past the refusal.
+  ///
+  /// # Invariant: a bounded batch push takes at most `max` records
+  ///
+  /// Whatever the policy and whatever the ring's state, the iterator is left
+  /// holding everything past the `max` records this call took. The loop is
+  /// [`Self::try_push_batch`]'s loop behind a `Take`, so the refusal protocol
+  /// is the same one `try_push_batch` documents and its tests enforce.
+  ///
+  /// **Enforced by.**
+  /// `a_bounded_batch_push_stops_at_the_budget_with_an_endless_iterator`,
+  /// which drives the call from an iterator that never runs dry;
+  /// `a_bounded_batch_push_keeps_the_refusal_protocol`, which pins the count,
+  /// the handed-back record and the iterator's position under a budget;
+  /// `a_bounded_batch_push_leaves_the_rest_of_the_iterator` and
+  /// `a_zero_budget_takes_nothing_from_the_iterator`, which pin what the
+  /// iterator still holds on an early return.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_core::Ring;
+  ///
+  /// let config = RingConfig::new( 4 ).unwrap();
+  /// let mut ring : Ring< u8 > = Ring::new( &config ).unwrap();
+  /// let mut ends = ring.ends();
+  /// let ( mut producer, _consumer ) = ends.split();
+  ///
+  /// // An endless source: the budget, not the ring, ends the call.
+  /// let mut endless = core::iter::repeat( 7 );
+  /// assert_eq!( producer.try_push_batch_bounded( &mut endless, 3 ), Ok( 3 ) );
+  /// assert_eq!( producer.free_capacity(), 1, "three of four slots went in" );
+  /// ```
+  pub fn try_push_batch_bounded(&mut self, records: &mut impl Iterator<Item = T>, max: usize) -> Result<usize, (usize, T)> {
     let mut accepted = 0;
 
-    for record in records.by_ref() {
+    for record in records.by_ref().take(max) {
       if let Err(refused) = self.try_push(record) {
         return Err((accepted, refused));
       }

@@ -133,6 +133,24 @@ fn try_push_batch_hands_back_the_record_that_did_not_fit() {
   assert_eq!(consumer.len(), 4);
 }
 
+/// The bounded form stops at its budget even against an iterator that never
+/// runs dry, through the handle as well as the core it forwards to.
+#[test]
+fn try_push_batch_bounded_stops_at_the_budget() {
+  let mut split = Split::new(ring(8));
+  let mut ends = split.ends();
+  let (mut producer, consumer) = ends.split();
+
+  let mut endless = core::iter::repeat(9);
+  assert_eq!(
+    producer.try_push_batch_bounded(&mut endless, 3),
+    Ok(3),
+    "the budget ended the call, not the ring"
+  );
+  assert_eq!(endless.next(), Some(9), "the iterator keeps everything past the budget");
+  assert_eq!(consumer.len(), 3, "and the three arrived");
+}
+
 /// `free_capacity` and `is_full` are one contract in two spellings.
 #[test]
 fn free_capacity_and_is_full_agree() {

@@ -510,6 +510,50 @@ impl<'a, T: Send> Guarded<'a, T> {
     self.producer.try_push_batch(records)
   }
 
+  /// Publish at most `max` records from `records`, then hand control back even
+  /// if the iterator has more to give.
+  ///
+  /// The bounded form of [`Guarded::try_push_batch`], for a drain loop that
+  /// owes its scheduler a per-call budget: a shutdown push can be bounded at a
+  /// batch at a time, and an endless iterator becomes a bounded wait. The
+  /// close behaviour is the same as the unbounded form's: the flag is checked
+  /// once, before the first read, so this returns `Ok( 0 )` on an already
+  /// closed shutdown without consuming from the iterator, and a close during
+  /// the batch does not stop it. Past that check this is
+  /// [`ring_core::Producer::try_push_batch_bounded`], and its refusal rule and
+  /// `DropNewest` pitfall apply unchanged.
+  ///
+  /// # Errors
+  ///
+  /// `( n, record )` when `n` records went in and then the ring refused
+  /// `record` for want of room, as [`Guarded::try_push_batch`] documents. The
+  /// budget never takes a record past the refusal. Like
+  /// [`Guarded::try_push`]'s `Full`, this is unreachable under
+  /// `OverflowPolicy::DropNewest`.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_core::Ring;
+  /// use ring_shutdown::Shutdown;
+  ///
+  /// let config = RingConfig::new( 8 ).unwrap();
+  /// let mut ring : Ring< u32 > = Ring::new( &config ).unwrap();
+  /// let mut ends = ring.ends();
+  /// let ( producer, _consumer ) = ends.split();
+  /// let shutdown = Shutdown::new();
+  /// let mut guarded = shutdown.guard( producer );
+  ///
+  /// let mut records = 0..100;
+  /// assert_eq!( guarded.try_push_batch_bounded( &mut records, 2 ), Ok( 2 ) );
+  /// assert_eq!( records.next(), Some( 2 ), "the budget, not the ring, ended the call" );
+  /// ```
+  pub fn try_push_batch_bounded(&mut self, records: &mut impl Iterator<Item = T>, max: usize) -> Result<usize, (usize, T)> {
+    if self.shutdown.is_closed() {
+      return Ok(0);
+    }
+    self.producer.try_push_batch_bounded(records, max)
+  }
+
   /// Room in the ring, binding at SPSC and advisory elsewhere, per
   /// `ring_core`'s own split contract. Guarding does not change that.
   #[must_use]

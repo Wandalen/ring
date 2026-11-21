@@ -157,6 +157,35 @@ impl<T: Send> Producer<'_, T> {
     self.inner.try_push_batch(records)
   }
 
+  /// Publish at most `max` of `records`, then hand control back even if the
+  /// iterator has more to give.
+  ///
+  /// The bounded form of [`try_push_batch`](Self::try_push_batch), with the
+  /// same refusal rule and the same pitfall: `Ok( n )` means the budget or
+  /// the iterator ran out, never that the ring is drained, and under
+  /// `DropNewest` `n` counts the records the policy discarded as well as the
+  /// ones it kept. See `ring_core`'s bounded batch push for the full
+  /// contract.
+  ///
+  /// ```
+  /// use ring_config::RingConfig;
+  /// use ring_core::Ring;
+  /// use ring_handle::Split;
+  ///
+  /// let config = RingConfig::new( 8 ).unwrap();
+  /// let ring : Ring< u32 > = Ring::new( &config ).unwrap();
+  /// let mut split = Split::new( ring );
+  /// let mut ends = split.ends();
+  /// let ( mut producer, _consumer ) = ends.split();
+  ///
+  /// let mut records = 0..100;
+  /// assert_eq!( producer.try_push_batch_bounded( &mut records, 3 ), Ok( 3 ) );
+  /// assert_eq!( records.next(), Some( 3 ), "the budget, not the ring, ended the call" );
+  /// ```
+  pub fn try_push_batch_bounded(&mut self, records: &mut impl Iterator<Item = T>, max: usize) -> Result<usize, (usize, T)> {
+    self.inner.try_push_batch_bounded(records, max)
+  }
+
   /// How much room there is, as a lower bound.
   ///
   /// Binding at SPSC cardinality, where this is the only producer; advisory at

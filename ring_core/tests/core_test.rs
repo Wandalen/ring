@@ -532,6 +532,160 @@ fn an_empty_batch_push_is_a_no_op() {
   }
 }
 
+/// A bounded batch push stops at the budget, even against an iterator that
+/// never runs dry.
+///
+/// This is the case the unbounded call cannot serve: the ring is full under
+/// the default `DropNewest`, so nothing refuses, and `try_push_batch` on this
+/// same input would drain `repeat` forever. The bound is a wait bound, not a
+/// kept count — every record past the ring's original two is discarded, and
+/// the consumer sees none of them.
+#[test]
+fn a_bounded_batch_push_stops_at_the_budget_with_an_endless_iterator() {
+  for backend in every_backend() {
+    let mut ring: Ring<u32> = ring_on(backend, 2, OverflowPolicy::DropNewest).unwrap();
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    producer.try_push(1).unwrap();
+    producer.try_push(2).unwrap();
+
+    let mut endless = core::iter::repeat(9_u32);
+    assert_eq!(
+      producer.try_push_batch_bounded(&mut endless, 5),
+      Ok(5),
+      "{backend:?}: the budget ended the call, not a refusal"
+    );
+
+    let mut received = Vec::new();
+    assert_eq!(
+      consumer.try_recv_batch(&mut received),
+      2,
+      "{backend:?}: the ring holds exactly its original two records"
+    );
+    assert_eq!(
+      received,
+      [1, 2],
+      "{backend:?}: the discarded records never reached the consumer"
+    );
+  }
+}
+
+/// A bounded batch push keeps `try_push_batch`'s refusal protocol: the count,
+/// the handed-back record and the iterator's position are the same under a
+/// budget, and the budget does not take a record past the refusal.
+#[test]
+fn a_bounded_batch_push_keeps_the_refusal_protocol() {
+  for backend in every_backend() {
+    let mut ring: Ring<u32> = ring_on(backend, 2, OverflowPolicy::Fail).unwrap();
+    let mut ends = ring.ends();
+    let (mut producer, _consumer) = ends.split();
+
+    let mut records = 0..10_u32;
+    assert_eq!(
+      producer.try_push_batch_bounded(&mut records, 5),
+      Err((2, 2)),
+      "{backend:?}: refusal after two records, inside the budget of five"
+    );
+    assert_eq!(
+      records.next(),
+      Some(3),
+      "{backend:?}: the iterator resumes after the refused record"
+    );
+    assert_eq!(
+      records.count(),
+      6,
+      "{backend:?}: the budget consumed nothing past the refusal (0, 1, 2 taken, 3 just read)"
+    );
+  }
+}
+
+/// With room to spare the budget, not the ring, ends the call, and the
+/// iterator keeps everything past it.
+#[test]
+fn a_bounded_batch_push_leaves_the_rest_of_the_iterator() {
+  for backend in every_backend() {
+    let mut ring: Ring<u32> = ring_on(backend, 8, OverflowPolicy::Fail).unwrap();
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    let mut records = 0..10_u32;
+    assert_eq!(
+      producer.try_push_batch_bounded(&mut records, 3),
+      Ok(3),
+      "{backend:?}: three went in and the budget ended the call early"
+    );
+    assert_eq!(
+      records.next(),
+      Some(3),
+      "{backend:?}: the iterator resumes where the budget stopped"
+    );
+    assert_eq!(records.count(), 6, "{backend:?}: nothing past the budget was taken");
+
+    let mut received = Vec::new();
+    assert_eq!(consumer.try_recv_batch(&mut received), 3, "{backend:?}: the three arrived");
+    assert_eq!(received, [0, 1, 2], "{backend:?}: nothing else was published");
+  }
+}
+
+/// A budget of zero takes nothing: `Ok( 0 )`, and the iterator is exactly
+/// where it was handed over.
+#[test]
+fn a_zero_budget_takes_nothing_from_the_iterator() {
+  for backend in every_backend() {
+    let mut ring: Ring<u32> = ring_on(backend, 8, OverflowPolicy::Fail).unwrap();
+    let mut ends = ring.ends();
+    let (mut producer, mut consumer) = ends.split();
+
+    producer.try_push(41).unwrap();
+
+    let mut records = 0..10_u32;
+    assert_eq!(
+      producer.try_push_batch_bounded(&mut records, 0),
+      Ok(0),
+      "{backend:?}: a zero budget is a no-op, not an error"
+    );
+    assert_eq!(records.next(), Some(0), "{backend:?}: the iterator was not read");
+
+    let mut received = Vec::new();
+    assert_eq!(
+      consumer.try_recv_batch(&mut received),
+      1,
+      "{backend:?}: the pre-existing record"
+    );
+    assert_eq!(received, [41], "{backend:?}: the zero budget published nothing");
+  }
+}
+
+/// `try_push_batch` and the bounded form with a budget that can never run out
+/// publish the same records, hand back the same refusal and leave the
+/// iterator in the same place, so the unbounded call stays a special case of
+/// the bounded one rather than a second implementation of it.
+#[test]
+fn the_unbounded_batch_push_agrees_with_an_unlimited_budget() {
+  for backend in every_backend() {
+    let mut unbounded_ring: Ring<u32> = ring_on(backend, 2, OverflowPolicy::Fail).unwrap();
+    let mut ends = unbounded_ring.ends();
+    let (mut producer, _consumer) = ends.split();
+    let mut unbounded = 0..6_u32;
+    let unbounded_outcome = producer.try_push_batch(&mut unbounded);
+    let unbounded_next = unbounded.next();
+
+    let mut budgeted_ring: Ring<u32> = ring_on(backend, 2, OverflowPolicy::Fail).unwrap();
+    let mut ends = budgeted_ring.ends();
+    let (mut producer, _consumer) = ends.split();
+    let mut budgeted = 0..6_u32;
+    let budgeted_outcome = producer.try_push_batch_bounded(&mut budgeted, usize::MAX);
+    let budgeted_next = budgeted.next();
+
+    assert_eq!(
+      unbounded_outcome, budgeted_outcome,
+      "{backend:?}: same acceptance and refusal"
+    );
+    assert_eq!(unbounded_next, budgeted_next, "{backend:?}: same iterator position");
+  }
+}
+
 /// `try_recv_batch` appends rather than replacing, and reports only its own count.
 #[test]
 fn try_recv_batch_appends_to_the_caller_s_buffer() {

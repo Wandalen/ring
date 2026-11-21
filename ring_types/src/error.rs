@@ -78,6 +78,16 @@ pub enum RingError {
   /// silently degrading to `DropNewest`. A caller who never learns their policy
   /// was not applied is worse off than one whose construction failed.
   PolicyUnsupported,
+  /// A producer count of zero was requested of a checked setter. A ring
+  /// nothing can publish into has no use. The infallible builder clamps this
+  /// up to one instead of refusing it; the checked setter rejects it so an
+  /// externally supplied value surfaces where it is read.
+  ProducersZero,
+  /// A batch size of zero was requested of a checked setter. A batch of zero
+  /// publishes nothing. The infallible builder clamps this up to one instead
+  /// of refusing it; the checked setter rejects it so an externally supplied
+  /// value surfaces where it is read.
+  BatchZero,
 }
 
 impl RingError {
@@ -109,7 +119,12 @@ impl RingError {
   #[must_use]
   pub const fn is_configuration(self) -> bool {
     match self {
-      Self::CapacityZero | Self::CapacityNotPowerOfTwo(_) | Self::BatchTooLarge { .. } | Self::PolicyUnsupported => true,
+      Self::CapacityZero
+      | Self::CapacityNotPowerOfTwo(_)
+      | Self::BatchTooLarge { .. }
+      | Self::PolicyUnsupported
+      | Self::ProducersZero
+      | Self::BatchZero => true,
       Self::Full | Self::Empty | Self::Closed | Self::NameTaken | Self::NameUnknown => false,
     }
   }
@@ -146,7 +161,9 @@ impl RingError {
       | Self::NameTaken
       | Self::NameUnknown
       | Self::BatchTooLarge { .. }
-      | Self::PolicyUnsupported => false,
+      | Self::PolicyUnsupported
+      | Self::ProducersZero
+      | Self::BatchZero => false,
     }
   }
 }
@@ -165,6 +182,8 @@ impl fmt::Display for RingError {
         write!(f, "batch of {requested} exceeds ring capacity {capacity}")
       }
       Self::PolicyUnsupported => write!(f, "this backend cannot honour the configured overflow policy"),
+      Self::ProducersZero => write!(f, "a producer count of zero cannot publish into the ring"),
+      Self::BatchZero => write!(f, "a batch of zero publishes nothing"),
     }
   }
 }
